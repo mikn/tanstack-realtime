@@ -5,6 +5,7 @@ import type {
   ClientMessage,
   ServerMessage,
   PresenceEvent,
+  QueryKey,
 } from './types.js'
 import { memoryAdapter } from './adapters/memory.js'
 
@@ -41,7 +42,7 @@ export interface RealtimeServer {
    * Publish an invalidation signal. All clients subscribed to keys matching
    * `key` (by prefix) will be asked to refetch.
    */
-  publish(key: ReadonlyArray<unknown>): Promise<void>
+  publish(key: QueryKey): Promise<void>
   /**
    * Attach the WebSocket server to a running HTTP server.
    * Call this once during application startup, before the server starts
@@ -363,7 +364,7 @@ export function createRealtimeServer(
       return wss
     },
 
-    async publish(key: ReadonlyArray<unknown>): Promise<void> {
+    async publish(key: QueryKey): Promise<void> {
       await adapterReady
       // Route through the adapter so that all instances (including this one)
       // receive the invalidation via the subscriber callback. The memory
@@ -395,15 +396,17 @@ export function createRealtimeServer(
       if (!httpServer) {
         throw new Error(
           '[realtime] Could not find HTTP server to attach to. ' +
-            'Pass the http.Server directly or a Nitro instance.',
+            'Pass the http.Server directly, or a Nitro/Vinxi instance ' +
+            '(which exposes `.server` or `.httpServer`).',
         )
       }
       initWss(httpServer)
     },
 
     async close(): Promise<void> {
+      // terminate() skips the closing handshake for an immediate shutdown.
       for (const conn of connections.values()) {
-        conn.ws.close()
+        conn.ws.terminate()
       }
       connections.clear()
       presenceChannels.clear()
@@ -423,7 +426,7 @@ export function createRealtimeServer(
  * Serialize a query key to a stable, deterministic JSON string.
  * Object keys are sorted at every level, mirroring TanStack Query's `hashKey`.
  */
-export function serializeKey(key: ReadonlyArray<unknown>): string {
+export function serializeKey(key: QueryKey): string {
   return JSON.stringify(key, (_, val: unknown) => {
     if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
       return Object.fromEntries(

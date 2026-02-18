@@ -13,11 +13,17 @@ export interface UsePresenceOptions<T> {
 }
 
 export interface UsePresenceResult<T> {
-  /** Other users currently on this presence channel. */
+  /**
+   * Other users currently on this presence channel, excluding the current
+   * user. Each entry has a stable `connectionId` suitable for use as a React
+   * key and a `data` field typed as `T`.
+   */
   others: Array<PresenceUser<T>>
   /**
-   * Update this user's presence data. Calls are automatically throttled
-   * (default 50 ms) so it is safe to call on every pointer move.
+   * Update this user's presence data. Only pass the fields that changed —
+   * the library merges the delta on the server so other users always receive
+   * the full state. Calls are automatically throttled (default 50 ms) so it
+   * is safe to call on every pointer move.
    */
   updatePresence: (data: Partial<T>) => void
 }

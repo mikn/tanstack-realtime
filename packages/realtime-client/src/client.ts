@@ -1,5 +1,6 @@
 import type {
   ConnectionStatus,
+  QueryKey,
   StatusListener,
   InvalidateListener,
   PresenceListener,
@@ -368,7 +369,7 @@ export function createRealtimeClient(
  * Serialize a query key to a stable, deterministic JSON string.
  * Object keys are sorted at every level, mirroring TanStack Query's `hashKey`.
  */
-export function serializeKey(key: ReadonlyArray<unknown>): string {
+export function serializeKey(key: QueryKey): string {
   return JSON.stringify(key, (_, val: unknown) => {
     if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
       return Object.fromEntries(

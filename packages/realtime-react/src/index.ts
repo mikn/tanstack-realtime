@@ -3,3 +3,5 @@ export { useRealtimeQuery } from './useRealtimeQuery.js'
 export { usePresence } from './usePresence.js'
 export type { RealtimeProviderProps, RealtimeControls } from './context.js'
 export type { UsePresenceOptions, UsePresenceResult } from './usePresence.js'
+// Re-exported so consumers only need one package import for React usage.
+export type { PresenceUser } from '@tanstack/realtime-client'

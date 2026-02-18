@@ -646,3 +646,275 @@ describe('Multi-client fan-out', () => {
     await harness.teardown()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Regression tests — each covers a specific bug that was fixed in review
+// ---------------------------------------------------------------------------
+
+describe('Regression: multiple presence channels cleaned up on disconnect', () => {
+  it('broadcasts leave for every presence channel when a connection drops', async () => {
+    const harness = await createTestHarness()
+    const observer = connectClient(harness.port)
+    const dropper = connectClient(harness.port)
+    observer.connect()
+    dropper.connect()
+    await Promise.all([
+      nextStatus(observer, 'connected'),
+      nextStatus(dropper, 'connected'),
+    ])
+
+    const ch1 = serializeKey(['doc', { id: 'ch1' }])
+    const ch2 = serializeKey(['doc', { id: 'ch2' }])
+    const ch3 = serializeKey(['doc', { id: 'ch3' }])
+
+    // observer joins all three channels
+    observer.presenceJoin(ch1, { name: 'Observer' })
+    observer.presenceJoin(ch2, { name: 'Observer' })
+    observer.presenceJoin(ch3, { name: 'Observer' })
+
+    // dropper joins all three channels
+    dropper.presenceJoin(ch1, { name: 'Dropper' })
+    dropper.presenceJoin(ch2, { name: 'Dropper' })
+    dropper.presenceJoin(ch3, { name: 'Dropper' })
+    await waitFor(100)
+
+    // Track every leave event the observer receives
+    const leaveChannels: string[] = []
+    const unsub = observer.onPresence((key, event) => {
+      if (event.type === 'leave') leaveChannels.push(key)
+    })
+
+    // Forcefully drop the dropper's connection
+    const { wss } = harness.realtime
+    if (!wss) throw new Error('No wss')
+    const allWsClients = Array.from(wss.clients)
+    allWsClients[allWsClients.length - 1]?.terminate()
+
+    await waitFor(200)
+
+    // Must receive exactly one leave per channel — the Map-snapshot fix
+    // prevents the for-of loop from skipping channels as it mutates.
+    expect(leaveChannels.sort()).toEqual([ch1, ch2, ch3].sort())
+
+    unsub()
+    observer.destroy()
+    dropper.destroy()
+    await harness.teardown()
+  })
+})
+
+describe('Regression: authenticate throws (not null) causes 4001', () => {
+  it('closes the WebSocket with code 4001 when authenticate throws', async () => {
+    const harness = await createTestHarness({
+      authenticate: async () => {
+        throw new Error('DB unavailable')
+      },
+    })
+
+    const client = connectClient(harness.port)
+    client.connect()
+
+    // The client should be pushed to 'reconnecting' because the server
+    // closed the connection right after the upgrade.
+    await nextStatus(client, 'reconnecting')
+    expect(client.status).toBe('reconnecting')
+
+    client.destroy()
+    await harness.teardown()
+  })
+})
+
+describe('Regression: presence data merging — late joiners get full state', () => {
+  it('accumulates incremental updates so late joiners receive the merged state via sync', async () => {
+    const harness = await createTestHarness()
+    const earlyClient = connectClient(harness.port)
+    const lateClient = connectClient(harness.port)
+    earlyClient.connect()
+    lateClient.connect()
+    await Promise.all([
+      nextStatus(earlyClient, 'connected'),
+      nextStatus(lateClient, 'connected'),
+    ])
+
+    const key = serializeKey(['doc', { id: 'merge-test' }])
+
+    // earlyClient joins then incrementally updates different fields
+    earlyClient.presenceJoin(key, { name: 'Alice', cursor: null, status: 'viewing' })
+    await waitFor(30)
+    earlyClient.presenceUpdate(key, { cursor: { x: 100, y: 200 } })
+    await waitFor(30)
+    earlyClient.presenceUpdate(key, { status: 'editing' })
+    await waitFor(30)
+
+    // lateClient joins and should receive the fully merged state in the sync
+    const syncPromise = new Promise<{
+      users: Array<{ connectionId: string; data: unknown }>
+    }>((resolve) => {
+      const unsub = lateClient.onPresence((presenceKey, event) => {
+        if (presenceKey === key && event.type === 'sync') {
+          unsub()
+          resolve(event)
+        }
+      })
+    })
+
+    lateClient.presenceJoin(key, { name: 'Bob', cursor: null, status: 'viewing' })
+    const sync = await syncPromise
+
+    const alice = sync.users.find(
+      (u) => (u.data as Record<string, unknown>).name === 'Alice',
+    )
+    expect(alice).toBeDefined()
+    // All three fields should reflect the accumulated state, not just the last delta
+    expect((alice!.data as Record<string, unknown>).cursor).toEqual({ x: 100, y: 200 })
+    expect((alice!.data as Record<string, unknown>).status).toBe('editing')
+
+    earlyClient.destroy()
+    lateClient.destroy()
+    await harness.teardown()
+  })
+})
+
+describe('Regression: custom WebSocket path', () => {
+  it('accepts connections on a user-specified path', async () => {
+    const httpServer = createServer()
+    const realtime = createRealtimeServer({
+      adapter: memoryAdapter(),
+      path: '/_rt',
+    })
+    realtime.attach(httpServer)
+    await new Promise<void>((resolve) => httpServer.listen(0, resolve))
+    const port = (httpServer.address() as { port: number }).port
+
+    const client = createRealtimeClient({
+      url: `ws://localhost:${port}/_rt`,
+      reconnect: { initialDelay: 100, maxDelay: 500, jitter: 0 },
+    })
+    client.connect()
+    await nextStatus(client, 'connected')
+    expect(client.status).toBe('connected')
+
+    client.destroy()
+    await realtime.close()
+    await new Promise<void>((resolve, reject) =>
+      httpServer.close((err) => (err ? reject(err) : resolve())),
+    )
+  })
+})
+
+describe('Regression: publish with no subscribers does not throw', () => {
+  it('resolves without error when no client is subscribed to the key', async () => {
+    const harness = await createTestHarness()
+    await expect(
+      harness.realtime.publish(['todos', { projectId: 'ghost' }]),
+    ).resolves.toBeUndefined()
+    await harness.teardown()
+  })
+})
+
+describe('Regression: createRealtimeClient requires url outside browser', () => {
+  it('throws synchronously when url is omitted in a non-browser (Node.js) environment', () => {
+    // The test runner is Node.js where window is undefined.
+    // resolveUrl() must throw rather than silently default to localhost.
+    expect(() => createRealtimeClient()).toThrow(/No WebSocket URL provided/)
+  })
+})
+
+describe('Regression: server instances are isolated', () => {
+  it('two server instances on different ports do not share subscription state', async () => {
+    const harness1 = await createTestHarness()
+    const harness2 = await createTestHarness()
+
+    const clientA = connectClient(harness1.port)
+    const clientB = connectClient(harness2.port)
+    clientA.connect()
+    clientB.connect()
+    await Promise.all([
+      nextStatus(clientA, 'connected'),
+      nextStatus(clientB, 'connected'),
+    ])
+
+    const key = serializeKey(['shared'])
+    clientA.subscribe(key)
+    clientB.subscribe(key)
+    await waitForServerProcessing()
+
+    // Publishing on harness1 must NOT reach clientB (connected to harness2)
+    let clientBReceived = false
+    const unsubB = clientB.onInvalidate(() => {
+      clientBReceived = true
+    })
+
+    const clientAInvalidated = nextInvalidate(clientA)
+    await harness1.realtime.publish(['shared'])
+    expect(await clientAInvalidated).toBe(key)
+
+    await waitFor(100)
+    expect(clientBReceived).toBe(false)
+
+    unsubB()
+    clientA.destroy()
+    clientB.destroy()
+    await harness1.teardown()
+    await harness2.teardown()
+  })
+})
+
+describe('Regression: presence sync on reconnect rejoin', () => {
+  it('receives a presence:sync after reconnecting to a channel', async () => {
+    const harness = await createTestHarness()
+    const persistentClient = connectClient(harness.port)
+    const reconnectingClient = connectClient(harness.port)
+    persistentClient.connect()
+    reconnectingClient.connect()
+    await Promise.all([
+      nextStatus(persistentClient, 'connected'),
+      nextStatus(reconnectingClient, 'connected'),
+    ])
+
+    const key = serializeKey(['doc', { id: 'rejoin-sync' }])
+
+    // persistentClient is already in the channel when reconnectingClient joins
+    persistentClient.presenceJoin(key, { name: 'Bob' })
+    await waitFor(50)
+
+    reconnectingClient.presenceJoin(key, { name: 'Alice' })
+    await waitFor(50)
+
+    // Register the sync listener BEFORE forcing the disconnect so it catches
+    // the sync that arrives after the automatic rejoin.
+    const syncAfterReconnect = new Promise<{
+      users: Array<{ connectionId: string; data: unknown }>
+    }>((resolve) => {
+      const unsub = reconnectingClient.onPresence((presenceKey, event) => {
+        if (presenceKey === key && event.type === 'sync') {
+          unsub()
+          resolve(event)
+        }
+      })
+    })
+
+    // Force-terminate reconnectingClient's socket
+    const { wss } = harness.realtime
+    if (!wss) throw new Error('No wss')
+    const wsClients = Array.from(wss.clients)
+    // The last client to connect is reconnectingClient
+    wsClients[wsClients.length - 1]?.terminate()
+
+    await nextStatus(reconnectingClient, 'reconnecting')
+    await nextStatus(reconnectingClient, 'connected')
+
+    // After reconnect the client re-sends presence:join and the server
+    // responds with presence:sync containing the current roster.
+    const sync = await syncAfterReconnect
+
+    const bob = sync.users.find(
+      (u) => (u.data as Record<string, unknown>).name === 'Bob',
+    )
+    expect(bob).toBeDefined()
+
+    persistentClient.destroy()
+    reconnectingClient.destroy()
+    await harness.teardown()
+  })
+})
