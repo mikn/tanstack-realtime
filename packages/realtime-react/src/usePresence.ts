@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { serializeKey } from '@tanstack/realtime-client'
-import type { PresenceUser } from '@tanstack/realtime-client'
+import type { PresenceUser, RealtimeClient } from '@tanstack/realtime-client'
 import { useRealtimeContext } from './context.js'
 
 export interface UsePresenceOptions<T> {
@@ -8,53 +8,61 @@ export interface UsePresenceOptions<T> {
   key: ReadonlyArray<unknown>
   /** Initial presence data for this user. */
   initial: T
-  /** Throttle delay for updatePresence in ms. Default: 50 */
+  /** Throttle delay for `updatePresence` in ms. Default: 50 */
   throttleMs?: number
 }
 
 export interface UsePresenceResult<T> {
-  /** Other users on this presence channel. */
+  /** Other users currently on this presence channel. */
   others: Array<PresenceUser<T>>
-  /** Update this user's presence data. Automatically throttled. */
+  /**
+   * Update this user's presence data. Calls are automatically throttled
+   * (default 50 ms) so it is safe to call on every pointer move.
+   */
   updatePresence: (data: Partial<T>) => void
 }
 
-function throttle<T extends (...args: any[]) => any>(
-  fn: T,
-  delay: number,
-): T & { flush: () => void } {
+/**
+ * A minimal leading-edge throttle that coalesces calls within `delay` ms.
+ * The last call within a window is always flushed, so no updates are lost.
+ */
+function makeThrottle(fn: (data: unknown) => void, delay: number) {
   let timer: ReturnType<typeof setTimeout> | null = null
-  let lastArgs: Parameters<T> | null = null
+  let pending: unknown = undefined
+  let hasPending = false
 
-  function run() {
-    timer = null
-    if (lastArgs) {
-      const args = lastArgs
-      lastArgs = null
-      fn(...args)
-    }
+  return {
+    call(data: unknown) {
+      pending = data
+      hasPending = true
+      if (!timer) {
+        timer = setTimeout(() => {
+          timer = null
+          if (hasPending) {
+            hasPending = false
+            fn(pending)
+          }
+        }, delay)
+      }
+    },
+    flush() {
+      if (timer) {
+        clearTimeout(timer)
+        timer = null
+      }
+      if (hasPending) {
+        hasPending = false
+        fn(pending)
+      }
+    },
+    cancel() {
+      if (timer) {
+        clearTimeout(timer)
+        timer = null
+      }
+      hasPending = false
+    },
   }
-
-  const throttled = function (...args: Parameters<T>) {
-    lastArgs = args
-    if (!timer) {
-      timer = setTimeout(run, delay)
-    }
-  } as T & { flush: () => void }
-
-  throttled.flush = function () {
-    if (timer) {
-      clearTimeout(timer)
-      timer = null
-    }
-    if (lastArgs) {
-      const args = lastArgs
-      lastArgs = null
-      fn(...args)
-    }
-  }
-
-  return throttled
 }
 
 /**
@@ -68,7 +76,7 @@ function throttle<T extends (...args: any[]) => any>(
  * })
  * ```
  */
-export function usePresence<T extends object = Record<string, unknown>>(
+export function usePresence<T extends Record<string, unknown>>(
   options: UsePresenceOptions<T>,
 ): UsePresenceResult<T> {
   const { key, initial, throttleMs = 50 } = options
@@ -76,63 +84,71 @@ export function usePresence<T extends object = Record<string, unknown>>(
   const serializedKey = serializeKey(key)
   const [others, setOthers] = useState<Array<PresenceUser<T>>>([])
 
-  // Stable ref to current data for throttled updates
-  const currentDataRef = useRef<T>(initial)
+  // Refs so the throttled callback always accesses the current values without
+  // needing to be recreated on every render.
+  const clientRef = useRef<RealtimeClient>(client)
+  const serializedKeyRef = useRef(serializedKey)
+  clientRef.current = client
+  serializedKeyRef.current = serializedKey
 
   useEffect(() => {
-    // Join the presence channel with initial data
-    client.presenceJoin(serializedKey, initial)
+    clientRef.current.presenceJoin(serializedKey, initial)
 
-    const unsubscribe = client.onPresence((presenceKey, event) => {
-      if (presenceKey !== serializedKey) return
+    const unsubscribe = clientRef.current.onPresence((presenceKey, event) => {
+      if (presenceKey !== serializedKeyRef.current) return
 
       setOthers((prev) => {
-        if (event.type === 'sync') {
-          return event.users.map((u) => ({
-            connectionId: u.connectionId,
-            data: u.data as T,
-          }))
+        switch (event.type) {
+          case 'sync':
+            return event.users.map((u) => ({
+              connectionId: u.connectionId,
+              data: u.data as T,
+            }))
+          case 'join':
+            if (prev.some((u) => u.connectionId === event.connectionId))
+              return prev
+            return [
+              ...prev,
+              { connectionId: event.connectionId, data: event.data as T },
+            ]
+          case 'update':
+            return prev.map((u) =>
+              u.connectionId === event.connectionId
+                ? { ...u, data: event.data as T }
+                : u,
+            )
+          case 'leave':
+            return prev.filter((u) => u.connectionId !== event.connectionId)
         }
-        if (event.type === 'join') {
-          if (prev.some((u) => u.connectionId === event.connectionId))
-            return prev
-          return [
-            ...prev,
-            { connectionId: event.connectionId, data: event.data as T },
-          ]
-        }
-        if (event.type === 'update') {
-          return prev.map((u) =>
-            u.connectionId === event.connectionId
-              ? { ...u, data: event.data as T }
-              : u,
-          )
-        }
-        if (event.type === 'leave') {
-          return prev.filter((u) => u.connectionId !== event.connectionId)
-        }
-        return prev
       })
     })
 
     return () => {
-      client.presenceLeave(serializedKey)
+      clientRef.current.presenceLeave(serializedKey)
       unsubscribe()
-      setOthers([])
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client, serializedKey])
+    // Re-run whenever the channel key or the client changes. `initial` is
+    // intentionally excluded: the initial value is only used on join.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serializedKey, client])
 
-  const throttledUpdate = useRef(
-    throttle((data: Partial<T>) => {
-      const merged = { ...currentDataRef.current, ...data }
-      currentDataRef.current = merged as T
-      client.presenceUpdate(serializedKey, data)
+  // The throttle instance lives for the component's lifetime. It reads the
+  // current key and client through refs so it never goes stale.
+  const throttleRef = useRef(
+    makeThrottle((data: unknown) => {
+      clientRef.current.presenceUpdate(serializedKeyRef.current, data)
     }, throttleMs),
   )
 
+  // Flush any pending update on unmount so the last state is always sent.
+  useEffect(() => {
+    return () => {
+      throttleRef.current.flush()
+    }
+  }, [])
+
   const updatePresence = useCallback((data: Partial<T>) => {
-    throttledUpdate.current(data)
+    throttleRef.current.call(data)
   }, [])
 
   return { others, updatePresence }

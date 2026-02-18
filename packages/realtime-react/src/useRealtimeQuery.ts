@@ -3,18 +3,25 @@ import { useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-
 import { serializeKey } from '@tanstack/realtime-client'
 import { useRealtimeContext } from './context.js'
 
+type AnyKey = ReadonlyArray<unknown>
+
 type RealtimeQueryOptions<
   TQueryFnData = unknown,
   TError = Error,
   TData = TQueryFnData,
-  TQueryKey extends ReadonlyArray<unknown> = ReadonlyArray<unknown>,
+  TQueryKey extends AnyKey = AnyKey,
 > = UseQueryOptions<TQueryFnData, TError, TData, TQueryKey>
 
 /**
- * A drop-in replacement for `useQuery` that subscribes to realtime invalidations.
+ * A drop-in replacement for `useQuery` that subscribes to realtime
+ * invalidations over the WebSocket.
  *
  * The query key is used as the subscription channel. When the server publishes
  * an invalidation for a matching key, TanStack Query refetches via `queryFn`.
+ * If no WebSocket connection is active the hook behaves exactly like `useQuery`.
+ *
+ * Only subscribes when `enabled` is not `false` — queries that are disabled
+ * don't participate in realtime updates.
  *
  * @example
  * ```tsx
@@ -28,32 +35,40 @@ export function useRealtimeQuery<
   TQueryFnData = unknown,
   TError = Error,
   TData = TQueryFnData,
-  TQueryKey extends ReadonlyArray<unknown> = ReadonlyArray<unknown>,
+  TQueryKey extends AnyKey = AnyKey,
 >(
   options: RealtimeQueryOptions<TQueryFnData, TError, TData, TQueryKey>,
 ) {
   const { client } = useRealtimeContext()
   const queryClient = useQueryClient()
-  const serializedKey = serializeKey(options.queryKey as ReadonlyArray<unknown>)
+
+  const serializedKey = serializeKey(options.queryKey as AnyKey)
+  // Keep a ref so the invalidation listener always sees the current key
+  // without needing to be recreated.
   const serializedKeyRef = useRef(serializedKey)
   serializedKeyRef.current = serializedKey
 
+  const enabled = options.enabled !== false
+
   useEffect(() => {
-    // Subscribe to invalidation signals for this query key
+    if (!enabled) return
+
     client.subscribe(serializedKey)
 
-    const unsubscribeInvalidate = client.onInvalidate((key) => {
+    const unsubscribe = client.onInvalidate((key) => {
       if (key === serializedKeyRef.current) {
-        queryClient.invalidateQueries({ queryKey: options.queryKey as unknown[] })
+        void queryClient.invalidateQueries({
+          queryKey: options.queryKey as unknown[],
+        })
       }
     })
 
     return () => {
       client.unsubscribe(serializedKey)
-      unsubscribeInvalidate()
+      unsubscribe()
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client, serializedKey, queryClient])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client, serializedKey, queryClient, enabled])
 
   return useQuery(options)
 }

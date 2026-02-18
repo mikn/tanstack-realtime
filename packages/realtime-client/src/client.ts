@@ -5,25 +5,33 @@ import type {
   PresenceListener,
   PresenceClientEvent,
   ServerMessage,
+  ClientMessage,
 } from './types.js'
 
 export interface RealtimeClientOptions {
-  /** WebSocket URL. Defaults to same origin with /_realtime path. */
+  /**
+   * WebSocket URL to connect to.
+   * Defaults to the same origin with `/_realtime` path when running in a
+   * browser. Must be provided explicitly in non-browser environments.
+   */
   url?: string
-  /** Reconnection settings */
+  /** Reconnection back-off settings. */
   reconnect?: {
     /** Initial delay in ms. Default: 1000 */
     initialDelay?: number
-    /** Max delay in ms. Default: 30000 */
+    /** Maximum delay in ms. Default: 30000 */
     maxDelay?: number
-    /** Jitter factor (0-1). Default: 0.25 */
+    /**
+     * Jitter factor applied to each delay as a multiplier in `[-jitter, +jitter]`.
+     * Default: 0.25
+     */
     jitter?: number
   }
-  /** Batched refetch settings on reconnect */
+  /** Batched invalidation settings applied after a reconnect. */
   refetch?: {
-    /** Max concurrent invalidations. Default: 5 */
+    /** Maximum keys to invalidate per batch. Default: 5 */
     maxConcurrency?: number
-    /** Stagger delay between batches in ms. Default: 50 */
+    /** Delay between batches in ms. Default: 50 */
     stagger?: number
   }
 }
@@ -31,30 +39,31 @@ export interface RealtimeClientOptions {
 export interface RealtimeClient {
   /** Open the WebSocket connection. Call after auth. */
   connect(): void
-  /** Close the WebSocket and clear subscriptions. */
+  /** Close the WebSocket and clear all pending reconnects. */
   disconnect(): void
-  /** Current connection status (reactive via onStatus) */
+  /** Current connection status. Subscribe to changes with `onStatus`. */
   readonly status: ConnectionStatus
 
-  /** Subscribe to an invalidation event for a serialized query key */
+  /** Send a subscribe message for a serialized query key. */
   subscribe(serializedKey: string): void
-  /** Unsubscribe from a serialized query key */
+  /** Send an unsubscribe message for a serialized query key. */
   unsubscribe(serializedKey: string): void
 
-  /** Join a presence channel */
+  /** Join a presence channel with initial data. */
   presenceJoin(serializedKey: string, data: unknown): void
-  /** Update presence data on a channel */
+  /** Send a partial update to a presence channel. */
   presenceUpdate(serializedKey: string, data: unknown): void
-  /** Leave a presence channel */
+  /** Leave a presence channel. */
   presenceLeave(serializedKey: string): void
 
-  /** Register a listener for status changes */
+  /** Register a status-change listener. Returns an unsubscribe function. */
   onStatus(listener: StatusListener): () => void
-  /** Register a listener for invalidation signals */
+  /** Register an invalidation listener. Returns an unsubscribe function. */
   onInvalidate(listener: InvalidateListener): () => void
-  /** Register a listener for presence events */
+  /** Register a presence listener. Returns an unsubscribe function. */
   onPresence(listener: PresenceListener): () => void
-  /** Cleanup all resources */
+
+  /** Disconnect and remove all listeners. */
   destroy(): void
 }
 
@@ -64,7 +73,10 @@ function resolveUrl(url?: string): string {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     return `${protocol}//${window.location.host}/_realtime`
   }
-  return 'ws://localhost:3000/_realtime'
+  throw new Error(
+    '[realtime] No WebSocket URL provided and no browser environment detected. ' +
+      'Pass `url` explicitly to createRealtimeClient.',
+  )
 }
 
 export function createRealtimeClient(
@@ -89,10 +101,9 @@ export function createRealtimeClient(
 
   // Active subscriptions: serialized keys
   const subscriptions = new Set<string>()
-  // Active presence channels: key -> last sent data
+  // Active presence channels: serialized key → full merged data last sent to server
   const presenceChannels = new Map<string, unknown>()
 
-  // Listeners
   const statusListeners = new Set<StatusListener>()
   const invalidateListeners = new Set<InvalidateListener>()
   const presenceListeners = new Set<PresenceListener>()
@@ -103,7 +114,7 @@ export function createRealtimeClient(
     for (const l of statusListeners) l(next)
   }
 
-  function send(msg: object) {
+  function send(msg: ClientMessage) {
     if (ws && ws.readyState === ws.OPEN) {
       ws.send(JSON.stringify(msg))
     }
@@ -113,7 +124,6 @@ export function createRealtimeClient(
     for (const key of subscriptions) {
       send({ type: 'subscribe', key })
     }
-    // Rejoin presence channels
     for (const [key, data] of presenceChannels) {
       send({ type: 'presence:join', key, data })
     }
@@ -152,29 +162,25 @@ export function createRealtimeClient(
       return
     }
 
-    // Presence messages
-    if (
-      msg.type === 'presence:join' ||
-      msg.type === 'presence:update' ||
-      msg.type === 'presence:leave' ||
-      msg.type === 'presence:sync'
-    ) {
-      let event: PresenceClientEvent
-      if (msg.type === 'presence:join') {
+    let event: PresenceClientEvent
+    switch (msg.type) {
+      case 'presence:join':
         event = { type: 'join', connectionId: msg.connectionId, data: msg.data }
-      } else if (msg.type === 'presence:update') {
-        event = {
-          type: 'update',
-          connectionId: msg.connectionId,
-          data: msg.data,
-        }
-      } else if (msg.type === 'presence:leave') {
+        break
+      case 'presence:update':
+        event = { type: 'update', connectionId: msg.connectionId, data: msg.data }
+        break
+      case 'presence:leave':
         event = { type: 'leave', connectionId: msg.connectionId }
-      } else {
+        break
+      case 'presence:sync':
         event = { type: 'sync', users: msg.users }
-      }
-      for (const l of presenceListeners) l(msg.key, event)
+        break
+      default:
+        return
     }
+
+    for (const l of presenceListeners) l(msg.key, event)
   }
 
   function openSocket() {
@@ -190,14 +196,15 @@ export function createRealtimeClient(
       reconnectAttempt = 0
       resubscribeAll()
       if (wasReconnecting) {
-        // Reconnected after a drop — invalidate all active queries to catch missed events
+        // Reconnected after a drop — invalidate all active queries in batches
+        // to avoid a thundering-herd refetch.
         batchInvalidateAll()
       }
       setStatus('connected')
     })
 
-    socket.addEventListener('message', (event) => {
-      handleMessage(event.data as string)
+    socket.addEventListener('message', (e) => {
+      handleMessage(e.data as string)
     })
 
     socket.addEventListener('close', () => {
@@ -210,7 +217,7 @@ export function createRealtimeClient(
     })
 
     socket.addEventListener('error', () => {
-      // close event will follow
+      // A 'close' event always follows 'error'; let it drive the state transition.
     })
   }
 
@@ -237,26 +244,44 @@ export function createRealtimeClient(
     }
   }
 
-  // Window focus handler
   let focusHandlerAttached = false
+
+  function handleWindowFocus() {
+    // Ignore focus events when we are not in an active / connected state.
+    if (status === 'disconnected' || status === 'reconnecting' || status === 'connecting') {
+      return
+    }
+    if (!ws || ws.readyState !== ws.OPEN) {
+      scheduleReconnect()
+      return
+    }
+    // Connection is alive — invalidate all active queries since events may
+    // have been missed while the tab was in the background.
+    batchInvalidateAll()
+  }
+
   function attachFocusHandler() {
     if (focusHandlerAttached || typeof window === 'undefined') return
     focusHandlerAttached = true
     window.addEventListener('focus', handleWindowFocus)
   }
+
   function detachFocusHandler() {
-    if (typeof window === 'undefined') return
+    if (!focusHandlerAttached || typeof window === 'undefined') return
     window.removeEventListener('focus', handleWindowFocus)
     focusHandlerAttached = false
   }
-  function handleWindowFocus() {
-    if (status === 'disconnected' || status === 'reconnecting') return
-    if (!ws || ws.readyState !== ws.OPEN) {
-      scheduleReconnect()
-      return
+
+  // All disconnect logic lives here; methods call this instead of duplicating.
+  function disconnectInternal() {
+    explicitDisconnect = true
+    cancelReconnect()
+    detachFocusHandler()
+    if (ws) {
+      ws.close()
+      ws = null
     }
-    // Connection alive — invalidate all to catch missed events
-    batchInvalidateAll()
+    setStatus('disconnected')
   }
 
   return {
@@ -273,14 +298,7 @@ export function createRealtimeClient(
     },
 
     disconnect() {
-      explicitDisconnect = true
-      cancelReconnect()
-      detachFocusHandler()
-      if (ws) {
-        ws.close()
-        ws = null
-      }
-      setStatus('disconnected')
+      disconnectInternal()
     },
 
     subscribe(serializedKey: string) {
@@ -299,10 +317,13 @@ export function createRealtimeClient(
     },
 
     presenceUpdate(serializedKey: string, data: unknown) {
+      // The client tracks the full merged state locally.
+      // Only the delta is sent to the server, which merges it server-side
+      // so that any late-joining clients receive accurate presence:sync data.
       const existing = presenceChannels.get(serializedKey)
       const merged =
         typeof existing === 'object' && existing !== null
-          ? { ...(existing as object), ...(data as object) }
+          ? { ...(existing as Record<string, unknown>), ...(data as Record<string, unknown>) }
           : data
       presenceChannels.set(serializedKey, merged)
       send({ type: 'presence:update', key: serializedKey, data })
@@ -315,21 +336,27 @@ export function createRealtimeClient(
 
     onStatus(listener: StatusListener) {
       statusListeners.add(listener)
-      return () => statusListeners.delete(listener)
+      return () => {
+        statusListeners.delete(listener)
+      }
     },
 
     onInvalidate(listener: InvalidateListener) {
       invalidateListeners.add(listener)
-      return () => invalidateListeners.delete(listener)
+      return () => {
+        invalidateListeners.delete(listener)
+      }
     },
 
     onPresence(listener: PresenceListener) {
       presenceListeners.add(listener)
-      return () => presenceListeners.delete(listener)
+      return () => {
+        presenceListeners.delete(listener)
+      }
     },
 
     destroy() {
-      this.disconnect()
+      disconnectInternal()
       statusListeners.clear()
       invalidateListeners.clear()
       presenceListeners.clear()
@@ -338,11 +365,11 @@ export function createRealtimeClient(
 }
 
 /**
- * Serialize a query key using deterministic JSON with sorted object keys.
- * Mirrors TanStack Query's hashKey behavior.
+ * Serialize a query key to a stable, deterministic JSON string.
+ * Object keys are sorted at every level, mirroring TanStack Query's `hashKey`.
  */
 export function serializeKey(key: ReadonlyArray<unknown>): string {
-  return JSON.stringify(key, (_, val) => {
+  return JSON.stringify(key, (_, val: unknown) => {
     if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
       return Object.fromEntries(
         Object.entries(val as Record<string, unknown>).sort(([a], [b]) =>

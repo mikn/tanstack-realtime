@@ -518,6 +518,35 @@ describe('Presence', () => {
     const leave = await leaveReceived
     expect(leave.connectionId).toBeDefined()
   })
+
+  it('delivers each presence event exactly once (no double fan-out)', async () => {
+    const key = serializeKey(['doc', { id: 'no-double-fanout' }])
+
+    client1.presenceJoin(key, { name: 'Alice' })
+    await waitFor(50)
+
+    // Count every presence event client1 receives after client2 joins
+    const receivedEvents: Array<{ type: string }> = []
+    const unsub = client1.onPresence((presenceKey, event) => {
+      if (presenceKey === key) receivedEvents.push({ type: event.type })
+    })
+
+    client2.presenceJoin(key, { name: 'Bob' })
+    await waitFor(100)
+    client2.presenceUpdate(key, { cursor: { x: 1, y: 2 } })
+    await waitFor(100)
+    client2.presenceLeave(key)
+    await waitFor(100)
+
+    const joins = receivedEvents.filter((e) => e.type === 'join')
+    const updates = receivedEvents.filter((e) => e.type === 'update')
+    const leaves = receivedEvents.filter((e) => e.type === 'leave')
+
+    expect(joins.length).toBe(1)
+    expect(updates.length).toBe(1)
+    expect(leaves.length).toBe(1)
+    unsub()
+  })
 })
 
 describe('Authentication', () => {

@@ -24,6 +24,14 @@ export type PresenceClientEvent =
   | { type: 'leave'; connectionId: string }
   | { type: 'sync'; users: Array<PresenceUser> }
 
+// Wire protocol messages (client → server)
+export type ClientMessage =
+  | { type: 'subscribe'; key: string }
+  | { type: 'unsubscribe'; key: string }
+  | { type: 'presence:join'; key: string; data: unknown }
+  | { type: 'presence:update'; key: string; data: unknown }
+  | { type: 'presence:leave'; key: string }
+
 // Wire protocol messages (server → client)
 export type ServerMessage =
   | { type: 'invalidate'; key: string }

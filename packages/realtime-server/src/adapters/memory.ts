@@ -3,7 +3,8 @@ import type { RealtimeAdapter, PresenceEvent } from '../types.js'
 
 export function memoryAdapter(): RealtimeAdapter {
   const emitter = new EventEmitter()
-  emitter.setMaxListeners(0) // no limit for large deployments
+  // One listener per topic (invalidate + presence) per createRealtimeServer call.
+  emitter.setMaxListeners(2)
 
   return {
     async publish(serializedKey: string): Promise<void> {

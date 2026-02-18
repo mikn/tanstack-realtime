@@ -10,5 +10,6 @@ export type {
   StatusListener,
   InvalidateListener,
   PresenceListener,
+  ClientMessage,
   QueryKey,
 } from './types.js'

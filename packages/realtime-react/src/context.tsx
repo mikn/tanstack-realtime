@@ -1,9 +1,8 @@
 import {
   createContext,
+  useCallback,
   useContext,
-  useEffect,
-  useRef,
-  useState,
+  useSyncExternalStore,
   type ReactNode,
 } from 'react'
 import type {
@@ -24,7 +23,7 @@ export interface RealtimeProviderProps {
 
 /**
  * Provides the RealtimeClient to the component tree.
- * Place inside QueryClientProvider.
+ * Must be placed inside `QueryClientProvider`.
  *
  * @example
  * ```tsx
@@ -58,7 +57,9 @@ export interface RealtimeControls {
 }
 
 /**
- * Returns reactive connection controls.
+ * Returns reactive connection controls. Uses `useSyncExternalStore` so the
+ * status is always consistent with the external client even in concurrent
+ * rendering.
  *
  * @example
  * ```tsx
@@ -67,17 +68,23 @@ export interface RealtimeControls {
  */
 export function useRealtime(): RealtimeControls {
   const { client } = useRealtimeContext()
-  const [status, setStatus] = useState<ConnectionStatus>(client.status)
 
-  useEffect(() => {
-    // Sync initial state
-    setStatus(client.status)
-    return client.onStatus((s) => setStatus(s))
-  }, [client])
+  const status = useSyncExternalStore(
+    // subscribe: the store notifies React by calling onStoreChange().
+    // onStatus receives the new status but useSyncExternalStore reads it
+    // via getSnapshot(), so we just signal that something changed.
+    useCallback(
+      (onStoreChange: () => void) => client.onStatus(onStoreChange),
+      [client],
+    ),
+    // getSnapshot: called on every render and after every notification.
+    () => client.status,
+    // getServerSnapshot: used during SSR / hydration.
+    () => 'disconnected' as ConnectionStatus,
+  )
 
-  return {
-    status,
-    connect: () => client.connect(),
-    disconnect: () => client.disconnect(),
-  }
+  const connect = useCallback(() => client.connect(), [client])
+  const disconnect = useCallback(() => client.disconnect(), [client])
+
+  return { status, connect, disconnect }
 }

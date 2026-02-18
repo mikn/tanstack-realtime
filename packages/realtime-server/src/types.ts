@@ -1,11 +1,14 @@
 export type QueryKey = ReadonlyArray<unknown>
 
-export interface PresenceEvent {
-  type: 'join' | 'update' | 'leave' | 'sync'
-  connectionId: string
-  data?: unknown
-  users?: Array<{ connectionId: string; data: unknown }>
-}
+/**
+ * A presence event that flows through the adapter between server instances.
+ * Each variant only carries fields that are meaningful for that event type.
+ */
+export type PresenceEvent =
+  | { type: 'join'; connectionId: string; data: unknown }
+  | { type: 'update'; connectionId: string; data: unknown }
+  | { type: 'leave'; connectionId: string }
+  | { type: 'sync'; users: Array<{ connectionId: string; data: unknown }> }
 
 export interface RealtimeAdapter {
   /** Publish an invalidation signal to all instances */
@@ -34,12 +37,7 @@ export type ClientMessage =
 export type ServerMessage =
   | { type: 'invalidate'; key: string }
   | { type: 'presence:join'; key: string; connectionId: string; data: unknown }
-  | {
-      type: 'presence:update'
-      key: string
-      connectionId: string
-      data: unknown
-    }
+  | { type: 'presence:update'; key: string; connectionId: string; data: unknown }
   | { type: 'presence:leave'; key: string; connectionId: string }
   | {
       type: 'presence:sync'
