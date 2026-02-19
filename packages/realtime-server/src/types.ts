@@ -1,4 +1,9 @@
-export type QueryKey = ReadonlyArray<unknown>
+// Wire protocol types live in core — single source of truth.
+export type {
+  QueryKey,
+  ClientMessage,
+  ServerMessage,
+} from '@tanstack/realtime-core'
 
 /**
  * A presence event that flows through the adapter between server instances.
@@ -24,23 +29,3 @@ export interface RealtimeAdapter {
   /** Cleanup */
   close(): Promise<void>
 }
-
-// Messages sent from client to server
-export type ClientMessage =
-  | { type: 'subscribe'; key: string }
-  | { type: 'unsubscribe'; key: string }
-  | { type: 'presence:join'; key: string; data: unknown }
-  | { type: 'presence:update'; key: string; data: unknown }
-  | { type: 'presence:leave'; key: string }
-
-// Messages sent from server to client
-export type ServerMessage =
-  | { type: 'invalidate'; key: string }
-  | { type: 'presence:join'; key: string; connectionId: string; data: unknown }
-  | { type: 'presence:update'; key: string; connectionId: string; data: unknown }
-  | { type: 'presence:leave'; key: string; connectionId: string }
-  | {
-      type: 'presence:sync'
-      key: string
-      users: Array<{ connectionId: string; data: unknown }>
-    }

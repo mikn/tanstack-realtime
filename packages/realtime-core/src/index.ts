@@ -6,5 +6,10 @@
  * foundation that all adapters build on.
  */
 
-export type { QueryKey } from './types.js'
+export type {
+  QueryKey,
+  PresenceUser,
+  ClientMessage,
+  ServerMessage,
+} from './types.js'
 export { serializeKey } from './serializeKey.js'

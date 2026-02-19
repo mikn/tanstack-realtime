@@ -415,7 +415,9 @@ describe('Presence', () => {
     await waitFor(50)
 
     // Client2 joins and should receive a sync with Alice
-    const syncReceived = new Promise<{ users: any[] }>((resolve) => {
+    const syncReceived = new Promise<{
+      users: Array<{ connectionId: string; data: unknown }>
+    }>((resolve) => {
       const unsub = client2.onPresence((presenceKey, event) => {
         if (presenceKey === key && event.type === 'sync') {
           unsub()
@@ -428,7 +430,9 @@ describe('Presence', () => {
     const sync = await syncReceived
 
     expect(sync.users.length).toBeGreaterThanOrEqual(1)
-    const alice = sync.users.find((u) => (u.data as any).name === 'Alice')
+    const alice = sync.users.find(
+      (u) => (u.data as Record<string, unknown>).name === 'Alice',
+    )
     expect(alice).toBeDefined()
   })
 
@@ -440,7 +444,7 @@ describe('Presence', () => {
     await waitFor(50)
 
     // Client1 should receive a join event when client2 joins
-    const joinReceived = new Promise<{ connectionId: string; data: any }>(
+    const joinReceived = new Promise<{ connectionId: string; data: unknown }>(
       (resolve) => {
         const unsub = client1.onPresence((presenceKey, event) => {
           if (presenceKey === key && event.type === 'join') {
@@ -454,7 +458,7 @@ describe('Presence', () => {
     client2.presenceJoin(key, { name: 'Bob' })
     const join = await joinReceived
 
-    expect((join.data as any).name).toBe('Bob')
+    expect((join.data as Record<string, unknown>).name).toBe('Bob')
   })
 
   it('broadcasts presence updates to other users', async () => {
@@ -464,7 +468,7 @@ describe('Presence', () => {
     client2.presenceJoin(key, { name: 'Bob', cursor: null })
     await waitFor(100)
 
-    const updateReceived = new Promise<{ connectionId: string; data: any }>(
+    const updateReceived = new Promise<{ connectionId: string; data: unknown }>(
       (resolve) => {
         const unsub = client1.onPresence((presenceKey, event) => {
           if (presenceKey === key && event.type === 'update') {
@@ -478,7 +482,7 @@ describe('Presence', () => {
     client2.presenceUpdate(key, { cursor: { x: 100, y: 200 } })
     const update = await updateReceived
 
-    expect((update.data as any).cursor).toEqual({ x: 100, y: 200 })
+    expect((update.data as Record<string, unknown>).cursor).toEqual({ x: 100, y: 200 })
   })
 
   it('broadcasts leave event when a user leaves', async () => {

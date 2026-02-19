@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto'
 import { WebSocketServer, WebSocket } from 'ws'
 import type { IncomingMessage, Server } from 'http'
 import { serializeKey } from '@tanstack/realtime-core'
@@ -348,7 +349,7 @@ export function createRealtimeServer(
         return
       }
 
-      const connectionId = `${Date.now()}-${++idCounter}`
+      const connectionId = `${Date.now()}-${++idCounter}-${randomBytes(4).toString('hex')}`
       const conn: ConnectionState = {
         connectionId,
         ws,
