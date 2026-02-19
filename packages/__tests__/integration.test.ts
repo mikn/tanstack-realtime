@@ -10,6 +10,7 @@
 
 import { createServer } from 'http'
 import type { Server } from 'http'
+import { WebSocketServer } from 'ws'
 import {
   createRealtimeServer,
   memoryAdapter,
@@ -17,7 +18,7 @@ import {
 } from '@tanstack/realtime-server'
 import { createRealtimeClient, serializeKey } from '@tanstack/realtime-client'
 import type { RealtimeClient } from '@tanstack/realtime-client'
-import type { RealtimeServerOptions } from '@tanstack/realtime-server'
+import type { RealtimeServer, RealtimeServerOptions } from '@tanstack/realtime-server'
 
 // ---------------------------------------------------------------------------
 // Test utilities
@@ -25,9 +26,20 @@ import type { RealtimeServerOptions } from '@tanstack/realtime-server'
 
 interface TestHarness {
   port: number
-  realtime: ReturnType<typeof createRealtimeServer>
+  realtime: RealtimeServer
   httpServer: Server
   teardown: () => Promise<void>
+}
+
+/**
+ * Access the underlying WebSocketServer for test infrastructure use only.
+ * The `wss` property is intentionally not part of the public RealtimeServer
+ * interface — it is an internal detail exposed here via type assertion.
+ */
+function getWss(server: RealtimeServer): WebSocketServer {
+  const wss = (server as unknown as { wss: WebSocketServer | null }).wss
+  if (!wss) throw new Error('wss not initialized — has attach() been called?')
+  return wss
 }
 
 async function createTestHarness(opts: {
@@ -36,7 +48,9 @@ async function createTestHarness(opts: {
   const httpServer = createServer()
   const realtime = createRealtimeServer({
     adapter: memoryAdapter(),
-    authenticate: opts.authenticate,
+    // Default to accepting all connections in tests; pass a custom function
+    // to exercise auth rejection scenarios.
+    authenticate: opts.authenticate ?? (async () => ({})),
   })
   realtime.attach(httpServer)
 
@@ -323,9 +337,8 @@ describe('Reconnection', () => {
   })
 
   it('reconnects automatically after server closes the connection', async () => {
-    // Force-close all WebSocket connections by closing the wss
-    const { wss } = harness.realtime
-    if (!wss) throw new Error('No wss')
+    // Force-close all WebSocket connections by terminating the underlying sockets
+    const wss = getWss(harness.realtime)
 
     for (const client of wss.clients) {
       client.terminate()
@@ -347,8 +360,7 @@ describe('Reconnection', () => {
     const unsub = client.onInvalidate((k) => invalidations.push(k))
 
     // Force disconnect
-    const { wss } = harness.realtime
-    if (!wss) throw new Error('No wss')
+    const wss = getWss(harness.realtime)
     for (const ws of wss.clients) ws.terminate()
 
     await nextStatus(client, 'reconnecting')
@@ -508,10 +520,8 @@ describe('Presence', () => {
     })
 
     // Force-close client2's connection
-    const { wss } = harness.realtime
-    if (!wss) throw new Error('No wss')
     // Terminate the second connected client (client2)
-    const clients = Array.from(wss.clients)
+    const clients = Array.from(getWss(harness.realtime).clients)
     expect(clients.length).toBeGreaterThanOrEqual(2)
     clients[clients.length - 1]?.terminate()
 
@@ -685,9 +695,7 @@ describe('Regression: multiple presence channels cleaned up on disconnect', () =
     })
 
     // Forcefully drop the dropper's connection
-    const { wss } = harness.realtime
-    if (!wss) throw new Error('No wss')
-    const allWsClients = Array.from(wss.clients)
+    const allWsClients = Array.from(getWss(harness.realtime).clients)
     allWsClients[allWsClients.length - 1]?.terminate()
 
     await waitFor(200)
@@ -780,6 +788,7 @@ describe('Regression: custom WebSocket path', () => {
     const httpServer = createServer()
     const realtime = createRealtimeServer({
       adapter: memoryAdapter(),
+      authenticate: async () => ({}),
       path: '/_rt',
     })
     realtime.attach(httpServer)
@@ -895,9 +904,7 @@ describe('Regression: presence sync on reconnect rejoin', () => {
     })
 
     // Force-terminate reconnectingClient's socket
-    const { wss } = harness.realtime
-    if (!wss) throw new Error('No wss')
-    const wsClients = Array.from(wss.clients)
+    const wsClients = Array.from(getWss(harness.realtime).clients)
     // The last client to connect is reconnectingClient
     wsClients[wsClients.length - 1]?.terminate()
 
@@ -941,9 +948,7 @@ describe('Regression: batchInvalidateAll fires first batch immediately after rec
     await waitForServerProcessing()
 
     // Force disconnect to trigger automatic reconnect + batchInvalidateAll
-    const { wss } = harness.realtime
-    if (!wss) throw new Error('No wss')
-    Array.from(wss.clients).forEach((ws) => ws.terminate())
+    Array.from(getWss(harness.realtime).clients).forEach((ws) => ws.terminate())
 
     await nextStatus(client, 'reconnecting')
 
@@ -974,8 +979,7 @@ describe('Regression: scheduleReconnect does not double-increment attempt on con
     await nextStatus(client, 'connected')
 
     // First forced disconnect → reconnect attempt 1
-    const { wss } = harness.realtime
-    if (!wss) throw new Error('No wss')
+    const wss = getWss(harness.realtime)
     Array.from(wss.clients).forEach((ws) => ws.terminate())
     await nextStatus(client, 'reconnecting')
     await nextStatus(client, 'connected')

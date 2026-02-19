@@ -62,13 +62,6 @@ function makeThrottle(fn: (data: unknown) => void, delay: number) {
         fn(pending)
       }
     },
-    cancel() {
-      if (timer) {
-        clearTimeout(timer)
-        timer = null
-      }
-      hasPending = false
-    },
   }
 }
 
@@ -83,7 +76,7 @@ function makeThrottle(fn: (data: unknown) => void, delay: number) {
  * })
  * ```
  */
-export function usePresence<T extends Record<string, unknown>>(
+export function usePresence<T extends object>(
   options: UsePresenceOptions<T>,
 ): UsePresenceResult<T> {
   const { key, initial, throttleMs = 50 } = options

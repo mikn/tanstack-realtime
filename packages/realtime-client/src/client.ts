@@ -1,3 +1,4 @@
+import { serializeKey } from '@tanstack/realtime-core'
 import type {
   ConnectionStatus,
   QueryKey,
@@ -8,6 +9,9 @@ import type {
   ServerMessage,
   ClientMessage,
 } from './types.js'
+
+// Re-export so consumers can access serializeKey from this package.
+export { serializeKey }
 
 export interface RealtimeClientOptions {
   /**
@@ -52,7 +56,13 @@ export interface RealtimeClient {
 
   /** Join a presence channel with initial data. */
   presenceJoin(serializedKey: string, data: unknown): void
-  /** Send a partial update to a presence channel. */
+  /**
+   * Send a partial presence update to the server.
+   * The server merges the delta into the stored full state and broadcasts
+   * the merged result to all other participants. Other clients therefore
+   * always receive the complete, up-to-date presence object — not just
+   * the delta that was sent.
+   */
   presenceUpdate(serializedKey: string, data: unknown): void
   /** Leave a presence channel. */
   presenceLeave(serializedKey: string): void
@@ -300,7 +310,14 @@ export function createRealtimeClient(
       explicitDisconnect = false
       attachFocusHandler()
       if (status === 'connected' || status === 'connecting') return
-      reconnectAttempt = 0
+      // If we are in an auto-reconnect cycle, cancel the pending timer to
+      // connect immediately. Do NOT reset reconnectAttempt in this case —
+      // openSocket() reads it to determine whether batchInvalidateAll() should
+      // fire after the socket opens (it should, since events were missed).
+      cancelReconnect()
+      if (status !== 'reconnecting') {
+        reconnectAttempt = 0
+      }
       openSocket()
     },
 
@@ -324,15 +341,15 @@ export function createRealtimeClient(
     },
 
     presenceUpdate(serializedKey: string, data: unknown) {
-      // The client tracks the full merged state locally.
-      // Only the delta is sent to the server, which merges it server-side
-      // so that any late-joining clients receive accurate presence:sync data.
+      // Track the full merged state locally for accurate reconnect rejoins.
       const existing = presenceChannels.get(serializedKey)
       const merged =
         typeof existing === 'object' && existing !== null
           ? { ...(existing as Record<string, unknown>), ...(data as Record<string, unknown>) }
           : data
       presenceChannels.set(serializedKey, merged)
+      // Send only the delta — the server merges it and broadcasts the full
+      // merged state to other participants.
       send({ type: 'presence:update', key: serializedKey, data })
     },
 
@@ -371,19 +388,5 @@ export function createRealtimeClient(
   }
 }
 
-/**
- * Serialize a query key to a stable, deterministic JSON string.
- * Object keys are sorted at every level, mirroring TanStack Query's `hashKey`.
- */
-export function serializeKey(key: QueryKey): string {
-  return JSON.stringify(key, (_, val: unknown) => {
-    if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
-      return Object.fromEntries(
-        Object.entries(val as Record<string, unknown>).sort(([a], [b]) =>
-          a.localeCompare(b),
-        ),
-      )
-    }
-    return val
-  })
-}
+// QueryKey is re-exported for consumers who want it from this package.
+export type { QueryKey }

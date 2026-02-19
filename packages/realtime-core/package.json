@@ -1,6 +1,7 @@
 {
-  "name": "@tanstack/realtime-react",
+  "name": "@tanstack/realtime-core",
   "version": "0.0.1",
+  "description": "Framework-agnostic core for TanStack Realtime",
   "type": "module",
   "main": "./dist/index.js",
   "exports": {
@@ -15,12 +16,5 @@
   ],
   "scripts": {
     "build": "tsup"
-  },
-  "dependencies": {
-    "@tanstack/realtime-client": "*"
-  },
-  "peerDependencies": {
-    "@tanstack/react-query": ">=5.0.0",
-    "react": ">=18.0.0"
   }
 }

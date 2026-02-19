@@ -1,5 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import type { IncomingMessage, Server } from 'http'
+import { serializeKey } from '@tanstack/realtime-core'
 import type {
   RealtimeAdapter,
   ClientMessage,
@@ -9,15 +10,16 @@ import type {
 } from './types.js'
 import { memoryAdapter } from './adapters/memory.js'
 
+// Re-export so consumers can import serializeKey from this package.
+export { serializeKey }
+
 export interface RealtimeServerOptions {
   /**
    * Called on each WebSocket upgrade request to authenticate the connection.
    * Return a user object (e.g. `{ userId }`) to allow, or `null` to reject.
-   * Defaults to accepting all connections — you should always provide this.
+   * This is a security boundary — always provide it in production.
    */
-  authenticate?: (
-    req: IncomingMessage,
-  ) => Promise<Record<string, unknown> | null>
+  authenticate: (req: IncomingMessage) => Promise<Record<string, unknown> | null>
   /** Adapter for multi-instance deployments. Defaults to the in-memory adapter. */
   adapter?: RealtimeAdapter
   /** WebSocket path. Defaults to `/_realtime`. */
@@ -51,11 +53,28 @@ export interface RealtimeServer {
   attach(server: Server | { server?: Server; httpServer?: Server }): void
   /** Close all connections, drain presence state, and clean up. */
   close(): Promise<void>
-  /**
-   * The underlying `WebSocketServer` instance.
-   * Exposed for testing and advanced use cases; treat as internal.
-   */
-  readonly wss: WebSocketServer | null
+}
+
+/**
+ * Deep structural equality. Used by `segmentMatches` to compare key segments
+ * without serializing to JSON, which avoids redundant stringify calls.
+ */
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (typeof a !== typeof b) return false
+  if (typeof a !== 'object' || a === null || b === null) return false
+  if (Array.isArray(a) !== Array.isArray(b)) return false
+  if (Array.isArray(a)) {
+    const arrB = b as unknown[]
+    if (a.length !== arrB.length) return false
+    return a.every((v, i) => deepEqual(v, arrB[i]))
+  }
+  const objA = a as Record<string, unknown>
+  const objB = b as Record<string, unknown>
+  const keysA = Object.keys(objA)
+  const keysB = Object.keys(objB)
+  if (keysA.length !== keysB.length) return false
+  return keysA.every((k) => k in objB && deepEqual(objA[k], objB[k]))
 }
 
 /**
@@ -65,10 +84,10 @@ export interface RealtimeServer {
  * For plain-object segments the published object is treated as a subset:
  * every key it carries must exist with an equal value in the subscribed
  * object (the subscribed object may have additional keys).
- * For all other types strict equality is required.
+ * For all other types strict deep equality is required.
  */
 function segmentMatches(published: unknown, subscribed: unknown): boolean {
-  if (JSON.stringify(published) === JSON.stringify(subscribed)) return true
+  if (deepEqual(published, subscribed)) return true
   if (
     typeof published === 'object' &&
     published !== null &&
@@ -79,9 +98,7 @@ function segmentMatches(published: unknown, subscribed: unknown): boolean {
   ) {
     const pub = published as Record<string, unknown>
     const sub = subscribed as Record<string, unknown>
-    return Object.keys(pub).every(
-      (k) => k in sub && JSON.stringify(pub[k]) === JSON.stringify(sub[k]),
-    )
+    return Object.keys(pub).every((k) => k in sub && deepEqual(pub[k], sub[k]))
   }
   return false
 }
@@ -116,12 +133,9 @@ function sendMessage(ws: WebSocket, msg: ServerMessage) {
 }
 
 export function createRealtimeServer(
-  options: RealtimeServerOptions = {},
+  options: RealtimeServerOptions,
 ): RealtimeServer {
-  const {
-    authenticate = async () => ({}),
-    path = '/_realtime',
-  } = options
+  const { authenticate, path = '/_realtime' } = options
 
   const adapter: RealtimeAdapter = options.adapter ?? memoryAdapter()
 
@@ -359,7 +373,13 @@ export function createRealtimeServer(
     })
   }
 
-  return {
+  // Build the concrete object first (without a type annotation so TypeScript
+  // does not apply excess-property checks). Assigning it to `RealtimeServer`
+  // afterwards lets TypeScript verify that all required methods are present.
+  const concrete = {
+    // Exposed on the concrete object (not on the RealtimeServer interface)
+    // for test infrastructure that needs direct socket access. Production
+    // code should use the typed interface only.
     get wss() {
       return wss
     },
@@ -420,21 +440,10 @@ export function createRealtimeServer(
       await adapter.close()
     },
   }
-}
 
-/**
- * Serialize a query key to a stable, deterministic JSON string.
- * Object keys are sorted at every level, mirroring TanStack Query's `hashKey`.
- */
-export function serializeKey(key: QueryKey): string {
-  return JSON.stringify(key, (_, val: unknown) => {
-    if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
-      return Object.fromEntries(
-        Object.entries(val as Record<string, unknown>).sort(([a], [b]) =>
-          a.localeCompare(b),
-        ),
-      )
-    }
-    return val
-  })
+  // Widen to the public interface. TypeScript verifies all required methods
+  // are present via assignability. The extra `wss` accessor is preserved on
+  // the runtime object and is accessible via type assertion in test helpers.
+  const server: RealtimeServer = concrete
+  return server
 }

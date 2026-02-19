@@ -1,10 +1,11 @@
+// Re-export the canonical type from core so consumers have a single import.
+export type { QueryKey } from '@tanstack/realtime-core'
+
 export type ConnectionStatus =
   | 'disconnected'
   | 'connecting'
   | 'connected'
   | 'reconnecting'
-
-export type QueryKey = ReadonlyArray<unknown>
 
 export interface PresenceUser<T = unknown> {
   connectionId: string
