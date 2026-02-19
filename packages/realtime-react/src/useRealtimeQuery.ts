@@ -58,7 +58,7 @@ export function useRealtimeQuery<
     const unsubscribe = client.onInvalidate((key) => {
       if (key === serializedKeyRef.current) {
         void queryClient.invalidateQueries({
-          queryKey: options.queryKey as unknown[],
+          queryKey: options.queryKey as ReadonlyArray<unknown>,
         })
       }
     })

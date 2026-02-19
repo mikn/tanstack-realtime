@@ -29,8 +29,9 @@ export interface UsePresenceResult<T> {
 }
 
 /**
- * A minimal leading-edge throttle that coalesces calls within `delay` ms.
- * The last call within a window is always flushed, so no updates are lost.
+ * A trailing-edge throttle: the first call starts a timer; the last value
+ * received within the window is what gets flushed when the timer fires.
+ * No updates are lost — `flush()` delivers any pending value immediately.
  */
 function makeThrottle(fn: (data: unknown) => void, delay: number) {
   let timer: ReturnType<typeof setTimeout> | null = null
@@ -98,6 +99,9 @@ export function usePresence<T extends Record<string, unknown>>(
   serializedKeyRef.current = serializedKey
 
   useEffect(() => {
+    // Reset before joining the new channel so stale users from the previous
+    // channel are never visible while waiting for presence:sync.
+    setOthers([])
     clientRef.current.presenceJoin(serializedKey, initial)
 
     const unsubscribe = clientRef.current.onPresence((presenceKey, event) => {

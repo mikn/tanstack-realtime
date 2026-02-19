@@ -145,8 +145,10 @@ export function createRealtimeClient(
       }
     }
 
+    // First batch fires immediately; subsequent batches are staggered to
+    // avoid a thundering-herd refetch after reconnect.
     if (keys.length > 0) {
-      setTimeout(flush, refetchOpts.stagger)
+      flush()
     }
   }
 
@@ -224,6 +226,10 @@ export function createRealtimeClient(
 
   function scheduleReconnect() {
     if (explicitDisconnect) return
+    // Cancel any existing timer so that concurrent calls (e.g. the window
+    // focus handler racing with the socket 'close' event) don't leak a timer
+    // or double-increment reconnectAttempt.
+    cancelReconnect()
     setStatus('reconnecting')
     const delay = Math.min(
       reconnectOpts.initialDelay * Math.pow(2, reconnectAttempt),

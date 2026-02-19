@@ -918,3 +918,83 @@ describe('Regression: presence sync on reconnect rejoin', () => {
     await harness.teardown()
   })
 })
+
+describe('Regression: batchInvalidateAll fires first batch immediately after reconnect', () => {
+  it('delivers the first batch without waiting for the stagger delay', async () => {
+    const harness = await createTestHarness()
+
+    // Use a very large stagger (500 ms) to make the timing observable.
+    // If the first batch were delayed by stagger, it would arrive ~500 ms
+    // after reconnect — much longer than the 50 ms budget we check.
+    const client = createRealtimeClient({
+      url: `ws://localhost:${harness.port}/_realtime`,
+      reconnect: { initialDelay: 100, maxDelay: 500, jitter: 0 },
+      refetch: { stagger: 500, maxConcurrency: 5 },
+    })
+
+    client.connect()
+    await nextStatus(client, 'connected')
+
+    // Subscribe to 3 keys — all fit within the first batch (maxConcurrency 5)
+    const keys = ['ka', 'kb', 'kc'].map((k) => serializeKey([k]))
+    keys.forEach((k) => client.subscribe(k))
+    await waitForServerProcessing()
+
+    // Force disconnect to trigger automatic reconnect + batchInvalidateAll
+    const { wss } = harness.realtime
+    if (!wss) throw new Error('No wss')
+    Array.from(wss.clients).forEach((ws) => ws.terminate())
+
+    await nextStatus(client, 'reconnecting')
+
+    const received: string[] = []
+    const unsub = client.onInvalidate((k) => received.push(k))
+
+    await nextStatus(client, 'connected')
+
+    // Give 50 ms — enough for the synchronous first flush but not enough
+    // for a 500 ms stagger delay.
+    await waitFor(50)
+
+    expect(received.sort()).toEqual(keys.sort())
+
+    unsub()
+    client.destroy()
+    await harness.teardown()
+  })
+})
+
+describe('Regression: scheduleReconnect does not double-increment attempt on concurrent calls', () => {
+  it('second reconnect attempt uses correct exponential backoff', async () => {
+    const harness = await createTestHarness()
+    // initialDelay 100 ms, jitter 0 so delays are deterministic
+    const client = connectClient(harness.port)
+
+    client.connect()
+    await nextStatus(client, 'connected')
+
+    // First forced disconnect → reconnect attempt 1
+    const { wss } = harness.realtime
+    if (!wss) throw new Error('No wss')
+    Array.from(wss.clients).forEach((ws) => ws.terminate())
+    await nextStatus(client, 'reconnecting')
+    await nextStatus(client, 'connected')
+
+    // Second forced disconnect → reconnect attempt 1 again (counter reset on
+    // successful connect). Delay should be 100 ms, not 400 ms (double-increment
+    // would produce 100*2^2 = 400 ms which would timeout the 250 ms window).
+    Array.from(wss.clients).forEach((ws) => ws.terminate())
+    await nextStatus(client, 'reconnecting')
+
+    // Reconnect should succeed within 250 ms (100 ms delay + overhead).
+    // A double-incremented attempt would use a 400 ms delay, causing a timeout.
+    const connectedPromise = nextStatus(client, 'connected')
+    await expect(Promise.race([
+      connectedPromise,
+      waitFor(250).then(() => Promise.reject(new Error('timeout'))),
+    ])).resolves.toBe('connected')
+
+    client.destroy()
+    await harness.teardown()
+  })
+})
