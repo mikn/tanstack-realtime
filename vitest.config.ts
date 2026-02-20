@@ -16,10 +16,27 @@ export default defineConfig({
     },
   },
   resolve: {
-    alias: {
-      '@tanstack/realtime-core': resolve(root, 'packages/realtime-core/src/index.ts'),
-      '@tanstack/realtime-client': resolve(root, 'packages/realtime-client/src/index.ts'),
-      '@tanstack/realtime-server': resolve(root, 'packages/realtime-server/src/index.ts'),
-    },
+    alias: [
+      // Subpath exports must be aliased before the bare package name.
+      {
+        find: /^@tanstack\/realtime\/react$/,
+        replacement: resolve(root, 'packages/realtime/src/react/index.ts'),
+      },
+      {
+        find: /^@tanstack\/realtime\/server$/,
+        replacement: resolve(root, 'packages/realtime/src/server/index.ts'),
+      },
+      {
+        find: /^@tanstack\/realtime$/,
+        replacement: resolve(root, 'packages/realtime/src/index.ts'),
+      },
+      {
+        find: /^@tanstack\/realtime-preset-node$/,
+        replacement: resolve(
+          root,
+          'packages/realtime-preset-node/src/index.ts',
+        ),
+      },
+    ],
   },
 })

@@ -1,0 +1,11 @@
+export { RealtimeProvider } from './RealtimeProvider.js'
+export type { RealtimeProviderProps } from './RealtimeProvider.js'
+export { useRealtime } from './useRealtime.js'
+export type { UseRealtimeResult } from './useRealtime.js'
+export { usePresence } from './usePresence.js'
+export type { UsePresenceOptions, UsePresenceResult } from './usePresence.js'
+export { usePublish } from './usePublish.js'
+export { useSubscribe } from './useSubscribe.js'
+// Re-export createRealtimeClient from core so consumers can import it from /react
+export { createRealtimeClient } from '../core/client.js'
+export type { RealtimeClient, RealtimeClientOptions } from '../core/client.js'
