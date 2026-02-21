@@ -1,7 +1,6 @@
 import { use, useCallback } from 'react'
 import { useStore } from '@tanstack/react-store'
-import type { ConnectionStatus } from '../core/types.js'
-import type { RealtimeClient } from '../core/client.js'
+import type { ConnectionStatus, RealtimeClient } from '../core/types.js'
 import { RealtimeContext } from './context.js'
 
 export interface UseRealtimeResult {

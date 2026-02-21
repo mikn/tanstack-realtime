@@ -25,6 +25,10 @@ export interface GapRecoveryOptions {
    * Implementations can re-fetch data, request history from the server,
    * or trigger a full collection reload.
    *
+   * Errors thrown synchronously and rejected promises are both silently
+   * ignored — gap recovery must not crash the transport.  Log or report
+   * errors inside the callback if observability is needed.
+   *
    * @param channel - The channel that experienced a gap.
    */
   onGap: (channel: string) => void | Promise<void>
@@ -66,19 +70,12 @@ export function withGapRecovery(
     }
     if (status === 'connected' && wasDisconnected) {
       wasDisconnected = false
-      // Fire gap recovery for all active channels.
+      // Fire gap recovery for all active channels.  Errors (sync throws and
+      // rejected promises) are silently swallowed — see GapRecoveryOptions.onGap.
+      // The async IIFE catches both: sync throws inside onGap() are converted
+      // to a rejected promise by the async wrapper before .catch() sees them.
       for (const channel of activeChannels) {
-        try {
-          const result = onGap(channel)
-          // Handle async onGap — catch but don't block.
-          if (result && typeof (result as Promise<void>).catch === 'function') {
-            ;(result as Promise<void>).catch(() => {
-              // Gap recovery error — swallow to avoid crashing
-            })
-          }
-        } catch {
-          // Gap recovery error — swallow
-        }
+        void (async () => onGap(channel))().catch(() => {})
       }
     }
   })

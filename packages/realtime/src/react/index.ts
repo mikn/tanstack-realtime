@@ -8,4 +8,4 @@ export { usePublish } from './usePublish.js'
 export { useSubscribe } from './useSubscribe.js'
 // Re-export createRealtimeClient from core so consumers can import it from /react
 export { createRealtimeClient } from '../core/client.js'
-export type { RealtimeClient, RealtimeClientOptions } from '../core/client.js'
+export type { RealtimeClient, RealtimeClientOptions } from '../core/types.js'

@@ -47,6 +47,10 @@ export interface StreamChannelConfig<
   /**
    * Return true when the event signals that the stream is complete.
    * After this the subscription is closed and status becomes 'done'.
+   *
+   * Receives the **post-reduce** state (i.e. `reduce` has already been called
+   * with the event before `isDone` is evaluated).
+   *
    * @default — stream is open-ended (never done)
    */
   isDone?: (state: TState, event: TEvent) => boolean
@@ -54,6 +58,11 @@ export interface StreamChannelConfig<
    * Return an error message string when the event signals an error,
    * or a falsy value if it is not an error event.
    * After this the subscription is closed and status becomes 'error'.
+   *
+   * Receives the **pre-reduce** state — `isError` is checked *before* `reduce`
+   * so that malformed events can be caught before they corrupt the accumulated
+   * state.  This is the opposite evaluation order to `isDone`, which receives
+   * the post-reduce state.
    */
   isError?: (state: TState, event: TEvent) => string | false | undefined | null
 }
@@ -77,7 +86,9 @@ export interface StreamChannelDef<
   resolveChannel(params: TParams): string
   readonly initial: TState
   readonly reduce: (state: TState, event: TEvent) => TState
+  /** Receives post-reduce state. See `StreamChannelConfig.isDone`. */
   readonly isDone?: (state: TState, event: TEvent) => boolean
+  /** Receives pre-reduce state. See `StreamChannelConfig.isError`. */
   readonly isError?: (
     state: TState,
     event: TEvent,

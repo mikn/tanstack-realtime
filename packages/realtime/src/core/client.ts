@@ -26,7 +26,7 @@ export function createRealtimeClient(
   // Mirror the transport's status into a typed store so React / Vue / Solid
   // adapters can observe it via their respective `useStore` implementations.
   const store = new Store<{ status: ConnectionStatus }>({
-    status: transport.store.get(),
+    status: transport.store.state,
   })
 
   // Keep a reference so we can clean up in destroy().
