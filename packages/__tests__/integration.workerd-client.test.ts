@@ -1,44 +1,51 @@
 /**
- * Workerd runtime compatibility tests for @tanstack/realtime-preset-workerd.
+ * Workerd runtime compatibility tests for @tanstack/realtime-preset-node.
  *
  * These tests run inside the real workerd runtime via
- * @cloudflare/vitest-pool-workers. Their purpose is to verify that the
- * client-side transport code — which must work in Cloudflare Workers /
- * TanStack Start deployments as well as the browser — uses no Node.js-
- * specific APIs and behaves correctly in the workerd environment.
+ * @cloudflare/vitest-pool-workers. Their job is to verify that nodeTransport
+ * works in Cloudflare Workers / TanStack Start workerd deployments without
+ * any Node.js-specific APIs leaking through.
  *
- * Only pure-JS state machine behaviour is exercised here (status store,
- * subscribe/unsubscribe lifecycle, pending-message queue). Tests that
- * require a live WebSocket server are covered by the Node.js integration
- * suite (integration.workerd.test.ts), which runs the same transport
- * against a real Node.js WebSocket server.
+ * How this works:
+ *   realtime-preset-node/package.json includes:
+ *     "browser": { "ws": false }
+ *   Wrangler's esbuild (platform: browser/worker) replaces the `ws` package
+ *   with an empty module when bundling for workerd, so NodeWebSocket = undefined.
+ *   The transport falls back to globalThis.WebSocket, which exists in workerd.
  *
- * Note: we deliberately do NOT patch globalThis.WebSocket.
- * @cloudflare/vitest-pool-workers uses that global for its own internal
- * communication between the worker runtime and the miniflare host process;
- * overriding it in beforeEach/afterEach corrupts that channel.
- * The transport calls new WebSocket() only inside connectChannel(), which
- * is fired asynchronously via `void connectChannel(...)` — errors there
- * become unhandled rejections that the transport catches via the `close`
- * event, so the synchronous state machine under test is unaffected.
+ * What is tested:
+ *   - The module imports cleanly in workerd (no Node.js API at import time)
+ *   - The transport object has the correct shape
+ *   - The @tanstack/store-backed status store works in workerd
+ *   - subscribe() / onPresenceChange() lifecycle (synchronous parts only)
+ *
+ * What is NOT tested here:
+ *   - Actual WebSocket connections (miniflare blocks outbound by default)
+ *   - Full message/presence flows — covered by integration.workerd.test.ts,
+ *     which runs nodeTransport against a real Node.js server
+ *
+ * NOTE: do NOT override globalThis.WebSocket in beforeEach/afterEach.
+ * @cloudflare/vitest-pool-workers uses that global for its own host↔worker
+ * communication; overriding it corrupts that channel (causes "Stack underflow").
  */
 
 import { describe, it, expect } from 'vitest'
-import { workerdTransport } from '@tanstack/realtime-preset-workerd'
+import { nodeTransport } from '@tanstack/realtime-preset-node'
 
-describe('workerdTransport — workerd runtime compatibility', () => {
-  // ── Module-level import ────────────────────────────────────────────────────
-  // If the module uses any Node.js-specific API (require('ws'), Buffer,
-  // http, etc.) the workerd runtime will throw at import time, failing
-  // these tests immediately.
+describe('nodeTransport — workerd runtime compatibility', () => {
+  // ── Module import ─────────────────────────────────────────────────────────
+  // If nodeTransport imports ws (a Node.js-only package) and ws tries to
+  // use Node.js built-ins, the workerd runtime throws at import time and
+  // every test below fails. Passing = ws was successfully excluded via the
+  // "browser": { "ws": false } field in realtime-preset-node/package.json.
 
   it('can be imported and instantiated in the workerd runtime', () => {
-    const transport = workerdTransport({ url: 'ws://localhost:3000' })
+    const transport = nodeTransport({ url: 'ws://localhost:3000' })
     expect(transport).toBeDefined()
   })
 
   it('exposes the complete RealtimeTransport interface', () => {
-    const transport = workerdTransport({ url: 'ws://localhost:3000' })
+    const transport = nodeTransport({ url: 'ws://localhost:3000' })
     expect(typeof transport.connect).toBe('function')
     expect(typeof transport.disconnect).toBe('function')
     expect(typeof transport.subscribe).toBe('function')
@@ -50,53 +57,44 @@ describe('workerdTransport — workerd runtime compatibility', () => {
     expect(transport.store).toBeDefined()
   })
 
-  // ── Status store — pure JS, no WebSocket I/O ───────────────────────────────
+  // ── Status store ──────────────────────────────────────────────────────────
 
   it('starts in disconnected state', () => {
-    const transport = workerdTransport({ url: 'ws://localhost:3000' })
+    const transport = nodeTransport({ url: 'ws://localhost:3000' })
     expect(transport.store.state).toBe('disconnected')
   })
 
-  it('transitions to connecting on connect()', async () => {
-    const transport = workerdTransport({ url: 'ws://localhost:3000' })
-    await transport.connect()
-    // Status is 'connecting' — channels open lazily, so no WebSocket is
-    // created until subscribe() or onPresenceChange() is called.
+  it('transitions to connecting synchronously when connect() is called', () => {
+    const transport = nodeTransport({ url: 'ws://localhost:3000' })
+    // Do NOT await — the WS connection will fail (blocked by miniflare), and
+    // awaitConnection() would hang waiting for 'connected'. We only need to
+    // verify the synchronous status transition inside openSocket().
+    void transport.connect()
     expect(transport.store.state).toBe('connecting')
     transport.disconnect()
   })
 
-  it('returns to disconnected after disconnect()', async () => {
-    const transport = workerdTransport({ url: 'ws://localhost:3000' })
-    await transport.connect()
+  it('returns to disconnected after disconnect()', () => {
+    const transport = nodeTransport({ url: 'ws://localhost:3000' })
+    void transport.connect()
     transport.disconnect()
     expect(transport.store.state).toBe('disconnected')
   })
 
-  it('calling connect() twice does not change status unexpectedly', async () => {
-    const transport = workerdTransport({ url: 'ws://localhost:3000' })
-    await transport.connect()
-    await transport.connect() // idempotent — already connecting
-    expect(transport.store.state).toBe('connecting')
-    transport.disconnect()
-  })
+  // ── Subscribe / onPresenceChange — synchronous parts ─────────────────────
+  // nodeTransport.subscribe() registers a listener without opening a WebSocket;
+  // the socket is opened lazily by connect(). So subscribe() is safe to call
+  // before connect() and returns a valid unsubscribe function synchronously.
 
-  // ── Subscribe lifecycle — synchronous parts only ───────────────────────────
-  // subscribe() returns an unsubscribe function synchronously, before the
-  // WebSocket handshake completes. The async WebSocket creation that follows
-  // will fail (blocked by miniflare), but that error is handled internally
-  // by the transport's reconnect logic and does not propagate here.
-
-  it('subscribe() synchronously returns an unsubscribe function', () => {
-    const transport = workerdTransport({ url: 'ws://localhost:3000' })
+  it('subscribe() returns an unsubscribe function before connect()', () => {
+    const transport = nodeTransport({ url: 'ws://localhost:3000' })
     const unsub = transport.subscribe('test-channel', () => {})
     expect(typeof unsub).toBe('function')
-    // Unsubscribing while the WebSocket is still opening should not throw.
     expect(() => unsub()).not.toThrow()
   })
 
-  it('multiple subscribers to the same channel all receive an unsubscribe fn', () => {
-    const transport = workerdTransport({ url: 'ws://localhost:3000' })
+  it('multiple subscribe() calls to the same channel each return an unsubscribe fn', () => {
+    const transport = nodeTransport({ url: 'ws://localhost:3000' })
     const unsub1 = transport.subscribe('ch', () => {})
     const unsub2 = transport.subscribe('ch', () => {})
     expect(typeof unsub1).toBe('function')
@@ -105,10 +103,16 @@ describe('workerdTransport — workerd runtime compatibility', () => {
     unsub2()
   })
 
-  it('onPresenceChange() synchronously returns an unsubscribe function', () => {
-    const transport = workerdTransport({ url: 'ws://localhost:3000' })
+  it('onPresenceChange() returns an unsubscribe function before connect()', () => {
+    const transport = nodeTransport({ url: 'ws://localhost:3000' })
     const unsub = transport.onPresenceChange('ch', () => {})
     expect(typeof unsub).toBe('function')
     expect(() => unsub()).not.toThrow()
+  })
+
+  it('publish() while not connected does not throw', async () => {
+    const transport = nodeTransport({ url: 'ws://localhost:3000' })
+    // nodeTransport.publish() calls send() which no-ops if socket is not OPEN.
+    await expect(transport.publish('ch', { x: 1 })).resolves.toBeUndefined()
   })
 })

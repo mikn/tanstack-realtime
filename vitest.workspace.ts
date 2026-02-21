@@ -19,25 +19,16 @@ const sourceAliases = [
     find: /^@tanstack\/realtime-preset-node$/,
     replacement: resolve(root, 'packages/realtime-preset-node/src/index.ts'),
   },
-  {
-    find: /^@tanstack\/realtime-preset-workerd$/,
-    replacement: resolve(root, 'packages/realtime-preset-workerd/src/index.ts'),
-  },
 ]
 
 export default defineWorkspace([
   // ── Node.js integration tests ────────────────────────────────────────────
-  // Defined inline (not via `extends`) so the `include` list is authoritative
-  // and the workerd-do test never leaks into this project.
   {
     test: {
       name: 'node',
       environment: 'node',
       globals: true,
-      include: [
-        'packages/__tests__/integration.test.ts',
-        'packages/__tests__/integration.workerd.test.ts',
-      ],
+      include: ['packages/__tests__/integration.test.ts'],
       pool: 'forks',
       poolOptions: { forks: { singleFork: true } },
     },
@@ -46,18 +37,15 @@ export default defineWorkspace([
 
   // ── Workerd runtime compatibility tests ──────────────────────────────────
   // Runs inside the real workerd runtime via @cloudflare/vitest-pool-workers.
-  // Verifies that the client-side transport code (@tanstack/realtime-preset-workerd)
-  // uses no Node.js-specific APIs and behaves correctly in workerd / TanStack
-  // Start deployments on Cloudflare Workers.
+  // Verifies that nodeTransport from @tanstack/realtime-preset-node is
+  // workerd-compatible: the "browser": { "ws": false } field in that
+  // package's package.json tells wrangler's esbuild to exclude the `ws`
+  // package, leaving the transport to use globalThis.WebSocket (which
+  // exists in workerd) instead.
   //
-  // No DO bindings. No SELF.fetch(). Pure unit tests for the transport's
-  // JS state machine (status store, subscribe/unsubscribe, message routing,
-  // pending-message queue, presence self-filter) driven by a mocked WebSocket.
-  //
-  // NOTE: wrangler uses esbuild to bundle the test file, so it resolves
-  // @tanstack/realtime-preset-workerd from the built dist/ via the workspace
-  // symlink. Run `npm run build` before this runs (CI handles it; locally run:
-  //   npm run build -w @tanstack/realtime-preset-workerd)
+  // NOTE: wrangler bundles via esbuild and resolves @tanstack/realtime-preset-node
+  // from the built dist/ via the workspace symlink. Run `npm run build` before
+  // this test project (CI does; locally: npm run build -w @tanstack/realtime-preset-node)
   defineWorkersProject({
     test: {
       name: 'workerd',

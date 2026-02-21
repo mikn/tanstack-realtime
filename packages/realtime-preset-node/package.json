@@ -9,6 +9,9 @@
       "import": { "types": "./dist/index.d.ts", "default": "./dist/index.js" }
     }
   },
+  "browser": {
+    "ws": false
+  },
   "scripts": {
     "build": "tsup"
   },
