@@ -111,16 +111,20 @@ export interface SharedWorkerServerOptions {
  * It manages the underlying `RealtimeTransport`, fans messages out to all
  * connected tabs, and relays publishes from tabs to the transport.
  *
- * The transport is connected lazily when the first tab requests it and is
- * kept alive until the worker itself is terminated.
+ * The inner transport is connected automatically when the first port registers
+ * and kept alive until the worker itself is terminated.
  *
- * **Lifecycle note**: each tab must call `tab.connect()` to signal that it
- * wants the inner transport to be active. The inner transport is only
- * disconnected when every connected tab has called `tab.disconnect()`.
+ * **Lifecycle**: the inner transport is connected automatically as soon as
+ * the first port is registered.  Calling `tab.connect()` is still accepted —
+ * it is a no-op when the transport is already active.  The inner transport
+ * is disconnected only when every active tab has called `tab.disconnect()`.
  *
- * **Presence snapshot**: `onPresenceChange` delivers updates as they arrive;
- * it does not replay the current presence list to newly-subscribing tabs.
- * If you need an initial snapshot, fetch it via your server API on mount.
+ * **Presence replay**: when a tab subscribes to a channel's presence via
+ * `onPresenceChange`, the server immediately sends the last known presence
+ * list for that channel (if one has been received).  Subsequent changes are
+ * pushed as they arrive.  The cache is cleared when the last subscriber
+ * leaves the channel, so a re-subscription after a quiet period may see an
+ * empty initial snapshot until the next change event.
  */
 export function createSharedWorkerServer(
   inner: RealtimeTransport,
@@ -144,12 +148,15 @@ export function createSharedWorkerServer(
   >()
   const channelUnsubs = new Map<string, () => void>()
 
-  // Per-channel: presence unsub and subscribed ports.
+  // Per-channel: presence unsub, subscribed ports, and last known user list.
   const presencePorts = new Map<
     string,
     Set<{ port: MessagePort; listenerId: string }>
   >()
   const presenceUnsubs = new Map<string, () => void>()
+  // Cache of the most recent presence snapshot per channel.  Used to replay
+  // the current list to tabs that subscribe after the first update has fired.
+  const presenceCache = new Map<string, ReadonlyArray<PresenceUser>>()
 
   function postToPort(port: MessagePort, msg: WorkerToTabMsg): void {
     try {
@@ -212,6 +219,7 @@ export function createSharedWorkerServer(
     if (presenceUnsubs.has(channel)) return
 
     const unsub = inner.onPresenceChange(channel, (users) => {
+      presenceCache.set(channel, users)
       const subscribers = presencePorts.get(channel)
       if (!subscribers) return
       // Fan out to each unique port once — same rationale as ensureChannelSubscription.
@@ -241,6 +249,7 @@ export function createSharedWorkerServer(
       presencePorts.delete(channel)
       presenceUnsubs.get(channel)?.()
       presenceUnsubs.delete(channel)
+      presenceCache.delete(channel)
     }
   }
 
@@ -274,21 +283,20 @@ export function createSharedWorkerServer(
   function handlePortMessage(port: MessagePort, msg: TabToWorkerMsg): void {
     switch (msg.type) {
       case 'connect':
+        // If this tab previously called disconnect() and now wants to reconnect,
+        // remove it from the disconnected set so the lifecycle accounting stays
+        // consistent — subsequent disconnect() calls from other tabs will no
+        // longer count this tab as "already gone".
+        disconnectedPorts.delete(port)
         inner.connect().catch(onConnectError)
         break
 
       case 'disconnect':
-        // Track that this port has requested a disconnect.
         disconnectedPorts.add(port)
         // Only disconnect the inner transport when every active port has
         // requested a disconnect (i.e. no tab still wants to stay connected).
-        {
-          const stillWantConnected = [...activePorts].filter(
-            (p) => !disconnectedPorts.has(p),
-          )
-          if (stillWantConnected.length === 0) {
-            inner.disconnect()
-          }
+        if ([...activePorts].every((p) => disconnectedPorts.has(p))) {
+          inner.disconnect()
         }
         break
 
@@ -338,6 +346,12 @@ export function createSharedWorkerServer(
         }
         presencePorts.get(msg.channel)!.add({ port, listenerId: msg.listenerId })
         ensurePresenceSubscription(msg.channel)
+        // Replay the last known presence snapshot so the new subscriber
+        // doesn't start blind waiting for the next change event.
+        const cached = presenceCache.get(msg.channel)
+        if (cached !== undefined) {
+          postToPort(port, { type: 'presence', channel: msg.channel, users: cached })
+        }
         break
       }
 
@@ -353,6 +367,15 @@ export function createSharedWorkerServer(
 
       // Send the current connection status so the tab starts in sync.
       postToPort(port, { type: 'status', status: inner.store.state })
+
+      // Auto-connect the inner transport if it is currently idle.  From the
+      // tab's perspective the worker is already "live", so requiring an
+      // explicit tab.connect() call is surprising.  We connect eagerly on
+      // first port arrival and re-connect whenever a new tab arrives and finds
+      // the inner transport disconnected (e.g. after all previous tabs left).
+      if (inner.store.state === 'disconnected') {
+        inner.connect().catch(onConnectError)
+      }
 
       port.onmessage = (event: MessageEvent<TabToWorkerMsg>) => {
         handlePortMessage(port, event.data)
@@ -392,17 +415,18 @@ export interface SharedWorkerTransportOptions {
  * The SharedWorker must call `createSharedWorkerServer(transport).connect(port)`
  * in its `connect` event handler.
  *
- * Call `transport.connect()` (or `client.connect()`) after creating the
- * transport to signal to the worker that this tab wants an active connection.
- * The inner transport is kept alive as long as at least one tab has called
- * `connect()` without a subsequent `disconnect()`.
+ * The worker connects the inner transport automatically when the first tab
+ * port is registered, so no explicit `connect()` call is required to start
+ * receiving data.  Call `transport.disconnect()` (or `client.disconnect()`)
+ * when the tab no longer needs the connection; the inner transport is torn
+ * down only when every active tab has disconnected.
  *
  * @example
  * const transport = createSharedWorkerTransport({
  *   url: new URL('./realtime.worker.ts', import.meta.url),
  * })
  * const client = createRealtimeClient({ transport })
- * await client.connect()
+ * // No explicit client.connect() needed — the worker auto-connects.
  */
 export function createSharedWorkerTransport(
   options: SharedWorkerTransportOptions | string | URL,
