@@ -17,11 +17,7 @@
   },
   "peerDependencies": {
     "react": ">=18.0.0",
-    "@tanstack/react-store": ">=0.0.0",
-    "@tanstack/react-db": ">=0.0.0"
-  },
-  "peerDependenciesMeta": {
-    "@tanstack/react-db": { "optional": true }
+    "@tanstack/react-store": ">=0.0.0"
   },
   "sideEffects": false
 }

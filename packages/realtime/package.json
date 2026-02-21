@@ -16,11 +16,5 @@
   "dependencies": {
     "@tanstack/db": "*",
     "@tanstack/store": "*"
-  },
-  "peerDependencies": {
-    "@tanstack/react-db": ">=0.0.0"
-  },
-  "peerDependenciesMeta": {
-    "@tanstack/react-db": { "optional": true }
   }
 }

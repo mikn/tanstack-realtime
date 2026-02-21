@@ -1,7 +1,6 @@
 import type { CollectionConfig, SyncConfig } from '@tanstack/db'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
-import type { RealtimeClient } from '../core/types.js'
-import type { QueryKey } from '../core/types.js'
+import type { RealtimeClient, QueryKey } from '../core/types.js'
 import { serializeKey } from '../core/serializeKey.js'
 
 export interface LiveChannelConfig<

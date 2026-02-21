@@ -923,6 +923,40 @@ describe('Presence correctness', () => {
     expect(data.color).toBe('red')                // Preserved from join
     expect(data.name).toBe('Bob')                 // Preserved from join
   })
+
+  it('onPresenceChange delivers others only — self is always excluded', async () => {
+    const channel = 'self-exclusion'
+
+    // Both clients subscribe then join presence.
+    client1.subscribe(channel, () => {})
+    await waitFor(30)
+    client1.joinPresence(channel, { name: 'Alice' })
+
+    client2.subscribe(channel, () => {})
+    await waitFor(30)
+    client2.joinPresence(channel, { name: 'Bob' })
+    await waitFor(50)
+
+    // Capture all snapshots received by client1.
+    const snapshots: ReadonlyArray<PresenceUser>[] = []
+    client1.onPresenceChange(channel, (users) => snapshots.push(users))
+
+    // Trigger a broadcast by having client2 send an update.
+    client2.updatePresence(channel, { name: 'Bob', cursor: { x: 1, y: 2 } })
+    await waitFor(80)
+
+    expect(snapshots.length).toBeGreaterThan(0)
+    for (const snapshot of snapshots) {
+      // 'Alice' is client1 (self) — must never appear in client1's own list.
+      expect(
+        snapshot.some((u) => (u.data as Record<string, unknown>).name === 'Alice'),
+      ).toBe(false)
+      // 'Bob' is a different connection — must always be present.
+      expect(
+        snapshot.some((u) => (u.data as Record<string, unknown>).name === 'Bob'),
+      ).toBe(true)
+    }
+  })
 })
 
 // ---------------------------------------------------------------------------

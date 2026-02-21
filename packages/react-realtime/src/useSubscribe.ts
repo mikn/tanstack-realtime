@@ -1,10 +1,13 @@
-import { use, useEffect } from 'react'
+import { use, useEffect, useRef } from 'react'
 import type { QueryKey } from '@tanstack/realtime'
 import { serializeKey } from '@tanstack/realtime'
 import { RealtimeContext } from './context.js'
 
 /**
  * Subscribes to raw channel events for the lifetime of the component.
+ *
+ * The `onMessage` callback is kept current via a ref so it always sees the
+ * latest props/state without triggering re-subscription on every render.
  *
  * @example
  * useSubscribe(['chat:typing', { roomId }], (event) => {
@@ -25,11 +28,14 @@ export function useSubscribe(
   const serializedChannel =
     typeof channel === 'string' ? channel : serializeKey(channel)
 
+  // Keep the latest callback in a ref so the subscription is not torn down and
+  // re-established on every render when the caller does not memoize onMessage.
+  const onMessageRef = useRef(onMessage)
+  onMessageRef.current = onMessage
+
   useEffect(() => {
-    return client.subscribe(serializedChannel, onMessage)
-    // `onMessage` intentionally excluded — callers should wrap in useCallback if
-    // they need stable identity. Subscribing/unsubscribing on every render is
-    // expensive; the channel key is the correct dependency.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return client.subscribe(serializedChannel, (data) =>
+      onMessageRef.current(data),
+    )
   }, [client, serializedChannel])
 }

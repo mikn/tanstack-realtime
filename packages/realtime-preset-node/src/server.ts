@@ -18,6 +18,7 @@ type ClientMsg =
   | { type: 'presence:leave'; channel: string }
 
 type ServerMsg =
+  | { type: 'connected'; connectionId: string }
   | { type: 'subscribe:ok'; channel: string }
   | { type: 'subscribe:error'; channel: string; code: number; reason: string }
   | { type: 'message'; channel: string; data: unknown }
@@ -255,6 +256,10 @@ export function createNodeServer(options: NodeServerOptions): NodeServer {
           presenceChannels: new Map(),
         }
         connections.set(connectionId, conn)
+
+        // Let the client know its own connectionId so it can exclude itself
+        // from presence lists (see RealtimeTransport.onPresenceChange filtering).
+        sendTo(ws, { type: 'connected', connectionId })
 
         ws.on('message', (data) => {
           handleMessage(conn, data.toString()).catch((err) => {

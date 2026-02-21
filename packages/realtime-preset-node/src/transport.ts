@@ -32,6 +32,7 @@ export interface NodeTransportOptions {
 // ---------------------------------------------------------------------------
 
 type ServerMsg =
+  | { type: 'connected'; connectionId: string }
   | { type: 'subscribe:ok'; channel: string }
   | { type: 'subscribe:error'; channel: string; code: number; reason: string }
   | { type: 'message'; channel: string; data: unknown }
@@ -79,6 +80,7 @@ export function nodeTransport(options: NodeTransportOptions = {}): RealtimeTrans
   let reconnectAttempt = 0
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let intentionalClose = false
+  let selfConnectionId: string | null = null
 
   function resolveUrl(): string {
     if (url) return url.replace(/\/?$/, '') + path
@@ -107,6 +109,10 @@ export function nodeTransport(options: NodeTransportOptions = {}): RealtimeTrans
 
   function handleMessage(msg: ServerMsg) {
     switch (msg.type) {
+      case 'connected': {
+        selfConnectionId = msg.connectionId
+        break
+      }
       case 'message': {
         const listeners = subscriptions.get(msg.channel)
         if (listeners) {
@@ -117,7 +123,11 @@ export function nodeTransport(options: NodeTransportOptions = {}): RealtimeTrans
       case 'presence:update': {
         const listeners = presenceListeners.get(msg.channel)
         if (listeners) {
-          for (const cb of listeners) cb(msg.users)
+          // Filter out the current connection so callers receive `others` — not self.
+          const others = selfConnectionId
+            ? msg.users.filter((u) => u.connectionId !== selfConnectionId)
+            : msg.users
+          for (const cb of listeners) cb(others)
         }
         break
       }
@@ -132,6 +142,7 @@ export function nodeTransport(options: NodeTransportOptions = {}): RealtimeTrans
   }
 
   function openSocket() {
+    selfConnectionId = null // reset until the server echoes our connectionId
     const wsUrl = resolveUrl()
     const ws = new WS(wsUrl)
     socket = ws
@@ -224,6 +235,7 @@ export function nodeTransport(options: NodeTransportOptions = {}): RealtimeTrans
 
     disconnect() {
       intentionalClose = true
+      selfConnectionId = null
       if (reconnectTimer) {
         clearTimeout(reconnectTimer)
         reconnectTimer = null
