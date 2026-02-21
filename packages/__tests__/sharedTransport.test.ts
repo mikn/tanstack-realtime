@@ -17,6 +17,7 @@ import type {
   RealtimeTransport,
   ConnectionStatus,
   PresenceUser,
+  SharedWorkerServerOptions,
 } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
@@ -77,6 +78,8 @@ const workerServers = new Map<string, ReturnType<typeof createSharedWorkerServer
 
 class MockSharedWorker {
   readonly port: MockMessagePort
+  /** The last worker-side port created — used by port-close tests. */
+  static lastWorkerPort: MockMessagePort | null = null
 
   constructor(url: string | URL) {
     const key = String(url)
@@ -85,6 +88,7 @@ class MockSharedWorker {
 
     const [tabPort, workerPort] = MockMessagePort.pair()
     this.port = tabPort
+    MockSharedWorker.lastWorkerPort = workerPort
     // Simulate the SharedWorker connect event firing synchronously.
     server.connect(workerPort as unknown as MessagePort)
   }
@@ -99,6 +103,7 @@ class MockSharedWorker {
 
 function createMockInnerTransport(): RealtimeTransport & {
   emit: (channel: string, data: unknown) => void
+  emitPresence: (channel: string, users: ReadonlyArray<PresenceUser>) => void
   publishCalls: Array<{ channel: string; data: unknown }>
   setStatus: (s: ConnectionStatus) => void
 } {
@@ -136,12 +141,11 @@ function createMockInnerTransport(): RealtimeTransport & {
       if (cbs) for (const cb of cbs) cb(data)
     },
     setStatus(s) { store.setState(() => s) },
-    // Helper to simulate a presence change notification.
-    emitPresence(channel: string, users: ReadonlyArray<PresenceUser>) {
+    emitPresence(channel, users) {
       const cbs = presenceListeners.get(channel)
       if (cbs) for (const cb of cbs) cb(users)
     },
-  } as any
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -150,9 +154,9 @@ function createMockInnerTransport(): RealtimeTransport & {
 
 const TEST_URL = 'https://worker.example.com/realtime.js'
 
-function setupWorker(inner?: RealtimeTransport) {
+function setupWorker(inner?: RealtimeTransport, options?: SharedWorkerServerOptions) {
   const transport = inner ?? createMockInnerTransport()
-  const server = createSharedWorkerServer(transport as RealtimeTransport)
+  const server = createSharedWorkerServer(transport as RealtimeTransport, options)
   workerServers.set(TEST_URL, server)
   return { transport: transport as ReturnType<typeof createMockInnerTransport>, server }
 }
@@ -161,8 +165,16 @@ function connectTab() {
   return createSharedWorkerTransport(TEST_URL)
 }
 
+/** Connects a tab and returns both the tab transport and the worker-side port. */
+function connectTabWithPort() {
+  const tab = connectTab()
+  const workerPort = MockSharedWorker.lastWorkerPort!
+  return { tab, workerPort }
+}
+
 beforeEach(() => {
   workerServers.clear()
+  MockSharedWorker.lastWorkerPort = null
 })
 
 afterEach(() => {
@@ -191,6 +203,18 @@ describe('createSharedWorkerServer', () => {
     transport.setStatus('reconnecting')
 
     expect(tab1.store.state).toBe('reconnecting')
+    expect(tab2.store.state).toBe('reconnecting')
+  })
+
+  it('new tab connecting after a status change receives the current status', () => {
+    const { transport } = setupWorker()
+    transport.setStatus('connected')
+    const tab1 = connectTab()
+    expect(tab1.store.state).toBe('connected')
+
+    transport.setStatus('reconnecting')
+    const tab2 = connectTab()
+    // tab2 was created after the status changed to reconnecting.
     expect(tab2.store.state).toBe('reconnecting')
   })
 
@@ -271,6 +295,21 @@ describe('createSharedWorkerServer', () => {
     expect(unsubInner).not.toHaveBeenCalled()
   })
 
+  it('only one inner subscribe per channel regardless of tab count', () => {
+    const { transport } = setupWorker()
+    const subscribeSpy = vi.spyOn(transport, 'subscribe')
+
+    const tab1 = connectTab()
+    const tab2 = connectTab()
+    const tab3 = connectTab()
+
+    tab1.subscribe('ch', vi.fn())
+    tab2.subscribe('ch', vi.fn())
+    tab3.subscribe('ch', vi.fn())
+
+    expect(subscribeSpy).toHaveBeenCalledTimes(1)
+  })
+
   it('publish from a tab is relayed to the inner transport', async () => {
     const { transport } = setupWorker()
 
@@ -303,6 +342,21 @@ describe('createSharedWorkerServer', () => {
     expect(transport.publishCalls.map((c) => c.data)).toEqual(['from-tab1', 'from-tab2'])
   })
 
+  it('two concurrent publish requests both resolve with their own requestIds', async () => {
+    const { transport } = setupWorker()
+    const tab = connectTab()
+
+    // Both promises should resolve (no cross-contamination of requestIds).
+    const results = await Promise.allSettled([
+      tab.publish('ch', 'a'),
+      tab.publish('ch', 'b'),
+    ])
+
+    expect(results[0]!.status).toBe('fulfilled')
+    expect(results[1]!.status).toBe('fulfilled')
+    expect(transport.publishCalls).toHaveLength(2)
+  })
+
   it('disconnect is only forwarded when the last tab disconnects', () => {
     const { transport } = setupWorker()
     const disconnectSpy = vi.spyOn(transport, 'disconnect')
@@ -326,7 +380,7 @@ describe('createSharedWorkerServer', () => {
     tab.onPresenceChange('ch', presenceCb)
 
     const fakeUsers = [{ connectionId: 'c1', data: { name: 'Alice' } }]
-    ;(inner as any).emitPresence('ch', fakeUsers)
+    inner.emitPresence('ch', fakeUsers)
 
     expect(presenceCb).toHaveBeenCalledTimes(1)
     expect(presenceCb).toHaveBeenCalledWith(fakeUsers)
@@ -341,8 +395,155 @@ describe('createSharedWorkerServer', () => {
     const unsub = tab.onPresenceChange('ch', presenceCb)
 
     unsub()
-    ;(inner as any).emitPresence('ch', [])
+    inner.emitPresence('ch', [])
     expect(presenceCb).not.toHaveBeenCalled()
+  })
+
+  it('only one inner presence subscription per channel regardless of tab count', () => {
+    const inner = createMockInnerTransport()
+    setupWorker(inner)
+    const onPresenceSpy = vi.spyOn(inner, 'onPresenceChange')
+
+    const tab1 = connectTab()
+    const tab2 = connectTab()
+    const tab3 = connectTab()
+
+    tab1.onPresenceChange('ch', vi.fn())
+    tab2.onPresenceChange('ch', vi.fn())
+    tab3.onPresenceChange('ch', vi.fn())
+
+    expect(onPresenceSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('inner presence unsub fires when the last tab unsubscribes', () => {
+    const inner = createMockInnerTransport()
+    setupWorker(inner)
+
+    const unsubInner = vi.fn()
+    vi.spyOn(inner, 'onPresenceChange').mockReturnValue(unsubInner)
+
+    const tab1 = connectTab()
+    const tab2 = connectTab()
+    const unsub1 = tab1.onPresenceChange('ch', vi.fn())
+    tab2.onPresenceChange('ch', vi.fn())
+
+    unsub1()
+    expect(unsubInner).not.toHaveBeenCalled() // tab2 still listening
+
+    // There's no public unsub2 because tab2.onPresenceChange result was discarded.
+    // Instead simulate tab2's port closing to clean everything up.
+    const workerPort = MockSharedWorker.lastWorkerPort!
+    workerPort.simulateClose()
+
+    expect(unsubInner).toHaveBeenCalledTimes(1)
+  })
+
+  it('tab port close removes all channel subscriptions for that port', () => {
+    const { transport } = setupWorker()
+    const subscribeSpy = vi.spyOn(transport, 'subscribe')
+    const unsubInner = vi.fn()
+    subscribeSpy.mockReturnValue(unsubInner)
+
+    const { tab, workerPort } = connectTabWithPort()
+    tab.subscribe('ch-a', vi.fn())
+    tab.subscribe('ch-b', vi.fn())
+
+    // Simulate the tab's port closing (browser navigates away).
+    workerPort.simulateClose()
+
+    // Both inner subscriptions should have been cleaned up.
+    expect(unsubInner).toHaveBeenCalledTimes(2)
+  })
+
+  it('tab port close removes all presence subscriptions for that port', () => {
+    const inner = createMockInnerTransport()
+    setupWorker(inner)
+
+    const unsubInner = vi.fn()
+    vi.spyOn(inner, 'onPresenceChange').mockReturnValue(unsubInner)
+
+    const { tab, workerPort } = connectTabWithPort()
+    tab.onPresenceChange('ch', vi.fn())
+
+    workerPort.simulateClose()
+
+    expect(unsubInner).toHaveBeenCalledTimes(1)
+  })
+
+  it('port close does not affect subscriptions from other tabs', () => {
+    const { transport } = setupWorker()
+    const cb2 = vi.fn()
+
+    // Connect tab1 and subscribe, then get its worker port before tab2 connects.
+    const { tab: tab1, workerPort: workerPort1 } = connectTabWithPort()
+    tab1.subscribe('ch', vi.fn())
+
+    // Connect tab2 and subscribe.
+    const tab2 = connectTab()
+    tab2.subscribe('ch', cb2)
+
+    // Close tab1's port — tab2 should be unaffected.
+    workerPort1.simulateClose()
+    transport.emit('ch', 'ping')
+
+    expect(cb2).toHaveBeenCalledWith('ping')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// createSharedWorkerServer — onConnectError option
+// ---------------------------------------------------------------------------
+
+describe('createSharedWorkerServer — onConnectError', () => {
+  it('connect error is passed to the onConnectError callback', async () => {
+    const connectError = new Error('auth failed')
+    const inner = createMockInnerTransport()
+    vi.spyOn(inner, 'connect').mockRejectedValueOnce(connectError)
+
+    const onConnectError = vi.fn()
+    setupWorker(inner, { onConnectError })
+
+    const tab = connectTab()
+    await tab.connect()
+    // Allow the rejected promise to settle.
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(onConnectError).toHaveBeenCalledWith(connectError)
+  })
+
+  it('connect error defaults to console.error when no onConnectError is provided', async () => {
+    const connectError = new Error('connection refused')
+    const inner = createMockInnerTransport()
+    vi.spyOn(inner, 'connect').mockRejectedValueOnce(connectError)
+
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    setupWorker(inner) // no options → defaults to console.error
+
+    const tab = connectTab()
+    await tab.connect()
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[SharedWorkerServer]'),
+      connectError,
+    )
+    consoleSpy.mockRestore()
+  })
+
+  it('onConnectError: () => {} suppresses the default console.error', async () => {
+    const connectError = new Error('silent failure')
+    const inner = createMockInnerTransport()
+    vi.spyOn(inner, 'connect').mockRejectedValueOnce(connectError)
+
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    setupWorker(inner, { onConnectError: () => {} })
+
+    const tab = connectTab()
+    await tab.connect()
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(consoleSpy).not.toHaveBeenCalled()
+    consoleSpy.mockRestore()
   })
 })
 
@@ -391,6 +592,28 @@ describe('createSharedWorkerTransport', () => {
 
     expect(typeof unsub).toBe('function')
     unsub()
+  })
+
+  it('same tab subscribing to the same channel twice creates two independent listeners', () => {
+    const { transport } = setupWorker()
+
+    const tab = connectTab()
+    const cb1 = vi.fn()
+    const cb2 = vi.fn()
+    const unsub1 = tab.subscribe('ch', cb1)
+    const unsub2 = tab.subscribe('ch', cb2)
+
+    transport.emit('ch', 'ping')
+    expect(cb1).toHaveBeenCalledWith('ping')
+    expect(cb2).toHaveBeenCalledWith('ping')
+
+    // Unsubscribe cb1 — cb2 still receives.
+    unsub1()
+    transport.emit('ch', 'pong')
+    expect(cb1).toHaveBeenCalledTimes(1) // not called again
+    expect(cb2).toHaveBeenCalledTimes(2)
+
+    unsub2()
   })
 
   it('multiple listeners on the same channel all receive messages', () => {
@@ -466,7 +689,7 @@ describe('createSharedWorkerTransport', () => {
     const unsub = tab.onPresenceChange('ch', cb)
 
     const users = [{ connectionId: 'x', data: {} }]
-    ;(inner as any).emitPresence('ch', users)
+    inner.emitPresence('ch', users)
 
     expect(cb).toHaveBeenCalledWith(users)
     expect(typeof unsub).toBe('function')
@@ -503,5 +726,21 @@ describe('createSharedWorkerTransport', () => {
     setupWorker()
     const tab = createSharedWorkerTransport({ url: TEST_URL, publishTimeout: 5000 })
     expect(tab.store).toBeDefined()
+  })
+
+  it('publish times out and rejects with a descriptive error when the worker does not ack', async () => {
+    const inner = createMockInnerTransport()
+    // publish never resolves — simulates a worker that drops the ack.
+    vi.spyOn(inner, 'publish').mockReturnValue(new Promise(() => {}))
+    setupWorker(inner)
+
+    vi.useFakeTimers()
+    const tab = createSharedWorkerTransport({ url: TEST_URL, publishTimeout: 1000 })
+    const publishPromise = tab.publish('ch', { data: 1 })
+
+    vi.advanceTimersByTime(1001)
+
+    await expect(publishPromise).rejects.toThrow('[SharedWorkerTransport] publish timed out after 1000ms')
+    vi.useRealTimers()
   })
 })

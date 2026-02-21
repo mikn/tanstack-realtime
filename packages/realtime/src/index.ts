@@ -82,6 +82,7 @@ export {
 } from './core/sharedWorkerTransport.js'
 export type {
   SharedWorkerTransportOptions,
+  SharedWorkerServerOptions,
   SharedWorkerServer,
   TabToWorkerMsg,
   WorkerToTabMsg,

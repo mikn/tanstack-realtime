@@ -85,6 +85,26 @@ export interface SharedWorkerServer {
   connect(port: MessagePort): void
 }
 
+export interface SharedWorkerServerOptions {
+  /**
+   * Called when the underlying transport's `connect()` rejects.
+   *
+   * Defaults to `console.error` so failures are always visible in the
+   * browser's DevTools console without any setup.
+   *
+   * Set to `() => {}` to suppress the default logging if you have your own
+   * error-reporting pipeline (Sentry, Datadog, etc.).
+   *
+   * @example
+   * createSharedWorkerServer(transport, {
+   *   onConnectError: (err) => Sentry.captureException(err),
+   * })
+   *
+   * @default (err) => console.error('[SharedWorkerServer] connect error:', err)
+   */
+  onConnectError?: (err: unknown) => void
+}
+
 /**
  * Creates the server-side coordinator that runs inside a SharedWorker.
  *
@@ -93,16 +113,30 @@ export interface SharedWorkerServer {
  *
  * The transport is connected lazily when the first tab requests it and is
  * kept alive until the worker itself is terminated.
+ *
+ * **Lifecycle note**: each tab must call `tab.connect()` to signal that it
+ * wants the inner transport to be active. The inner transport is only
+ * disconnected when every connected tab has called `tab.disconnect()`.
+ *
+ * **Presence snapshot**: `onPresenceChange` delivers updates as they arrive;
+ * it does not replay the current presence list to newly-subscribing tabs.
+ * If you need an initial snapshot, fetch it via your server API on mount.
  */
 export function createSharedWorkerServer(
   inner: RealtimeTransport,
+  options: SharedWorkerServerOptions = {},
 ): SharedWorkerServer {
+  const {
+    onConnectError = (err: unknown) =>
+      console.error('[SharedWorkerServer] connect error:', err),
+  } = options
+
   const activePorts = new Set<MessagePort>()
   // Tracks ports that have explicitly called disconnect() so we don't keep
   // the inner transport alive on their behalf.
   const disconnectedPorts = new Set<MessagePort>()
 
-  // Per-channel: Set of (portId, listenerId) pairs that subscribed.
+  // Per-channel: Set of (port, listenerId) pairs that subscribed.
   // We keep a single real subscription on `inner` per channel.
   const channelPorts = new Map<
     string,
@@ -121,7 +155,7 @@ export function createSharedWorkerServer(
     try {
       port.postMessage(msg)
     } catch {
-      // Port closed — will be cleaned up on next operation.
+      // Port closed — will be cleaned up on next operation or on close event.
     }
   }
 
@@ -142,8 +176,15 @@ export function createSharedWorkerServer(
     const unsub = inner.subscribe(channel, (data) => {
       const subscribers = channelPorts.get(channel)
       if (!subscribers) return
+      // Fan out to each unique port once — not to every {port, listenerId} pair.
+      // A single tab may hold multiple callbacks for the same channel; the tab
+      // dispatches the single message to all its local callbacks itself.
+      const seen = new Set<MessagePort>()
       for (const { port } of subscribers) {
-        postToPort(port, { type: 'message', channel, data })
+        if (!seen.has(port)) {
+          seen.add(port)
+          postToPort(port, { type: 'message', channel, data })
+        }
       }
     })
     channelUnsubs.set(channel, unsub)
@@ -173,8 +214,13 @@ export function createSharedWorkerServer(
     const unsub = inner.onPresenceChange(channel, (users) => {
       const subscribers = presencePorts.get(channel)
       if (!subscribers) return
+      // Fan out to each unique port once — same rationale as ensureChannelSubscription.
+      const seen = new Set<MessagePort>()
       for (const { port } of subscribers) {
-        postToPort(port, { type: 'presence', channel, users })
+        if (!seen.has(port)) {
+          seen.add(port)
+          postToPort(port, { type: 'presence', channel, users })
+        }
       }
     })
     presenceUnsubs.set(channel, unsub)
@@ -202,29 +248,33 @@ export function createSharedWorkerServer(
     activePorts.delete(port)
     disconnectedPorts.delete(port)
 
-    // Remove all channel subscriptions for this port.
+    // Snapshot subscriptions before cleanup to avoid mutating maps/sets while
+    // iterating them — cleanupChannelPort deletes from channelPorts in place.
+    const channelSubs: Array<{ channel: string; listenerId: string }> = []
     for (const [channel, subs] of channelPorts) {
       for (const sub of subs) {
-        if (sub.port === port) {
-          cleanupChannelPort(port, channel, sub.listenerId)
-        }
+        if (sub.port === port) channelSubs.push({ channel, listenerId: sub.listenerId })
       }
     }
+    for (const { channel, listenerId } of channelSubs) {
+      cleanupChannelPort(port, channel, listenerId)
+    }
 
-    // Remove all presence subscriptions for this port.
+    const presenceSubs: Array<{ channel: string; listenerId: string }> = []
     for (const [channel, subs] of presencePorts) {
       for (const sub of subs) {
-        if (sub.port === port) {
-          cleanupPresencePort(port, channel, sub.listenerId)
-        }
+        if (sub.port === port) presenceSubs.push({ channel, listenerId: sub.listenerId })
       }
+    }
+    for (const { channel, listenerId } of presenceSubs) {
+      cleanupPresencePort(port, channel, listenerId)
     }
   }
 
   function handlePortMessage(port: MessagePort, msg: TabToWorkerMsg): void {
     switch (msg.type) {
       case 'connect':
-        void inner.connect()
+        inner.connect().catch(onConnectError)
         break
 
       case 'disconnect':
@@ -308,7 +358,8 @@ export function createSharedWorkerServer(
         handlePortMessage(port, event.data)
       }
 
-      // When the port closes (tab navigates / closes), clean up.
+      // When the port closes (tab navigates / crashes), clean up all
+      // subscriptions associated with it.
       port.addEventListener('close', () => {
         cleanupPort(port)
       })
@@ -341,11 +392,17 @@ export interface SharedWorkerTransportOptions {
  * The SharedWorker must call `createSharedWorkerServer(transport).connect(port)`
  * in its `connect` event handler.
  *
+ * Call `transport.connect()` (or `client.connect()`) after creating the
+ * transport to signal to the worker that this tab wants an active connection.
+ * The inner transport is kept alive as long as at least one tab has called
+ * `connect()` without a subsequent `disconnect()`.
+ *
  * @example
  * const transport = createSharedWorkerTransport({
  *   url: new URL('./realtime.worker.ts', import.meta.url),
  * })
  * const client = createRealtimeClient({ transport })
+ * await client.connect()
  */
 export function createSharedWorkerTransport(
   options: SharedWorkerTransportOptions | string | URL,

@@ -15,6 +15,11 @@ export interface RealtimeChannelMessage<T = unknown> {
   data: T
 }
 
+/** Internal write operation passed to the TanStack DB sync `write` callback. */
+type WriteOp<T, TKey> =
+  | { type: 'insert' | 'update'; value: T }
+  | { type: 'delete'; key: TKey }
+
 export interface RealtimeCollectionConfig<
   T extends object = Record<string, unknown>,
   TKey extends string | number = string,
@@ -66,10 +71,17 @@ export interface RealtimeCollectionConfig<
    * already exists in the synced collection state.
    *
    * - `previous`: the last value this sync layer confirmed for that key.
+   *   Updated on every incoming server message and after each successful
+   *   mutation (`onInsert` / `onUpdate` / `onDelete`).
    * - `incoming`: the new value arriving from the server/channel.
    *
    * Return the value to write into the collection. If omitted, the incoming
    * server value always wins (last-write-wins / remote-wins default).
+   *
+   * **Baseline lifetime**: by default the baseline is cleared when the sync
+   * function stops (collection unmounts). Each remount therefore starts with
+   * a clean slate. To preserve the baseline across unmount/remount cycles
+   * set `retainMergeState: true` — see its JSDoc for when that makes sense.
    *
    * @example
    * // Preserve a locally-relevant derived field while accepting server state
@@ -82,6 +94,28 @@ export interface RealtimeCollectionConfig<
    * })
    */
   merge?: (previous: T, incoming: T) => T
+
+  /**
+   * When `true`, the internal merge-baseline map is preserved across sync
+   * stop/restart cycles instead of being cleared on unmount.
+   *
+   * **Sane default (`false`)**: the baseline is cleared when the sync
+   * function stops. Each remount starts with a clean slate. This is always
+   * correct when you supply a `queryFn` (it re-seeds the baseline on every
+   * mount) and is safe in the absence of one (merge simply won't be called
+   * for the first update of each key after remount, falling back to
+   * last-write-wins for that one event).
+   *
+   * **Escape hatch (`true`)**: retain the baseline across unmount/remount.
+   * Consider this only when:
+   *  - you have **no** `queryFn` (no server round-trip to re-seed data), AND
+   *  - `merge` must have access to values seen in a previous mount (e.g. a
+   *    long-lived SPA that suspends the collection temporarily without
+   *    reloading from the server).
+   *
+   * @default false
+   */
+  retainMergeState?: boolean
 
   /**
    * Called on mount to populate the collection with initial data.
@@ -154,6 +188,11 @@ export function realtimeCollectionOptions<
     onInsert,
     onUpdate,
     onDelete,
+    retainMergeState = false,
+    // getKey is destructured explicitly so applyMessage and mutation wrappers
+    // can close over it directly rather than holding a reference to the whole
+    // config object.
+    getKey,
     ...collectionConfig
   } = config
 
@@ -178,28 +217,29 @@ export function realtimeCollectionOptions<
     ),
   ]
 
-  // Track the last confirmed value per key so merge() can receive it.
-  // This is closure-scoped so multiple sync restarts share the same map.
+  // Track the last confirmed value per key so merge() has a stable baseline.
+  // Cleared on sync stop by default (retainMergeState: false) so each remount
+  // starts fresh. Set retainMergeState: true to preserve it across restarts.
   const syncedValues = new Map<TKey, T>()
 
   /**
    * Process one raw channel message inside an open sync transaction.
-   * Caller must wrap in begin() / commit().
+   * Caller must wrap with begin() / commit().
    */
   function applyMessage(
     raw: unknown,
-    write: (op: { type: 'insert' | 'update' | 'delete'; value?: T; key?: TKey }) => void,
+    write: (op: WriteOp<T, TKey>) => void,
   ): void {
     const msg = raw as RealtimeChannelMessage<T>
     if (!msg || typeof msg.action !== 'string') return
 
     if (msg.action === 'delete') {
-      const key = config.getKey(msg.data as T)
+      const key = getKey(msg.data as T)
       write({ type: 'delete', key })
       syncedValues.delete(key)
     } else {
       const incoming = msg.data as T
-      const key = config.getKey(incoming)
+      const key = getKey(incoming)
       const previous = syncedValues.get(key)
 
       const value =
@@ -237,7 +277,7 @@ export function realtimeCollectionOptions<
             begin()
             for (const row of rows) {
               write({ type: 'insert', value: row })
-              syncedValues.set(config.getKey(row), row)
+              syncedValues.set(getKey(row), row)
             }
             commit()
             markReady()
@@ -253,6 +293,11 @@ export function realtimeCollectionOptions<
       return () => {
         stopped = true
         for (const unsub of unsubs) unsub()
+        // Clear the merge baseline so the next mount starts fresh.
+        // Set retainMergeState: true to keep the baseline across restarts.
+        if (!retainMergeState) {
+          syncedValues.clear()
+        }
       }
     },
   }
@@ -265,7 +310,7 @@ export function realtimeCollectionOptions<
     ? async (params) => {
         const result = await onInsert(params)
         if (result != null && primaryChannel) {
-          syncedValues.set(config.getKey(result), result)
+          syncedValues.set(getKey(result), result)
           await client.publish(primaryChannel, {
             action: 'insert',
             data: result,
@@ -279,7 +324,7 @@ export function realtimeCollectionOptions<
     ? async (params) => {
         const result = await onUpdate(params)
         if (result != null && primaryChannel) {
-          syncedValues.set(config.getKey(result), result)
+          syncedValues.set(getKey(result), result)
           await client.publish(primaryChannel, {
             action: 'update',
             data: result,
@@ -293,7 +338,7 @@ export function realtimeCollectionOptions<
     ? async (params) => {
         const result = await onDelete(params)
         if (result != null && primaryChannel) {
-          syncedValues.delete(config.getKey(result))
+          syncedValues.delete(getKey(result))
           await client.publish(primaryChannel, {
             action: 'delete',
             data: result,
@@ -305,6 +350,7 @@ export function realtimeCollectionOptions<
 
   return {
     ...collectionConfig,
+    getKey,
     sync,
     ...(wrappedOnInsert && { onInsert: wrappedOnInsert }),
     ...(wrappedOnUpdate && { onUpdate: wrappedOnUpdate }),
