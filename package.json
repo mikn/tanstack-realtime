@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w @tanstack/realtime && npm run build -w @tanstack/realtime-preset-node",
+    "build": "npm run build -w @tanstack/realtime && npm run build -w @tanstack/realtime-preset-node && npm run build -w @tanstack/realtime-preset-workerd",
     "test": "vitest run",
     "test:watch": "vitest"
   },

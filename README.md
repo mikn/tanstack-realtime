@@ -13,6 +13,7 @@
 | [`@tanstack/realtime`](#tanstackrealtime) | Core client, live collection helpers, and type definitions |
 | [`@tanstack/react-realtime`](#tanstackreact-realtime) | React hooks and provider (`useSubscribe`, `usePresence`, `usePublish`, `useRealtime`) |
 | [`@tanstack/realtime-preset-node`](#tanstackrealtime-preset-node) | WebSocket transport + Node.js server for local dev and self-hosted deployments |
+| [`@tanstack/realtime-preset-workerd`](#tanstackrealtime-preset-workerd) | Cloudflare Workers transport + Durable Object server for edge deployments |
 
 ---
 
@@ -183,6 +184,101 @@ export const client = createRealtimeClient({
     path: '/_realtime',
   }),
 })
+```
+
+---
+
+## `@tanstack/realtime-preset-workerd`
+
+Cloudflare Workers preset. Uses **Durable Objects** as the server, with one DO instance per channel key — the "granular key" pattern that gives each channel its own independent state, scales to zero when idle, and avoids the contention ceiling of a single shared DO.
+
+The client transport opens one WebSocket per channel (not a single multiplexed connection) so each socket goes directly to the responsible DO instance.
+
+### Installation
+
+```bash
+npm install @tanstack/realtime-preset-workerd
+```
+
+### Worker entry point
+
+```ts
+// worker.ts
+import {
+  RealtimeChannel,
+  createWorkerdHandler,
+  type WorkerdEnv,
+} from '@tanstack/realtime-preset-workerd'
+
+// Re-export the DO class so wrangler can bind it.
+export { RealtimeChannel }
+
+interface Env extends WorkerdEnv {
+  AUTH_SECRET: string
+}
+
+const handler = createWorkerdHandler<Env>({
+  getAuthToken(request) {
+    // Auth token from query param, cookie, or Authorization header.
+    return new URL(request.url).searchParams.get('token')
+  },
+
+  async authorize(token, channel) {
+    const userId = await verifyJwt(token)
+    if (!userId) return null
+    return { subscribe: true, publish: false, presence: true }
+  },
+})
+
+export default { fetch: handler.fetch }
+```
+
+```toml
+# wrangler.toml
+[[durable_objects.bindings]]
+name        = "REALTIME_CHANNEL"
+class_name  = "RealtimeChannel"
+
+[[migrations]]
+tag         = "v1"
+new_classes = ["RealtimeChannel"]
+```
+
+### Client transport
+
+```ts
+// client/realtime.ts
+import { createRealtimeClient } from '@tanstack/realtime'
+import { workerdTransport } from '@tanstack/realtime-preset-workerd'
+
+export const client = createRealtimeClient({
+  transport: workerdTransport({
+    // Omit in a browser — derived from window.location.
+    // Required when calling from another Worker.
+    url: 'https://my-worker.example.com',
+    getAuthToken: () => myAuthStore.token,
+  }),
+})
+```
+
+All React hooks (`useSubscribe`, `usePublish`, `usePresence`, `useRealtime`) work unchanged with this transport.
+
+### Server-side publish
+
+Push to a channel from outside a client connection by routing a `POST` request to the DO:
+
+```ts
+// In your API handler or queue consumer:
+async function publish(env: Env, channel: string, data: unknown) {
+  const doId = env.REALTIME_CHANNEL.idFromName(channel)
+  const stub = env.REALTIME_CHANNEL.get(doId)
+  await stub.fetch(
+    new Request(`https://internal/_realtime/${encodeURIComponent(channel)}`, {
+      method: 'POST',
+      body: JSON.stringify({ data }),
+    }),
+  )
+}
 ```
 
 ---
