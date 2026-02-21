@@ -42,7 +42,7 @@ function getClient(ctx: RealtimeClient | null): RealtimeClient {
  */
 export function useRealtime(): UseRealtimeResult {
   const client = getClient(use(RealtimeContext))
-  const { status } = useStore(client.store, (s) => s)
+  const status = useStore(client.store, (s) => s.status)
 
   const connect = useCallback(() => client.connect(), [client])
   const disconnect = useCallback(() => client.disconnect(), [client])
