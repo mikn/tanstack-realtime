@@ -1,17 +1,18 @@
 /**
- * Tests for derived channel options (derivedChannelOptions).
+ * Tests for the `channels[]` fan-in option in realtimeCollectionOptions.
  *
- * Tests the sync config by calling sync() directly with mock hooks.
+ * Fan-in lets multiple pub/sub channels feed a single collection — the classic
+ * use case being geographic shards (`us-east:orders`, `eu:orders`, …) that
+ * belong to the same logical dataset.
+ *
+ * Cross-collection joins (orders + inventory) belong at the query layer;
+ * those are intentionally NOT covered here.
  */
 
 import { describe, it, expect, vi } from 'vitest'
 import { Store } from '@tanstack/store'
-import { derivedChannelOptions, createRealtimeClient } from '@tanstack/realtime'
-import type {
-  RealtimeTransport,
-  ConnectionStatus,
-  PresenceUser,
-} from '@tanstack/realtime'
+import { realtimeCollectionOptions, createRealtimeClient } from '@tanstack/realtime'
+import type { RealtimeTransport, ConnectionStatus, PresenceUser } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Mock transport
@@ -19,12 +20,16 @@ import type {
 
 function createMockTransport(): RealtimeTransport & {
   emit: (channel: string, data: unknown) => void
+  publishCalls: Array<{ channel: string; data: unknown }>
+  subscribedChannels: () => string[]
 } {
   const listeners = new Map<string, Set<(data: unknown) => void>>()
   const store = new Store<ConnectionStatus>('connected')
+  const publishCalls: Array<{ channel: string; data: unknown }> = []
 
   return {
     store,
+    publishCalls,
     async connect() {},
     disconnect() {},
     subscribe(channel, onMessage) {
@@ -32,242 +37,305 @@ function createMockTransport(): RealtimeTransport & {
       listeners.get(channel)!.add(onMessage)
       return () => {
         listeners.get(channel)?.delete(onMessage)
+        if (listeners.get(channel)?.size === 0) listeners.delete(channel)
       }
     },
-    async publish() {},
+    async publish(channel, data) {
+      publishCalls.push({ channel, data })
+    },
     joinPresence() {},
     updatePresence() {},
     leavePresence() {},
-    onPresenceChange(
-      _ch: string,
-      _cb: (users: ReadonlyArray<PresenceUser>) => void,
-    ) {
-      return () => {}
-    },
+    onPresenceChange(_ch, _cb) { return () => {} },
     emit(channel: string, data: unknown) {
       const cbs = listeners.get(channel)
       if (cbs) for (const cb of cbs) cb(data)
     },
+    subscribedChannels() {
+      return [...listeners.keys()]
+    },
   }
 }
 
 // ---------------------------------------------------------------------------
-// Test helpers
+// Helpers
 // ---------------------------------------------------------------------------
 
-interface Item {
+interface Order {
   id: string
-  source: string
-  value: number
+  region: string
+  amount: number
 }
 
-function setup(
-  selectFn?: (sources: { a: Array<unknown>; b: Array<unknown> }) => Item[],
-  sourceOverrides?: {
-    a?: { initialData?: () => Promise<Array<unknown>> }
-    b?: { initialData?: () => Promise<Array<unknown>> }
-  },
-) {
-  const transport = createMockTransport()
-  const client = createRealtimeClient({ transport })
+type WriteOp = { type: string; value?: unknown; key?: unknown }
 
-  const config = derivedChannelOptions<Item, string>({
-    client,
-    id: 'derived',
-    getKey: (item) => item.id,
-    sources: {
-      a: { channel: 'source-a', ...sourceOverrides?.a },
-      b: { channel: 'source-b', ...sourceOverrides?.b },
-    },
-    select:
-      selectFn ??
-      ((sources) => {
-        const aItems = sources.a as Item[]
-        const bItems = sources.b as Item[]
-        return [...aItems, ...bItems]
-      }),
-  })
-
-  const ops: Array<{ type: string; value?: unknown; key?: unknown }> = []
-  let readyCalled = false
-  let beginCount = 0
-
-  const stopSync = config.sync!.sync({
-    begin: () => {
-      beginCount++
-    },
-    write: (op: { type: string; value?: unknown; key?: unknown }) => {
-      ops.push(op)
-    },
-    commit: () => {},
-    markReady: () => {
-      readyCalled = true
-    },
-  })
-
-  return {
-    transport,
-    client,
-    config,
-    ops,
-    stopSync,
-    isReady: () => readyCalled,
-    getBeginCount: () => beginCount,
-  }
-}
-
-describe('derivedChannelOptions', () => {
-  it('returns a valid CollectionConfig', () => {
-    const { config } = setup()
-    expect(config.sync).toBeDefined()
-    expect(config.id).toBe('derived')
-  })
-
-  it('marks ready immediately when no sources have initialData', () => {
-    const { isReady } = setup()
-    expect(isReady()).toBe(true)
-  })
-
-  it('marks ready after all initialData resolves', async () => {
-    const { isReady } = setup(undefined, {
-      a: {
-        initialData: async () => [
-          { id: '1', source: 'a', value: 10 },
-        ],
-      },
-      b: {
-        initialData: async () => [
-          { id: '2', source: 'b', value: 20 },
-        ],
-      },
-    })
-
-    // Before microtask, not ready.
-    expect(isReady()).toBe(false)
-
-    await new Promise((r) => setTimeout(r, 0))
-    expect(isReady()).toBe(true)
-  })
-
-  it('recomputes when a source channel receives a message', () => {
-    const { transport, ops } = setup()
-
-    transport.emit('source-a', { id: '1', source: 'a', value: 42 })
-
-    // The select function should have been called, producing inserts.
-    expect(ops.length).toBeGreaterThan(0)
-    expect(ops).toContainEqual(
-      expect.objectContaining({
-        type: 'insert',
-        value: expect.objectContaining({ id: '1', source: 'a' }),
-      }),
-    )
-  })
-
-  it('accumulates messages from multiple sources', () => {
-    const { transport, ops } = setup()
-
-    transport.emit('source-a', { id: '1', source: 'a', value: 1 })
-    transport.emit('source-b', { id: '2', source: 'b', value: 2 })
-
-    // After both messages, select gets both accumulated arrays.
-    const lastInserts = ops.filter((op) => op.type === 'insert')
-    expect(lastInserts.length).toBeGreaterThanOrEqual(2)
-  })
-
-  it('uses the select function to derive rows', () => {
-    const select = vi.fn(
-      (sources: { a: Array<unknown>; b: Array<unknown> }) => {
-        return (sources.a as Item[]).map((item) => ({
-          ...item,
-          value: item.value * 2,
-        }))
-      },
-    )
-    const { transport } = setup(select)
-
-    transport.emit('source-a', { id: '1', source: 'a', value: 5 })
-
-    expect(select).toHaveBeenCalled()
-    const lastCall = select.mock.results[select.mock.results.length - 1]!
-    expect(lastCall.value).toEqual([{ id: '1', source: 'a', value: 10 }])
-  })
-
-  it('stops processing after cleanup', () => {
-    const { transport, ops, stopSync } = setup()
-    stopSync()
-
-    const opsBefore = ops.length
-    transport.emit('source-a', { id: 'after', source: 'a', value: 99 })
-    expect(ops.length).toBe(opsBefore)
-  })
-
-  it('handles initialData loading before channel messages', async () => {
-    const ops: Array<{ type: string; value?: unknown }> = []
-    const transport = createMockTransport()
-    const client = createRealtimeClient({ transport })
-
-    const config = derivedChannelOptions<Item, string>({
-      client,
-      id: 'derived-init',
-      getKey: (item) => item.id,
-      sources: {
-        a: {
-          channel: 'src-a',
-          initialData: async () => [{ id: '1', source: 'a', value: 100 }],
-        },
-      },
-      select: (sources) => sources.a as Item[],
-    })
-
-    let readyCalled = false
+function driveSync(
+  config: ReturnType<typeof realtimeCollectionOptions>,
+): { ops: WriteOp[]; stop: () => void } {
+  const ops: WriteOp[] = []
+  const stop =
     config.sync!.sync({
       begin: () => {},
-      write: (op: any) => ops.push(op),
+      write: (op: WriteOp) => ops.push(op),
       commit: () => {},
-      markReady: () => {
-        readyCalled = true
-      },
-    })
+      markReady: () => {},
+    }) ?? (() => {})
+  return { ops, stop }
+}
 
-    await new Promise((r) => setTimeout(r, 0))
-    expect(readyCalled).toBe(true)
-    expect(ops).toContainEqual(
-      expect.objectContaining({
-        type: 'insert',
-        value: expect.objectContaining({ id: '1', value: 100 }),
-      }),
-    )
+// ---------------------------------------------------------------------------
+// Invariant tests
+// ---------------------------------------------------------------------------
+
+describe('realtimeCollectionOptions — channels fan-in', () => {
+  it('subscribes to the primary channel', () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+    const subscribeSpy = vi.spyOn(transport, 'subscribe')
+
+    const config = realtimeCollectionOptions<Order, string>({
+      client,
+      channel: 'us-east:orders',
+      getKey: (o) => o.id,
+    })
+    driveSync(config)
+
+    expect(subscribeSpy).toHaveBeenCalledWith('us-east:orders', expect.any(Function))
   })
 
-  it('marks ready even if initialData rejects', async () => {
-    const { isReady } = setup(undefined, {
-      a: {
-        initialData: async () => {
-          throw new Error('load failed')
-        },
-      },
-    })
+  it('subscribes to every channel in the channels[] array', () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+    const subscribeSpy = vi.spyOn(transport, 'subscribe')
 
-    await new Promise((r) => setTimeout(r, 0))
-    expect(isReady()).toBe(true)
+    const config = realtimeCollectionOptions<Order, string>({
+      client,
+      channel: 'us-east:orders',
+      channels: ['eu:orders', 'ap:orders'],
+      getKey: (o) => o.id,
+    })
+    driveSync(config)
+
+    expect(subscribeSpy).toHaveBeenCalledWith('us-east:orders', expect.any(Function))
+    expect(subscribeSpy).toHaveBeenCalledWith('eu:orders', expect.any(Function))
+    expect(subscribeSpy).toHaveBeenCalledWith('ap:orders', expect.any(Function))
+    expect(subscribeSpy).toHaveBeenCalledTimes(3)
   })
 
-  it('supports QueryKey arrays as channel names', () => {
+  it('messages from all channels land in the same collection', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
 
-    // Should not throw — serializeKey is called internally.
-    const config = derivedChannelOptions({
+    const config = realtimeCollectionOptions<Order, string>({
       client,
-      id: 'qk',
-      getKey: (item: any) => item.id,
-      sources: {
-        x: { channel: ['orders', { status: 'active' }] },
-      },
-      select: (sources) => sources.x as any[],
+      channel: 'us-east:orders',
+      channels: ['eu:orders', 'ap:orders'],
+      getKey: (o) => o.id,
     })
+    const { ops } = driveSync(config)
 
-    expect(config.sync).toBeDefined()
+    transport.emit('us-east:orders', { action: 'insert', data: { id: '1', region: 'us', amount: 100 } })
+    transport.emit('eu:orders', { action: 'insert', data: { id: '2', region: 'eu', amount: 200 } })
+    transport.emit('ap:orders', { action: 'insert', data: { id: '3', region: 'ap', amount: 300 } })
+
+    expect(ops).toHaveLength(3)
+    expect((ops[0]!.value as Order).region).toBe('us')
+    expect((ops[1]!.value as Order).region).toBe('eu')
+    expect((ops[2]!.value as Order).region).toBe('ap')
+  })
+
+  it('fan-in channels each support insert, update, and delete', () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+
+    const config = realtimeCollectionOptions<Order, string>({
+      client,
+      channel: 'primary',
+      channels: ['secondary'],
+      getKey: (o) => o.id,
+    })
+    const { ops } = driveSync(config)
+
+    transport.emit('secondary', { action: 'insert', data: { id: 'A', region: 'x', amount: 1 } })
+    transport.emit('secondary', { action: 'update', data: { id: 'A', region: 'x', amount: 2 } })
+    transport.emit('secondary', { action: 'delete', data: { id: 'A', region: 'x', amount: 0 } })
+
+    expect(ops[0]!.type).toBe('insert')
+    expect(ops[1]!.type).toBe('update')
+    expect(ops[2]!.type).toBe('delete')
+    expect(ops[2]!.key).toBe('A')
+  })
+
+  it('publish-back after a mutation goes ONLY to the primary channel', async () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+
+    const config = realtimeCollectionOptions<Order, string>({
+      client,
+      channel: 'primary',
+      channels: ['secondary', 'tertiary'],
+      getKey: (o) => o.id,
+      onInsert: async () => ({ id: '1', region: 'us', amount: 50 }),
+    })
+    driveSync(config)
+
+    await config.onInsert!({
+      transaction: {
+        mutations: [{ modified: { id: '1', region: 'us', amount: 50 } as unknown, key: '1', original: {} }],
+      },
+    } as any)
+
+    expect(transport.publishCalls).toHaveLength(1)
+    expect(transport.publishCalls[0]!.channel).toBe('primary')
+  })
+
+  it('channels-only (no primary channel) works and disables publish-back', async () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+
+    const config = realtimeCollectionOptions<Order, string>({
+      client,
+      channels: ['shard-a', 'shard-b'],
+      getKey: (o) => o.id,
+      onInsert: async () => ({ id: '1', region: 'us', amount: 50 }),
+    })
+    const { ops } = driveSync(config)
+
+    transport.emit('shard-a', { action: 'insert', data: { id: '1', region: 'a', amount: 10 } })
+    transport.emit('shard-b', { action: 'insert', data: { id: '2', region: 'b', amount: 20 } })
+
+    expect(ops).toHaveLength(2)
+
+    // No publish-back because there's no primary channel.
+    await config.onInsert!({
+      transaction: {
+        mutations: [{ modified: { id: '3', region: 'us', amount: 50 } as unknown, key: '3', original: {} }],
+      },
+    } as any)
+    expect(transport.publishCalls).toHaveLength(0)
+  })
+
+  it('throws if neither channel nor channels[] is provided', () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+
+    expect(() =>
+      realtimeCollectionOptions<Order, string>({
+        client,
+        getKey: (o) => o.id,
+      } as any),
+    ).toThrow('[realtimeCollectionOptions]')
+  })
+
+  it('throws if channels[] is an empty array and no channel provided', () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+
+    expect(() =>
+      realtimeCollectionOptions<Order, string>({
+        client,
+        channels: [],
+        getKey: (o) => o.id,
+      }),
+    ).toThrow('[realtimeCollectionOptions]')
+  })
+
+  it('serializes QueryKey arrays for additional channels', () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+    const subscribeSpy = vi.spyOn(transport, 'subscribe')
+
+    const config = realtimeCollectionOptions<Order, string>({
+      client,
+      channel: 'primary',
+      channels: [['region', { id: 'eu' }]],
+      getKey: (o) => o.id,
+    })
+    driveSync(config)
+
+    expect(subscribeSpy).toHaveBeenCalledWith('region:id=eu', expect.any(Function))
+  })
+
+  it('serializes the primary channel QueryKey array', () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+    const subscribeSpy = vi.spyOn(transport, 'subscribe')
+
+    const config = realtimeCollectionOptions<Order, string>({
+      client,
+      channel: ['orders', { region: 'us' }],
+      getKey: (o) => o.id,
+    })
+    driveSync(config)
+
+    expect(subscribeSpy).toHaveBeenCalledWith('orders:region=us', expect.any(Function))
+  })
+
+  it('cleanup unsubscribes from ALL channels', () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+
+    const config = realtimeCollectionOptions<Order, string>({
+      client,
+      channel: 'ch-a',
+      channels: ['ch-b', 'ch-c'],
+      getKey: (o) => o.id,
+    })
+    const { ops, stop } = driveSync(config)
+
+    stop()
+
+    const countBefore = ops.length
+    transport.emit('ch-a', { action: 'insert', data: { id: '1', region: 'a', amount: 1 } })
+    transport.emit('ch-b', { action: 'insert', data: { id: '2', region: 'b', amount: 2 } })
+    transport.emit('ch-c', { action: 'insert', data: { id: '3', region: 'c', amount: 3 } })
+
+    expect(ops.length).toBe(countBefore)
+  })
+
+  it('merge is applied consistently across all fan-in channels', () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+    const merge = vi.fn((prev: Order, next: Order) => ({ ...next, amount: prev.amount }))
+
+    const config = realtimeCollectionOptions<Order, string>({
+      client,
+      channel: 'ch-a',
+      channels: ['ch-b'],
+      getKey: (o) => o.id,
+      merge,
+    })
+    const { ops } = driveSync(config)
+
+    // Insert from ch-a establishes the key.
+    transport.emit('ch-a', { action: 'insert', data: { id: '1', region: 'a', amount: 100 } })
+    // Update from ch-b triggers merge.
+    transport.emit('ch-b', { action: 'update', data: { id: '1', region: 'b', amount: 200 } })
+
+    expect(merge).toHaveBeenCalledTimes(1)
+    const updateOp = ops.find((op) => op.type === 'update')!
+    // merge preserved amount from ch-a insert.
+    expect((updateOp.value as Order).amount).toBe(100)
+    expect((updateOp.value as Order).region).toBe('b')
+  })
+
+  it('ordering: messages are processed in arrival order across channels', () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+
+    const config = realtimeCollectionOptions<Order, string>({
+      client,
+      channel: 'ch-1',
+      channels: ['ch-2', 'ch-3'],
+      getKey: (o) => o.id,
+    })
+    const { ops } = driveSync(config)
+
+    // Interleave messages across three channels.
+    transport.emit('ch-3', { action: 'insert', data: { id: 'C', region: 'c', amount: 3 } })
+    transport.emit('ch-1', { action: 'insert', data: { id: 'A', region: 'a', amount: 1 } })
+    transport.emit('ch-2', { action: 'insert', data: { id: 'B', region: 'b', amount: 2 } })
+
+    expect(ops.map((op) => (op.value as Order).id)).toEqual(['C', 'A', 'B'])
   })
 })

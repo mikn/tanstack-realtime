@@ -45,21 +45,6 @@ export type {
   StreamStatus,
 } from './collections/streamChannelOptions.js'
 
-// Derived / multi-channel collections
-export { derivedChannelOptions } from './collections/derivedChannelOptions.js'
-export type {
-  DerivedSource,
-  DerivedChannelConfig,
-} from './collections/derivedChannelOptions.js'
-
-// Optimistic mutations + conflict resolution
-export { optimisticCollectionOptions } from './collections/optimisticCollectionOptions.js'
-export type {
-  PendingMutation,
-  OptimisticState,
-  OptimisticCollectionConfig,
-} from './collections/optimisticCollectionOptions.js'
-
 // Core utilities
 export { createDedup } from './core/dedup.js'
 export type { DedupOptions, DeduplicationFilter } from './core/dedup.js'
@@ -88,11 +73,19 @@ export type {
   GapRecoveryTransport,
 } from './core/gapRecovery.js'
 
-export { createSharedTransport } from './core/sharedTransport.js'
+// SharedWorker-based multi-tab transport.
+// Tab side: createSharedWorkerTransport(workerUrl)
+// Worker side: createSharedWorkerServer(innerTransport) — call in the SharedWorker file.
+export {
+  createSharedWorkerTransport,
+  createSharedWorkerServer,
+} from './core/sharedWorkerTransport.js'
 export type {
-  SharedTransportOptions,
-  SharedTransport,
-} from './core/sharedTransport.js'
+  SharedWorkerTransportOptions,
+  SharedWorkerServer,
+  TabToWorkerMsg,
+  WorkerToTabMsg,
+} from './core/sharedWorkerTransport.js'
 
 // Server-side types — transport-agnostic, exported from core so any preset
 // can implement the same contract without an additional import path.
