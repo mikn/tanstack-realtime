@@ -62,15 +62,21 @@ export function usePresence<
 
   useEffect(() => {
     const ch = channelRef.current
+
+    // Subscribe to the channel first so the server authorizes this connection
+    // before we attempt to join presence. The server drops presence:join
+    // messages for channels that haven't been authorized via subscribe.
+    const unsubChannel = client.subscribe(ch, () => {})
     client.joinPresence(ch, initial)
 
-    const unsub = client.onPresenceChange(ch, (users) => {
+    const unsubPresence = client.onPresenceChange(ch, (users) => {
       setOthers(users as ReadonlyArray<PresenceUser<TData>>)
     })
 
     return () => {
-      unsub()
+      unsubPresence()
       client.leavePresence(ch)
+      unsubChannel()
     }
     // `initial` intentionally excluded — joining/leaving should only
     // happen when the channel changes, not on every initial update.

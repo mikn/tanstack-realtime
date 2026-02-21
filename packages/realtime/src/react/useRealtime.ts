@@ -1,4 +1,4 @@
-import { use } from 'react'
+import { use, useCallback } from 'react'
 import { useStore } from '@tanstack/react-store'
 import type { ConnectionStatus } from '../core/types.js'
 import type { RealtimeClient } from '../core/client.js'
@@ -44,10 +44,8 @@ export function useRealtime(): UseRealtimeResult {
   const client = getClient(use(RealtimeContext))
   const { status } = useStore(client.store, (s) => s)
 
-  return {
-    status,
-    connect: () => client.connect(),
-    disconnect: () => client.disconnect(),
-    client,
-  }
+  const connect = useCallback(() => client.connect(), [client])
+  const disconnect = useCallback(() => client.disconnect(), [client])
+
+  return { status, connect, disconnect, client }
 }

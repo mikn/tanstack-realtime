@@ -20,6 +20,12 @@ export interface RealtimeClient {
   connect(): Promise<void>
   /** Close the connection. Collections stop receiving live updates. */
   disconnect(): void
+  /**
+   * Tear down the client and release all internal resources.
+   * Call this when the client will no longer be used (e.g. in component cleanup
+   * or test teardown) to prevent memory leaks from store subscriptions.
+   */
+  destroy(): void
 
   /** Subscribe to a serialized channel key. Returns an unsubscribe function. */
   subscribe(channel: string, onMessage: (data: unknown) => void): () => void
@@ -35,9 +41,6 @@ export interface RealtimeClient {
     channel: string,
     callback: (users: ReadonlyArray<PresenceUser>) => void,
   ): () => void
-
-  /** @internal The underlying transport. Used by test helpers and presets. */
-  readonly transport: RealtimeTransport
 }
 
 /**
@@ -62,13 +65,13 @@ export function createRealtimeClient(
     status: transport.store.get(),
   })
 
-  transport.store.subscribe((status) => {
+  // Keep a reference so we can clean up in destroy().
+  const statusSub = transport.store.subscribe((status) => {
     store.setState(() => ({ status }))
   })
 
   const client: RealtimeClient = {
     store,
-    transport,
 
     async connect() {
       await transport.connect()
@@ -76,6 +79,10 @@ export function createRealtimeClient(
 
     disconnect() {
       transport.disconnect()
+    },
+
+    destroy() {
+      statusSub.unsubscribe()
     },
 
     subscribe(channel, onMessage) {

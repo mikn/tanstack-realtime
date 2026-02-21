@@ -2,7 +2,6 @@ export { realtimeCollectionOptions } from './realtimeCollectionOptions.js'
 export type {
   RealtimeCollectionConfig,
   RealtimeChannelMessage,
-  MutationHandlerParams,
 } from './realtimeCollectionOptions.js'
 
 export { liveChannelOptions } from './liveChannelOptions.js'

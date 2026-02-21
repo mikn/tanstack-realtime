@@ -1,4 +1,10 @@
-import type { Collection, CollectionConfig, SyncConfig } from '@tanstack/db'
+import type {
+  CollectionConfig,
+  InsertMutationFn,
+  UpdateMutationFn,
+  DeleteMutationFn,
+  SyncConfig,
+} from '@tanstack/db'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { RealtimeClient } from '../core/client.js'
 import type { QueryKey } from '../core/types.js'
@@ -8,22 +14,6 @@ import { serializeKey } from '../core/serializeKey.js'
 export interface RealtimeChannelMessage<T = unknown> {
   action: 'insert' | 'update' | 'delete'
   data: T
-}
-
-/** Mutation handler context — mirrors TanStack DB's handler shape. */
-export interface MutationHandlerParams<
-  T extends object = Record<string, unknown>,
-> {
-  transaction: {
-    mutations: Array<{
-      original: Partial<T>
-      modified: T
-      changes: Partial<T>
-      key: string | number
-      type: 'insert' | 'update' | 'delete'
-    }>
-  }
-  collection: Collection<T, any, any, any, any>
 }
 
 export interface RealtimeCollectionConfig<
@@ -52,11 +42,11 @@ export interface RealtimeCollectionConfig<
   queryFn?: () => Promise<T[]>
 
   /** Called after a local insert. Should persist to the server. */
-  onInsert?: (params: MutationHandlerParams<T>) => Promise<unknown>
+  onInsert?: InsertMutationFn<T, TKey>
   /** Called after a local update. Should persist to the server. */
-  onUpdate?: (params: MutationHandlerParams<T>) => Promise<unknown>
+  onUpdate?: UpdateMutationFn<T, TKey>
   /** Called after a local delete. Should persist to the server. */
-  onDelete?: (params: MutationHandlerParams<T>) => Promise<unknown>
+  onDelete?: DeleteMutationFn<T, TKey>
 }
 
 /**
@@ -158,8 +148,8 @@ export function realtimeCollectionOptions<
   }
 
   // Wrap mutation handlers to publish results to the channel after success.
-  const wrappedOnInsert = onInsert
-    ? async (params: MutationHandlerParams<T>) => {
+  const wrappedOnInsert: InsertMutationFn<T, TKey> | undefined = onInsert
+    ? async (params) => {
         const result = await onInsert(params)
         if (result != null) {
           await client.publish(serializedChannel, {
@@ -171,8 +161,8 @@ export function realtimeCollectionOptions<
       }
     : undefined
 
-  const wrappedOnUpdate = onUpdate
-    ? async (params: MutationHandlerParams<T>) => {
+  const wrappedOnUpdate: UpdateMutationFn<T, TKey> | undefined = onUpdate
+    ? async (params) => {
         const result = await onUpdate(params)
         if (result != null) {
           await client.publish(serializedChannel, {
@@ -184,8 +174,8 @@ export function realtimeCollectionOptions<
       }
     : undefined
 
-  const wrappedOnDelete = onDelete
-    ? async (params: MutationHandlerParams<T>) => {
+  const wrappedOnDelete: DeleteMutationFn<T, TKey> | undefined = onDelete
+    ? async (params) => {
         const result = await onDelete(params)
         if (result != null) {
           await client.publish(serializedChannel, {
@@ -200,8 +190,8 @@ export function realtimeCollectionOptions<
   return {
     ...collectionConfig,
     sync,
-    ...(wrappedOnInsert && { onInsert: wrappedOnInsert as any }),
-    ...(wrappedOnUpdate && { onUpdate: wrappedOnUpdate as any }),
-    ...(wrappedOnDelete && { onDelete: wrappedOnDelete as any }),
+    ...(wrappedOnInsert && { onInsert: wrappedOnInsert }),
+    ...(wrappedOnUpdate && { onUpdate: wrappedOnUpdate }),
+    ...(wrappedOnDelete && { onDelete: wrappedOnDelete }),
   }
 }

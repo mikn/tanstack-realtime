@@ -11,7 +11,7 @@ const WS: typeof WebSocket =
 // Options
 // ---------------------------------------------------------------------------
 
-interface NodeTransportOptions {
+export interface NodeTransportOptions {
   /**
    * WebSocket server URL (e.g. "ws://localhost:3000").
    * Required in Node.js; in a browser it defaults to the current origin.
@@ -185,7 +185,28 @@ export function nodeTransport(options: NodeTransportOptions = {}): RealtimeTrans
     store,
 
     async connect() {
-      if (socket || store.get() === 'connecting' || store.get() === 'connected') return
+      const current = store.get()
+
+      // If already connected, resolve immediately.
+      if (current === 'connected') return
+
+      // If a reconnect cycle is in progress (connecting or waiting to retry),
+      // return a Promise that settles once the connection is established or
+      // intentionally closed — without starting a redundant socket open.
+      if (current !== 'disconnected') {
+        return new Promise<void>((resolve, reject) => {
+          const sub = store.subscribe((status) => {
+            if (status === 'connected') {
+              sub.unsubscribe()
+              resolve()
+            } else if (status === 'disconnected') {
+              sub.unsubscribe()
+              reject(new Error('[realtime:node] Connection failed'))
+            }
+          })
+        })
+      }
+
       intentionalClose = false
       openSocket()
       return new Promise<void>((resolve, reject) => {
