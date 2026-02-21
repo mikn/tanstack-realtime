@@ -44,21 +44,25 @@ export default defineWorkspace([
     resolve: { alias: sourceAliases },
   },
 
-  // ── Workerd / miniflare DO tests ─────────────────────────────────────────
+  // ── Workerd runtime compatibility tests ──────────────────────────────────
   // Runs inside the real workerd runtime via @cloudflare/vitest-pool-workers.
-  // Tests the actual RealtimeChannel Durable Object and createWorkerdHandler
-  // using SELF.fetch() — exercises WebSocketPair, ctx.acceptWebSocket,
-  // serializeAttachment, idFromName routing, and the full wire protocol.
+  // Verifies that the client-side transport code (@tanstack/realtime-preset-workerd)
+  // uses no Node.js-specific APIs and behaves correctly in workerd / TanStack
+  // Start deployments on Cloudflare Workers.
   //
-  // NOTE: wrangler resolves @tanstack/realtime-preset-workerd from the built
-  // dist/ via the workspace symlink. Run `npm run build` before this runs —
-  // the CI build step handles it; for local dev run:
-  //   npm run build -w @tanstack/realtime-preset-workerd
+  // No DO bindings. No SELF.fetch(). Pure unit tests for the transport's
+  // JS state machine (status store, subscribe/unsubscribe, message routing,
+  // pending-message queue, presence self-filter) driven by a mocked WebSocket.
+  //
+  // NOTE: wrangler uses esbuild to bundle the test file, so it resolves
+  // @tanstack/realtime-preset-workerd from the built dist/ via the workspace
+  // symlink. Run `npm run build` before this runs (CI handles it; locally run:
+  //   npm run build -w @tanstack/realtime-preset-workerd)
   defineWorkersProject({
     test: {
       name: 'workerd',
       globals: true,
-      include: ['packages/__tests__/integration.workerd-do.test.ts'],
+      include: ['packages/__tests__/integration.workerd-client.test.ts'],
       poolOptions: {
         workers: {
           wrangler: { configPath: './wrangler.test.toml' },

@@ -30,14 +30,10 @@ function clamp(value: number, min: number, max: number): number {
 
 /**
  * Client-side transport for {@link @tanstack/realtime#createRealtimeClient} that
- * connects to a Cloudflare Workers deployment backed by
- * {@link createWorkerdHandler} and {@link RealtimeChannel} Durable Objects.
+ * works in both **browser** and **Cloudflare Workers / workerd** environments
+ * (no Node.js APIs required).
  *
- * Unlike {@link @tanstack/realtime-preset-node#nodeTransport}, which multiplexes
- * all channels over a single WebSocket, `workerdTransport` opens **one WebSocket
- * per channel**. Each socket goes directly to the Durable Object instance for
- * that channel, so subscriptions are isolated and independently scalable.
- *
+ * Opens **one WebSocket per channel**, connecting to the configured server URL.
  * Multiple calls to `subscribe()` or `onPresenceChange()` for the **same**
  * channel share a single WebSocket connection.
  *
@@ -63,7 +59,7 @@ function clamp(value: number, min: number, max: number): number {
  *
  * export const client = createRealtimeClient({
  *   transport: workerdTransport({
- *     url: 'https://my-worker.example.com', // omit in a browser
+ *     url: 'https://my-server.example.com', // omit in a browser
  *     getAuthToken: () => myAuthStore.token,
  *   }),
  * })
@@ -152,7 +148,7 @@ export function workerdTransport(
     state.ws = ws
 
     ws.addEventListener('open', () => {
-      // Nothing to send on open — the DO immediately sends `connected`.
+      // Nothing to send on open — the server immediately sends `connected`.
     })
 
     ws.addEventListener('message', (event) => {
