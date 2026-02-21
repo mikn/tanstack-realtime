@@ -2,13 +2,13 @@
  * End-to-end tests for @tanstack/realtime-adapter-centrifugo against a real
  * Centrifugo binary.
  *
- * Prerequisites:
- *   npm run download-centrifugo   # fetch the binary once
- *   npx vitest run --project centrifugo-e2e
+ * Usage:
+ *   npx vitest run --project centrifugo-e2e   (or: npm run test:e2e)
  *
- * The binary is started by centrifugo.globalSetup.ts and the port is injected
- * via Vitest's provide/inject mechanism. If the binary is absent the
- * globalSetup throws before any test runs, surfacing a clear actionable error.
+ * The globalSetup (centrifugo.globalSetup.ts) downloads the binary
+ * automatically on first run if it isn't already cached at
+ * .cache/centrifugo/centrifugo. Subsequent runs reuse the cached binary.
+ * To pre-download manually: npm run download-centrifugo.
  *
  * Config used: anonymous connections, no auth token required, publish allowed
  * for subscribers, presence sidecar channel ($prs:*) open.

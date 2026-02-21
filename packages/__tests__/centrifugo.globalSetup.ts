@@ -1,16 +1,18 @@
 /**
  * Vitest globalSetup for the centrifugo-e2e project.
  *
- * Checks that the Centrifugo binary has been pre-downloaded (via
- * `npm run download-centrifugo`), starts an instance on a free port with a
- * minimal test config, waits for the health endpoint, and provides the port
- * to every test via `inject('centrifugoPort')`.
+ * If the Centrifugo binary has not yet been downloaded it is fetched
+ * automatically by delegating to scripts/download-centrifugo.mjs — the same
+ * script that `npm run download-centrifugo` invokes. Subsequent runs reuse
+ * the cached binary (the script is a no-op when the version matches).
  *
- * If the binary is absent this module throws immediately with a clear
- * actionable message — no silent skips, no download attempts here.
+ * After ensuring the binary is present, starts an isolated Centrifugo
+ * instance on a free port with a minimal anonymous-access config, waits for
+ * the health endpoint, and provides the port to every test via
+ * `inject('centrifugoPort')`.
  */
 
-import { spawn } from 'child_process'
+import { spawn, execFileSync } from 'child_process'
 import type { ChildProcess } from 'child_process'
 import { writeFileSync, existsSync } from 'fs'
 import { createServer } from 'net'
@@ -99,12 +101,13 @@ async function waitForHealth(port: number, timeoutMs = 10_000): Promise<void> {
 let proc: ChildProcess | undefined
 
 export default async function setup({ provide }: GlobalSetupContext) {
-  // ── 1. Binary presence check ─────────────────────────────────────────────
+  // ── 1. Ensure binary is present (download if necessary) ─────────────────
   if (!existsSync(BINARY)) {
-    throw new Error(
-      `[centrifugo-e2e] Centrifugo binary not found at:\n  ${BINARY}\n\n` +
-        `Run the download step first:\n  npm run download-centrifugo\n\n` +
-        `Then re-run the E2E tests:\n  npx vitest run --project centrifugo-e2e\n`,
+    console.log('[centrifugo-e2e] Binary not cached — downloading via download-centrifugo.mjs…')
+    execFileSync(
+      process.execPath, // the `node` binary running this process
+      [join(root, 'scripts', 'download-centrifugo.mjs')],
+      { stdio: 'inherit', cwd: root },
     )
   }
 
