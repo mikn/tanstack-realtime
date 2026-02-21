@@ -1,0 +1,45 @@
+name: Feature request
+description: Suggest an idea or improvement
+labels: [enhancement, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement! Before filing, please check if a similar request already exists in [Discussions](https://github.com/TanStack/realtime/discussions) or [Issues](https://github.com/TanStack/realtime/issues).
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: Describe the problem this feature would solve. What are you trying to do that you can't do today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe the API or behaviour you'd like to see. Code examples are helpful.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Have you explored any workarounds or alternative approaches?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: packages
+    attributes:
+      label: Affected package(s)
+      multiple: true
+      options:
+        - '@tanstack/realtime'
+        - '@tanstack/react-realtime'
+        - '@tanstack/realtime-preset-node'
+        - 'new package'
+    validations:
+      required: true
