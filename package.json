@@ -8,8 +8,10 @@
   ],
   "scripts": {
     "build": "npm run build -w @tanstack/realtime && npm run build -w @tanstack/realtime-preset-node && npm run build -w @tanstack/realtime-adapter-centrifugo",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vitest run --project node --project workerd",
+    "test:watch": "vitest --project node --project workerd",
+    "test:e2e": "vitest run --project centrifugo-e2e",
+    "download-centrifugo": "node scripts/download-centrifugo.mjs"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.12.14",

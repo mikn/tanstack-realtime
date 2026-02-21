@@ -43,6 +43,28 @@ export default defineWorkspace([
     resolve: { alias: sourceAliases },
   },
 
+  // ── Centrifugo E2E tests (real binary) ──────────────────────────────────
+  // Requires the Centrifugo binary to be pre-downloaded:
+  //   npm run download-centrifugo
+  // Then run with:
+  //   npx vitest run --project centrifugo-e2e
+  //
+  // globalSetup starts an isolated Centrifugo instance on a free port and
+  // tears it down after the suite. If the binary is absent, setup throws
+  // immediately with an actionable error — nothing is downloaded here.
+  {
+    test: {
+      name: 'centrifugo-e2e',
+      environment: 'node',
+      globals: true,
+      include: ['packages/__tests__/centrifugo.e2e.test.ts'],
+      globalSetup: ['packages/__tests__/centrifugo.globalSetup.ts'],
+      pool: 'forks',
+      poolOptions: { forks: { singleFork: true } },
+    },
+    resolve: { alias: sourceAliases },
+  },
+
   // ── Workerd runtime compatibility tests ──────────────────────────────────
   // Runs inside the real workerd runtime via @cloudflare/vitest-pool-workers.
   // Verifies that nodeTransport from @tanstack/realtime-preset-node is
