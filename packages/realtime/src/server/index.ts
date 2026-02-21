@@ -53,10 +53,10 @@ export type AuthorizeFn = (
 
 /**
  * Publish data to a channel from the server (e.g. from a server function or
- * background job). This calls the preset's publish endpoint.
+ * background job). The preset routes the message to all subscribed clients.
  *
- * In the Node preset this is a direct EventEmitter emit.
- * In Centrifugo/Ably presets this calls the provider's HTTP API.
+ * In the Node preset this fans out directly over the in-process WebSocket
+ * server. In Centrifugo/Ably presets this calls the provider's HTTP publish API.
  *
  * @example
  * // server/functions/ai.ts

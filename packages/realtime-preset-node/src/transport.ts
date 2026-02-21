@@ -13,17 +13,24 @@ const WS: typeof WebSocket =
 
 export interface NodeTransportOptions {
   /**
-   * WebSocket server URL (e.g. "ws://localhost:3000").
-   * Required in Node.js; in a browser it defaults to the current origin.
+   * Base WebSocket server URL, e.g. `"ws://localhost:3000"`.
+   * The `path` option is appended to form the final URL.
+   *
+   * Required when running in Node.js. In a browser this can be omitted —
+   * the transport derives the URL from `window.location` (using `wss:` over
+   * HTTPS and `ws:` over HTTP) so the connection always targets the current page's origin.
    */
   url?: string
-  /** WebSocket path. Defaults to `/_realtime`. */
+  /**
+   * WebSocket endpoint path appended to `url` (or the derived origin in a browser).
+   * Must match the `path` passed to `createNodeServer`. Defaults to `/_realtime`.
+   */
   path?: string
-  /** Reconnection: initial delay in ms. Defaults to 1000. */
+  /** Reconnection: initial back-off delay in ms. Defaults to `1000`. */
   initialDelay?: number
-  /** Reconnection: maximum delay in ms. Defaults to 30000. */
+  /** Reconnection: maximum back-off delay in ms. Defaults to `30000`. */
   maxDelay?: number
-  /** Reconnection: jitter factor 0–1. Defaults to 0.25. */
+  /** Reconnection: jitter factor applied to each delay, between 0 and 1. Defaults to `0.25`. */
   jitter?: number
 }
 

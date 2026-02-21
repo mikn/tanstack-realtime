@@ -6,20 +6,29 @@ export interface UsePresenceOptions<
   TData extends object = Record<string, unknown>,
   TParams extends Record<string, unknown> = Record<string, unknown>,
 > {
-  /** Params used to resolve the channel key. */
+  /** Params used to resolve the serialized channel key via `channelDef.resolveChannel`. */
   params: TParams
-  /** Initial presence data to publish on join. */
+  /**
+   * Presence data sent when the component mounts (or when `channel` changes).
+   * **Not reactive** — subsequent changes to this value are ignored. Call
+   * `updatePresence` to broadcast field updates after the initial join.
+   */
   initial: TData
 }
 
 export interface UsePresenceResult<
   TData extends object = Record<string, unknown>,
 > {
-  /** All other connected users in this channel (excludes the current user). */
+  /**
+   * All other connected users in this channel. Starts as an empty array
+   * and updates reactively as members join, update, or leave.
+   * The current user is always excluded.
+   */
   others: ReadonlyArray<PresenceUser<TData>>
   /**
-   * Update the current user's presence data.
-   * Sends a delta — only the provided fields are merged into the stored state.
+   * Broadcast a presence delta for the current user.
+   * Only the provided fields are merged into the server-stored state;
+   * all other fields remain unchanged.
    */
   updatePresence(delta: Partial<TData>): void
 }
@@ -27,13 +36,22 @@ export interface UsePresenceResult<
 /**
  * Joins a presence channel and returns reactive presence state.
  *
+ * On mount the component joins the channel with `initial` data and subscribes
+ * to presence changes. When `channel` changes the previous presence membership
+ * is left and a new one is joined. On unmount the component leaves the channel.
+ *
+ * `initial` is sent once on join — it is **not** reactive. To broadcast
+ * subsequent changes (e.g. cursor movement) call `updatePresence`.
+ *
+ * Must be used inside `<RealtimeProvider>`.
+ *
  * @example
  * const { others, updatePresence } = usePresence(editorPresence, {
  *   params: { documentId },
  *   initial: { cursor: null, name: userName },
  * })
  *
- * // Broadcast cursor position
+ * // Broadcast cursor position on mouse move
  * updatePresence({ cursor: { x: e.clientX, y: e.clientY } })
  */
 export function usePresence<
@@ -55,7 +73,8 @@ export function usePresence<
 
   const [others, setOthers] = useState<ReadonlyArray<PresenceUser<TData>>>([])
 
-  // Keep a stable ref to the channel string so effects only re-run on change.
+  // Keep the current channel in a ref so `updatePresence` always targets the
+  // latest channel without needing to be recreated when the channel changes.
   const channelRef = useRef(channel)
   channelRef.current = channel
 

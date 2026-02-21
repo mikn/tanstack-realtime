@@ -9,15 +9,26 @@ export interface RealtimeProviderProps {
 }
 
 /**
- * Provides a `RealtimeClient` to the component tree.
- * Place this inside `QueryClientProvider` and `DBProvider`.
+ * Provides a `RealtimeClient` to the component tree via React context.
+ * All hooks from `@tanstack/react-realtime` (`useRealtime`, `usePresence`,
+ * `useSubscribe`, `usePublish`) must be descendants of this provider.
+ *
+ * Typical nesting order in a full TanStack application:
  *
  * @example
  * const realtimeClient = createRealtimeClient({ transport: nodeTransport() })
  *
- * <RealtimeProvider client={realtimeClient}>
- *   <App />
- * </RealtimeProvider>
+ * function Root() {
+ *   return (
+ *     <QueryClientProvider client={queryClient}>
+ *       <DBProvider db={db}>
+ *         <RealtimeProvider client={realtimeClient}>
+ *           <App />
+ *         </RealtimeProvider>
+ *       </DBProvider>
+ *     </QueryClientProvider>
+ *   )
+ * }
  */
 export function RealtimeProvider({ client, children }: RealtimeProviderProps) {
   return (

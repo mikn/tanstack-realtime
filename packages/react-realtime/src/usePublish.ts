@@ -5,9 +5,11 @@ import { RealtimeContext } from './context.js'
 
 /**
  * Returns a stable `publish` function bound to `channel`.
+ * The returned function is memoized and only changes when the resolved
+ * channel key changes.
  *
  * @example
- * const publish = usePublish(['chat:typing', { roomId }])
+ * const publish = usePublish(['typing', { roomId }])
  * publish({ userId: currentUser.id, isTyping: true })
  */
 export function usePublish(channel: QueryKey | string) {

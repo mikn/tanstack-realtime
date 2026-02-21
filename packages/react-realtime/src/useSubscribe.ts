@@ -7,11 +7,12 @@ import { RealtimeContext } from './context.js'
  * Subscribes to raw channel events for the lifetime of the component.
  *
  * The `onMessage` callback is kept current via a ref so it always sees the
- * latest props/state without triggering re-subscription on every render.
+ * latest props/state without triggering a re-subscription on every render.
+ * The subscription is torn down and re-established only when `channel` changes.
  *
  * @example
- * useSubscribe(['chat:typing', { roomId }], (event) => {
- *   setTypingUsers(...)
+ * useSubscribe(['typing', { roomId }], (event) => {
+ *   setTypingUsers(event as string[])
  * })
  */
 export function useSubscribe(

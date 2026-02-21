@@ -4,13 +4,23 @@ import type { ConnectionStatus, RealtimeClient } from '@tanstack/realtime'
 import { RealtimeContext } from './context.js'
 
 export interface UseRealtimeResult {
-  /** Current connection status, reactive. */
+  /**
+   * Reactive connection status. Causes a re-render only when the status
+   * value changes (e.g. `'connecting'` → `'connected'`).
+   */
   status: ConnectionStatus
-  /** Open the connection. Collections start receiving live data. */
+  /** Open the WebSocket connection. Resolves once `status` is `'connected'`. */
   connect(): Promise<void>
-  /** Close the connection. Collections fall back to `queryFn` data. */
+  /**
+   * Close the connection immediately. No reconnect will occur.
+   * Collections retain their current data but stop receiving live updates.
+   */
   disconnect(): void
-  /** Access the full client for advanced use cases. */
+  /**
+   * The underlying `RealtimeClient` instance. Use this for operations not
+   * covered by the hooks, such as manually calling `joinPresence` or
+   * subscribing to raw channels outside of React's lifecycle.
+   */
   client: RealtimeClient
 }
 
