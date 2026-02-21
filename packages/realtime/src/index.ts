@@ -45,6 +45,55 @@ export type {
   StreamStatus,
 } from './collections/streamChannelOptions.js'
 
+// Derived / multi-channel collections
+export { derivedChannelOptions } from './collections/derivedChannelOptions.js'
+export type {
+  DerivedSource,
+  DerivedChannelConfig,
+} from './collections/derivedChannelOptions.js'
+
+// Optimistic mutations + conflict resolution
+export { optimisticCollectionOptions } from './collections/optimisticCollectionOptions.js'
+export type {
+  PendingMutation,
+  OptimisticState,
+  OptimisticCollectionConfig,
+} from './collections/optimisticCollectionOptions.js'
+
+// Core utilities
+export { createDedup } from './core/dedup.js'
+export type { DedupOptions, DeduplicationFilter } from './core/dedup.js'
+
+export { createOfflineQueue } from './core/offlineQueue.js'
+export type {
+  QueuedMessage,
+  OfflineQueueState,
+  OfflineQueueOptions,
+  OfflineQueueTransport,
+} from './core/offlineQueue.js'
+
+export { throttle } from './core/throttle.js'
+export type { ThrottleOptions, ThrottledFn } from './core/throttle.js'
+
+export { createEphemeralMap } from './core/ephemeral.js'
+export type {
+  EphemeralMapOptions,
+  EphemeralEntry,
+  EphemeralMap,
+} from './core/ephemeral.js'
+
+export { withGapRecovery } from './core/gapRecovery.js'
+export type {
+  GapRecoveryOptions,
+  GapRecoveryTransport,
+} from './core/gapRecovery.js'
+
+export { createSharedTransport } from './core/sharedTransport.js'
+export type {
+  SharedTransportOptions,
+  SharedTransport,
+} from './core/sharedTransport.js'
+
 // Server-side types — transport-agnostic, exported from core so any preset
 // can implement the same contract without an additional import path.
 export type {
