@@ -16,3 +16,6 @@ export type { UsePresenceOptions, UsePresenceResult } from './usePresence.js'
 export { useSubscribe } from './useSubscribe.js'
 
 export { usePublish } from './usePublish.js'
+
+export { useStream } from './useStream.js'
+export type { UseStreamOptions, UseStreamResult } from './useStream.js'

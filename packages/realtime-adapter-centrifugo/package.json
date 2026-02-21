@@ -1,0 +1,19 @@
+{
+  "name": "@tanstack/realtime-adapter-centrifugo",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Centrifugo transport adapter for @tanstack/realtime",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "import": { "types": "./dist/index.d.ts", "default": "./dist/index.js" }
+    }
+  },
+  "scripts": {
+    "build": "tsup"
+  },
+  "dependencies": {
+    "@tanstack/realtime": "*",
+    "@tanstack/store": "*"
+  }
+}

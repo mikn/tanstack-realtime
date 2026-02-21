@@ -36,6 +36,15 @@ export type {
   PresenceChannelDef,
 } from './collections/presenceChannel.js'
 
+export { streamChannelOptions, createStreamChannel } from './collections/streamChannelOptions.js'
+export type {
+  StreamChannelConfig,
+  StreamChannelDef,
+  StreamChannelDefConfig,
+  StreamItem,
+  StreamStatus,
+} from './collections/streamChannelOptions.js'
+
 // Server-side types — transport-agnostic, exported from core so any preset
 // can implement the same contract without an additional import path.
 export type {

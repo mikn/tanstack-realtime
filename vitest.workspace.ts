@@ -19,6 +19,10 @@ const sourceAliases = [
     find: /^@tanstack\/realtime-preset-node$/,
     replacement: resolve(root, 'packages/realtime-preset-node/src/index.ts'),
   },
+  {
+    find: /^@tanstack\/realtime-adapter-centrifugo$/,
+    replacement: resolve(root, 'packages/realtime-adapter-centrifugo/src/index.ts'),
+  },
 ]
 
 export default defineWorkspace([
@@ -28,7 +32,11 @@ export default defineWorkspace([
       name: 'node',
       environment: 'node',
       globals: true,
-      include: ['packages/__tests__/integration.test.ts'],
+      include: [
+        'packages/__tests__/integration.test.ts',
+        'packages/__tests__/stream.test.ts',
+        'packages/__tests__/centrifugo.test.ts',
+      ],
       pool: 'forks',
       poolOptions: { forks: { singleFork: true } },
     },
