@@ -77,3 +77,43 @@ export interface RealtimeTransport {
   /** TanStack Store holding the current connection status. */
   readonly store: Store<ConnectionStatus>
 }
+
+// ---------------------------------------------------------------------------
+// Client interface
+// ---------------------------------------------------------------------------
+
+export interface RealtimeClientOptions {
+  /** The transport implementation to use (e.g. nodeTransport()). */
+  transport: RealtimeTransport
+}
+
+export interface RealtimeClient {
+  /** TanStack Store holding the current connection status. */
+  readonly store: Store<{ status: ConnectionStatus }>
+
+  /** Open the connection. Collections subscribe to channels after this. */
+  connect(): Promise<void>
+  /** Close the connection. Collections stop receiving live updates. */
+  disconnect(): void
+  /**
+   * Tear down the client and release all internal resources.
+   * Call this when the client will no longer be used (e.g. in component cleanup
+   * or test teardown) to prevent memory leaks from store subscriptions.
+   */
+  destroy(): void
+
+  /** Subscribe to a serialized channel key. Returns an unsubscribe function. */
+  subscribe(channel: string, onMessage: (data: unknown) => void): () => void
+
+  /** Publish data to a serialized channel key. */
+  publish(key: QueryKey | string, data: unknown): Promise<void>
+
+  // Presence helpers (serialized channel key)
+  joinPresence(channel: string, data: unknown): void
+  updatePresence(channel: string, data: unknown): void
+  leavePresence(channel: string): void
+  onPresenceChange(
+    channel: string,
+    callback: (users: ReadonlyArray<PresenceUser>) => void,
+  ): () => void
+}

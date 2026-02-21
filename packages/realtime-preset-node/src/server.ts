@@ -2,7 +2,7 @@ import { WebSocketServer, WebSocket } from 'ws'
 import { randomBytes } from 'crypto'
 import type { IncomingMessage, Server } from 'http'
 import { parseChannel } from '@tanstack/realtime'
-import type { ChannelPermissions } from '@tanstack/realtime/server'
+import type { ChannelPermissions } from '@tanstack/realtime'
 import type { ParsedChannel, PresenceUser } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------

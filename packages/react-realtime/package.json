@@ -1,26 +1,27 @@
 {
-  "name": "@tanstack/realtime",
+  "name": "@tanstack/react-realtime",
   "version": "0.0.1",
   "type": "module",
-  "description": "Framework-agnostic realtime client, collection helpers, and presence for TanStack DB",
+  "description": "React hooks and provider for @tanstack/realtime",
   "license": "MIT",
   "exports": {
     ".": {
       "import": { "types": "./dist/index.d.ts", "default": "./dist/index.js" }
     }
   },
-  "sideEffects": false,
   "scripts": {
     "build": "tsup"
   },
   "dependencies": {
-    "@tanstack/db": "*",
-    "@tanstack/store": "*"
+    "@tanstack/realtime": "*"
   },
   "peerDependencies": {
+    "react": ">=18.0.0",
+    "@tanstack/react-store": ">=0.0.0",
     "@tanstack/react-db": ">=0.0.0"
   },
   "peerDependenciesMeta": {
     "@tanstack/react-db": { "optional": true }
-  }
+  },
+  "sideEffects": false
 }

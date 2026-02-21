@@ -1,12 +1,10 @@
 /**
  * @tanstack/realtime
  *
- * Live data, ephemeral channels, and presence for TanStack DB.
+ * Framework-agnostic realtime client, collection helpers, and presence for TanStack DB.
  *
- * Subpath exports:
- *   @tanstack/realtime        — collection primitives + key utilities
- *   @tanstack/realtime/react  — React provider and hooks
- *   @tanstack/realtime/server — server-side authorize type and publish helper
+ * For React hooks and provider, use @tanstack/react-realtime.
+ * For the Node.js preset, use @tanstack/realtime-preset-node.
  */
 
 // Core primitives
@@ -18,8 +16,9 @@ export type {
   ParsedChannel,
   QueryKey,
   RealtimeTransport,
+  RealtimeClient,
+  RealtimeClientOptions,
 } from './core/types.js'
-export type { RealtimeClient, RealtimeClientOptions } from './core/client.js'
 
 // Collection sources
 export { realtimeCollectionOptions } from './collections/realtimeCollectionOptions.js'
@@ -36,3 +35,11 @@ export type {
   PresenceChannelConfig,
   PresenceChannelDef,
 } from './collections/presenceChannel.js'
+
+// Server-side types — transport-agnostic, exported from core so any preset
+// can implement the same contract without an additional import path.
+export type {
+  ChannelPermissions,
+  AuthorizeFn,
+  PublishFn,
+} from './server/index.js'

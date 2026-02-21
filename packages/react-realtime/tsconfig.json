@@ -3,8 +3,8 @@
   "compilerOptions": {
     "composite": false,
     "incremental": false,
+    "jsx": "react-jsx",
     "outDir": "dist"
   },
-  "include": ["src"],
-  "exclude": ["src/react"]
+  "include": ["src"]
 }

@@ -6,8 +6,7 @@ import type {
   SyncConfig,
 } from '@tanstack/db'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
-import type { RealtimeClient } from '../core/client.js'
-import type { QueryKey } from '../core/types.js'
+import type { RealtimeClient, QueryKey } from '../core/types.js'
 import { serializeKey } from '../core/serializeKey.js'
 
 /** Shape of messages published to / received from the realtime channel. */

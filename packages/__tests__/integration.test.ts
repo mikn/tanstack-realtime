@@ -16,7 +16,7 @@ import {
   createRealtimeClient,
 } from '@tanstack/realtime'
 import type { ParsedChannel, PresenceUser } from '@tanstack/realtime'
-import type { ChannelPermissions } from '@tanstack/realtime/server'
+import type { ChannelPermissions } from '@tanstack/realtime'
 import { createNodeServer, nodeTransport } from '@tanstack/realtime-preset-node'
 import type { NodeServer } from '@tanstack/realtime-preset-node'
 import type { RealtimeClient } from '@tanstack/realtime'

@@ -8,5 +8,10 @@ export default defineConfig({
   target: 'es2022',
   splitting: false,
   clean: true,
-  external: ['@standard-schema/spec'],
+  external: [
+    'react',
+    '@tanstack/realtime',
+    '@tanstack/react-store',
+    '@tanstack/react-db',
+  ],
 })

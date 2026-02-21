@@ -1,4 +1,4 @@
-import type { ParsedChannel } from '../core/types.js'
+import type { ParsedChannel, QueryKey } from '../core/types.js'
 
 // ---------------------------------------------------------------------------
 // Authorization
@@ -60,13 +60,13 @@ export type AuthorizeFn = (
  *
  * @example
  * // server/functions/ai.ts
- * import { publish } from '@tanstack/realtime/server'
+ * import { publish } from '@tanstack/realtime'
  *
  * for await (const chunk of stream) {
  *   await publish(['ai-stream', { sessionId }], { type: 'token', content: chunk })
  * }
  */
 export type PublishFn = (
-  channel: import('../core/types.js').QueryKey | string,
+  channel: QueryKey | string,
   data: unknown,
 ) => Promise<void>

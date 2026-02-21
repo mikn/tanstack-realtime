@@ -17,14 +17,9 @@ export default defineConfig({
   },
   resolve: {
     alias: [
-      // Subpath exports must be aliased before the bare package name.
       {
-        find: /^@tanstack\/realtime\/react$/,
-        replacement: resolve(root, 'packages/realtime/src/react/index.ts'),
-      },
-      {
-        find: /^@tanstack\/realtime\/server$/,
-        replacement: resolve(root, 'packages/realtime/src/server/index.ts'),
+        find: /^@tanstack\/react-realtime$/,
+        replacement: resolve(root, 'packages/react-realtime/src/index.ts'),
       },
       {
         find: /^@tanstack\/realtime$/,
