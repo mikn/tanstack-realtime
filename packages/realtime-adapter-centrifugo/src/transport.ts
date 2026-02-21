@@ -312,22 +312,31 @@ export function centrifugoTransport(
   }
 
   function handleMessage(raw: string): void {
-    let msgs: Array<IncomingMsg>
-    try {
-      const parsed: unknown = JSON.parse(raw)
-      // Centrifugo may batch replies as an array or send single objects
-      msgs = Array.isArray(parsed)
-        ? (parsed as Array<IncomingMsg>)
-        : [parsed as IncomingMsg]
-    } catch {
-      return
-    }
-
-    for (const msg of msgs) {
-      if ('push' in msg) {
-        handlePush(msg.push)
-      } else if ('id' in msg) {
-        handleReply(msg)
+    // Centrifugo v6 may batch multiple JSON objects in a single WebSocket frame
+    // using newline-delimited JSON (NDJSON). For example, when the publishing
+    // client is also subscribed to the channel, Centrifugo sends the push
+    // notification and the publish reply together:
+    //   {"push":{"channel":"ch","pub":{...}}}\n{"id":3,"publish":{}}
+    // Older behaviour (single object or a JSON array) is also supported.
+    const lines = raw.split('\n')
+    for (const line of lines) {
+      if (!line.trim()) continue
+      let msgs: Array<IncomingMsg>
+      try {
+        const parsed: unknown = JSON.parse(line)
+        // Centrifugo may also batch replies as a JSON array
+        msgs = Array.isArray(parsed)
+          ? (parsed as Array<IncomingMsg>)
+          : [parsed as IncomingMsg]
+      } catch {
+        continue
+      }
+      for (const msg of msgs) {
+        if ('push' in msg) {
+          handlePush(msg.push)
+        } else if ('id' in msg) {
+          handleReply(msg)
+        }
       }
     }
   }
@@ -511,20 +520,21 @@ export function centrifugoTransport(
 
       // Broadcast our join data to the presence channel.
       const clientId = centrifugoClientId ?? `local-${Math.random().toString(36).slice(2)}`
-      void this.publish(prs, { type: 'prs:join', clientId, data } satisfies PrsJoin)
+      // fire-and-forget; suppress unhandled rejection if socket closes before reply
+      void this.publish(prs, { type: 'prs:join', clientId, data } satisfies PrsJoin).catch(() => {})
     },
 
     updatePresence(channel, data) {
       const prs = presenceChannel(channel)
       const clientId = centrifugoClientId ?? ''
-      void this.publish(prs, { type: 'prs:update', clientId, data } satisfies PrsUpdate)
+      void this.publish(prs, { type: 'prs:update', clientId, data } satisfies PrsUpdate).catch(() => {})
     },
 
     leavePresence(channel) {
       const prs = presenceChannel(channel)
       const clientId = centrifugoClientId ?? ''
 
-      void this.publish(prs, { type: 'prs:leave', clientId } satisfies PrsLeave)
+      void this.publish(prs, { type: 'prs:leave', clientId } satisfies PrsLeave).catch(() => {})
 
       // Clean up sidecar subscription
       if (subscriptions.has(prs)) {

@@ -2,20 +2,24 @@
  * Download the Centrifugo binary for the current platform and cache it at
  * .cache/centrifugo/centrifugo (Linux/macOS) or .cache/centrifugo/centrifugo.exe (Windows).
  *
+ * Uses `curl` for HTTP requests so that HTTPS_PROXY / HTTP_PROXY environment
+ * variables are respected automatically — Node.js built-in fetch does not
+ * honour proxy env vars.
+ *
  * Usage:
  *   node scripts/download-centrifugo.mjs          # latest release
  *   node scripts/download-centrifugo.mjs v5.4.8   # specific version
  *
  * The cached binary is used by the centrifugo-e2e Vitest project.
  * Run this once before running: npx vitest run --project centrifugo-e2e
+ * (or just run `npm run test:e2e` — it downloads automatically on first use)
  */
 
 import { execSync } from 'child_process'
-import { mkdirSync, existsSync, chmodSync, writeFileSync, readFileSync, createWriteStream } from 'fs'
+import { mkdirSync, existsSync, chmodSync, writeFileSync, readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { tmpdir } from 'os'
-import { pipeline } from 'stream/promises'
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const CACHE_DIR = join(root, '.cache', 'centrifugo')
@@ -46,22 +50,29 @@ function getPlatformSlug() {
 }
 
 // ---------------------------------------------------------------------------
-// GitHub API helpers
+// curl-based helpers (proxy-aware)
 // ---------------------------------------------------------------------------
 
-async function getLatestVersion() {
-  console.log('Fetching latest Centrifugo release from GitHub…')
-  const res = await fetch(
-    'https://api.github.com/repos/centrifugal/centrifugo/releases/latest',
-    { headers: { 'User-Agent': 'tanstack-realtime-download-script' } },
+function curlJson(url) {
+  const out = execSync(
+    `curl -sL --fail -H "User-Agent: tanstack-realtime-download-script" "${url}"`,
+    { encoding: 'utf8' },
   )
-  if (!res.ok) throw new Error(`GitHub API error: ${res.status} ${res.statusText}`)
-  const data = await res.json()
+  return JSON.parse(out)
+}
+
+function curlDownload(url, dest) {
+  console.log(`Downloading ${url}`)
+  execSync(`curl -sL --fail -o "${dest}" "${url}"`, { stdio: ['ignore', 'ignore', 'inherit'] })
+}
+
+function getLatestVersion() {
+  console.log('Fetching latest Centrifugo release from GitHub…')
+  const data = curlJson('https://api.github.com/repos/centrifugal/centrifugo/releases/latest')
   return data.tag_name // e.g. "v5.4.8"
 }
 
 function buildDownloadUrl(version, os, arch) {
-  // Strip leading 'v' for the filename
   const ver = version.replace(/^v/, '')
   const ext = os === 'windows' ? 'zip' : 'tar.gz'
   const filename = `centrifugo_${ver}_${os}_${arch}.${ext}`
@@ -72,23 +83,10 @@ function buildDownloadUrl(version, os, arch) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Download + extract
-// ---------------------------------------------------------------------------
-
-async function downloadFile(url, dest) {
-  console.log(`Downloading ${url}`)
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`Download failed: ${res.status} ${res.statusText}\nURL: ${url}`)
-  const out = createWriteStream(dest)
-  await pipeline(res.body, out)
-}
-
 function extract(archivePath, ext, destDir) {
   if (ext === 'tar.gz') {
     execSync(`tar -xzf "${archivePath}" -C "${destDir}" centrifugo`, { stdio: 'inherit' })
   } else {
-    // zip (Windows) — use PowerShell
     execSync(
       `powershell -Command "Expand-Archive -Path '${archivePath}' -DestinationPath '${destDir}' -Force"`,
       { stdio: 'inherit' },
@@ -100,13 +98,11 @@ function extract(archivePath, ext, destDir) {
 // Main
 // ---------------------------------------------------------------------------
 
-async function main() {
+function main() {
   const requestedVersion = process.argv[2] ?? null
+  const version = requestedVersion ?? getLatestVersion()
 
-  // Resolve version
-  const version = requestedVersion ?? await getLatestVersion()
-
-  // Check if already cached at this version
+  // Skip if already cached at this version
   if (existsSync(BINARY) && existsSync(VERSION_FILE)) {
     const cached = readFileSync(VERSION_FILE, 'utf8').trim()
     if (cached === version) {
@@ -122,7 +118,7 @@ async function main() {
   mkdirSync(CACHE_DIR, { recursive: true })
 
   const tmp = join(tmpdir(), filename)
-  await downloadFile(url, tmp)
+  curlDownload(url, tmp)
 
   console.log(`Extracting to ${CACHE_DIR}…`)
   extract(tmp, ext, CACHE_DIR)
@@ -133,7 +129,9 @@ async function main() {
   console.log(`✓ Centrifugo ${version} ready at ${BINARY}`)
 }
 
-main().catch((err) => {
+try {
+  main()
+} catch (err) {
   console.error(err.message)
   process.exit(1)
-})
+}

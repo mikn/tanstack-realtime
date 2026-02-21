@@ -7,17 +7,24 @@
  * the cached binary (the script is a no-op when the version matches).
  *
  * After ensuring the binary is present, starts an isolated Centrifugo
- * instance on a free port with a minimal anonymous-access config, waits for
- * the health endpoint, and provides the port to every test via
+ * instance on a free port using a temporary JSON config file and waits for
+ * the health endpoint, then provides the port to every test via
  * `inject('centrifugoPort')`.
+ *
+ * Config overview (Centrifugo v6 nested JSON format):
+ *   - client.insecure: true          — skip connection token auth
+ *   - channel.without_namespace.*    — open subscribe/publish for all anon channels
+ *   - channel.namespaces[{name:prs}] — same for the presence sidecar namespace
+ *     (named "prs:" not "$prs:" to avoid the private-channel '$' prefix that
+ *      requires subscription tokens even in insecure mode)
  */
 
 import { spawn, execFileSync } from 'child_process'
 import type { ChildProcess } from 'child_process'
-import { writeFileSync, existsSync } from 'fs'
+import { existsSync, writeFileSync, unlinkSync } from 'fs'
 import { createServer } from 'net'
-import { tmpdir } from 'os'
 import { join } from 'path'
+import { tmpdir } from 'os'
 import { fileURLToPath } from 'url'
 import type { GlobalSetupContext } from 'vitest/node'
 
@@ -25,11 +32,54 @@ import type { GlobalSetupContext } from 'vitest/node'
 // Paths
 // ---------------------------------------------------------------------------
 
-const root = fileURLToPath(new URL('../../..', import.meta.url))
+// __tests__/ is 2 levels deep from the repo root (packages/__tests__)
+const root = fileURLToPath(new URL('../..', import.meta.url))
 const IS_WINDOWS = process.platform === 'win32'
 const BINARY =
   process.env['CENTRIFUGO_BIN'] ??
   join(root, '.cache', 'centrifugo', IS_WINDOWS ? 'centrifugo.exe' : 'centrifugo')
+
+// ---------------------------------------------------------------------------
+// Config builder
+// ---------------------------------------------------------------------------
+
+function buildConfig(port: number): string {
+  return JSON.stringify(
+    {
+      http_server: {
+        address: '127.0.0.1',
+        port: String(port), // v6 expects a string here
+      },
+      log: { level: 'none' },
+      health: { enabled: true },
+      client: { insecure: true },
+      channel: {
+        without_namespace: {
+          allow_subscribe_for_anonymous: true,
+          allow_publish_for_anonymous: true,
+          allow_publish_for_subscriber: true,
+          allow_presence_for_anonymous: true,
+          allow_presence_for_subscriber: true,
+        },
+        // "prs" namespace used for presence sidecar channels (presencePrefix: 'prs:').
+        // Must NOT start with '$' — Centrifugo treats channels starting with '$'
+        // as private (require subscription tokens) even in insecure mode.
+        namespaces: [
+          {
+            name: 'prs',
+            allow_subscribe_for_anonymous: true,
+            allow_publish_for_anonymous: true,
+            allow_publish_for_subscriber: true,
+            allow_presence_for_anonymous: true,
+            allow_presence_for_subscriber: true,
+          },
+        ],
+      },
+    },
+    null,
+    2,
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -46,44 +96,11 @@ function findFreePort(): Promise<number> {
   })
 }
 
-function buildConfig(port: number): string {
-  // Centrifugo v5+ JSON config.
-  // Targets the "channel_without_namespace" (default namespace) and the
-  // "$prs" namespace (used by centrifugoTransport for sidecar presence).
-  // All channels are open for anonymous subscribers/publishers — test-only.
-  return JSON.stringify(
-    {
-      port,
-      address: '127.0.0.1',
-      log_level: 'none',
-      // A dummy HMAC secret satisfies the validation check even though no
-      // tokens are required in this anonymous-access config.
-      token_hmac_secret_key: 'e2e-test-secret-key-at-least-32-bytes!',
-      // Allow connections without a JWT token.
-      allow_anonymous_connect: true,
-      // Default namespace — applies to every channel with no explicit namespace.
-      channel_without_namespace: {
-        allow_subscribe_for_anonymous: true,
-        allow_publish_for_subscriber: true,
-      },
-      // Presence sidecar namespace ($prs:<channel>).
-      namespaces: [
-        {
-          name: '$prs',
-          allow_subscribe_for_anonymous: true,
-          allow_publish_for_subscriber: true,
-        },
-      ],
-    },
-    null,
-    2,
-  )
-}
-
 async function waitForHealth(port: number, timeoutMs = 10_000): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     try {
+      // Localhost fetch is not routed through HTTPS_PROXY
       const res = await fetch(`http://127.0.0.1:${port}/health`)
       if (res.ok) return
     } catch {
@@ -99,6 +116,7 @@ async function waitForHealth(port: number, timeoutMs = 10_000): Promise<void> {
 // ---------------------------------------------------------------------------
 
 let proc: ChildProcess | undefined
+let configFile: string | undefined
 
 export default async function setup({ provide }: GlobalSetupContext) {
   // ── 1. Ensure binary is present (download if necessary) ─────────────────
@@ -114,12 +132,12 @@ export default async function setup({ provide }: GlobalSetupContext) {
   // ── 2. Find a free port ───────────────────────────────────────────────────
   const port = await findFreePort()
 
-  // ── 3. Write temp config ─────────────────────────────────────────────────
-  const configPath = join(tmpdir(), `centrifugo-e2e-${port}.json`)
-  writeFileSync(configPath, buildConfig(port), 'utf8')
+  // ── 3. Write a temporary config file ─────────────────────────────────────
+  configFile = join(tmpdir(), `centrifugo-e2e-${port}.json`)
+  writeFileSync(configFile, buildConfig(port), 'utf8')
 
-  // ── 4. Start the binary ───────────────────────────────────────────────────
-  proc = spawn(BINARY, ['--config', configPath], {
+  // ── 4. Start the binary with the config file ──────────────────────────────
+  proc = spawn(BINARY, ['--config', configFile], {
     stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env },
   })
@@ -132,12 +150,11 @@ export default async function setup({ provide }: GlobalSetupContext) {
     throw new Error(`[centrifugo-e2e] Failed to spawn binary: ${err.message}`)
   })
 
-  proc.on('exit', (code, signal) => {
+  proc.on('exit', (code) => {
     if (code !== null && code !== 0) {
       const log = stderr.join('').slice(-2000)
       throw new Error(
-        `[centrifugo-e2e] Centrifugo exited with code ${code}.\n` +
-          `Config: ${configPath}\nStderr:\n${log}`,
+        `[centrifugo-e2e] Centrifugo exited unexpectedly with code ${code}.\nStderr:\n${log}`,
       )
     }
   })
@@ -149,9 +166,7 @@ export default async function setup({ provide }: GlobalSetupContext) {
     proc.kill()
     const log = stderr.join('').slice(-2000)
     throw new Error(
-      `[centrifugo-e2e] ${(err as Error).message}\n` +
-        `Config: ${configPath}\n` +
-        `Stderr:\n${log || '(empty)'}`,
+      `[centrifugo-e2e] ${(err as Error).message}\nStderr:\n${log || '(empty)'}`,
     )
   }
 
@@ -164,5 +179,13 @@ export default async function setup({ provide }: GlobalSetupContext) {
   return function teardown() {
     proc?.kill('SIGTERM')
     proc = undefined
+    if (configFile && existsSync(configFile)) {
+      try {
+        unlinkSync(configFile)
+      } catch {
+        // best-effort cleanup
+      }
+      configFile = undefined
+    }
   }
 }

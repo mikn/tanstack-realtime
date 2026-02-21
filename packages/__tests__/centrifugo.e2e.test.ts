@@ -43,6 +43,11 @@ function makeClient(port: number): ReturnType<typeof createRealtimeClient> {
   return createRealtimeClient({
     transport: centrifugoTransport({
       url: `ws://127.0.0.1:${port}/connection/websocket`,
+      // Must match the "prs" namespace configured in centrifugo.globalSetup.ts.
+      // The default '$prs:' prefix would hit Centrifugo's private-channel guard
+      // (channel.private_prefix = '$') and require subscription tokens even in
+      // insecure mode.
+      presencePrefix: 'prs:',
       initialDelay: 50,
       maxDelay: 200,
       jitter: 0,
