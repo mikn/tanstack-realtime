@@ -1,0 +1,11 @@
+name = "tanstack-realtime-test"
+main = "packages/__tests__/workerd-test-worker.ts"
+compatibility_date = "2025-01-01"
+
+[[durable_objects.bindings]]
+name        = "REALTIME_CHANNEL"
+class_name  = "RealtimeChannel"
+
+[[migrations]]
+tag         = "v1"
+new_classes = ["RealtimeChannel"]

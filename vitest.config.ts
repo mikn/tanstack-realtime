@@ -32,6 +32,13 @@ export default defineConfig({
           'packages/realtime-preset-node/src/index.ts',
         ),
       },
+      {
+        find: /^@tanstack\/realtime-preset-workerd$/,
+        replacement: resolve(
+          root,
+          'packages/realtime-preset-workerd/src/index.ts',
+        ),
+      },
     ],
   },
 })
