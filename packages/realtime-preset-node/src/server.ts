@@ -2,8 +2,7 @@ import { WebSocketServer, WebSocket } from 'ws'
 import { randomBytes } from 'crypto'
 import type { IncomingMessage, Server } from 'http'
 import { parseChannel } from '@tanstack/realtime'
-import type { ChannelPermissions } from '@tanstack/realtime'
-import type { ParsedChannel, PresenceUser } from '@tanstack/realtime'
+import type { ChannelPermissions, ParsedChannel, PresenceUser } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Wire protocol
@@ -261,10 +260,18 @@ export function createNodeServer(options: NodeServerOptions): NodeServer {
         // from presence lists (see RealtimeTransport.onPresenceChange filtering).
         sendTo(ws, { type: 'connected', connectionId })
 
+        // Process messages from this connection sequentially so that an async
+        // `subscribe` (which awaits `authorize`) always completes before a
+        // subsequent `presence:join` is evaluated. Without this, back-to-back
+        // messages (e.g. from usePresence) can race and the presence join is
+        // dropped because authorizedChannels has not been populated yet.
+        let messageChain = Promise.resolve()
         ws.on('message', (data) => {
-          handleMessage(conn, data.toString()).catch((err) => {
-            console.error('[realtime:node] message handler error', err)
-          })
+          messageChain = messageChain
+            .then(() => handleMessage(conn, data.toString()))
+            .catch((err) => {
+              console.error('[realtime:node] message handler error', err)
+            })
         })
 
         ws.on('close', () => handleDisconnect(conn))

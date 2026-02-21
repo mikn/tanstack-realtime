@@ -56,8 +56,8 @@ export interface RealtimeTransport {
 
   /**
    * Publish `data` to `channel`.
-   * In the Node preset this calls the `/_realtime/publish` endpoint.
-   * In Centrifugo/Ably presets it uses the client-side WebSocket.
+   * Implementations send the data through the transport's active connection
+   * (e.g. a WebSocket publish message in the Node preset).
    */
   publish(channel: string, data: unknown): Promise<void>
 

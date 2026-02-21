@@ -192,6 +192,23 @@ export function nodeTransport(options: NodeTransportOptions = {}): RealtimeTrans
     }, delay)
   }
 
+  // Returns a Promise that resolves when the store reaches 'connected' or
+  // rejects when it reaches 'disconnected'. Used by connect() to avoid
+  // duplicating the same settlement logic in two code paths.
+  function awaitConnection(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const sub = store.subscribe((status) => {
+        if (status === 'connected') {
+          sub.unsubscribe()
+          resolve()
+        } else if (status === 'disconnected') {
+          sub.unsubscribe()
+          reject(new Error('[realtime:node] Connection failed'))
+        }
+      })
+    })
+  }
+
   const transport: RealtimeTransport = {
     store,
 
@@ -204,33 +221,11 @@ export function nodeTransport(options: NodeTransportOptions = {}): RealtimeTrans
       // If a reconnect cycle is in progress (connecting or waiting to retry),
       // return a Promise that settles once the connection is established or
       // intentionally closed — without starting a redundant socket open.
-      if (current !== 'disconnected') {
-        return new Promise<void>((resolve, reject) => {
-          const sub = store.subscribe((status) => {
-            if (status === 'connected') {
-              sub.unsubscribe()
-              resolve()
-            } else if (status === 'disconnected') {
-              sub.unsubscribe()
-              reject(new Error('[realtime:node] Connection failed'))
-            }
-          })
-        })
-      }
+      if (current !== 'disconnected') return awaitConnection()
 
       intentionalClose = false
       openSocket()
-      return new Promise<void>((resolve, reject) => {
-        const sub = store.subscribe((status) => {
-          if (status === 'connected') {
-            sub.unsubscribe()
-            resolve()
-          } else if (status === 'disconnected') {
-            sub.unsubscribe()
-            reject(new Error('[realtime:node] Connection failed'))
-          }
-        })
-      })
+      return awaitConnection()
     },
 
     disconnect() {

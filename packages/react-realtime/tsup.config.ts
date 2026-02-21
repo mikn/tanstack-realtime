@@ -12,6 +12,5 @@ export default defineConfig({
     'react',
     '@tanstack/realtime',
     '@tanstack/react-store',
-    '@tanstack/react-db',
   ],
 })
