@@ -14,12 +14,13 @@ import {
   serializeKey,
   parseChannel,
   createRealtimeClient,
+  realtimeCollectionOptions,
+  liveChannelOptions,
 } from '@tanstack/realtime'
-import type { ParsedChannel, PresenceUser } from '@tanstack/realtime'
+import type { ParsedChannel, PresenceUser, RealtimeClient } from '@tanstack/realtime'
 import type { ChannelPermissions } from '@tanstack/realtime'
 import { createNodeServer, nodeTransport } from '@tanstack/realtime-preset-node'
 import type { NodeServer } from '@tanstack/realtime-preset-node'
-import type { RealtimeClient } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Test utilities
@@ -972,5 +973,557 @@ describe('Reconnection — resubscription', () => {
     await new Promise<void>((resolve, reject) =>
       harness.httpServer.close((err) => (err ? reject(err) : resolve())),
     )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Mock client factory for unit-style collection tests
+// ---------------------------------------------------------------------------
+
+function createMockRealtimeClient() {
+  const listeners = new Map<string, Set<(data: unknown) => void>>()
+  const published: { channel: string; data: unknown }[] = []
+
+  return {
+    store: {
+      get: () => ({ status: 'connected' as const }),
+      subscribe: () => ({ unsubscribe: () => {} }),
+    },
+    connect: async () => {},
+    disconnect: () => {},
+    destroy: () => {},
+    subscribe(channel: string, cb: (data: unknown) => void): () => void {
+      if (!listeners.has(channel)) listeners.set(channel, new Set())
+      listeners.get(channel)!.add(cb)
+      return () => {
+        listeners.get(channel)?.delete(cb)
+      }
+    },
+    async publish(channel: unknown, data: unknown): Promise<void> {
+      published.push({ channel: String(channel), data })
+    },
+    joinPresence: () => {},
+    updatePresence: () => {},
+    leavePresence: () => {},
+    onPresenceChange: () => () => {},
+    /** Deliver a message to all channel listeners (test helper). */
+    emit(channel: string, data: unknown) {
+      listeners.get(channel)?.forEach((cb) => cb(data))
+    },
+    published,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// realtimeCollectionOptions — SyncConfig invariants
+// ---------------------------------------------------------------------------
+
+describe('realtimeCollectionOptions — SyncConfig invariants', () => {
+  it('stopped flag prevents write() after cleanup is called', () => {
+    const client = createMockRealtimeClient()
+    const config = realtimeCollectionOptions({
+      client: client as unknown as RealtimeClient,
+      channel: 'items',
+      getKey: (x: { id: string }) => x.id,
+    })
+
+    const written: unknown[] = []
+    const cleanup = config.sync!.sync!({
+      begin: () => {},
+      write: (msg) => written.push(msg),
+      commit: () => {},
+      markReady: () => {},
+    })
+
+    // Message before cleanup → must be written
+    client.emit('items', { action: 'insert', data: { id: '1' } })
+    expect(written).toHaveLength(1)
+
+    // Cleanup sets stopped = true
+    cleanup!()
+
+    // Message after cleanup → must be ignored
+    client.emit('items', { action: 'insert', data: { id: '2' } })
+    expect(written).toHaveLength(1)
+  })
+
+  it('markReady() is called even when queryFn rejects', async () => {
+    const client = createMockRealtimeClient()
+    const config = realtimeCollectionOptions({
+      client: client as unknown as RealtimeClient,
+      channel: 'items',
+      getKey: (x: { id: string }) => x.id,
+      queryFn: async () => {
+        throw new Error('network error')
+      },
+    })
+
+    let readyCalled = false
+    config.sync!.sync!({
+      begin: () => {},
+      write: () => {},
+      commit: () => {},
+      markReady: () => {
+        readyCalled = true
+      },
+    })
+
+    await waitFor(50)
+    expect(readyCalled).toBe(true)
+  })
+
+  it('markReady() is called synchronously when no queryFn is provided', () => {
+    const client = createMockRealtimeClient()
+    const config = realtimeCollectionOptions({
+      client: client as unknown as RealtimeClient,
+      channel: 'items',
+      getKey: (x: { id: string }) => x.id,
+    })
+
+    let readyCalled = false
+    config.sync!.sync!({
+      begin: () => {},
+      write: () => {},
+      commit: () => {},
+      markReady: () => {
+        readyCalled = true
+      },
+    })
+
+    expect(readyCalled).toBe(true) // synchronous — no queryFn
+  })
+
+  it('queryFn rows are written as inserts and markReady() is called', async () => {
+    const client = createMockRealtimeClient()
+    const rows = [{ id: '1' }, { id: '2' }, { id: '3' }]
+    const config = realtimeCollectionOptions({
+      client: client as unknown as RealtimeClient,
+      channel: 'items',
+      getKey: (x: { id: string }) => x.id,
+      queryFn: async () => rows,
+    })
+
+    const written: unknown[] = []
+    let readyCalled = false
+    config.sync!.sync!({
+      begin: () => {},
+      write: (msg) => written.push(msg),
+      commit: () => {},
+      markReady: () => {
+        readyCalled = true
+      },
+    })
+
+    await waitFor(50)
+    expect(written).toHaveLength(3)
+    expect(readyCalled).toBe(true)
+  })
+
+  it('delete message uses getKey to derive the deletion key', () => {
+    const client = createMockRealtimeClient()
+    const config = realtimeCollectionOptions({
+      client: client as unknown as RealtimeClient,
+      channel: 'items',
+      getKey: (x: { id: string }) => x.id,
+    })
+
+    const written: unknown[] = []
+    config.sync!.sync!({
+      begin: () => {},
+      write: (msg) => written.push(msg),
+      commit: () => {},
+      markReady: () => {},
+    })
+
+    client.emit('items', { action: 'delete', data: { id: 'abc' } })
+    expect(written).toEqual([{ type: 'delete', key: 'abc' }])
+  })
+
+  it('wrappedOnInsert publishes the returned row to the channel', async () => {
+    const client = createMockRealtimeClient()
+    const savedRow = { id: '42', text: 'hello' }
+    const config = realtimeCollectionOptions({
+      client: client as unknown as RealtimeClient,
+      channel: 'items',
+      getKey: (x: { id: string }) => x.id,
+      onInsert: async () => savedRow,
+    })
+
+    await (config.onInsert as (p: unknown) => Promise<unknown>)({})
+
+    expect(client.published).toHaveLength(1)
+    expect(client.published[0]).toEqual({
+      channel: 'items',
+      data: { action: 'insert', data: savedRow },
+    })
+  })
+
+  it('wrappedOnUpdate publishes the returned row to the channel', async () => {
+    const client = createMockRealtimeClient()
+    const updatedRow = { id: '42', text: 'updated' }
+    const config = realtimeCollectionOptions({
+      client: client as unknown as RealtimeClient,
+      channel: 'items',
+      getKey: (x: { id: string }) => x.id,
+      onUpdate: async () => updatedRow,
+    })
+
+    await (config.onUpdate as (p: unknown) => Promise<unknown>)({})
+
+    expect(client.published).toHaveLength(1)
+    expect(client.published[0]).toEqual({
+      channel: 'items',
+      data: { action: 'update', data: updatedRow },
+    })
+  })
+
+  it('wrappedOnDelete publishes the returned row to the channel', async () => {
+    const client = createMockRealtimeClient()
+    const deletedRow = { id: '42', text: 'bye' }
+    const config = realtimeCollectionOptions({
+      client: client as unknown as RealtimeClient,
+      channel: 'items',
+      getKey: (x: { id: string }) => x.id,
+      onDelete: async () => deletedRow,
+    })
+
+    await (config.onDelete as (p: unknown) => Promise<unknown>)({})
+
+    expect(client.published).toHaveLength(1)
+    expect(client.published[0]).toEqual({
+      channel: 'items',
+      data: { action: 'delete', data: deletedRow },
+    })
+  })
+
+  it('mutation wrapper skips publish when handler returns null', async () => {
+    const client = createMockRealtimeClient()
+    const config = realtimeCollectionOptions({
+      client: client as unknown as RealtimeClient,
+      channel: 'items',
+      getKey: (x: { id: string }) => x.id,
+      onInsert: async () => null,
+    })
+
+    await (config.onInsert as (p: unknown) => Promise<unknown>)({})
+    expect(client.published).toHaveLength(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// liveChannelOptions — SyncConfig invariants
+// ---------------------------------------------------------------------------
+
+describe('liveChannelOptions — SyncConfig invariants', () => {
+  it('onEvent returning null filters out the event — no write() called', () => {
+    const client = createMockRealtimeClient()
+    const config = liveChannelOptions({
+      client: client as unknown as RealtimeClient,
+      channel: 'events',
+      getKey: (x: { id: string }) => x.id,
+      onEvent: (event) => {
+        const e = event as { type: string; id: string }
+        return e.type === 'message' ? { id: e.id } : null
+      },
+    })
+
+    const written: unknown[] = []
+    config.sync!.sync!({
+      begin: () => {},
+      write: (msg) => written.push(msg),
+      commit: () => {},
+      markReady: () => {},
+    })
+
+    client.emit('events', { type: 'typing' }) // null → filtered
+    client.emit('events', { type: 'message', id: 'm1' }) // kept
+    expect(written).toHaveLength(1)
+    expect(written[0]).toMatchObject({ type: 'insert', value: { id: 'm1' } })
+  })
+
+  it('stopped flag prevents write() after cleanup', () => {
+    const client = createMockRealtimeClient()
+    const config = liveChannelOptions({
+      client: client as unknown as RealtimeClient,
+      channel: 'events',
+      getKey: (x: { id: string }) => x.id,
+      onEvent: (e) => e as { id: string },
+    })
+
+    const written: unknown[] = []
+    const cleanup = config.sync!.sync!({
+      begin: () => {},
+      write: (msg) => written.push(msg),
+      commit: () => {},
+      markReady: () => {},
+    })
+
+    client.emit('events', { id: '1' })
+    expect(written).toHaveLength(1)
+
+    cleanup!()
+
+    client.emit('events', { id: '2' })
+    expect(written).toHaveLength(1) // not incremented after stop
+  })
+
+  it('markReady() is called synchronously when no initialData provided', () => {
+    const client = createMockRealtimeClient()
+    const config = liveChannelOptions({
+      client: client as unknown as RealtimeClient,
+      channel: 'events',
+      getKey: (x: { id: string }) => x.id,
+      onEvent: (e) => e as { id: string },
+    })
+
+    let readyCalled = false
+    config.sync!.sync!({
+      begin: () => {},
+      write: () => {},
+      commit: () => {},
+      markReady: () => {
+        readyCalled = true
+      },
+    })
+
+    expect(readyCalled).toBe(true)
+  })
+
+  it('initialData rows are written as inserts before markReady()', async () => {
+    const client = createMockRealtimeClient()
+    const config = liveChannelOptions({
+      client: client as unknown as RealtimeClient,
+      channel: 'events',
+      getKey: (x: { id: string }) => x.id,
+      onEvent: (e) => e as { id: string },
+      initialData: async () => [{ id: 'a' }, { id: 'b' }],
+    })
+
+    const written: unknown[] = []
+    let readyCalled = false
+    config.sync!.sync!({
+      begin: () => {},
+      write: (msg) => written.push(msg),
+      commit: () => {},
+      markReady: () => {
+        readyCalled = true
+      },
+    })
+
+    expect(readyCalled).toBe(false) // async — not yet
+    await waitFor(50)
+    expect(written).toHaveLength(2)
+    expect(readyCalled).toBe(true)
+  })
+
+  it('markReady() is called even when initialData rejects', async () => {
+    const client = createMockRealtimeClient()
+    const config = liveChannelOptions({
+      client: client as unknown as RealtimeClient,
+      channel: 'events',
+      getKey: (x: { id: string }) => x.id,
+      onEvent: (e) => e as { id: string },
+      initialData: async () => {
+        throw new Error('fetch failed')
+      },
+    })
+
+    let readyCalled = false
+    config.sync!.sync!({
+      begin: () => {},
+      write: () => {},
+      commit: () => {},
+      markReady: () => {
+        readyCalled = true
+      },
+    })
+
+    await waitFor(50)
+    expect(readyCalled).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Authorization — publish permission denied
+// ---------------------------------------------------------------------------
+
+describe('Authorization — publish permission', () => {
+  it('client with publish:false cannot fan out messages to other subscribers', async () => {
+    const harness = await createTestHarness(async (_, channel) => ({
+      subscribe: true,
+      publish: channel.namespace === 'allowed',
+      presence: false,
+    }))
+
+    const sender = connectClient(harness.port)
+    const receiver = connectClient(harness.port)
+    sender.connect()
+    receiver.connect()
+    await Promise.all([
+      nextStatus(sender, 'connected'),
+      nextStatus(receiver, 'connected'),
+    ])
+
+    const channel = 'restricted'
+    const received: unknown[] = []
+    receiver.subscribe(channel, (msg) => received.push(msg))
+    sender.subscribe(channel, () => {})
+    await waitFor(50)
+
+    // sender has publish:false for 'restricted'
+    await sender.publish(channel, { secret: true })
+    await waitFor(80)
+
+    expect(received).toEqual([]) // must NOT be delivered
+
+    sender.disconnect()
+    receiver.disconnect()
+    await harness.teardown()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Authorization — presence permission denied
+// ---------------------------------------------------------------------------
+
+describe('Authorization — presence permission', () => {
+  it('joinPresence is dropped by server when authorize returns presence:false', async () => {
+    const harness = await createTestHarness(async () => ({
+      subscribe: true,
+      publish: true,
+      presence: false,
+    }))
+
+    const client1 = connectClient(harness.port)
+    const client2 = connectClient(harness.port)
+    client1.connect()
+    client2.connect()
+    await Promise.all([
+      nextStatus(client1, 'connected'),
+      nextStatus(client2, 'connected'),
+    ])
+
+    const channel = 'room'
+    client1.subscribe(channel, () => {})
+    client2.subscribe(channel, () => {})
+    await waitFor(30)
+
+    const presenceSnapshots: ReadonlyArray<PresenceUser>[] = []
+    client1.onPresenceChange(channel, (u) => presenceSnapshots.push(u))
+
+    client1.joinPresence(channel, { name: 'Alice' })
+    client2.joinPresence(channel, { name: 'Bob' })
+    await waitFor(80)
+
+    const lastSnapshot = presenceSnapshots[presenceSnapshots.length - 1] ?? []
+    const names = lastSnapshot.map(
+      (u) => (u.data as Record<string, unknown>).name,
+    )
+    expect(names).not.toContain('Alice')
+    expect(names).not.toContain('Bob')
+
+    client1.disconnect()
+    client2.disconnect()
+    await harness.teardown()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Presence — membership cleared on disconnect (no auto-rejoin on reconnect)
+// ---------------------------------------------------------------------------
+
+describe('Presence — membership cleared on disconnect', () => {
+  it('presence entry is removed when a member disconnects', async () => {
+    const harness = await createTestHarness()
+    const observer = connectClient(harness.port)
+    const joiner = connectClient(harness.port, 0)
+    observer.connect()
+    joiner.connect()
+    await Promise.all([
+      nextStatus(observer, 'connected'),
+      nextStatus(joiner, 'connected'),
+    ])
+
+    const channel = 'room'
+    observer.subscribe(channel, () => {})
+    joiner.subscribe(channel, () => {})
+    await waitFor(30)
+
+    joiner.joinPresence(channel, { name: 'Joiner' })
+    await waitFor(50)
+
+    // Collect presence state visible to observer
+    const snapshots: ReadonlyArray<PresenceUser>[] = []
+    observer.onPresenceChange(channel, (u) => snapshots.push(u))
+    await waitFor(30)
+
+    // Disconnect the joiner — server must remove them from presence
+    joiner.disconnect()
+    await nextStatus(joiner, 'disconnected')
+    await waitFor(80)
+
+    const lastSnapshot = snapshots[snapshots.length - 1] ?? []
+    const joinerStillPresent = lastSnapshot.some(
+      (u) => (u.data as Record<string, unknown>).name === 'Joiner',
+    )
+    expect(joinerStillPresent).toBe(false)
+
+    observer.disconnect()
+    await harness.teardown()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// subscribe() registered while disconnected
+// ---------------------------------------------------------------------------
+
+describe('subscribe() while disconnected', () => {
+  it('receives messages after connecting when subscribed before connect()', async () => {
+    const harness = await createTestHarness()
+    const client = connectClient(harness.port)
+
+    // Register before connecting
+    const received: unknown[] = []
+    client.subscribe('preconnect', (msg) => received.push(msg))
+
+    // Now connect
+    client.connect()
+    await nextStatus(client, 'connected')
+    await waitFor(30)
+
+    harness.nodeServer.publish('preconnect', { hello: 'world' })
+    await waitFor(50)
+
+    expect(received).toEqual([{ hello: 'world' }])
+
+    client.disconnect()
+    await harness.teardown()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// connect() idempotency
+// ---------------------------------------------------------------------------
+
+describe('connect() idempotency', () => {
+  it('connect() when already connected resolves immediately with no state churn', async () => {
+    const harness = await createTestHarness()
+    const client = connectClient(harness.port)
+    client.connect()
+    await nextStatus(client, 'connected')
+
+    const statusChanges: string[] = []
+    const sub = client.store.subscribe((s) => statusChanges.push(s.status))
+
+    // Second connect() — already connected, must resolve immediately
+    await client.connect()
+
+    sub.unsubscribe()
+
+    expect(statusChanges).toEqual([]) // no spurious state transitions
+    expect(client.store.get().status).toBe('connected')
+
+    client.disconnect()
+    await harness.teardown()
   })
 })
