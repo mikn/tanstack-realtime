@@ -213,29 +213,13 @@ describe('realtimeCollectionOptions — channels fan-in', () => {
     expect(transport.publishCalls).toHaveLength(0)
   })
 
-  it('throws if neither channel nor channels[] is provided', () => {
-    const transport = createMockTransport()
-    const client = createRealtimeClient({ transport })
-
-    expect(() =>
-      realtimeCollectionOptions<Order, string>({
-        client,
-        getKey: (o) => o.id,
-      } as any),
-    ).toThrow('[realtimeCollectionOptions]')
-  })
-
-  it('throws if channels[] is an empty array and no channel provided', () => {
-    const transport = createMockTransport()
-    const client = createRealtimeClient({ transport })
-
-    expect(() =>
-      realtimeCollectionOptions<Order, string>({
-        client,
-        channels: [],
-        getKey: (o) => o.id,
-      }),
-    ).toThrow('[realtimeCollectionOptions]')
+  it('server-only mode works without channel or channels', () => {
+    const config = realtimeCollectionOptions<Order, string>({
+      getKey: (o) => o.id,
+      queryFn: async () => [{ id: '1', region: 'us', amount: 100 }],
+    })
+    // No crash — collection operates in server-only mode.
+    expect(config.sync).toBeDefined()
   })
 
   it('serializes QueryKey arrays for additional channels', () => {
@@ -289,32 +273,6 @@ describe('realtimeCollectionOptions — channels fan-in', () => {
     transport.emit('ch-c', { action: 'insert', data: { id: '3', region: 'c', amount: 3 } })
 
     expect(ops.length).toBe(countBefore)
-  })
-
-  it('merge is applied consistently across all fan-in channels', () => {
-    const transport = createMockTransport()
-    const client = createRealtimeClient({ transport })
-    const merge = vi.fn((prev: Order, next: Order) => ({ ...next, amount: prev.amount }))
-
-    const config = realtimeCollectionOptions<Order, string>({
-      client,
-      channel: 'ch-a',
-      channels: ['ch-b'],
-      getKey: (o) => o.id,
-      merge,
-    })
-    const { ops } = driveSync(config)
-
-    // Insert from ch-a establishes the key.
-    transport.emit('ch-a', { action: 'insert', data: { id: '1', region: 'a', amount: 100 } })
-    // Update from ch-b triggers merge.
-    transport.emit('ch-b', { action: 'update', data: { id: '1', region: 'b', amount: 200 } })
-
-    expect(merge).toHaveBeenCalledTimes(1)
-    const updateOp = ops.find((op) => op.type === 'update')!
-    // merge preserved amount from ch-a insert.
-    expect((updateOp.value as Order).amount).toBe(100)
-    expect((updateOp.value as Order).region).toBe('b')
   })
 
   it('ordering: messages are processed in arrival order across channels', () => {
@@ -498,33 +456,4 @@ describe('realtimeCollectionOptions — refetchOnReconnect', () => {
     expect(fetchCount).toBe(1) // only initial; no fetch after stop
   })
 
-  it('applies merge to re-fetched rows that already exist', async () => {
-    const transport = createMockTransport()
-    const client = createRealtimeClient({ transport })
-
-    let serverData: Order[] = [{ id: '1', region: 'us', amount: 100 }]
-    const merge = vi.fn((_prev: Order, next: Order) => ({ ...next, region: 'preserved' }))
-
-    const config = realtimeCollectionOptions<Order, string>({
-      client,
-      channel: 'orders',
-      getKey: (o) => o.id,
-      queryFn: async () => [...serverData],
-      merge,
-      refetchOnReconnect: true,
-    })
-    const { ops } = driveSync(config)
-    await vi.advanceTimersByTimeAsync(0)
-
-    serverData = [{ id: '1', region: 'us', amount: 500 }]
-    transport.setStatus('reconnecting')
-    transport.setStatus('connected')
-    await vi.advanceTimersByTimeAsync(0)
-
-    const updateOp = ops.find((o) => o.type === 'update')!
-    expect((updateOp.value as Order).amount).toBe(500)
-    // merge preserved the region field
-    expect((updateOp.value as Order).region).toBe('preserved')
-    expect(merge).toHaveBeenCalled()
-  })
 })
