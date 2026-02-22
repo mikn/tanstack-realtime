@@ -12,3 +12,12 @@ export type {
   PresenceChannelConfig,
   PresenceChannelDef,
 } from './presenceChannel.js'
+
+export { streamChannelOptions, createStreamChannel } from './streamChannelOptions.js'
+export type {
+  StreamChannelConfig,
+  StreamChannelDef,
+  StreamChannelDefConfig,
+  StreamItem,
+  StreamStatus,
+} from './streamChannelOptions.js'

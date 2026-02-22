@@ -28,9 +28,9 @@ export interface LiveChannelConfig<
   initialData?: () => Promise<T[]>
   /**
    * Called for every channel event. Return the row to insert into the
-   * collection, or `null` to ignore the event.
+   * collection, or `null` / `undefined` to ignore the event.
    */
-  onEvent: (event: unknown) => T | null
+  onEvent: (event: unknown) => T | null | undefined
 }
 
 /**

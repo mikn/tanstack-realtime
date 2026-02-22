@@ -73,8 +73,9 @@ export interface StreamChannelConfig<
 
 /**
  * A typed stream channel definition — a reusable descriptor created at module
- * level and shared across components. Passed as the first argument to
- * `useStream`.
+ * level and shared across components.  Analogous to `PresenceChannelDef` but
+ * for accumulated event streams.  Pass to a compatible stream hook; for
+ * direct collection use (without a hook) see `streamChannelOptions`.
  */
 export interface StreamChannelDef<
   TState,

@@ -21,29 +21,25 @@ export type {
 } from './core/types.js'
 
 // Collection sources
-export { realtimeCollectionOptions } from './collections/realtimeCollectionOptions.js'
+export {
+  realtimeCollectionOptions,
+  liveChannelOptions,
+  createPresenceChannel,
+  streamChannelOptions,
+  createStreamChannel,
+} from './collections/index.js'
 export type {
   RealtimeCollectionConfig,
   RealtimeChannelMessage,
-} from './collections/realtimeCollectionOptions.js'
-
-export { liveChannelOptions } from './collections/liveChannelOptions.js'
-export type { LiveChannelConfig } from './collections/liveChannelOptions.js'
-
-export { createPresenceChannel } from './collections/presenceChannel.js'
-export type {
+  LiveChannelConfig,
   PresenceChannelConfig,
   PresenceChannelDef,
-} from './collections/presenceChannel.js'
-
-export { streamChannelOptions, createStreamChannel } from './collections/streamChannelOptions.js'
-export type {
   StreamChannelConfig,
   StreamChannelDef,
   StreamChannelDefConfig,
   StreamItem,
   StreamStatus,
-} from './collections/streamChannelOptions.js'
+} from './collections/index.js'
 
 // Core utilities
 export { createDedup } from './core/dedup.js'
