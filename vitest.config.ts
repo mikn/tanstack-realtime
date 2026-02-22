@@ -9,6 +9,7 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     include: ['packages/**/__tests__/**/*.test.ts'],
+    setupFiles: ['packages/__tests__/setup.ts'],
     // Run tests serially to avoid port conflicts between harnesses
     pool: 'forks',
     poolOptions: {
@@ -37,6 +38,13 @@ export default defineConfig({
         replacement: resolve(
           root,
           'packages/realtime-preset-workerd/src/index.ts',
+        ),
+      },
+      {
+        find: /^@tanstack\/realtime-adapter-centrifugo$/,
+        replacement: resolve(
+          root,
+          'packages/realtime-adapter-centrifugo/src/index.ts',
         ),
       },
     ],
