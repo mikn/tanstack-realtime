@@ -87,10 +87,13 @@ export function useLiveChannel<
   }
 
   // Clean up when the component unmounts.
+  // Reset the ref to null so React Strict Mode's simulated unmount+remount
+  // cycle creates a fresh collection rather than reusing the cleaned-up one.
   useEffect(() => {
     const col = collectionRef.current!
     return () => {
       void col.cleanup()
+      collectionRef.current = null
     }
   }, [])
 

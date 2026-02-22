@@ -71,12 +71,10 @@ export function useRealtimeCollection<
     )
   }
 
-  // Hold the collection in a ref so it is created once and stays stable.
+  // Hold the collection in a ref so it is created once and stays stable
+  // across renders. Created synchronously so it is available on the first
+  // render for useLiveQuery / useLiveSuspenseQuery.
   const collectionRef = useRef<Collection<T, TKey> | null>(null)
-  // Hold the config ref so the cleanup effect can access latest config
-  // without closing over a stale copy.
-  const configRef = useRef(config)
-  configRef.current = config
 
   if (!collectionRef.current) {
     // createCollection's overloads are strict about schema generics; cast through unknown.
@@ -86,10 +84,13 @@ export function useRealtimeCollection<
   }
 
   // Clean up when the component unmounts.
+  // Reset the ref to null so React Strict Mode's simulated unmount+remount
+  // cycle creates a fresh collection rather than reusing the cleaned-up one.
   useEffect(() => {
     const col = collectionRef.current!
     return () => {
       void col.cleanup()
+      collectionRef.current = null
     }
   }, [])
 

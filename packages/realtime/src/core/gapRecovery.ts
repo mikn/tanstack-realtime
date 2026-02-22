@@ -41,6 +41,28 @@ export interface GapRecoveryOptions {
    * @param channel - The serialized channel key that experienced the gap.
    */
   onGap: (channel: string) => void | Promise<void>
+  /**
+   * Called when `onGap` throws or returns a rejected promise.
+   *
+   * By default errors are silently swallowed so a failing recovery never
+   * crashes the transport. Provide `onGapError` to log them, report to an
+   * error tracker, or trigger a fallback (e.g. force a full page reload).
+   *
+   * Matches the `onFlushError` pattern in `createOfflineQueue`.
+   *
+   * @param error - The thrown error or rejected value.
+   * @param channel - The channel whose gap recovery failed.
+   *
+   * @example
+   * withGapRecovery(transport, {
+   *   onGap: async (ch) => { await refetch(ch) },
+   *   onGapError: (err, ch) => {
+   *     console.error(`Gap recovery failed for ${ch}:`, err)
+   *     Sentry.captureException(err)
+   *   },
+   * })
+   */
+  onGapError?: (error: unknown, channel: string) => void
 }
 
 export interface GapRecoveryTransport extends RealtimeTransport {
@@ -92,7 +114,7 @@ export function withGapRecovery(
   inner: RealtimeTransport,
   options: GapRecoveryOptions,
 ): GapRecoveryTransport {
-  const { onGap } = options
+  const { onGap, onGapError } = options
   const activeChannels = new Set<string>()
   let wasDisconnected = false
 
@@ -105,9 +127,13 @@ export function withGapRecovery(
       wasDisconnected = false
       // Fire gap recovery for all active channels. The async IIFE converts
       // sync throws inside onGap() into a rejected promise before .catch() sees
-      // them, ensuring both sync and async errors are swallowed.
+      // them, keeping error handling uniform for sync and async handlers.
       for (const channel of activeChannels) {
-        void (async () => onGap(channel))().catch(() => {})
+        void (async () => onGap(channel))().catch((err: unknown) => {
+          if (onGapError) onGapError(err, channel)
+          // Silently swallow when no error handler provided so a failing
+          // recovery never crashes the transport.
+        })
       }
     }
   })

@@ -17,6 +17,9 @@ export { useSubscribe } from './useSubscribe.js'
 
 export { usePublish } from './usePublish.js'
 
+export { useChannel } from './useChannel.js'
+export type { UseChannelResult } from './useChannel.js'
+
 export { useStream } from './useStream.js'
 export type { UseStreamOptions, UseStreamResult } from './useStream.js'
 

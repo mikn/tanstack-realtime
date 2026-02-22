@@ -268,4 +268,80 @@ describe('withGapRecovery', () => {
     transport.onPresenceChange('ch', cb)
     expect(onPresenceSpy).toHaveBeenCalledWith('ch', cb)
   })
+
+  // ── onGapError ────────────────────────────────────────────────────────────
+
+  it('calls onGapError when onGap throws synchronously', async () => {
+    const inner = createMockTransport()
+    const err = new Error('sync failure')
+    const onGap = vi.fn(() => { throw err })
+    const onGapError = vi.fn()
+
+    const transport = withGapRecovery(inner, { onGap, onGapError })
+    transport.subscribe('ch', () => {})
+
+    inner.setStatus('reconnecting')
+    inner.setStatus('connected')
+
+    // Error handler is called asynchronously (via promise chain).
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(onGapError).toHaveBeenCalledWith(err, 'ch')
+  })
+
+  it('calls onGapError when onGap returns a rejected promise', async () => {
+    const inner = createMockTransport()
+    const err = new Error('async failure')
+    const onGap = vi.fn(() => Promise.reject(err))
+    const onGapError = vi.fn()
+
+    const transport = withGapRecovery(inner, { onGap, onGapError })
+    transport.subscribe('ch', () => {})
+
+    inner.setStatus('disconnected')
+    inner.setStatus('connected')
+
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(onGapError).toHaveBeenCalledWith(err, 'ch')
+  })
+
+  it('silently swallows onGap errors when onGapError is not provided', async () => {
+    const inner = createMockTransport()
+    const onGap = vi.fn(() => Promise.reject(new Error('silent')))
+
+    const transport = withGapRecovery(inner, { onGap })
+    transport.subscribe('ch', () => {})
+
+    inner.setStatus('reconnecting')
+    inner.setStatus('connected')
+
+    // Should not throw.
+    await new Promise((r) => setTimeout(r, 0))
+    expect(onGap).toHaveBeenCalledWith('ch')
+  })
+
+  it('calls onGapError for each failing channel independently', async () => {
+    const inner = createMockTransport()
+    const errA = new Error('ch-a failed')
+    const errB = new Error('ch-b failed')
+    const onGap = vi.fn((ch: string) => {
+      if (ch === 'ch-a') throw errA
+      if (ch === 'ch-b') throw errB
+    })
+    const onGapError = vi.fn()
+
+    const transport = withGapRecovery(inner, { onGap, onGapError })
+    transport.subscribe('ch-a', () => {})
+    transport.subscribe('ch-b', () => {})
+
+    inner.setStatus('reconnecting')
+    inner.setStatus('connected')
+
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(onGapError).toHaveBeenCalledTimes(2)
+    expect(onGapError).toHaveBeenCalledWith(errA, 'ch-a')
+    expect(onGapError).toHaveBeenCalledWith(errB, 'ch-b')
+  })
 })
