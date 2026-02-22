@@ -8,7 +8,7 @@
  * every active channel so the application can re-fetch missed data.
  */
 
-import type { BaseTransport, RealtimeTransport } from './types.js'
+import type { RealtimeTransport } from './types.js'
 import { hasPresence } from './types.js'
 
 // ---------------------------------------------------------------------------
@@ -59,7 +59,7 @@ export interface GapRecoveryTransport extends RealtimeTransport {
  * that resolves back to `'connected'`, the `onGap` callback is invoked for
  * every channel that has an active subscription at that moment.
  *
- * Accepts any {@link BaseTransport}. When the inner transport also implements
+ * Accepts any {@link RealtimeTransport}. When the inner transport also implements
  * {@link PresenceCapable}, the presence methods are forwarded transparently.
  * Calling presence methods on a wrapper around a non-presence transport throws
  * a descriptive error.
@@ -89,7 +89,7 @@ export interface GapRecoveryTransport extends RealtimeTransport {
  * )
  */
 export function withGapRecovery(
-  inner: BaseTransport,
+  inner: RealtimeTransport,
   options: GapRecoveryOptions,
 ): GapRecoveryTransport {
   const { onGap } = options

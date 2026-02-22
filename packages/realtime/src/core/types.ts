@@ -40,22 +40,26 @@ export interface ParsedChannel {
 export type QueryKey = ReadonlyArray<unknown>
 
 // ---------------------------------------------------------------------------
-// Transport interface — split into base + optional presence capability
+// Transport interface — base + optional presence capability
 // ---------------------------------------------------------------------------
 
 /**
- * The minimal transport contract: connection lifecycle and pub/sub.
+ * The core transport contract: connection lifecycle and pub/sub.
  *
- * Presence support is opt-in — implement {@link PresenceCapable} alongside
- * this interface to enable `joinPresence`, `updatePresence`, `leavePresence`,
- * and `onPresenceChange` on the client.
+ * This is the interface to implement for a custom transport. Presence support
+ * is opt-in — additionally implement {@link PresenceCapable} to enable
+ * `joinPresence`, `updatePresence`, `leavePresence`, and `onPresenceChange`
+ * on both the transport and the {@link RealtimeClient}.
  *
- * All built-in transports (Node, Centrifugo, SharedWorker) satisfy the
- * full {@link RealtimeTransport} alias which includes {@link PresenceCapable}.
- * Custom transports that do not require presence can implement only
- * `BaseTransport` and avoid the four presence no-op stubs.
+ * All built-in transports (Node preset, Centrifugo adapter, SharedWorker)
+ * implement both `RealtimeTransport` and {@link PresenceCapable}. Custom
+ * transports that do not require presence implement only `RealtimeTransport`
+ * — no presence no-op stubs needed.
+ *
+ * Use {@link hasPresence} to check for presence capability at runtime when
+ * writing generic middleware.
  */
-export interface BaseTransport {
+export interface RealtimeTransport {
   /**
    * Open a connection to the channel server.
    * If the transport is already connected this resolves immediately.
@@ -97,9 +101,9 @@ export interface BaseTransport {
 /**
  * Optional transport extension for realtime presence.
  *
- * Implement this alongside {@link BaseTransport} to unlock the full presence
- * API (`joinPresence`, `updatePresence`, `leavePresence`, `onPresenceChange`)
- * on both the transport and the {@link RealtimeClient}.
+ * Implement this alongside {@link RealtimeTransport} to unlock the full
+ * presence API (`joinPresence`, `updatePresence`, `leavePresence`,
+ * `onPresenceChange`) on both the transport and the {@link RealtimeClient}.
  *
  * Use the {@link hasPresence} type guard to branch on presence support at
  * runtime when writing generic transport middleware.
@@ -148,24 +152,13 @@ export interface PresenceCapable {
 }
 
 /**
- * Full transport interface — {@link BaseTransport} plus {@link PresenceCapable}.
- *
- * All built-in transports (Node preset, Centrifugo adapter, SharedWorker)
- * satisfy this type. Use {@link BaseTransport} when building custom transports
- * that do not need presence support.
- *
- * Use {@link hasPresence} to check for presence capability at runtime.
- */
-export type RealtimeTransport = BaseTransport & PresenceCapable
-
-/**
  * Type guard — returns `true` when `transport` implements {@link PresenceCapable}.
  *
  * Use this in generic middleware or utility code that accepts any
- * {@link BaseTransport} but should conditionally enable presence features:
+ * {@link RealtimeTransport} but should conditionally enable presence features:
  *
  * @example
- * function myMiddleware(inner: BaseTransport) {
+ * function myMiddleware(inner: RealtimeTransport) {
  *   return {
  *     ...inner,
  *     joinPresence(channel: string, data: unknown) {
@@ -176,8 +169,8 @@ export type RealtimeTransport = BaseTransport & PresenceCapable
  * }
  */
 export function hasPresence(
-  transport: BaseTransport,
-): transport is BaseTransport & PresenceCapable {
+  transport: RealtimeTransport,
+): transport is RealtimeTransport & PresenceCapable {
   return typeof (transport as Partial<PresenceCapable>).joinPresence === 'function'
 }
 
@@ -189,13 +182,13 @@ export interface RealtimeClientOptions {
   /**
    * The transport implementation.
    *
-   * Accepts any {@link BaseTransport}. Presence features (`joinPresence`,
+   * Accepts any {@link RealtimeTransport}. Presence features (`joinPresence`,
    * `updatePresence`, `leavePresence`, `onPresenceChange`) are automatically
    * enabled when the transport also implements {@link PresenceCapable}.
    * Calling those methods on a client whose transport lacks presence support
    * throws a descriptive `Error` at runtime.
    */
-  transport: BaseTransport
+  transport: RealtimeTransport
 }
 
 export interface RealtimeClient {

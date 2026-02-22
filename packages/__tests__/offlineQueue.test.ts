@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Store } from '@tanstack/store'
 import { createOfflineQueue } from '@tanstack/realtime'
-import type { RealtimeTransport, ConnectionStatus } from '@tanstack/realtime'
+import type { RealtimeTransport, PresenceCapable, ConnectionStatus } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Mock transport with controllable connection status
@@ -42,12 +42,20 @@ function createMockTransport(): RealtimeTransport & {
       publishCalls.push({ channel, data })
       return publishImpl(channel, data)
     },
-    joinPresence() {},
-    updatePresence() {},
-    leavePresence() {},
-    onPresenceChange(_ch, _cb) {
-      return () => {}
-    },
+  }
+}
+
+function createPresenceMockTransport(): (RealtimeTransport & PresenceCapable) & {
+  setStatus: (s: ConnectionStatus) => void
+  publishCalls: Array<{ channel: string; data: unknown }>
+  publishImpl: (channel: string, data: unknown) => Promise<void>
+} {
+  return {
+    ...createMockTransport(),
+    joinPresence: vi.fn(),
+    updatePresence: vi.fn(),
+    leavePresence: vi.fn(),
+    onPresenceChange: vi.fn(() => () => {}),
   }
 }
 
@@ -262,7 +270,7 @@ describe('createOfflineQueue', () => {
   })
 
   it('delegates joinPresence to inner transport', () => {
-    const inner = createMockTransport()
+    const inner = createPresenceMockTransport()
     const joinSpy = vi.spyOn(inner, 'joinPresence')
     const queue = createOfflineQueue(inner)
 
@@ -271,7 +279,7 @@ describe('createOfflineQueue', () => {
   })
 
   it('delegates updatePresence to inner transport', () => {
-    const inner = createMockTransport()
+    const inner = createPresenceMockTransport()
     const updateSpy = vi.spyOn(inner, 'updatePresence')
     const queue = createOfflineQueue(inner)
 
@@ -280,7 +288,7 @@ describe('createOfflineQueue', () => {
   })
 
   it('delegates leavePresence to inner transport', () => {
-    const inner = createMockTransport()
+    const inner = createPresenceMockTransport()
     const leaveSpy = vi.spyOn(inner, 'leavePresence')
     const queue = createOfflineQueue(inner)
 
@@ -289,7 +297,7 @@ describe('createOfflineQueue', () => {
   })
 
   it('delegates onPresenceChange to inner transport', () => {
-    const inner = createMockTransport()
+    const inner = createPresenceMockTransport()
     const onPresenceSpy = vi.spyOn(inner, 'onPresenceChange')
     const queue = createOfflineQueue(inner)
 

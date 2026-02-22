@@ -30,10 +30,6 @@ function createMockTransport(): RealtimeTransport & {
       return () => { listeners.get(channel)?.delete(onMessage) }
     },
     async publish() {},
-    joinPresence() {},
-    updatePresence() {},
-    leavePresence() {},
-    onPresenceChange(_ch, _cb) { return () => {} },
     emit(channel, data) {
       const cbs = listeners.get(channel)
       if (cbs) for (const cb of cbs) cb(data)

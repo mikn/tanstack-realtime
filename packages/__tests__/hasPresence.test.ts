@@ -4,7 +4,7 @@
  * Covers:
  *  - hasPresence(transport) returns correct boolean based on presence methods
  *  - client.joinPresence / updatePresence / leavePresence / onPresenceChange
- *    throw descriptive errors when transport is BaseTransport-only
+ *    throw descriptive errors when transport is RealtimeTransport-only (no presence)
  *  - client presence methods delegate correctly when transport is PresenceCapable
  *  - destroy() + connect() lifecycle is safe (React Strict Mode)
  */
@@ -12,13 +12,13 @@
 import { describe, it, expect, vi } from 'vitest'
 import { Store } from '@tanstack/store'
 import { hasPresence, createRealtimeClient } from '@tanstack/realtime'
-import type { BaseTransport, RealtimeTransport, ConnectionStatus } from '@tanstack/realtime'
+import type { RealtimeTransport, PresenceCapable, ConnectionStatus } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Mock transports
 // ---------------------------------------------------------------------------
 
-function createBaseTransport(): BaseTransport & {
+function createBaseTransport(): RealtimeTransport & {
   setStatus: (s: ConnectionStatus) => void
 } {
   const store = new Store<ConnectionStatus>('disconnected')
@@ -36,7 +36,7 @@ function createBaseTransport(): BaseTransport & {
   }
 }
 
-function createPresenceTransport(): RealtimeTransport & {
+function createPresenceTransport(): (RealtimeTransport & PresenceCapable) & {
   setStatus: (s: ConnectionStatus) => void
   joinPresence: ReturnType<typeof vi.fn>
   updatePresence: ReturnType<typeof vi.fn>
@@ -71,19 +71,19 @@ describe('hasPresence', () => {
   it('returns false when joinPresence is not a function', () => {
     const t = createBaseTransport() as unknown as Record<string, unknown>
     t['joinPresence'] = 'not-a-function'
-    expect(hasPresence(t as BaseTransport)).toBe(false)
+    expect(hasPresence(t as RealtimeTransport)).toBe(false)
   })
 
   it('returns false when joinPresence is null', () => {
     const t = createBaseTransport() as unknown as Record<string, unknown>
     t['joinPresence'] = null
-    expect(hasPresence(t as BaseTransport)).toBe(false)
+    expect(hasPresence(t as RealtimeTransport)).toBe(false)
   })
 
   it('returns false when joinPresence is undefined', () => {
     const t = createBaseTransport() as unknown as Record<string, unknown>
     t['joinPresence'] = undefined
-    expect(hasPresence(t as BaseTransport)).toBe(false)
+    expect(hasPresence(t as RealtimeTransport)).toBe(false)
   })
 
   it('returns true with only joinPresence defined (single-method check)', () => {
@@ -93,9 +93,9 @@ describe('hasPresence', () => {
   })
 
   it('acts as a type narrowing guard — narrowed type has presence methods', () => {
-    const t: BaseTransport = createPresenceTransport()
+    const t: RealtimeTransport = createPresenceTransport()
     if (hasPresence(t)) {
-      // TypeScript narrowed to BaseTransport & PresenceCapable inside this block.
+      // TypeScript narrowed to RealtimeTransport & PresenceCapable inside this block.
       // If this compiles without error the narrowing works.
       expect(typeof t.joinPresence).toBe('function')
       expect(typeof t.updatePresence).toBe('function')

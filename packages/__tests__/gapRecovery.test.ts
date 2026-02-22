@@ -5,7 +5,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { Store } from '@tanstack/store'
 import { withGapRecovery } from '@tanstack/realtime'
-import type { RealtimeTransport, ConnectionStatus } from '@tanstack/realtime'
+import type { RealtimeTransport, PresenceCapable, ConnectionStatus } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Mock transport
@@ -37,12 +37,19 @@ function createMockTransport(): RealtimeTransport & {
       }
     },
     async publish() {},
-    joinPresence() {},
-    updatePresence() {},
-    leavePresence() {},
-    onPresenceChange(_ch, _cb) {
-      return () => {}
-    },
+  }
+}
+
+function createPresenceMockTransport(): (RealtimeTransport & PresenceCapable) & {
+  setStatus: (s: ConnectionStatus) => void
+  subscriptions: Map<string, Set<(data: unknown) => void>>
+} {
+  return {
+    ...createMockTransport(),
+    joinPresence: vi.fn(),
+    updatePresence: vi.fn(),
+    leavePresence: vi.fn(),
+    onPresenceChange: vi.fn(() => () => {}),
   }
 }
 
@@ -226,7 +233,7 @@ describe('withGapRecovery', () => {
   })
 
   it('delegates joinPresence to inner transport', () => {
-    const inner = createMockTransport()
+    const inner = createPresenceMockTransport()
     const joinSpy = vi.spyOn(inner, 'joinPresence')
     const transport = withGapRecovery(inner, { onGap: vi.fn() })
 
@@ -235,7 +242,7 @@ describe('withGapRecovery', () => {
   })
 
   it('delegates updatePresence to inner transport', () => {
-    const inner = createMockTransport()
+    const inner = createPresenceMockTransport()
     const updateSpy = vi.spyOn(inner, 'updatePresence')
     const transport = withGapRecovery(inner, { onGap: vi.fn() })
 
@@ -244,7 +251,7 @@ describe('withGapRecovery', () => {
   })
 
   it('delegates leavePresence to inner transport', () => {
-    const inner = createMockTransport()
+    const inner = createPresenceMockTransport()
     const leaveSpy = vi.spyOn(inner, 'leavePresence')
     const transport = withGapRecovery(inner, { onGap: vi.fn() })
 
@@ -253,7 +260,7 @@ describe('withGapRecovery', () => {
   })
 
   it('delegates onPresenceChange to inner transport', () => {
-    const inner = createMockTransport()
+    const inner = createPresenceMockTransport()
     const onPresenceSpy = vi.spyOn(inner, 'onPresenceChange')
     const transport = withGapRecovery(inner, { onGap: vi.fn() })
 

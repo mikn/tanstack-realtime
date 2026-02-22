@@ -46,12 +46,6 @@ function createMockTransport(): RealtimeTransport & {
       }
     },
     async publish() {},
-    joinPresence() {},
-    updatePresence() {},
-    leavePresence() {},
-    onPresenceChange(_ch, _cb) {
-      return () => {}
-    },
     emit(channel, data) {
       const cbs = channelListeners.get(channel)
       if (cbs) for (const cb of cbs) cb(data)

@@ -1,6 +1,5 @@
 import { Store } from '@tanstack/store'
 import type {
-  BaseTransport,
   ConnectionStatus,
   QueryKey,
   RealtimeClient,

@@ -18,13 +18,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Store } from '@tanstack/store'
 import { isSharedWorkerSupported, createSharedWorkerTransport } from '@tanstack/realtime'
-import type { BaseTransport, ConnectionStatus } from '@tanstack/realtime'
+import type { RealtimeTransport, PresenceCapable, ConnectionStatus } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
-// Minimal BaseTransport stub for fallback testing
+// Minimal RealtimeTransport & PresenceCapable stub for fallback testing
 // ---------------------------------------------------------------------------
 
-function createFallbackTransport(): BaseTransport {
+function createFallbackTransport(): RealtimeTransport & PresenceCapable {
   const store = new Store<ConnectionStatus>('disconnected')
   return {
     store,
@@ -34,6 +34,12 @@ function createFallbackTransport(): BaseTransport {
       return () => {}
     },
     async publish() {},
+    joinPresence() {},
+    updatePresence() {},
+    leavePresence() {},
+    onPresenceChange(_ch, _cb) {
+      return () => {}
+    },
   }
 }
 

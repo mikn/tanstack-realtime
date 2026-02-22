@@ -63,6 +63,21 @@ export interface StreamChannelConfig<
    * so that malformed events can be caught before they corrupt the accumulated
    * state.  This is the opposite evaluation order to `isDone`, which receives
    * the post-reduce state.
+   *
+   * @example
+   * ```ts
+   * // Why pre-reduce matters: an error event with type: "error" has no token.
+   * // If reduce ran first, it would concatenate `undefined`, corrupting state:
+   * //   reduce("Hello", { type: "error" }) → "Helloundefined"
+   * // With pre-reduce isError, the state remains "Hello" and status is 'error'.
+   * streamChannelOptions({
+   *   client,
+   *   channel: 'ai-chat',
+   *   initial: '',
+   *   reduce: (s, e: { type: string; token?: string }) => s + (e.token ?? ''),
+   *   isError: (_state, e) => (e.type === 'error' ? 'Stream failed' : false),
+   * })
+   * ```
    */
   isError?: (state: TState, event: TEvent) => string | false | undefined | null
 }

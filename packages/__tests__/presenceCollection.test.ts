@@ -16,13 +16,13 @@
 import { describe, it, expect, vi } from 'vitest'
 import { Store } from '@tanstack/store'
 import { presenceChannelOptions, createRealtimeClient } from '@tanstack/realtime'
-import type { PresenceUser, RealtimeTransport, ConnectionStatus } from '@tanstack/realtime'
+import type { PresenceUser, RealtimeTransport, PresenceCapable, ConnectionStatus } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Mock transport with controllable presence events
 // ---------------------------------------------------------------------------
 
-function createMockTransport(): RealtimeTransport & {
+function createMockTransport(): (RealtimeTransport & PresenceCapable) & {
   triggerPresence: (channel: string, users: ReadonlyArray<PresenceUser>) => void
   presenceListeners: Map<string, Set<(users: ReadonlyArray<PresenceUser>) => void>>
 } {

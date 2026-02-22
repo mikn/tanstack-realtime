@@ -1,5 +1,5 @@
 import { Store } from '@tanstack/store'
-import type { ConnectionStatus, PresenceUser, RealtimeTransport } from '@tanstack/realtime'
+import type { ConnectionStatus, PresenceCapable, PresenceUser, RealtimeTransport } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Options
@@ -182,7 +182,7 @@ type PrsMsg = PrsJoin | PrsUpdate | PrsLeave
  */
 export function centrifugoTransport(
   options: CentrifugoTransportOptions,
-): RealtimeTransport {
+): RealtimeTransport & PresenceCapable {
   const {
     url,
     token,
@@ -568,7 +568,7 @@ export function centrifugoTransport(
   // Transport interface
   // --------------------------------------------------------------------------
 
-  const transport: RealtimeTransport = {
+  const transport: RealtimeTransport & PresenceCapable = {
     store,
 
     async connect() {

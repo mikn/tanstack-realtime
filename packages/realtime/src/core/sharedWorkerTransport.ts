@@ -44,7 +44,7 @@
  */
 
 import { Store } from '@tanstack/store'
-import type { BaseTransport, RealtimeTransport, ConnectionStatus, PresenceUser } from './types.js'
+import type { RealtimeTransport, PresenceCapable, ConnectionStatus, PresenceUser } from './types.js'
 
 // ---------------------------------------------------------------------------
 // Wire protocol — messages between tab (port) and worker (server)
@@ -127,7 +127,7 @@ export interface SharedWorkerServerOptions {
  * empty initial snapshot until the next change event.
  */
 export function createSharedWorkerServer(
-  inner: RealtimeTransport,
+  inner: RealtimeTransport & PresenceCapable,
   options: SharedWorkerServerOptions = {},
 ): SharedWorkerServer {
   const {
@@ -457,8 +457,8 @@ export function isSharedWorkerSupported(): boolean {
  */
 export function createSharedWorkerTransport(
   options: SharedWorkerTransportOptions | string | URL,
-  fallback?: (options: SharedWorkerTransportOptions | string | URL) => BaseTransport,
-): BaseTransport {
+  fallback?: (options: SharedWorkerTransportOptions | string | URL) => RealtimeTransport & PresenceCapable,
+): RealtimeTransport & PresenceCapable {
   // Surface environment incompatibility early with a clear error (or fallback).
   if (!isSharedWorkerSupported()) {
     if (fallback) return fallback(options)
@@ -542,7 +542,7 @@ export function createSharedWorkerTransport(
 
   port.start()
 
-  const transport: RealtimeTransport = {
+  const transport: RealtimeTransport & PresenceCapable = {
     store,
 
     async connect() {

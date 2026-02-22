@@ -10,7 +10,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { Store } from '@tanstack/store'
 import { realtimeCollectionOptions, createRealtimeClient } from '@tanstack/realtime'
-import type { RealtimeTransport, ConnectionStatus, PresenceUser } from '@tanstack/realtime'
+import type { RealtimeTransport, ConnectionStatus } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Mock transport
@@ -36,15 +36,6 @@ function createMockTransport(): RealtimeTransport & {
     },
     async publish(channel, data) {
       publishCalls.push({ channel, data })
-    },
-    joinPresence() {},
-    updatePresence() {},
-    leavePresence() {},
-    onPresenceChange(
-      _ch: string,
-      _cb: (users: ReadonlyArray<PresenceUser>) => void,
-    ) {
-      return () => {}
     },
     emit(channel: string, data: unknown) {
       const cbs = listeners.get(channel)

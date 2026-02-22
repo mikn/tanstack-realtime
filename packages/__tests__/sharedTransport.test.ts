@@ -15,6 +15,7 @@ import {
 } from '@tanstack/realtime'
 import type {
   RealtimeTransport,
+  PresenceCapable,
   ConnectionStatus,
   PresenceUser,
   SharedWorkerServerOptions,
@@ -101,7 +102,7 @@ class MockSharedWorker {
 // Inner mock transport
 // ---------------------------------------------------------------------------
 
-function createMockInnerTransport(): RealtimeTransport & {
+function createMockInnerTransport(): (RealtimeTransport & PresenceCapable) & {
   emit: (channel: string, data: unknown) => void
   emitPresence: (channel: string, users: ReadonlyArray<PresenceUser>) => void
   publishCalls: Array<{ channel: string; data: unknown }>
@@ -154,9 +155,9 @@ function createMockInnerTransport(): RealtimeTransport & {
 
 const TEST_URL = 'https://worker.example.com/realtime.js'
 
-function setupWorker(inner?: RealtimeTransport, options?: SharedWorkerServerOptions) {
+function setupWorker(inner?: RealtimeTransport & PresenceCapable, options?: SharedWorkerServerOptions) {
   const transport = inner ?? createMockInnerTransport()
-  const server = createSharedWorkerServer(transport as RealtimeTransport, options)
+  const server = createSharedWorkerServer(transport as RealtimeTransport & PresenceCapable, options)
   workerServers.set(TEST_URL, server)
   return { transport: transport as ReturnType<typeof createMockInnerTransport>, server }
 }

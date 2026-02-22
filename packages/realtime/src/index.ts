@@ -16,12 +16,10 @@ export type {
   PresenceUser,
   ParsedChannel,
   QueryKey,
-  // Minimal transport (no presence required for custom implementations)
-  BaseTransport,
-  // Optional presence extension
-  PresenceCapable,
-  // Full alias: BaseTransport & PresenceCapable — all built-in transports satisfy this
+  // Core transport interface (no presence required for custom implementations)
   RealtimeTransport,
+  // Optional presence extension — implement alongside RealtimeTransport
+  PresenceCapable,
   RealtimeClient,
   RealtimeClientOptions,
 } from './core/types.js'

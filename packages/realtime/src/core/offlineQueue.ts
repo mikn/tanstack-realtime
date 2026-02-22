@@ -1,5 +1,5 @@
 /**
- * Offline queue — wraps a `BaseTransport` to buffer publishes while
+ * Offline queue — wraps a {@link RealtimeTransport} to buffer publishes while
  * disconnected and replay them on reconnect.
  *
  * The queue exposes its state via a TanStack Store so the UI can display
@@ -7,7 +7,7 @@
  */
 
 import { Store } from '@tanstack/store'
-import type { BaseTransport, RealtimeTransport, ConnectionStatus } from './types.js'
+import type { RealtimeTransport, ConnectionStatus } from './types.js'
 import { hasPresence } from './types.js'
 
 // ---------------------------------------------------------------------------
@@ -66,7 +66,7 @@ export interface OfflineQueueTransport extends RealtimeTransport {
  * buffered. Once the connection reaches `'connected'`, the queue is flushed
  * in FIFO order.
  *
- * Accepts any {@link BaseTransport}. When the inner transport also implements
+ * Accepts any {@link RealtimeTransport}. When the inner transport also implements
  * {@link PresenceCapable}, presence methods are forwarded transparently.
  * Calling presence methods on a wrapper around a non-presence transport throws
  * a descriptive error.
@@ -85,7 +85,7 @@ export interface OfflineQueueTransport extends RealtimeTransport {
  * const pending = useStore(transport.queueStore, s => s.pending.length)
  */
 export function createOfflineQueue(
-  inner: BaseTransport,
+  inner: RealtimeTransport,
   options: OfflineQueueOptions = {},
 ): OfflineQueueTransport {
   const { maxSize = 1000, onFlushError = () => false } = options
