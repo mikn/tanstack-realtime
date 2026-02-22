@@ -34,6 +34,13 @@ export interface CentrifugoTransportOptions {
   maxDelay?: number
   /** Reconnection: jitter factor (0–1). @default 0.25 */
   jitter?: number
+  /**
+   * WebSocket constructor to use. Defaults to the global `WebSocket`.
+   * Useful in Node.js environments that lack a native WebSocket global
+   * (Node < 21) — pass the `WebSocket` class from the `ws` package.
+   * @example import { WebSocket } from 'ws'; centrifugoTransport({ url, WebSocket })
+   */
+  WebSocket?: typeof globalThis.WebSocket
 }
 
 // ---------------------------------------------------------------------------
@@ -191,6 +198,7 @@ export function centrifugoTransport(
     initialDelay = 1000,
     maxDelay = 30000,
     jitter = 0.25,
+    WebSocket: WebSocketImpl = globalThis.WebSocket,
   } = options
 
   const store = new Store<ConnectionStatus>('disconnected')
@@ -491,7 +499,7 @@ export function centrifugoTransport(
 
   async function openSocket(): Promise<void> {
     centrifugoClientId = null
-    const ws = new WebSocket(url)
+    const ws = new WebSocketImpl(url)
     socket = ws
 
     store.setState(() => 'connecting')

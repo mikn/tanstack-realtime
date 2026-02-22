@@ -14,11 +14,15 @@
 
 import { createServer } from 'http'
 import type { Server as HttpServer } from 'http'
-import { WebSocketServer } from 'ws'
+import { WebSocket as WsWebSocket, WebSocketServer } from 'ws'
 import type { WebSocket as WsSocket } from 'ws'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
 import { createRealtimeClient } from '@tanstack/realtime'
+
+// In Node < 21 there is no global WebSocket. Pass the ws package's
+// implementation so tests work across all supported Node versions.
+const NodeWebSocket = WsWebSocket as unknown as typeof globalThis.WebSocket
 
 // ---------------------------------------------------------------------------
 // Mini Centrifugo server
@@ -143,6 +147,7 @@ describe('centrifugoTransport', () => {
         initialDelay: 50,
         maxDelay: 200,
         jitter: 0,
+        WebSocket: NodeWebSocket,
       }),
     })
     await client.connect()
@@ -157,7 +162,7 @@ describe('centrifugoTransport', () => {
   // ── Module interface ─────────────────────────────────────────────────────
 
   it('exposes the complete RealtimeTransport interface', () => {
-    const transport = centrifugoTransport({ url: 'ws://localhost:9999' })
+    const transport = centrifugoTransport({ url: 'ws://localhost:9999', WebSocket: NodeWebSocket })
     expect(typeof transport.connect).toBe('function')
     expect(typeof transport.disconnect).toBe('function')
     expect(typeof transport.subscribe).toBe('function')
@@ -170,7 +175,7 @@ describe('centrifugoTransport', () => {
   })
 
   it('starts disconnected before connect()', () => {
-    const transport = centrifugoTransport({ url: 'ws://localhost:9999' })
+    const transport = centrifugoTransport({ url: 'ws://localhost:9999', WebSocket: NodeWebSocket })
     expect(transport.store.state).toBe('disconnected')
   })
 
@@ -256,6 +261,7 @@ describe('centrifugoTransport', () => {
         initialDelay: 50,
         maxDelay: 200,
         jitter: 0,
+        WebSocket: NodeWebSocket,
       }),
     })
     await client2.connect()
@@ -284,6 +290,7 @@ describe('centrifugoTransport', () => {
       transport: centrifugoTransport({
         url: `ws://localhost:${server.port}`,
         token: 'test-jwt',
+        WebSocket: NodeWebSocket,
       }),
     })
     await tokenClient.connect()
@@ -301,6 +308,7 @@ describe('centrifugoTransport', () => {
           called = true
           return 'async-jwt'
         },
+        WebSocket: NodeWebSocket,
       }),
     })
     await tokenClient.connect()
