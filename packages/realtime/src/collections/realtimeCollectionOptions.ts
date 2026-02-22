@@ -123,6 +123,23 @@ export interface RealtimeCollectionConfig<
    */
   queryFn?: () => Promise<T[]>
 
+  /**
+   * When `true`, `queryFn` is automatically re-called after every reconnection
+   * gap (any transition through `'disconnected'` or `'reconnecting'` followed
+   * by `'connected'`).  The results are diffed against the current collection
+   * state so only changed rows produce insert / update / delete operations.
+   *
+   * Mirrors the TanStack Query option of the same name. Set this to `true` for
+   * any collection that must stay consistent after a flaky connection — it
+   * replaces the need for a manual `withGapRecovery` wrapper for the common
+   * case of just re-querying the server.
+   *
+   * Has no effect when `queryFn` is not provided.
+   *
+   * @default false
+   */
+  refetchOnReconnect?: boolean
+
   /** Called after a local insert. Should persist to the server. */
   onInsert?: InsertMutationFn<T, TKey>
   /** Called after a local update. Should persist to the server. */
@@ -144,6 +161,8 @@ export interface RealtimeCollectionConfig<
  * 4. When `merge` is provided, incoming server values for keys the collection
  *    already holds are merged rather than overwritten, enabling conflict
  *    resolution between concurrent edits.
+ * 5. When `refetchOnReconnect` is `true`, automatically re-runs `queryFn`
+ *    after every reconnection gap and diffs the result into the collection.
  *
  * @example
  * // Single channel with conflict-aware merge
@@ -185,6 +204,7 @@ export function realtimeCollectionOptions<
     channels: additionalChannels,
     merge,
     queryFn,
+    refetchOnReconnect = false,
     onInsert,
     onUpdate,
     onDelete,
@@ -290,8 +310,54 @@ export function realtimeCollectionOptions<
         markReady()
       }
 
+      // Re-fetch after a reconnection gap so the collection catches up on
+      // messages missed while disconnected.  The diff ensures only changed
+      // rows produce write operations — unchanged rows are a no-op.
+      let statusSub: { unsubscribe(): void } | null = null
+      if (refetchOnReconnect && queryFn) {
+        let wasGapped = false
+
+        async function refetchFromServer(): Promise<void> {
+          const rows = await queryFn!()
+          if (stopped) return
+
+          const newKeys = new Set(rows.map((r) => getKey(r)))
+
+          begin()
+          for (const row of rows) {
+            const key = getKey(row)
+            const prev = syncedValues.get(key)
+            const value = merge && prev !== undefined ? merge(prev, row) : row
+            write({ type: prev !== undefined ? 'update' : 'insert', value })
+            syncedValues.set(key, value)
+          }
+          // Delete rows that are no longer present on the server.
+          const staleKeys = [...syncedValues.keys()].filter((k) => !newKeys.has(k))
+          for (const key of staleKeys) {
+            write({ type: 'delete', key })
+            syncedValues.delete(key)
+          }
+          commit()
+        }
+
+        statusSub = client.store.subscribe(({ status }) => {
+          if (status === 'reconnecting' || status === 'disconnected') {
+            wasGapped = true
+          }
+          if (status === 'connected' && wasGapped) {
+            wasGapped = false
+            if (!stopped) {
+              refetchFromServer().catch((err) => {
+                console.error('[realtime] refetchOnReconnect error', err)
+              })
+            }
+          }
+        })
+      }
+
       return () => {
         stopped = true
+        statusSub?.unsubscribe()
         for (const unsub of unsubs) unsub()
         // Clear the merge baseline so the next mount starts fresh.
         // Set retainMergeState: true to keep the baseline across restarts.

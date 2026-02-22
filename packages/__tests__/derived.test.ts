@@ -9,7 +9,7 @@
  * those are intentionally NOT covered here.
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Store } from '@tanstack/store'
 import { realtimeCollectionOptions, createRealtimeClient } from '@tanstack/realtime'
 import type { RealtimeTransport, ConnectionStatus, PresenceUser } from '@tanstack/realtime'
@@ -22,6 +22,7 @@ function createMockTransport(): RealtimeTransport & {
   emit: (channel: string, data: unknown) => void
   publishCalls: Array<{ channel: string; data: unknown }>
   subscribedChannels: () => string[]
+  setStatus: (s: ConnectionStatus) => void
 } {
   const listeners = new Map<string, Set<(data: unknown) => void>>()
   const store = new Store<ConnectionStatus>('connected')
@@ -30,6 +31,7 @@ function createMockTransport(): RealtimeTransport & {
   return {
     store,
     publishCalls,
+    setStatus(s: ConnectionStatus) { store.setState(() => s) },
     async connect() {},
     disconnect() {},
     subscribe(channel, onMessage) {
@@ -337,5 +339,196 @@ describe('realtimeCollectionOptions — channels fan-in', () => {
     transport.emit('ch-2', { action: 'insert', data: { id: 'B', region: 'b', amount: 2 } })
 
     expect(ops.map((op) => (op.value as Order).id)).toEqual(['C', 'A', 'B'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// refetchOnReconnect
+// ---------------------------------------------------------------------------
+
+describe('realtimeCollectionOptions — refetchOnReconnect', () => {
+  beforeEach(() => { vi.useFakeTimers() })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('re-calls queryFn after a reconnect gap (reconnecting → connected)', async () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+
+    let fetchCount = 0
+    const config = realtimeCollectionOptions<Order, string>({
+      client,
+      channel: 'orders',
+      getKey: (o) => o.id,
+      queryFn: async () => { fetchCount++; return [] },
+      refetchOnReconnect: true,
+    })
+    driveSync(config)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(fetchCount).toBe(1) // initial load
+
+    transport.setStatus('reconnecting')
+    transport.setStatus('connected')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(fetchCount).toBe(2) // +1 after gap
+  })
+
+  it('inserts rows that appeared on the server during the gap', async () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+
+    let serverData: Order[] = [{ id: '1', region: 'us', amount: 100 }]
+    const config = realtimeCollectionOptions<Order, string>({
+      client,
+      channel: 'orders',
+      getKey: (o) => o.id,
+      queryFn: async () => [...serverData],
+      refetchOnReconnect: true,
+    })
+    const { ops } = driveSync(config)
+    await vi.advanceTimersByTimeAsync(0)
+
+    // A new row appears on the server during the gap.
+    serverData = [
+      { id: '1', region: 'us', amount: 100 },
+      { id: '2', region: 'eu', amount: 200 },
+    ]
+
+    transport.setStatus('reconnecting')
+    transport.setStatus('connected')
+    await vi.advanceTimersByTimeAsync(0)
+
+    const insertOps = ops.filter((o) => o.type === 'insert').map((o) => (o.value as Order).id)
+    expect(insertOps).toContain('2')
+  })
+
+  it('updates rows that changed on the server during the gap', async () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+
+    let serverData: Order[] = [{ id: '1', region: 'us', amount: 100 }]
+    const config = realtimeCollectionOptions<Order, string>({
+      client,
+      channel: 'orders',
+      getKey: (o) => o.id,
+      queryFn: async () => [...serverData],
+      refetchOnReconnect: true,
+    })
+    const { ops } = driveSync(config)
+    await vi.advanceTimersByTimeAsync(0)
+
+    // Row '1' changed while disconnected.
+    serverData = [{ id: '1', region: 'us', amount: 999 }]
+
+    transport.setStatus('disconnected')
+    transport.setStatus('connected')
+    await vi.advanceTimersByTimeAsync(0)
+
+    const updateOp = ops.find((o) => o.type === 'update' && (o.value as Order).id === '1')
+    expect(updateOp).toBeDefined()
+    expect((updateOp!.value as Order).amount).toBe(999)
+  })
+
+  it('deletes rows that disappeared from the server during the gap', async () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+
+    let serverData: Order[] = [
+      { id: '1', region: 'us', amount: 100 },
+      { id: '2', region: 'eu', amount: 200 },
+    ]
+    const config = realtimeCollectionOptions<Order, string>({
+      client,
+      channel: 'orders',
+      getKey: (o) => o.id,
+      queryFn: async () => [...serverData],
+      refetchOnReconnect: true,
+    })
+    const { ops } = driveSync(config)
+    await vi.advanceTimersByTimeAsync(0)
+
+    // Row '2' was deleted while disconnected.
+    serverData = [{ id: '1', region: 'us', amount: 100 }]
+
+    transport.setStatus('reconnecting')
+    transport.setStatus('connected')
+    await vi.advanceTimersByTimeAsync(0)
+
+    const deleteOp = ops.find((o) => o.type === 'delete' && o.key === '2')
+    expect(deleteOp).toBeDefined()
+  })
+
+  it('does not refetch when refetchOnReconnect is false (default)', async () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+
+    let fetchCount = 0
+    const config = realtimeCollectionOptions<Order, string>({
+      client,
+      channel: 'orders',
+      getKey: (o) => o.id,
+      queryFn: async () => { fetchCount++; return [] },
+      // refetchOnReconnect omitted — defaults to false
+    })
+    driveSync(config)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(fetchCount).toBe(1)
+
+    transport.setStatus('reconnecting')
+    transport.setStatus('connected')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(fetchCount).toBe(1) // no additional fetch
+  })
+
+  it('stops refetching after sync is torn down', async () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+
+    let fetchCount = 0
+    const config = realtimeCollectionOptions<Order, string>({
+      client,
+      channel: 'orders',
+      getKey: (o) => o.id,
+      queryFn: async () => { fetchCount++; return [] },
+      refetchOnReconnect: true,
+    })
+    const { stop } = driveSync(config)
+    await vi.advanceTimersByTimeAsync(0)
+
+    stop()
+
+    transport.setStatus('reconnecting')
+    transport.setStatus('connected')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(fetchCount).toBe(1) // only initial; no fetch after stop
+  })
+
+  it('applies merge to re-fetched rows that already exist', async () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+
+    let serverData: Order[] = [{ id: '1', region: 'us', amount: 100 }]
+    const merge = vi.fn((_prev: Order, next: Order) => ({ ...next, region: 'preserved' }))
+
+    const config = realtimeCollectionOptions<Order, string>({
+      client,
+      channel: 'orders',
+      getKey: (o) => o.id,
+      queryFn: async () => [...serverData],
+      merge,
+      refetchOnReconnect: true,
+    })
+    const { ops } = driveSync(config)
+    await vi.advanceTimersByTimeAsync(0)
+
+    serverData = [{ id: '1', region: 'us', amount: 500 }]
+    transport.setStatus('reconnecting')
+    transport.setStatus('connected')
+    await vi.advanceTimersByTimeAsync(0)
+
+    const updateOp = ops.find((o) => o.type === 'update')!
+    expect((updateOp.value as Order).amount).toBe(500)
+    // merge preserved the region field
+    expect((updateOp.value as Order).region).toBe('preserved')
+    expect(merge).toHaveBeenCalled()
   })
 })
