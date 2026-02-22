@@ -5,11 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Store } from '@tanstack/store'
 import { createOfflineQueue } from '@tanstack/realtime'
-import type {
-  RealtimeTransport,
-  ConnectionStatus,
-  PresenceUser,
-} from '@tanstack/realtime'
+import type { RealtimeTransport, ConnectionStatus } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Mock transport with controllable connection status
@@ -49,10 +45,7 @@ function createMockTransport(): RealtimeTransport & {
     joinPresence() {},
     updatePresence() {},
     leavePresence() {},
-    onPresenceChange(
-      _ch: string,
-      _cb: (users: ReadonlyArray<PresenceUser>) => void,
-    ) {
+    onPresenceChange(_ch, _cb) {
       return () => {}
     },
   }
@@ -246,5 +239,86 @@ describe('createOfflineQueue', () => {
     await queue.publish('ch', { msg: 1 })
     expect(inner.publishCalls).toHaveLength(0)
     expect(queue.queueStore.state.pending).toHaveLength(1)
+  })
+
+  it('flushes messages across channels in FIFO order', async () => {
+    const inner = createMockTransport()
+    const queue = createOfflineQueue(inner)
+
+    await queue.publish('ch-a', 1)
+    await queue.publish('ch-b', 2)
+    await queue.publish('ch-a', 3)
+
+    inner.setStatus('connected')
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(inner.publishCalls.map((c) => c.data)).toEqual([1, 2, 3])
+  })
+
+  it('shares the inner transport store reference', () => {
+    const inner = createMockTransport()
+    const queue = createOfflineQueue(inner)
+    expect(queue.store).toBe(inner.store)
+  })
+
+  it('delegates joinPresence to inner transport', () => {
+    const inner = createMockTransport()
+    const joinSpy = vi.spyOn(inner, 'joinPresence')
+    const queue = createOfflineQueue(inner)
+
+    queue.joinPresence('ch', { userId: 'u1' })
+    expect(joinSpy).toHaveBeenCalledWith('ch', { userId: 'u1' })
+  })
+
+  it('delegates updatePresence to inner transport', () => {
+    const inner = createMockTransport()
+    const updateSpy = vi.spyOn(inner, 'updatePresence')
+    const queue = createOfflineQueue(inner)
+
+    queue.updatePresence('ch', { status: 'away' })
+    expect(updateSpy).toHaveBeenCalledWith('ch', { status: 'away' })
+  })
+
+  it('delegates leavePresence to inner transport', () => {
+    const inner = createMockTransport()
+    const leaveSpy = vi.spyOn(inner, 'leavePresence')
+    const queue = createOfflineQueue(inner)
+
+    queue.leavePresence('ch')
+    expect(leaveSpy).toHaveBeenCalledWith('ch')
+  })
+
+  it('delegates onPresenceChange to inner transport', () => {
+    const inner = createMockTransport()
+    const onPresenceSpy = vi.spyOn(inner, 'onPresenceChange')
+    const queue = createOfflineQueue(inner)
+
+    const cb = vi.fn()
+    queue.onPresenceChange('ch', cb)
+    expect(onPresenceSpy).toHaveBeenCalledWith('ch', cb)
+  })
+
+  it('re-queues remaining messages when connection drops mid-flush', async () => {
+    const inner = createMockTransport()
+    let callCount = 0
+    inner.publishImpl = async () => {
+      callCount++
+      // Drop connection after first publish so subsequent messages are re-queued.
+      if (callCount === 1) inner.setStatus('disconnected')
+    }
+
+    const queue = createOfflineQueue(inner)
+
+    await queue.publish('ch', 'first')
+    await queue.publish('ch', 'second')
+    await queue.publish('ch', 'third')
+
+    inner.setStatus('connected')
+    await vi.advanceTimersByTimeAsync(0)
+
+    // 'first' was published before the drop; 'second' and 'third' are re-queued.
+    expect(inner.publishCalls).toHaveLength(1)
+    expect(queue.queueStore.state.pending).toHaveLength(2)
+    expect((queue.queueStore.state.pending[0] as { data: string }).data).toBe('second')
   })
 })

@@ -11,7 +11,7 @@ import {
   createStreamChannel,
   createRealtimeClient,
 } from '@tanstack/realtime'
-import type { RealtimeTransport, PresenceUser } from '@tanstack/realtime'
+import type { RealtimeTransport } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Mock transport — synchronous event dispatch, no network
@@ -38,7 +38,7 @@ function createMockTransport(): RealtimeTransport & {
     joinPresence() {},
     updatePresence() {},
     leavePresence() {},
-    onPresenceChange(_ch: string, _cb: (users: ReadonlyArray<PresenceUser>) => void) {
+    onPresenceChange(_ch, _cb) {
       return () => {}
     },
     emit(channel, data) {
@@ -289,5 +289,110 @@ describe('streamChannelOptions', () => {
     })
     expect(opts.id).toContain('llm')
     expect(opts.id).toContain('abc')
+  })
+
+  it('treats falsy isError return values as not-error', () => {
+    type Ev = { kind: string }
+    let callCount = 0
+    const opts = streamChannelOptions({
+      client,
+      channel: 'falsy-err',
+      initial: '',
+      reduce: (s: string, _e: Ev) => s + 'x',
+      // Cycle through all falsy return types to ensure none trigger the error path.
+      isError: (_s, _e): string | false | undefined | null => {
+        const falsy = [false as const, null, undefined, ''][callCount++ % 4]
+        return falsy
+      },
+    })
+
+    const updates: Array<{ status: string }> = []
+    opts.sync!.sync({
+      begin: () => {},
+      write: (op) => {
+        const o = op as { type: string; value: { status: string } }
+        if (o.type === 'update') updates.push({ status: o.value.status })
+      },
+      commit: () => {},
+      markReady: () => {},
+      onError: () => {},
+      collection: null as never,
+    })
+
+    // Each event should reduce normally (not trigger error).
+    mockTransport.emit('falsy-err', { kind: 'token' })
+    mockTransport.emit('falsy-err', { kind: 'token' })
+    mockTransport.emit('falsy-err', { kind: 'token' })
+    mockTransport.emit('falsy-err', { kind: 'token' })
+
+    expect(updates.every((u) => u.status === 'streaming')).toBe(true)
+    expect(updates).toHaveLength(4)
+  })
+
+  it('isError is checked before reduce — error does not corrupt state', () => {
+    type Ev = { type: string; token?: string }
+    const opts = streamChannelOptions({
+      client,
+      channel: 'pre-reduce-err',
+      initial: 'initial',
+      reduce: (s: string, e: Ev) => s + (e.token ?? ''),
+      isError: (_s, e: Ev) => (e.type === 'error' ? 'boom' : false),
+    })
+
+    const written: Array<{ status: string; state: string }> = []
+    opts.sync!.sync({
+      begin: () => {},
+      write: (op) => {
+        const o = op as { type: string; value: { status: string; state: string } }
+        if (o.type === 'update') written.push({ status: o.value.status, state: o.value.state })
+      },
+      commit: () => {},
+      markReady: () => {},
+      onError: () => {},
+      collection: null as never,
+    })
+
+    mockTransport.emit('pre-reduce-err', { type: 'token', token: 'hello' })
+    // Now trigger an error — state must be the post-'hello' state, not mutated further.
+    mockTransport.emit('pre-reduce-err', { type: 'error' })
+
+    expect(written).toHaveLength(2)
+    expect(written[1]!.status).toBe('error')
+    // isError is checked *before* reduce, so the error write reflects
+    // the state *before* the error event was reduced into it.
+    expect(written[1]!.state).toBe('initialhello')
+  })
+
+  it('isError takes priority over isDone when both match the same event', () => {
+    // If isError fires, the stream enters error state and reduce/isDone are never called.
+    type Ev = { type: string }
+    const isDone = vi.fn((_s: string, _e: Ev) => true)
+    const opts = streamChannelOptions({
+      client,
+      channel: 'both-err-done',
+      initial: '',
+      reduce: (s: string) => s,
+      isError: (_s, e: Ev) => (e.type === 'terminal' ? 'error wins' : false),
+      isDone,
+    })
+
+    const statuses: Array<string> = []
+    opts.sync!.sync({
+      begin: () => {},
+      write: (op) => {
+        const o = op as { type: string; value: { status: string } }
+        if (o.type === 'update') statuses.push(o.value.status)
+      },
+      commit: () => {},
+      markReady: () => {},
+      onError: () => {},
+      collection: null as never,
+    })
+
+    mockTransport.emit('both-err-done', { type: 'terminal' })
+
+    expect(statuses).toEqual(['error'])
+    // isDone was never called because isError short-circuited first.
+    expect(isDone).not.toHaveBeenCalled()
   })
 })

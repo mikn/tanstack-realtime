@@ -190,4 +190,36 @@ describe('createEphemeralMap', () => {
     vi.advanceTimersByTime(1)
     expect(map.has('a')).toBe(false)
   })
+
+  it('notifies all subscribers on each change', () => {
+    const map = createEphemeralMap<string>({ ttl: 5000 })
+    const cb1 = vi.fn()
+    const cb2 = vi.fn()
+    const cb3 = vi.fn()
+
+    map.subscribe(cb1)
+    map.subscribe(cb2)
+    map.subscribe(cb3)
+
+    map.set('x', 'hello')
+
+    expect(cb1).toHaveBeenCalledTimes(1)
+    expect(cb2).toHaveBeenCalledTimes(1)
+    expect(cb3).toHaveBeenCalledTimes(1)
+  })
+
+  it('unsubscribing one listener does not affect others', () => {
+    const map = createEphemeralMap<string>({ ttl: 5000 })
+    const cb1 = vi.fn()
+    const cb2 = vi.fn()
+
+    const unsub1 = map.subscribe(cb1)
+    map.subscribe(cb2)
+
+    unsub1()
+    map.set('k', 'v')
+
+    expect(cb1).not.toHaveBeenCalled()
+    expect(cb2).toHaveBeenCalledTimes(1)
+  })
 })
