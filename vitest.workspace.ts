@@ -55,6 +55,7 @@ export default defineWorkspace([
         'packages/__tests__/ephemeralLive.test.ts',
         'packages/__tests__/sharedWorkerFallback.test.ts',
         'packages/__tests__/sse.test.ts',
+        'packages/__tests__/reconnect-edge-cases.test.ts',
       ],
       pool: 'forks',
       poolOptions: { forks: { singleFork: true } },
