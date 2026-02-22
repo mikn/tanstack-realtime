@@ -43,6 +43,7 @@ export default defineWorkspace([
         'packages/__tests__/gapRecovery.test.ts',
         'packages/__tests__/optimistic.test.ts',
         'packages/__tests__/derived.test.ts',
+        'packages/__tests__/liveChannel.test.ts',
         'packages/__tests__/sharedTransport.test.ts',
       ],
       pool: 'forks',

@@ -175,6 +175,25 @@ export function createStreamChannel<
  * you want to fold successive events into one piece of state rather than
  * create a new row per event.
  *
+ * **Restarting a stream / triggering a new generation**
+ *
+ * Once `status` reaches `'done'` or `'error'` the subscription is closed and
+ * the item is frozen.  To start a fresh generation, change the `channel` value
+ * passed to `streamChannelOptions` — a new channel key causes TanStack DB to
+ * tear down and remount the collection, resetting status to `'pending'` and
+ * re-subscribing.  The idiomatic pattern is to include a request / generation
+ * ID in the channel key and bump it when the user triggers a retry or a new
+ * prompt:
+ *
+ * ```ts
+ * const [requestId, setRequestId] = useState(() => crypto.randomUUID())
+ * const aiStream = createCollection(
+ *   streamChannelOptions({ client, channel: ['ai', { requestId }], ... })
+ * )
+ * // Trigger a fresh generation:
+ * const retry = () => setRequestId(crypto.randomUUID())
+ * ```
+ *
  * @example
  * const aiStream = createCollection(streamChannelOptions({
  *   client,

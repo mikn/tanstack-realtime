@@ -74,9 +74,20 @@ export function liveChannelOptions<
     sync({ begin, write, commit, markReady }) {
       let stopped = false
 
+      // Events that arrive while initialData is still loading are buffered so
+      // that history always precedes live events in the collection.  Without
+      // this, a message arriving 1 ms before the history fetch completes would
+      // appear *before* older messages loaded from the server.
+      const pending: unknown[] = []
+      let initialized = !initialData // true immediately when there is no history
+
       // Subscribe to incoming channel events.
       const unsub = client.subscribe(serializedChannel, (raw) => {
         if (stopped) return
+        if (!initialized) {
+          pending.push(raw)
+          return
+        }
         const row = onEvent(raw)
         if (row == null) return
         begin({ immediate: true })
@@ -89,16 +100,36 @@ export function liveChannelOptions<
         initialData()
           .then((rows) => {
             if (stopped) return
+            initialized = true
             begin()
             for (const row of rows) {
               write({ type: 'insert', value: row })
             }
+            // Replay buffered live events in arrival order after history.
+            for (const raw of pending) {
+              const row = onEvent(raw)
+              if (row != null) write({ type: 'insert', value: row })
+            }
+            pending.length = 0
             commit()
             markReady()
           })
           .catch((err) => {
             console.error('[realtime] initialData error', err)
+            initialized = true
+            if (stopped) return
             markReady()
+            // Replay buffered events even when history loading failed so
+            // live data is not silently dropped.
+            for (const raw of pending) {
+              if (stopped) break
+              const row = onEvent(raw)
+              if (row == null) continue
+              begin({ immediate: true })
+              write({ type: 'insert', value: row })
+              commit()
+            }
+            pending.length = 0
           })
       } else {
         markReady()
