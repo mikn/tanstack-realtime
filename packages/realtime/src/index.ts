@@ -1,7 +1,8 @@
 /**
  * @tanstack/realtime
  *
- * Framework-agnostic realtime client, collection helpers, and presence for TanStack DB.
+ * Framework-agnostic realtime client, collection helpers, CRDT primitives,
+ * and presence for TanStack DB.
  *
  * For React hooks and provider, use @tanstack/react-realtime.
  * For the Node.js preset, use @tanstack/realtime-preset-node.
