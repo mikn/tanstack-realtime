@@ -8,7 +8,11 @@
  * every active channel so the application can re-fetch missed data.
  */
 
-import type { RealtimeTransport } from './types.js'
+import type {
+  RealtimeTransport,
+  PresenceCapable,
+  PresenceUser,
+} from './types.js'
 import { hasPresence } from './types.js'
 
 // ---------------------------------------------------------------------------
@@ -163,42 +167,42 @@ export function withGapRecovery(
     async publish(channel, data) {
       return inner.publish(channel, data)
     },
+  }
 
-    joinPresence(channel, data) {
-      if (!hasPresence(inner)) {
-        throw new Error(
-          '[realtime] withGapRecovery: the wrapped transport does not implement PresenceCapable.',
-        )
-      }
-      inner.joinPresence(channel, data)
-    },
-
-    updatePresence(channel, data) {
-      if (!hasPresence(inner)) {
-        throw new Error(
-          '[realtime] withGapRecovery: the wrapped transport does not implement PresenceCapable.',
-        )
-      }
-      inner.updatePresence(channel, data)
-    },
-
-    leavePresence(channel) {
-      if (!hasPresence(inner)) {
-        throw new Error(
-          '[realtime] withGapRecovery: the wrapped transport does not implement PresenceCapable.',
-        )
-      }
-      inner.leavePresence(channel)
-    },
-
-    onPresenceChange(channel, callback) {
-      if (!hasPresence(inner)) {
-        throw new Error(
-          '[realtime] withGapRecovery: the wrapped transport does not implement PresenceCapable.',
-        )
-      }
-      return inner.onPresenceChange(channel, callback)
-    },
+  // Presence methods are added via Object.assign (rather than on the object
+  // literal) to avoid TypeScript excess-property errors — GapRecoveryTransport
+  // extends RealtimeTransport which does not include PresenceCapable.
+  if (hasPresence(inner)) {
+    const presenceInner = inner
+    Object.assign(transport, {
+      joinPresence(channel: string, data: unknown) {
+        presenceInner.joinPresence(channel, data)
+      },
+      updatePresence(channel: string, data: unknown) {
+        presenceInner.updatePresence(channel, data)
+      },
+      leavePresence(channel: string) {
+        presenceInner.leavePresence(channel)
+      },
+      onPresenceChange(
+        channel: string,
+        callback: (users: ReadonlyArray<PresenceUser>) => void,
+      ) {
+        return presenceInner.onPresenceChange(channel, callback)
+      },
+    } satisfies PresenceCapable)
+  } else {
+    const notSupported = (method: string) => () => {
+      throw new Error(
+        `[realtime] withGapRecovery: the wrapped transport does not implement PresenceCapable. Called ${method}().`,
+      )
+    }
+    Object.assign(transport, {
+      joinPresence: notSupported('joinPresence'),
+      updatePresence: notSupported('updatePresence'),
+      leavePresence: notSupported('leavePresence'),
+      onPresenceChange: notSupported('onPresenceChange'),
+    })
   }
 
   return transport
