@@ -7,7 +7,7 @@
  */
 
 import { Store } from '@tanstack/store'
-import type { RealtimeTransport, ConnectionStatus, PresenceUser } from './types.js'
+import type { RealtimeTransport, ConnectionStatus } from './types.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -143,10 +143,8 @@ export function createOfflineQueue(
 
     queueStore.setState((s) => {
       const updated = [...s.pending, msg]
-      // Evict oldest if over capacity.
-      while (updated.length > maxSize) {
-        updated.shift()
-      }
+      // Evict the single oldest message if over capacity (one element added per call).
+      if (updated.length > maxSize) updated.shift()
       return { ...s, pending: updated }
     })
   }
@@ -186,10 +184,7 @@ export function createOfflineQueue(
       inner.leavePresence(channel)
     },
 
-    onPresenceChange(
-      channel: string,
-      callback: (users: ReadonlyArray<PresenceUser>) => void,
-    ) {
+    onPresenceChange(channel, callback) {
       return inner.onPresenceChange(channel, callback)
     },
 

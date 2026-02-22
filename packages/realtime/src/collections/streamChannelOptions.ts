@@ -108,9 +108,13 @@ export interface StreamChannelDefConfig<
    * channel: (params: { messageId: string }) => ['ai', { messageId: params.messageId }]
    */
   channel: (params: TParams) => QueryKey | string
+  /** Initial state before the first event arrives. */
   initial: TState
+  /** Accumulate each incoming event into the current state. */
   reduce: (state: TState, event: TEvent) => TState
+  /** Receives post-reduce state. See `StreamChannelConfig.isDone`. */
   isDone?: (state: TState, event: TEvent) => boolean
+  /** Receives pre-reduce state. See `StreamChannelConfig.isError`. */
   isError?: (state: TState, event: TEvent) => string | false | undefined | null
 }
 

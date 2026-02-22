@@ -12,7 +12,7 @@
  * simply re-run a queryFn to catch up.
  */
 
-import type { RealtimeTransport, ConnectionStatus, PresenceUser } from './types.js'
+import type { RealtimeTransport } from './types.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -64,7 +64,7 @@ export function withGapRecovery(
   let wasDisconnected = false
 
   // Watch for reconnection events.
-  inner.store.subscribe((status: ConnectionStatus) => {
+  inner.store.subscribe((status) => {
     if (status === 'reconnecting' || status === 'disconnected') {
       wasDisconnected = true
     }
@@ -118,10 +118,7 @@ export function withGapRecovery(
       inner.leavePresence(channel)
     },
 
-    onPresenceChange(
-      channel: string,
-      callback: (users: ReadonlyArray<PresenceUser>) => void,
-    ) {
+    onPresenceChange(channel, callback) {
       return inner.onPresenceChange(channel, callback)
     },
   }

@@ -56,49 +56,39 @@ export interface DeduplicationFilter {
  */
 export function createDedup(options: DedupOptions = {}): DeduplicationFilter {
   const { maxSize = 1000 } = options
-  // Map uses insertion order — iterating from the beginning gives oldest first.
+  // Set preserves insertion order, so the oldest entry is always first in iteration.
   const channels = new Map<string, Set<string>>()
-  // Track insertion order for LRU eviction within each channel.
-  const orderMap = new Map<string, string[]>()
 
-  function getOrCreate(channel: string): { set: Set<string>; order: string[] } {
+  function getOrCreate(channel: string): Set<string> {
     let set = channels.get(channel)
-    let order = orderMap.get(channel)
     if (!set) {
       set = new Set()
       channels.set(channel, set)
     }
-    if (!order) {
-      order = []
-      orderMap.set(channel, order)
-    }
-    return { set, order }
+    return set
   }
 
   return {
     seen(channel: string, id: string): boolean {
-      const { set, order } = getOrCreate(channel)
+      const set = getOrCreate(channel)
       if (set.has(id)) return true
 
-      // Evict oldest if at capacity.
-      while (set.size >= maxSize && order.length > 0) {
-        const oldest = order.shift()!
-        set.delete(oldest)
+      // Evict the oldest entry when at capacity.  Set iteration order is
+      // insertion order, so the first element is always the oldest.
+      if (set.size >= maxSize) {
+        set.delete(set.values().next().value!)
       }
 
       set.add(id)
-      order.push(id)
       return false
     },
 
     resetChannel(channel: string): void {
       channels.delete(channel)
-      orderMap.delete(channel)
     },
 
     reset(): void {
       channels.clear()
-      orderMap.clear()
     },
 
     size(channel: string): number {
