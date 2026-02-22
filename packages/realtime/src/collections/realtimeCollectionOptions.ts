@@ -55,8 +55,14 @@ export interface RealtimeCollectionConfig<
   TKey extends string | number = string,
   TSchema extends StandardSchemaV1 = StandardSchemaV1,
 > {
-  /** The realtime client that manages the underlying transport. */
-  client: RealtimeClient
+  /**
+   * The realtime client that manages the underlying transport.
+   *
+   * Required when using `channel`, `channels`, `fields`, or
+   * `refetchOnReconnect`. Optional for server-only collections that
+   * only use `queryFn` + mutation callbacks.
+   */
+  client?: RealtimeClient
   /** Collection id — must be unique across all collections. */
   id?: string
   /** Zod / Standard Schema for type validation. */
@@ -71,7 +77,10 @@ export interface RealtimeCollectionConfig<
    * Accepts a QueryKey array (serialized to a flat channel string) or a
    * pre-serialized channel string.
    *
-   * At least one of `channel` or `channels` must be provided.
+   * When omitted (and `channels` is also omitted), the collection operates
+   * in server-only mode: `queryFn` loads data, mutations persist via
+   * `onInsert` / `onUpdate` / `onDelete`, and no peer sync occurs.
+   * Add a channel to enable realtime peer sync.
    */
   channel?: QueryKey | string
 
@@ -364,50 +373,53 @@ function buildCrdtFields<T extends object>(
 // ---------------------------------------------------------------------------
 
 /**
- * Creates a TanStack DB `CollectionConfig` backed by one or more realtime
- * channels.
+ * Creates a TanStack DB `CollectionConfig` with progressive realtime
+ * capabilities. Start with server-only data, add realtime features one
+ * config key at a time.
  *
- * The collection:
- * 1. Loads initial data via `queryFn` when it first activates.
- * 2. Subscribes to the primary `channel` (and any additional `channels`) for
- *    live inserts / updates / deletes from other clients.
- * 3. After `onInsert` / `onUpdate` / `onDelete` succeed, publishes the result
- *    back to the **primary** channel so other clients receive it.
- * 4. When `fields` is provided, applies per-field CRDT merge semantics so
- *    concurrent edits from multiple clients always converge correctly.
- * 5. When `refetchOnReconnect` is `true`, automatically re-runs `queryFn`
- *    after every reconnection gap and diffs the result into the collection.
+ * **The spectrum** — each line adds a capability, nothing else changes:
  *
- * @example
- * // CRDT-aware collaborative todos
- * export const todosCollection = createCollection(
- *   realtimeCollectionOptions({
- *     client,
- *     id: 'todos',
- *     getKey: (t) => t.id,
- *     channel: ['todos', { projectId }],
- *     queryFn: () => fetchTodos(projectId),
- *     fields: {
- *       title:    'lww',        // last writer wins
- *       votes:    'pn-counter', // concurrent increments never lost
- *       tags:     'or-set',     // concurrent add/remove always correct
- *       draft:    'local',      // client-only, never synced
- *     },
- *     onUpdate: async ({ transaction }) =>
- *       updateTodo({ data: transaction.mutations[0].modified }),
- *   })
- * )
+ * | Config                          | Behaviour                            |
+ * |---------------------------------|--------------------------------------|
+ * | `queryFn`                       | Server-only data loading             |
+ * | `+ onInsert/Update/Delete`      | Server-persisted mutations            |
+ * | `+ client + channel`            | Realtime peer sync                   |
+ * | `+ fields`                      | Per-field CRDT convergence           |
+ * | `+ refetchOnReconnect`          | Automatic gap recovery               |
  *
  * @example
- * // Geographic shard fan-in — all regions in one collection
- * export const ordersCollection = createCollection(
- *   realtimeCollectionOptions({
- *     client,
- *     channel: 'us-east:orders',
- *     channels: ['eu:orders', 'ap:orders'],
- *     getKey: (o) => o.id,
- *   })
- * )
+ * // 1. Server-only — works without a realtime client
+ * realtimeCollectionOptions({
+ *   getKey: (t) => t.id,
+ *   queryFn: () => fetchTodos(projectId),
+ *   onInsert: async ({ transaction }) => createTodo(transaction.mutations[0].modified),
+ * })
+ *
+ * @example
+ * // 2. Add realtime peer sync — just add client + channel
+ * realtimeCollectionOptions({
+ *   client,
+ *   getKey: (t) => t.id,
+ *   channel: ['todos', { projectId }],
+ *   queryFn: () => fetchTodos(projectId),
+ *   onUpdate: async ({ transaction }) => updateTodo(transaction.mutations[0].modified),
+ * })
+ *
+ * @example
+ * // 3. Add CRDT convergence — just add fields
+ * realtimeCollectionOptions({
+ *   client,
+ *   getKey: (t) => t.id,
+ *   channel: ['todos', { projectId }],
+ *   queryFn: () => fetchTodos(projectId),
+ *   fields: {
+ *     title:    'lww',        // last writer wins
+ *     votes:    'pn-counter', // concurrent increments never lost
+ *     tags:     'or-set',     // concurrent add/remove always correct
+ *     draft:    'local',      // client-only, never synced
+ *   },
+ *   onUpdate: async ({ transaction }) => updateTodo(transaction.mutations[0].modified),
+ * })
  */
 export function realtimeCollectionOptions<
   T extends object = Record<string, unknown>,
@@ -431,9 +443,15 @@ export function realtimeCollectionOptions<
     ...collectionConfig
   } = config
 
-  if (!channel && (!additionalChannels || additionalChannels.length === 0)) {
+  const hasRealtimeFeatures =
+    channel != null ||
+    (additionalChannels != null && additionalChannels.length > 0) ||
+    fields != null ||
+    refetchOnReconnect
+
+  if (hasRealtimeFeatures && !client) {
     throw new Error(
-      '[realtimeCollectionOptions] At least one of `channel` or `channels` must be provided.',
+      '[realtimeCollectionOptions] `client` is required when using `channel`, `channels`, `fields`, or `refetchOnReconnect`.',
     )
   }
 
@@ -487,7 +505,8 @@ export function realtimeCollectionOptions<
     }
 
     const crdtHeader = (raw as Partial<RealtimeChannelMessage<T>>)._crdt
-    const merged = mergeCrdtRow(existing, incoming, crdtHeader, fields, client.clientId)
+    // `fields` requires `client` (validated above), so client is guaranteed here.
+    const merged = mergeCrdtRow(existing, incoming, crdtHeader, fields, client!.clientId)
     write({ type: 'update', value: merged.row })
     syncedEntries.set(key, merged)
   }
@@ -503,14 +522,16 @@ export function realtimeCollectionOptions<
       let stopped = false
       const unsubs: Array<() => void> = []
 
-      for (const ch of allChannels) {
-        const unsub = client.subscribe(ch, (raw) => {
-          if (stopped) return
-          begin({ immediate: true })
-          applyMessage(raw, write)
-          commit()
-        })
-        unsubs.push(unsub)
+      if (client) {
+        for (const ch of allChannels) {
+          const unsub = client.subscribe(ch, (raw) => {
+            if (stopped) return
+            begin({ immediate: true })
+            applyMessage(raw, write)
+            commit()
+          })
+          unsubs.push(unsub)
+        }
       }
 
       if (queryFn) {
@@ -537,7 +558,7 @@ export function realtimeCollectionOptions<
       }
 
       let statusSub: { unsubscribe(): void } | null = null
-      if (refetchOnReconnect && queryFn) {
+      if (refetchOnReconnect && queryFn && client) {
         let wasGapped = false
 
         async function refetchFromServer(): Promise<void> {
@@ -552,7 +573,7 @@ export function realtimeCollectionOptions<
             const existing = syncedEntries.get(key)
 
             if (existing && fields) {
-              const merged = mergeCrdtRow(existing, row, undefined, fields, client.clientId)
+              const merged = mergeCrdtRow(existing, row, undefined, fields, client!.clientId)
               write({ type: 'update', value: merged.row })
               syncedEntries.set(key, merged)
             } else {
@@ -599,17 +620,21 @@ export function realtimeCollectionOptions<
   const wrappedOnInsert: InsertMutationFn<T, TKey> | undefined = onInsert
     ? async (params) => {
         const result = await onInsert(params)
-        if (result != null && primaryChannel) {
+        if (result != null) {
           const key = getKey(result)
           const entry: RowEntry<T> = { row: result, crdt: initCrdtFromRow(result, fields) }
           syncedEntries.set(key, entry)
 
-          const crdtFields = fields ? buildCrdtFields(entry, result, fields, client.clientId) : {}
-          await client.publish(primaryChannel, {
-            action: 'insert',
-            data: stripLocalFields(result, fields),
-            ...(Object.keys(crdtFields).length > 0 && { _crdt: { fields: crdtFields } }),
-          } satisfies RealtimeChannelMessage)
+          if (primaryChannel && client) {
+            const crdtFields = fields
+              ? buildCrdtFields(entry, result, fields, client.clientId)
+              : {}
+            await client.publish(primaryChannel, {
+              action: 'insert',
+              data: stripLocalFields(result, fields),
+              ...(Object.keys(crdtFields).length > 0 && { _crdt: { fields: crdtFields } }),
+            } satisfies RealtimeChannelMessage)
+          }
         }
         return result
       }
@@ -618,7 +643,7 @@ export function realtimeCollectionOptions<
   const wrappedOnUpdate: UpdateMutationFn<T, TKey> | undefined = onUpdate
     ? async (params) => {
         const result = await onUpdate(params)
-        if (result != null && primaryChannel) {
+        if (result != null) {
           const key = getKey(result)
           const entry: RowEntry<T> = syncedEntries.get(key) ?? {
             row: result,
@@ -626,13 +651,17 @@ export function realtimeCollectionOptions<
           }
           syncedEntries.set(key, entry)
 
-          const crdtFields = fields ? buildCrdtFields(entry, result, fields, client.clientId) : {}
-          entry.row = result
-          await client.publish(primaryChannel, {
-            action: 'update',
-            data: stripLocalFields(result, fields),
-            ...(Object.keys(crdtFields).length > 0 && { _crdt: { fields: crdtFields } }),
-          } satisfies RealtimeChannelMessage)
+          if (primaryChannel && client) {
+            const crdtFields = fields
+              ? buildCrdtFields(entry, result, fields, client.clientId)
+              : {}
+            entry.row = result
+            await client.publish(primaryChannel, {
+              action: 'update',
+              data: stripLocalFields(result, fields),
+              ...(Object.keys(crdtFields).length > 0 && { _crdt: { fields: crdtFields } }),
+            } satisfies RealtimeChannelMessage)
+          }
         }
         return result
       }
@@ -641,12 +670,15 @@ export function realtimeCollectionOptions<
   const wrappedOnDelete: DeleteMutationFn<T, TKey> | undefined = onDelete
     ? async (params) => {
         const result = await onDelete(params)
-        if (result != null && primaryChannel) {
+        if (result != null) {
           syncedEntries.delete(getKey(result))
-          await client.publish(primaryChannel, {
-            action: 'delete',
-            data: result,
-          } satisfies RealtimeChannelMessage)
+
+          if (primaryChannel && client) {
+            await client.publish(primaryChannel, {
+              action: 'delete',
+              data: result,
+            } satisfies RealtimeChannelMessage)
+          }
         }
         return result
       }
