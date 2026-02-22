@@ -44,7 +44,7 @@
  */
 
 import { Store } from '@tanstack/store'
-import type { RealtimeTransport, ConnectionStatus, PresenceUser } from './types.js'
+import type { BaseTransport, RealtimeTransport, ConnectionStatus, PresenceUser } from './types.js'
 
 // ---------------------------------------------------------------------------
 // Wire protocol — messages between tab (port) and worker (server)
@@ -410,6 +410,16 @@ export interface SharedWorkerTransportOptions {
 }
 
 /**
+ * Returns `true` when the `SharedWorker` global is available in the current
+ * environment. `SharedWorker` is missing in Safari on iOS (prior to iOS 16),
+ * some older Firefox versions, and non-browser environments such as
+ * Cloudflare Workers or server-side rendering runtimes.
+ */
+export function isSharedWorkerSupported(): boolean {
+  return typeof SharedWorker !== 'undefined'
+}
+
+/**
  * Creates a `RealtimeTransport` that proxies all operations to a SharedWorker.
  *
  * The SharedWorker must call `createSharedWorkerServer(transport).connect(port)`
@@ -421,16 +431,46 @@ export interface SharedWorkerTransportOptions {
  * when the tab no longer needs the connection; the inner transport is torn
  * down only when every active tab has disconnected.
  *
+ * **Environment support**: `SharedWorker` is not available in all browsers
+ * (notably Safari on iOS and some server-side environments). Pass a `fallback`
+ * factory that returns a direct transport for those environments. When no
+ * `fallback` is provided and `SharedWorker` is unavailable, this function
+ * throws at call time — making the failure early and explicit.
+ *
+ * Use {@link isSharedWorkerSupported} to branch before constructing the
+ * transport if you prefer manual feature-detection over the `fallback` param.
+ *
+ * @param options - Transport options or a bare worker URL / URL string.
+ * @param fallback - Optional factory called when `SharedWorker` is unavailable.
+ *   Receives the same `options` object so you can reuse the `url` if needed.
+ *
  * @example
- * const transport = createSharedWorkerTransport({
- *   url: new URL('./realtime.worker.ts', import.meta.url),
- * })
+ * // With automatic fallback to a direct transport
+ * import { nodeTransport } from '@tanstack/realtime-preset-node'
+ *
+ * const transport = createSharedWorkerTransport(
+ *   { url: new URL('./realtime.worker.ts', import.meta.url) },
+ *   () => nodeTransport({ url: 'wss://realtime.example.com' }),
+ * )
  * const client = createRealtimeClient({ transport })
  * // No explicit client.connect() needed — the worker auto-connects.
  */
 export function createSharedWorkerTransport(
   options: SharedWorkerTransportOptions | string | URL,
-): RealtimeTransport {
+  fallback?: (options: SharedWorkerTransportOptions | string | URL) => BaseTransport,
+): BaseTransport {
+  // Surface environment incompatibility early with a clear error (or fallback).
+  if (!isSharedWorkerSupported()) {
+    if (fallback) return fallback(options)
+    throw new Error(
+      '[realtime] SharedWorker is not supported in this environment ' +
+        '(e.g. Safari on iOS, server-side rendering runtimes). ' +
+        'Pass a `fallback` factory as the second argument to createSharedWorkerTransport ' +
+        'to use a direct transport in unsupported environments. ' +
+        'Use isSharedWorkerSupported() to detect support before constructing the transport.',
+    )
+  }
+
   const { url, publishTimeout = 10_000 } =
     typeof options === 'string' || options instanceof URL
       ? { url: options, publishTimeout: 10_000 }

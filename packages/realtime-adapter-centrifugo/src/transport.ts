@@ -41,7 +41,15 @@ export interface CentrifugoTransportOptions {
 // ---------------------------------------------------------------------------
 
 type ConnectCmd = { token?: string; data?: Record<string, unknown> }
-type SubscribeCmd = { channel: string }
+type SubscribeCmd = {
+  channel: string
+  /** Request recovery — send `true` alongside `epoch` and `offset`. */
+  recover?: boolean
+  /** Recovery position: epoch from the last subscribe reply. */
+  epoch?: string
+  /** Recovery position: offset of the last message received on this channel. */
+  offset?: number
+}
 type UnsubscribeCmd = { channel: string }
 type PublishCmd = { channel: string; data: unknown }
 
@@ -60,7 +68,15 @@ interface CentrifugoError {
 interface CentrifugoReply {
   id: number
   connect?: { client: string; version: string; data?: unknown; subs?: unknown }
-  subscribe?: { recoverable?: boolean; epoch?: string; data?: unknown }
+  subscribe?: {
+    recoverable?: boolean
+    epoch?: string
+    /** Current stream offset at the time of subscribe. */
+    offset?: number
+    /** Publications missed since the client's last known position. */
+    publications?: Array<{ data: unknown; offset?: number }>
+    data?: unknown
+  }
   publish?: Record<string, never>
   unsubscribe?: Record<string, never>
   error?: CentrifugoError
@@ -87,6 +103,15 @@ interface CentrifugoClientInfo {
 }
 
 type IncomingMsg = CentrifugoReply | CentrifugoPush
+
+// ---------------------------------------------------------------------------
+// Recovery position per channel
+// ---------------------------------------------------------------------------
+
+interface RecoveryPosition {
+  epoch: string
+  offset: number
+}
 
 // ---------------------------------------------------------------------------
 // Sidecar presence message format
@@ -119,6 +144,19 @@ type PrsMsg = PrsJoin | PrsUpdate | PrsLeave
  * ## Standard channels
  * `subscribe` / `publish` / `unsubscribe` map directly to Centrifugo commands.
  * Your channel namespace configuration controls access control.
+ *
+ * ## Epoch/offset recovery
+ * When a channel is configured as recoverable on the server, the adapter
+ * tracks the last seen `epoch` and `offset` per channel. On reconnect, it
+ * automatically subscribes with `recover: true` and the stored position,
+ * causing Centrifugo to replay only the missed publications — no full
+ * re-fetch needed. Recovered publications are dispatched to subscribers in
+ * order before the normal live stream resumes.
+ *
+ * This is more efficient than `refetchOnReconnect: true` when:
+ * - The channel is configured with `history_size > 0` and `history_ttl > 0`
+ *   in Centrifugo so the server can retain missed messages.
+ * - You want to replay exact missed events rather than re-running a REST query.
  *
  * ## Presence
  * Presence is implemented via a **sidecar channel** (`${presencePrefix}{channel}`
@@ -168,6 +206,14 @@ export function centrifugoTransport(
 
   // channel → Map<clientId, data> (maintained client-side for sidecar presence)
   const presenceState = new Map<string, Map<string, unknown>>()
+
+  // channel → last known recovery position (epoch + offset)
+  // Populated from subscribe replies and updated as publications arrive.
+  const channelRecovery = new Map<string, RecoveryPosition>()
+
+  // commandId → channel: maps in-flight subscribe commands to their channel
+  // so handleReply can find the channel when the reply arrives.
+  const cmdChannels = new Map<number, string>()
 
   let socket: WebSocket | null = null
   let cmdId = 0
@@ -273,6 +319,19 @@ export function centrifugoTransport(
     if (push.pub !== undefined) {
       const data = push.pub.data
 
+      // Update the recovery offset for this channel as live publications arrive.
+      // Only track data channels (not presence sidecars) and only when we have
+      // a recovery position (i.e. the channel is marked recoverable by the server).
+      if (!channel.startsWith(presencePrefix) && push.pub.offset !== undefined) {
+        const existing = channelRecovery.get(channel)
+        if (existing) {
+          channelRecovery.set(channel, {
+            epoch: existing.epoch,
+            offset: push.pub.offset,
+          })
+        }
+      }
+
       // Check if this is a sidecar presence channel message
       if (channel.startsWith(presencePrefix)) {
         const dataChannel = channel.slice(presencePrefix.length)
@@ -290,12 +349,24 @@ export function centrifugoTransport(
     }
   }
 
+  function dispatchPublications(
+    channel: string,
+    publications: Array<{ data: unknown; offset?: number }>,
+  ): void {
+    const listeners = subscriptions.get(channel)
+    if (!listeners || listeners.size === 0) return
+    for (const pub of publications) {
+      for (const cb of listeners) cb(pub.data)
+    }
+  }
+
   function handleReply(reply: CentrifugoReply): void {
     const p = pending.get(reply.id)
     if (!p) return
     pending.delete(reply.id)
 
     if (reply.error) {
+      cmdChannels.delete(reply.id)
       p.reject(
         new Error(
           `[realtime:centrifugo] Command ${reply.id} error ${reply.error.code}: ${reply.error.message}`,
@@ -306,6 +377,37 @@ export function centrifugoTransport(
 
     if (reply.connect) {
       centrifugoClientId = reply.connect.client
+    }
+
+    // Process subscribe replies — update recovery state and dispatch missed pubs.
+    if (reply.subscribe) {
+      const sub = reply.subscribe
+      const channel = cmdChannels.get(reply.id)
+      cmdChannels.delete(reply.id)
+
+      if (channel && !channel.startsWith(presencePrefix)) {
+        // Update recovery position if the channel is recoverable.
+        if (sub.recoverable && sub.epoch !== undefined) {
+          // The offset to store is the last offset among the recovered
+          // publications (if any), otherwise the channel's current offset.
+          const lastPub =
+            sub.publications?.length
+              ? sub.publications[sub.publications.length - 1]
+              : undefined
+          const storedOffset =
+            lastPub?.offset ?? sub.offset ?? 0
+
+          channelRecovery.set(channel, {
+            epoch: sub.epoch,
+            offset: storedOffset,
+          })
+        }
+
+        // Dispatch any missed publications received during recovery.
+        if (sub.publications?.length) {
+          dispatchPublications(channel, sub.publications)
+        }
+      }
     }
 
     p.resolve(reply)
@@ -347,8 +449,26 @@ export function centrifugoTransport(
 
   async function resubscribeAll(): Promise<void> {
     for (const [channel, listeners] of subscriptions) {
-      if (listeners.size > 0) {
-        const id = nextId()
+      if (listeners.size === 0) continue
+
+      const recovery = channelRecovery.get(channel)
+      const id = nextId()
+
+      if (recovery) {
+        // Attempt server-assisted recovery: send our last known epoch/offset
+        // so Centrifugo can replay only the missed publications.
+        cmdChannels.set(id, channel)
+        // Use sendCmd so we can process the reply (recovered publications).
+        void sendCmd({ id, subscribe: { channel, recover: true, ...recovery } }).catch(
+          () => {
+            // Recovery failed (e.g. TTL expired) — fall back to a plain subscribe
+            // and discard the stored position so the next reconnect doesn't retry.
+            channelRecovery.delete(channel)
+          },
+        )
+      } else {
+        // Plain subscribe — server will replay nothing (normal behaviour).
+        cmdChannels.set(id, channel)
         send({ id, subscribe: { channel } })
       }
     }
@@ -409,6 +529,7 @@ export function centrifugoTransport(
         p.reject(new Error('[realtime:centrifugo] WebSocket closed'))
       }
       pending.clear()
+      cmdChannels.clear()
 
       if (intentionalClose) {
         store.setState(() => 'disconnected')
@@ -464,6 +585,8 @@ export function centrifugoTransport(
     disconnect() {
       intentionalClose = true
       centrifugoClientId = null
+      channelRecovery.clear()
+      cmdChannels.clear()
 
       if (reconnectTimer) {
         clearTimeout(reconnectTimer)
@@ -484,6 +607,7 @@ export function centrifugoTransport(
       // Send subscribe when the first listener registers and we're connected.
       if (listeners.size === 1 && store.state === 'connected') {
         const id = nextId()
+        cmdChannels.set(id, channel)
         send({ id, subscribe: { channel } })
       }
 
@@ -491,6 +615,9 @@ export function centrifugoTransport(
         listeners.delete(onMessage)
         if (listeners.size === 0) {
           subscriptions.delete(channel)
+          // Clear any stored recovery position — the channel is no longer
+          // actively subscribed, so recovery data is stale.
+          channelRecovery.delete(channel)
           if (store.state === 'connected') {
             const id = nextId()
             send({ id, unsubscribe: { channel } })

@@ -1,5 +1,5 @@
 /**
- * Offline queue — wraps a `RealtimeTransport` to buffer publishes while
+ * Offline queue — wraps a `BaseTransport` to buffer publishes while
  * disconnected and replay them on reconnect.
  *
  * The queue exposes its state via a TanStack Store so the UI can display
@@ -7,7 +7,8 @@
  */
 
 import { Store } from '@tanstack/store'
-import type { RealtimeTransport, ConnectionStatus } from './types.js'
+import type { BaseTransport, RealtimeTransport, ConnectionStatus } from './types.js'
+import { hasPresence } from './types.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -65,6 +66,11 @@ export interface OfflineQueueTransport extends RealtimeTransport {
  * buffered. Once the connection reaches `'connected'`, the queue is flushed
  * in FIFO order.
  *
+ * Accepts any {@link BaseTransport}. When the inner transport also implements
+ * {@link PresenceCapable}, presence methods are forwarded transparently.
+ * Calling presence methods on a wrapper around a non-presence transport throws
+ * a descriptive error.
+ *
  * @example
  * import { createOfflineQueue } from '@tanstack/realtime'
  * import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
@@ -79,7 +85,7 @@ export interface OfflineQueueTransport extends RealtimeTransport {
  * const pending = useStore(transport.queueStore, s => s.pending.length)
  */
 export function createOfflineQueue(
-  inner: RealtimeTransport,
+  inner: BaseTransport,
   options: OfflineQueueOptions = {},
 ): OfflineQueueTransport {
   const { maxSize = 1000, onFlushError = () => false } = options
@@ -173,18 +179,38 @@ export function createOfflineQueue(
     },
 
     joinPresence(channel, data) {
+      if (!hasPresence(inner)) {
+        throw new Error(
+          '[realtime] createOfflineQueue: the wrapped transport does not implement PresenceCapable.',
+        )
+      }
       inner.joinPresence(channel, data)
     },
 
     updatePresence(channel, data) {
+      if (!hasPresence(inner)) {
+        throw new Error(
+          '[realtime] createOfflineQueue: the wrapped transport does not implement PresenceCapable.',
+        )
+      }
       inner.updatePresence(channel, data)
     },
 
     leavePresence(channel) {
+      if (!hasPresence(inner)) {
+        throw new Error(
+          '[realtime] createOfflineQueue: the wrapped transport does not implement PresenceCapable.',
+        )
+      }
       inner.leavePresence(channel)
     },
 
     onPresenceChange(channel, callback) {
+      if (!hasPresence(inner)) {
+        throw new Error(
+          '[realtime] createOfflineQueue: the wrapped transport does not implement PresenceCapable.',
+        )
+      }
       return inner.onPresenceChange(channel, callback)
     },
 

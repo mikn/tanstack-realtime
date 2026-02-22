@@ -13,6 +13,12 @@ export type {
   PresenceChannelDef,
 } from './presenceChannel.js'
 
+export { presenceChannelOptions } from './presenceChannelOptions.js'
+export type { PresenceCollectionConfig } from './presenceChannelOptions.js'
+
+export { ephemeralLiveOptions } from './ephemeralLiveOptions.js'
+export type { EphemeralLiveConfig } from './ephemeralLiveOptions.js'
+
 export { streamChannelOptions, createStreamChannel } from './streamChannelOptions.js'
 export type {
   StreamChannelConfig,

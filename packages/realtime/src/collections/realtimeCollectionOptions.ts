@@ -140,6 +140,41 @@ export interface RealtimeCollectionConfig<
    */
   refetchOnReconnect?: boolean
 
+  /**
+   * Transform a raw channel message into the standard
+   * `{ action: 'insert' | 'update' | 'delete', data: T }` shape, or return
+   * `null` / `undefined` to discard the message entirely.
+   *
+   * **When to use**: your server publishes messages in a format that differs
+   * from `RealtimeChannelMessage<T>`.  Common cases include Supabase
+   * (`{ eventType: 'INSERT', new: T, old: T }`), Postgres logical replication
+   * (`{ op: 'c' | 'u' | 'd', after: T }`), or any custom envelope.
+   *
+   * When omitted, the library assumes every incoming payload already conforms
+   * to `RealtimeChannelMessage<T>` — malformed messages are silently ignored
+   * (the `action` field check in `applyMessage` rejects them without throwing).
+   *
+   * @example
+   * // Adapt Supabase realtime to the standard format
+   * onMessage: (raw) => {
+   *   const e = raw as { eventType: string; new: Todo; old: Todo }
+   *   if (e.eventType === 'INSERT') return { action: 'insert', data: e.new }
+   *   if (e.eventType === 'UPDATE') return { action: 'update', data: e.new }
+   *   if (e.eventType === 'DELETE') return { action: 'delete', data: e.old }
+   *   return null
+   * }
+   *
+   * @example
+   * // Batch of events published as an array
+   * onMessage: (raw) => {
+   *   // Returning a single message — for batch support, use channels[] fan-in
+   *   // or process the array in a custom subscribe wrapper.
+   *   const events = raw as Array<RealtimeChannelMessage<T>>
+   *   return events[0] ?? null
+   * }
+   */
+  onMessage?: (raw: unknown) => RealtimeChannelMessage<T> | null | undefined
+
   /** Called after a local insert. Should persist to the server. */
   onInsert?: InsertMutationFn<T, TKey>
   /** Called after a local update. Should persist to the server. */
@@ -209,6 +244,7 @@ export function realtimeCollectionOptions<
     onUpdate,
     onDelete,
     retainMergeState = false,
+    onMessage,
     // getKey is destructured explicitly so applyMessage and mutation wrappers
     // can close over it directly rather than holding a reference to the whole
     // config object.
@@ -245,12 +281,20 @@ export function realtimeCollectionOptions<
   /**
    * Process one raw channel message inside an open sync transaction.
    * Caller must wrap with begin() / commit().
+   *
+   * If `onMessage` is configured it is called first to normalise the payload
+   * into `RealtimeChannelMessage<T>`. Returning `null` / `undefined` discards
+   * the message without error. When `onMessage` is not configured the raw
+   * value is assumed to already conform to `RealtimeChannelMessage<T>`.
    */
   function applyMessage(
     raw: unknown,
     write: (op: WriteOp<T, TKey>) => void,
   ): void {
-    const msg = raw as RealtimeChannelMessage<T>
+    const msg: RealtimeChannelMessage<T> | null | undefined = onMessage
+      ? onMessage(raw)
+      : (raw as RealtimeChannelMessage<T>)
+
     if (!msg || typeof msg.action !== 'string') return
 
     if (msg.action === 'delete') {

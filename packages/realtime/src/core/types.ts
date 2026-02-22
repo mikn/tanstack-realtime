@@ -40,18 +40,22 @@ export interface ParsedChannel {
 export type QueryKey = ReadonlyArray<unknown>
 
 // ---------------------------------------------------------------------------
-// Transport interface
+// Transport interface — split into base + optional presence capability
 // ---------------------------------------------------------------------------
 
 /**
- * The provider-agnostic transport contract.
- * Each preset implements this interface: Node (local), Centrifugo, Ably, etc.
+ * The minimal transport contract: connection lifecycle and pub/sub.
  *
- * The `store` is the single source of truth for connection state.
- * Framework adapters (React, Vue, Solid) observe it reactively via
- * their respective `useStore` hooks.
+ * Presence support is opt-in — implement {@link PresenceCapable} alongside
+ * this interface to enable `joinPresence`, `updatePresence`, `leavePresence`,
+ * and `onPresenceChange` on the client.
+ *
+ * All built-in transports (Node, Centrifugo, SharedWorker) satisfy the
+ * full {@link RealtimeTransport} alias which includes {@link PresenceCapable}.
+ * Custom transports that do not require presence can implement only
+ * `BaseTransport` and avoid the four presence no-op stubs.
  */
-export interface RealtimeTransport {
+export interface BaseTransport {
   /**
    * Open a connection to the channel server.
    * If the transport is already connected this resolves immediately.
@@ -86,6 +90,27 @@ export interface RealtimeTransport {
    */
   publish(channel: string, data: unknown): Promise<void>
 
+  /** TanStack Store holding the current connection status. */
+  readonly store: Store<ConnectionStatus>
+}
+
+/**
+ * Optional transport extension for realtime presence.
+ *
+ * Implement this alongside {@link BaseTransport} to unlock the full presence
+ * API (`joinPresence`, `updatePresence`, `leavePresence`, `onPresenceChange`)
+ * on both the transport and the {@link RealtimeClient}.
+ *
+ * Use the {@link hasPresence} type guard to branch on presence support at
+ * runtime when writing generic transport middleware.
+ *
+ * @example
+ * // Check at runtime before calling presence methods
+ * if (hasPresence(transport)) {
+ *   transport.joinPresence('channel', { name: 'Alice' })
+ * }
+ */
+export interface PresenceCapable {
   /**
    * Join the presence set for `channel` with the supplied initial `data`.
    * The server broadcasts the updated presence list to all channel members.
@@ -120,9 +145,40 @@ export interface RealtimeTransport {
     channel: string,
     callback: (users: ReadonlyArray<PresenceUser>) => void,
   ): () => void
+}
 
-  /** TanStack Store holding the current connection status. */
-  readonly store: Store<ConnectionStatus>
+/**
+ * Full transport interface — {@link BaseTransport} plus {@link PresenceCapable}.
+ *
+ * All built-in transports (Node preset, Centrifugo adapter, SharedWorker)
+ * satisfy this type. Use {@link BaseTransport} when building custom transports
+ * that do not need presence support.
+ *
+ * Use {@link hasPresence} to check for presence capability at runtime.
+ */
+export type RealtimeTransport = BaseTransport & PresenceCapable
+
+/**
+ * Type guard — returns `true` when `transport` implements {@link PresenceCapable}.
+ *
+ * Use this in generic middleware or utility code that accepts any
+ * {@link BaseTransport} but should conditionally enable presence features:
+ *
+ * @example
+ * function myMiddleware(inner: BaseTransport) {
+ *   return {
+ *     ...inner,
+ *     joinPresence(channel: string, data: unknown) {
+ *       if (hasPresence(inner)) inner.joinPresence(channel, data)
+ *       else throw new Error('Transport does not support presence')
+ *     },
+ *   }
+ * }
+ */
+export function hasPresence(
+  transport: BaseTransport,
+): transport is BaseTransport & PresenceCapable {
+  return typeof (transport as Partial<PresenceCapable>).joinPresence === 'function'
 }
 
 // ---------------------------------------------------------------------------
@@ -130,8 +186,16 @@ export interface RealtimeTransport {
 // ---------------------------------------------------------------------------
 
 export interface RealtimeClientOptions {
-  /** The transport implementation to use (e.g. `nodeTransport()`). */
-  transport: RealtimeTransport
+  /**
+   * The transport implementation.
+   *
+   * Accepts any {@link BaseTransport}. Presence features (`joinPresence`,
+   * `updatePresence`, `leavePresence`, `onPresenceChange`) are automatically
+   * enabled when the transport also implements {@link PresenceCapable}.
+   * Calling those methods on a client whose transport lacks presence support
+   * throws a descriptive `Error` at runtime.
+   */
+  transport: BaseTransport
 }
 
 export interface RealtimeClient {
@@ -145,6 +209,10 @@ export interface RealtimeClient {
   /**
    * Open the connection. Resolves once `status` reaches `'connected'`.
    * Safe to call repeatedly — already connected returns immediately.
+   *
+   * Also restores the internal status-listener if `destroy()` was previously
+   * called, making the client safe to reconnect after teardown (e.g. in
+   * React Strict Mode where effects fire twice).
    */
   connect(): Promise<void>
 
@@ -155,9 +223,15 @@ export interface RealtimeClient {
   disconnect(): void
 
   /**
-   * Tear down the client and release all internal subscriptions.
-   * Call this when the client will no longer be used (e.g. on app teardown
-   * or in test cleanup) to prevent memory leaks from the status store subscription.
+   * Release the internal status-store subscription.
+   *
+   * Call this when the client will no longer be used (e.g. on app teardown).
+   * After `destroy()`, the client's own `store.status` will no longer mirror
+   * the transport's connection state until `connect()` is called again.
+   *
+   * **React lifecycle**: if you pass the client to `<RealtimeProvider>`,
+   * the provider will call `destroy()` for you on unmount. It is safe to
+   * reconnect the same client instance after `destroy()`.
    */
   destroy(): void
 
@@ -179,12 +253,16 @@ export interface RealtimeClient {
    * Join the presence set for `channel` with the given `data`.
    * `channel` must be a pre-serialized string (use `serializeKey` if needed).
    * The server broadcasts the updated presence list to all channel members.
+   *
+   * @throws {Error} if the underlying transport does not implement {@link PresenceCapable}.
    */
   joinPresence(channel: string, data: unknown): void
 
   /**
    * Merge `data` into the current user's stored presence state for `channel`.
    * Only the supplied fields are updated; all others are preserved on the server.
+   *
+   * @throws {Error} if the underlying transport does not implement {@link PresenceCapable}.
    */
   updatePresence(channel: string, data: unknown): void
 
@@ -192,6 +270,8 @@ export interface RealtimeClient {
    * Leave the presence set for `channel`.
    * The server removes this connection from the member list and broadcasts
    * the updated list to all remaining members.
+   *
+   * @throws {Error} if the underlying transport does not implement {@link PresenceCapable}.
    */
   leavePresence(channel: string): void
 
@@ -199,6 +279,8 @@ export interface RealtimeClient {
    * Subscribe to presence changes on `channel`. Returns an unsubscribe fn.
    * The callback receives the current list of **other** connected users
    * (the calling client is always excluded from the list).
+   *
+   * @throws {Error} if the underlying transport does not implement {@link PresenceCapable}.
    */
   onPresenceChange(
     channel: string,

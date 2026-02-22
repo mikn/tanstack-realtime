@@ -10,11 +10,17 @@
 // Core primitives
 export { serializeKey, parseChannel } from './core/serializeKey.js'
 export { createRealtimeClient } from './core/client.js'
+export { hasPresence } from './core/types.js'
 export type {
   ConnectionStatus,
   PresenceUser,
   ParsedChannel,
   QueryKey,
+  // Minimal transport (no presence required for custom implementations)
+  BaseTransport,
+  // Optional presence extension
+  PresenceCapable,
+  // Full alias: BaseTransport & PresenceCapable — all built-in transports satisfy this
   RealtimeTransport,
   RealtimeClient,
   RealtimeClientOptions,
@@ -25,6 +31,8 @@ export {
   realtimeCollectionOptions,
   liveChannelOptions,
   createPresenceChannel,
+  presenceChannelOptions,
+  ephemeralLiveOptions,
   streamChannelOptions,
   createStreamChannel,
 } from './collections/index.js'
@@ -34,6 +42,8 @@ export type {
   LiveChannelConfig,
   PresenceChannelConfig,
   PresenceChannelDef,
+  PresenceCollectionConfig,
+  EphemeralLiveConfig,
   StreamChannelConfig,
   StreamChannelDef,
   StreamChannelDefConfig,
@@ -75,6 +85,7 @@ export type {
 export {
   createSharedWorkerTransport,
   createSharedWorkerServer,
+  isSharedWorkerSupported,
 } from './core/sharedWorkerTransport.js'
 export type {
   SharedWorkerTransportOptions,
