@@ -8,17 +8,47 @@ import type {
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { RealtimeClient, QueryKey } from '../core/types.js'
 import { serializeKey } from '../core/serializeKey.js'
+import type {
+  CrdtFields,
+  CrdtMessageHeader,
+  CrdtRowState,
+  LwwState,
+  LwwWire,
+  OrState,
+  OrWire,
+  PnState,
+  PnWire,
+} from '../core/crdt.js'
+import {
+  advanceClock,
+  initOrFromArray,
+  lwwWins,
+  mergeOr,
+  mergePn,
+  orAdd,
+  orRemove,
+  orValues,
+  pnDecrement,
+  pnIncrement,
+  pnValue,
+  tickClock,
+} from '../core/crdt.js'
+
+// ---------------------------------------------------------------------------
+// Public types
+// ---------------------------------------------------------------------------
 
 /** Shape of messages published to / received from a realtime channel. */
 export interface RealtimeChannelMessage<T = unknown> {
   action: 'insert' | 'update' | 'delete'
   data: T
+  /**
+   * CRDT metadata — present when the sender uses `fields` in
+   * `realtimeCollectionOptions`. Receivers use this for correct per-field
+   * convergence. Non-CRDT receivers can safely ignore it and read `data`.
+   */
+  _crdt?: CrdtMessageHeader
 }
-
-/** Internal write operation passed to the TanStack DB sync `write` callback. */
-type WriteOp<T, TKey> =
-  | { type: 'insert' | 'update'; value: T }
-  | { type: 'delete'; key: TKey }
 
 export interface RealtimeCollectionConfig<
   T extends object = Record<string, unknown>,
@@ -51,7 +81,7 @@ export interface RealtimeCollectionConfig<
    * All messages from these channels are processed identically to the
    * primary `channel` (insert / update / delete). This is a fan-in pattern
    * for cases like geographic shards where the same logical collection is
-   * spread across multiple channels:
+   * spread across multiple channels.
    *
    * @example
    * realtimeCollectionOptions({
@@ -60,62 +90,34 @@ export interface RealtimeCollectionConfig<
    *   channels: ['eu:orders', 'ap:orders'], // fan-in (subscribe only)
    *   getKey: (o) => o.id,
    * })
-   *
-   * Cross-collection joins (e.g. orders + inventory) belong at the query
-   * layer — compose two `useLiveQuery` results in the component instead.
    */
   channels?: Array<QueryKey | string>
 
   /**
-   * Resolve conflicts when an incoming server value targets a row that
-   * already exists in the synced collection state.
+   * Declare the convergence behaviour for individual fields.
    *
-   * - `previous`: the last value this sync layer confirmed for that key.
-   *   Updated on every incoming server message and after each successful
-   *   mutation (`onInsert` / `onUpdate` / `onDelete`).
-   * - `incoming`: the new value arriving from the server/channel.
+   * Without `fields`, incoming server values always overwrite local state
+   * (last-write-wins). With `fields`, each listed field follows its CRDT
+   * semantics — concurrent edits from multiple clients converge correctly
+   * without data loss.
    *
-   * Return the value to write into the collection. If omitted, the incoming
-   * server value always wins (last-write-wins / remote-wins default).
+   * ```ts
+   * fields: {
+   *   title:    'lww',        // Last-write-wins (Lamport clock, clientId tie-break)
+   *   votes:    'pn-counter', // Concurrent increments always add up correctly
+   *   tags:     'or-set',     // Concurrent add/remove never conflicts
+   *   draft:    'local',      // Never sent or received — client-only UI state
+   * }
+   * ```
    *
-   * **Baseline lifetime**: by default the baseline is cleared when the sync
-   * function stops (collection unmounts). Each remount therefore starts with
-   * a clean slate. To preserve the baseline across unmount/remount cycles
-   * set `retainMergeState: true` — see its JSDoc for when that makes sense.
+   * Fields not listed here fall back to incoming-wins.
    *
-   * @example
-   * // Preserve a locally-relevant derived field while accepting server state
-   * merge: (prev, next) => ({ ...next, localTag: prev.localTag })
-   *
-   * // Three-way merge: apply the server's changes onto the previous baseline
-   * merge: (prev, next) => ({
-   *   ...next,
-   *   title: next.updatedAt > prev.updatedAt ? next.title : prev.title,
-   * })
+   * **Mutations**: after `onInsert` / `onUpdate` succeed, the library
+   * automatically infers the CRDT operation from the value delta and embeds
+   * the correct CRDT state in the published message so other clients merge it
+   * correctly — no extra work required.
    */
-  merge?: (previous: T, incoming: T) => T
-
-  /**
-   * When `true`, the internal merge-baseline map is preserved across sync
-   * stop/restart cycles instead of being cleared on unmount.
-   *
-   * **Sane default (`false`)**: the baseline is cleared when the sync
-   * function stops. Each remount starts with a clean slate. This is always
-   * correct when you supply a `queryFn` (it re-seeds the baseline on every
-   * mount) and is safe in the absence of one (merge simply won't be called
-   * for the first update of each key after remount, falling back to
-   * last-write-wins for that one event).
-   *
-   * **Escape hatch (`true`)**: retain the baseline across unmount/remount.
-   * Consider this only when:
-   *  - you have **no** `queryFn` (no server round-trip to re-seed data), AND
-   *  - `merge` must have access to values seen in a previous mount (e.g. a
-   *    long-lived SPA that suspends the collection temporarily without
-   *    reloading from the server).
-   *
-   * @default false
-   */
-  retainMergeState?: boolean
+  fields?: CrdtFields<T>
 
   /**
    * Called on mount to populate the collection with initial data.
@@ -126,15 +128,8 @@ export interface RealtimeCollectionConfig<
   /**
    * When `true`, `queryFn` is automatically re-called after every reconnection
    * gap (any transition through `'disconnected'` or `'reconnecting'` followed
-   * by `'connected'`).  The results are diffed against the current collection
+   * by `'connected'`). The results are diffed against the current collection
    * state so only changed rows produce insert / update / delete operations.
-   *
-   * Mirrors the TanStack Query option of the same name. Set this to `true` for
-   * any collection that must stay consistent after a flaky connection — it
-   * replaces the need for a manual `withGapRecovery` wrapper for the common
-   * case of just re-querying the server.
-   *
-   * Has no effect when `queryFn` is not provided.
    *
    * @default false
    */
@@ -146,31 +141,17 @@ export interface RealtimeCollectionConfig<
    * `null` / `undefined` to discard the message entirely.
    *
    * **When to use**: your server publishes messages in a format that differs
-   * from `RealtimeChannelMessage<T>`.  Common cases include Supabase
+   * from `RealtimeChannelMessage<T>`. Common cases include Supabase
    * (`{ eventType: 'INSERT', new: T, old: T }`), Postgres logical replication
    * (`{ op: 'c' | 'u' | 'd', after: T }`), or any custom envelope.
    *
-   * When omitted, the library assumes every incoming payload already conforms
-   * to `RealtimeChannelMessage<T>` — malformed messages are silently ignored
-   * (the `action` field check in `applyMessage` rejects them without throwing).
-   *
    * @example
-   * // Adapt Supabase realtime to the standard format
    * onMessage: (raw) => {
    *   const e = raw as { eventType: string; new: Todo; old: Todo }
    *   if (e.eventType === 'INSERT') return { action: 'insert', data: e.new }
    *   if (e.eventType === 'UPDATE') return { action: 'update', data: e.new }
    *   if (e.eventType === 'DELETE') return { action: 'delete', data: e.old }
    *   return null
-   * }
-   *
-   * @example
-   * // Batch of events published as an array
-   * onMessage: (raw) => {
-   *   // Returning a single message — for batch support, use channels[] fan-in
-   *   // or process the array in a custom subscribe wrapper.
-   *   const events = raw as Array<RealtimeChannelMessage<T>>
-   *   return events[0] ?? null
    * }
    */
   onMessage?: (raw: unknown) => RealtimeChannelMessage<T> | null | undefined
@@ -183,6 +164,205 @@ export interface RealtimeCollectionConfig<
   onDelete?: DeleteMutationFn<T, TKey>
 }
 
+// ---------------------------------------------------------------------------
+// Internal types
+// ---------------------------------------------------------------------------
+
+type WriteOp<T, TKey> =
+  | { type: 'insert' | 'update'; value: T }
+  | { type: 'delete'; key: TKey }
+
+interface RowEntry<T> {
+  row: T
+  crdt: CrdtRowState
+}
+
+// ---------------------------------------------------------------------------
+// CRDT helpers
+// ---------------------------------------------------------------------------
+
+function initCrdtFromRow<T extends object>(
+  row: T,
+  fields: CrdtFields<T> | undefined,
+): CrdtRowState {
+  if (!fields) return {}
+  const crdt: CrdtRowState = {}
+  for (const [field, fieldType] of Object.entries(fields)) {
+    const value = (row as Record<string, unknown>)[field]
+    if (fieldType === 'lww') {
+      crdt[field] = { clock: 0, clientId: '' } satisfies LwwState
+    } else if (fieldType === 'pn-counter') {
+      const num = typeof value === 'number' ? value : 0
+      crdt[field] = {
+        inc: num > 0 ? { __seed__: num } : {},
+        dec: num < 0 ? { __seed__: -num } : {},
+      } satisfies PnState
+    } else if (fieldType === 'or-set') {
+      crdt[field] = initOrFromArray(Array.isArray(value) ? value : [])
+    }
+    // 'local' fields need no CRDT state
+  }
+  return crdt
+}
+
+function stripLocalFields<T extends object>(
+  row: T,
+  fields: CrdtFields<T> | undefined,
+): T {
+  if (!fields) return row
+  const stripped = { ...row } as Record<string, unknown>
+  for (const [field, fieldType] of Object.entries(fields)) {
+    if (fieldType === 'local') delete stripped[field]
+  }
+  return stripped as T
+}
+
+function mergeCrdtRow<T extends object>(
+  prevEntry: RowEntry<T>,
+  incoming: T,
+  crdtHeader: CrdtMessageHeader | undefined,
+  fields: CrdtFields<T>,
+  clientId: string,
+): RowEntry<T> {
+  const result = { ...incoming } as Record<string, unknown>
+  const prevRow = prevEntry.row as Record<string, unknown>
+  const newCrdt: CrdtRowState = { ...prevEntry.crdt }
+
+  for (const [field, fieldType] of Object.entries(fields)) {
+    if (fieldType === 'local') {
+      result[field] = prevRow[field]
+      continue
+    }
+
+    if (fieldType === 'lww') {
+      const prevState = prevEntry.crdt[field] as LwwState | undefined
+      const wire = crdtHeader?.fields[field] as LwwWire | undefined
+      if (wire) {
+        advanceClock(wire.clock)
+        if (!prevState || lwwWins(prevState, wire)) {
+          result[field] = wire.value
+          newCrdt[field] = { clock: wire.clock, clientId: wire.clientId } satisfies LwwState
+        } else {
+          result[field] = prevRow[field]
+        }
+      } else {
+        // No clock info — incoming wins, stamp with current clock.
+        const clock = tickClock()
+        result[field] = (incoming as Record<string, unknown>)[field]
+        newCrdt[field] = { clock, clientId } satisfies LwwState
+      }
+      continue
+    }
+
+    if (fieldType === 'pn-counter') {
+      const prevState: PnState = (prevEntry.crdt[field] as PnState | undefined) ?? {
+        inc: {},
+        dec: {},
+      }
+      const wire = crdtHeader?.fields[field] as PnWire | undefined
+      if (wire) {
+        const merged = mergePn(prevState, wire)
+        newCrdt[field] = merged
+        result[field] = pnValue(merged)
+      } else {
+        // No CRDT header — cannot safely merge; preserve current value.
+        result[field] = pnValue(prevState)
+      }
+      continue
+    }
+
+    if (fieldType === 'or-set') {
+      const prevState: OrState = (prevEntry.crdt[field] as OrState | undefined) ?? {
+        entries: [],
+      }
+      const wire = crdtHeader?.fields[field] as OrWire | undefined
+      if (wire) {
+        const merged = mergeOr(prevState, wire)
+        newCrdt[field] = merged
+        result[field] = orValues(merged)
+      } else {
+        // No CRDT header — cannot safely merge; preserve current value.
+        result[field] = orValues(prevState)
+      }
+      continue
+    }
+  }
+
+  return { row: result as T, crdt: newCrdt }
+}
+
+/**
+ * Build `_crdt.fields` for an outgoing mutation publish.
+ * Infers CRDT operations from value deltas and updates stored CRDT state.
+ */
+function buildCrdtFields<T extends object>(
+  entry: RowEntry<T>,
+  result: T,
+  fields: CrdtFields<T>,
+  clientId: string,
+): Record<string, LwwWire | PnWire | OrWire> {
+  const crdtFields: Record<string, LwwWire | PnWire | OrWire> = {}
+  const prevRow = entry.row as Record<string, unknown>
+  const newRow = result as Record<string, unknown>
+
+  for (const [field, fieldType] of Object.entries(fields)) {
+    if (fieldType === 'local') continue
+
+    if (fieldType === 'lww') {
+      const clock = tickClock()
+      crdtFields[field] = { type: 'lww', value: newRow[field], clock, clientId } satisfies LwwWire
+      entry.crdt[field] = { clock, clientId } satisfies LwwState
+      continue
+    }
+
+    if (fieldType === 'pn-counter') {
+      const prevState: PnState = (entry.crdt[field] as PnState | undefined) ?? {
+        inc: {},
+        dec: {},
+      }
+      const prevNum = typeof prevRow[field] === 'number' ? (prevRow[field] as number) : 0
+      const newNum = typeof newRow[field] === 'number' ? (newRow[field] as number) : 0
+      const delta = newNum - prevNum
+      const newState =
+        delta >= 0
+          ? pnIncrement(prevState, clientId, delta)
+          : pnDecrement(prevState, clientId, -delta)
+      entry.crdt[field] = newState
+      crdtFields[field] = { type: 'pn', inc: newState.inc, dec: newState.dec } satisfies PnWire
+      continue
+    }
+
+    if (fieldType === 'or-set') {
+      const prevState: OrState = (entry.crdt[field] as OrState | undefined) ?? { entries: [] }
+      const prevKeys = new Set(
+        (Array.isArray(prevRow[field]) ? (prevRow[field] as unknown[]) : []).map((v) =>
+          JSON.stringify(v),
+        ),
+      )
+      const newKeys = new Set(
+        (Array.isArray(newRow[field]) ? (newRow[field] as unknown[]) : []).map((v) =>
+          JSON.stringify(v),
+        ),
+      )
+      let newState = prevState
+      for (const k of prevKeys) {
+        if (!newKeys.has(k)) newState = orRemove(newState, JSON.parse(k) as unknown)
+      }
+      for (const k of newKeys) {
+        if (!prevKeys.has(k)) newState = orAdd(newState, JSON.parse(k) as unknown)
+      }
+      entry.crdt[field] = newState
+      crdtFields[field] = { type: 'or', entries: newState.entries } satisfies OrWire
+    }
+  }
+
+  return crdtFields
+}
+
+// ---------------------------------------------------------------------------
+// realtimeCollectionOptions
+// ---------------------------------------------------------------------------
+
 /**
  * Creates a TanStack DB `CollectionConfig` backed by one or more realtime
  * channels.
@@ -193,25 +373,28 @@ export interface RealtimeCollectionConfig<
  *    live inserts / updates / deletes from other clients.
  * 3. After `onInsert` / `onUpdate` / `onDelete` succeed, publishes the result
  *    back to the **primary** channel so other clients receive it.
- * 4. When `merge` is provided, incoming server values for keys the collection
- *    already holds are merged rather than overwritten, enabling conflict
- *    resolution between concurrent edits.
+ * 4. When `fields` is provided, applies per-field CRDT merge semantics so
+ *    concurrent edits from multiple clients always converge correctly.
  * 5. When `refetchOnReconnect` is `true`, automatically re-runs `queryFn`
  *    after every reconnection gap and diffs the result into the collection.
  *
  * @example
- * // Single channel with conflict-aware merge
+ * // CRDT-aware collaborative todos
  * export const todosCollection = createCollection(
  *   realtimeCollectionOptions({
  *     client,
  *     id: 'todos',
- *     schema: todoSchema,
  *     getKey: (t) => t.id,
- *     channel: ['todos', { projectId: '123' }],
- *     queryFn: () => getTodos({ data: { projectId: '123' } }),
- *     merge: (prev, next) => ({ ...next, localDraft: prev.localDraft }),
- *     onInsert: async ({ transaction }) =>
- *       addTodo({ data: transaction.mutations[0].modified }),
+ *     channel: ['todos', { projectId }],
+ *     queryFn: () => fetchTodos(projectId),
+ *     fields: {
+ *       title:    'lww',        // last writer wins
+ *       votes:    'pn-counter', // concurrent increments never lost
+ *       tags:     'or-set',     // concurrent add/remove always correct
+ *       draft:    'local',      // client-only, never synced
+ *     },
+ *     onUpdate: async ({ transaction }) =>
+ *       updateTodo({ data: transaction.mutations[0].modified }),
  *   })
  * )
  *
@@ -237,17 +420,13 @@ export function realtimeCollectionOptions<
     client,
     channel,
     channels: additionalChannels,
-    merge,
+    fields,
     queryFn,
     refetchOnReconnect = false,
     onInsert,
     onUpdate,
     onDelete,
-    retainMergeState = false,
     onMessage,
-    // getKey is destructured explicitly so applyMessage and mutation wrappers
-    // can close over it directly rather than holding a reference to the whole
-    // config object.
     getKey,
     ...collectionConfig
   } = config
@@ -258,14 +437,12 @@ export function realtimeCollectionOptions<
     )
   }
 
-  // The primary channel is used for both subscribe and publish-back.
   const primaryChannel = channel
     ? typeof channel === 'string'
       ? channel
       : serializeKey(channel)
     : undefined
 
-  // Full set of subscribe channels: primary + additional fan-in.
   const allChannels: string[] = [
     ...(primaryChannel ? [primaryChannel] : []),
     ...(additionalChannels ?? []).map((ch) =>
@@ -273,20 +450,13 @@ export function realtimeCollectionOptions<
     ),
   ]
 
-  // Track the last confirmed value per key so merge() has a stable baseline.
-  // Cleared on sync stop by default (retainMergeState: false) so each remount
-  // starts fresh. Set retainMergeState: true to preserve it across restarts.
-  const syncedValues = new Map<TKey, T>()
+  // Per-row: derived plain row + per-field CRDT internal state.
+  const syncedEntries = new Map<TKey, RowEntry<T>>()
 
-  /**
-   * Process one raw channel message inside an open sync transaction.
-   * Caller must wrap with begin() / commit().
-   *
-   * If `onMessage` is configured it is called first to normalise the payload
-   * into `RealtimeChannelMessage<T>`. Returning `null` / `undefined` discards
-   * the message without error. When `onMessage` is not configured the raw
-   * value is assumed to already conform to `RealtimeChannelMessage<T>`.
-   */
+  // ---------------------------------------------------------------------------
+  // Message processing
+  // ---------------------------------------------------------------------------
+
   function applyMessage(
     raw: unknown,
     write: (op: WriteOp<T, TKey>) => void,
@@ -300,29 +470,39 @@ export function realtimeCollectionOptions<
     if (msg.action === 'delete') {
       const key = getKey(msg.data as T)
       write({ type: 'delete', key })
-      syncedValues.delete(key)
-    } else {
-      const incoming = msg.data as T
-      const key = getKey(incoming)
-      const previous = syncedValues.get(key)
-
-      const value =
-        merge && previous !== undefined ? merge(previous, incoming) : incoming
-
-      write({ type: msg.action === 'insert' ? 'insert' : 'update', value })
-      syncedValues.set(key, value)
+      syncedEntries.delete(key)
+      return
     }
+
+    const incoming = msg.data as T
+    const key = getKey(incoming)
+    const existing = syncedEntries.get(key)
+
+    if (!existing || !fields) {
+      // First time we see this key, or no CRDT fields declared: seed from incoming.
+      const crdt = initCrdtFromRow(incoming, fields)
+      write({ type: msg.action === 'insert' ? 'insert' : 'update', value: incoming })
+      syncedEntries.set(key, { row: incoming, crdt })
+      return
+    }
+
+    const crdtHeader = (raw as Partial<RealtimeChannelMessage<T>>)._crdt
+    const merged = mergeCrdtRow(existing, incoming, crdtHeader, fields, client.clientId)
+    write({ type: 'update', value: merged.row })
+    syncedEntries.set(key, merged)
   }
 
+  // ---------------------------------------------------------------------------
+  // Sync config
+  // ---------------------------------------------------------------------------
+
   const sync: SyncConfig<T, TKey> = {
-    // Full row updates — the channel publishes complete rows, not diffs.
     rowUpdateMode: 'full',
 
     sync({ begin, write, commit, markReady }) {
       let stopped = false
       const unsubs: Array<() => void> = []
 
-      // Subscribe to all channels (primary + fan-in).
       for (const ch of allChannels) {
         const unsub = client.subscribe(ch, (raw) => {
           if (stopped) return
@@ -333,7 +513,6 @@ export function realtimeCollectionOptions<
         unsubs.push(unsub)
       }
 
-      // Load initial data.
       if (queryFn) {
         queryFn()
           .then((rows) => {
@@ -341,7 +520,10 @@ export function realtimeCollectionOptions<
             begin()
             for (const row of rows) {
               write({ type: 'insert', value: row })
-              syncedValues.set(getKey(row), row)
+              syncedEntries.set(getKey(row), {
+                row,
+                crdt: initCrdtFromRow(row, fields),
+              })
             }
             commit()
             markReady()
@@ -354,9 +536,6 @@ export function realtimeCollectionOptions<
         markReady()
       }
 
-      // Re-fetch after a reconnection gap so the collection catches up on
-      // messages missed while disconnected.  The diff ensures only changed
-      // rows produce write operations — unchanged rows are a no-op.
       let statusSub: { unsubscribe(): void } | null = null
       if (refetchOnReconnect && queryFn) {
         let wasGapped = false
@@ -370,24 +549,29 @@ export function realtimeCollectionOptions<
           begin()
           for (const row of rows) {
             const key = getKey(row)
-            const prev = syncedValues.get(key)
-            const value = merge && prev !== undefined ? merge(prev, row) : row
-            write({ type: prev !== undefined ? 'update' : 'insert', value })
-            syncedValues.set(key, value)
+            const existing = syncedEntries.get(key)
+
+            if (existing && fields) {
+              const merged = mergeCrdtRow(existing, row, undefined, fields, client.clientId)
+              write({ type: 'update', value: merged.row })
+              syncedEntries.set(key, merged)
+            } else {
+              const crdt = initCrdtFromRow(row, fields)
+              write({ type: existing ? 'update' : 'insert', value: row })
+              syncedEntries.set(key, { row, crdt })
+            }
           }
-          // Delete rows that are no longer present on the server.
-          const staleKeys = [...syncedValues.keys()].filter((k) => !newKeys.has(k))
+
+          const staleKeys = [...syncedEntries.keys()].filter((k) => !newKeys.has(k))
           for (const key of staleKeys) {
             write({ type: 'delete', key })
-            syncedValues.delete(key)
+            syncedEntries.delete(key)
           }
           commit()
         }
 
         statusSub = client.store.subscribe(({ status }) => {
-          if (status === 'reconnecting' || status === 'disconnected') {
-            wasGapped = true
-          }
+          if (status === 'reconnecting' || status === 'disconnected') wasGapped = true
           if (status === 'connected' && wasGapped) {
             wasGapped = false
             if (!stopped) {
@@ -403,27 +587,28 @@ export function realtimeCollectionOptions<
         stopped = true
         statusSub?.unsubscribe()
         for (const unsub of unsubs) unsub()
-        // Clear the merge baseline so the next mount starts fresh.
-        // Set retainMergeState: true to keep the baseline across restarts.
-        if (!retainMergeState) {
-          syncedValues.clear()
-        }
+        syncedEntries.clear()
       }
     },
   }
 
   // ---------------------------------------------------------------------------
-  // Mutation wrappers — publish result to primary channel after success.
+  // Mutation wrappers
   // ---------------------------------------------------------------------------
 
   const wrappedOnInsert: InsertMutationFn<T, TKey> | undefined = onInsert
     ? async (params) => {
         const result = await onInsert(params)
         if (result != null && primaryChannel) {
-          syncedValues.set(getKey(result), result)
+          const key = getKey(result)
+          const entry: RowEntry<T> = { row: result, crdt: initCrdtFromRow(result, fields) }
+          syncedEntries.set(key, entry)
+
+          const crdtFields = fields ? buildCrdtFields(entry, result, fields, client.clientId) : {}
           await client.publish(primaryChannel, {
             action: 'insert',
-            data: result,
+            data: stripLocalFields(result, fields),
+            ...(Object.keys(crdtFields).length > 0 && { _crdt: { fields: crdtFields } }),
           } satisfies RealtimeChannelMessage)
         }
         return result
@@ -434,10 +619,19 @@ export function realtimeCollectionOptions<
     ? async (params) => {
         const result = await onUpdate(params)
         if (result != null && primaryChannel) {
-          syncedValues.set(getKey(result), result)
+          const key = getKey(result)
+          const entry: RowEntry<T> = syncedEntries.get(key) ?? {
+            row: result,
+            crdt: initCrdtFromRow(result, fields),
+          }
+          syncedEntries.set(key, entry)
+
+          const crdtFields = fields ? buildCrdtFields(entry, result, fields, client.clientId) : {}
+          entry.row = result
           await client.publish(primaryChannel, {
             action: 'update',
-            data: result,
+            data: stripLocalFields(result, fields),
+            ...(Object.keys(crdtFields).length > 0 && { _crdt: { fields: crdtFields } }),
           } satisfies RealtimeChannelMessage)
         }
         return result
@@ -448,7 +642,7 @@ export function realtimeCollectionOptions<
     ? async (params) => {
         const result = await onDelete(params)
         if (result != null && primaryChannel) {
-          syncedValues.delete(getKey(result))
+          syncedEntries.delete(getKey(result))
           await client.publish(primaryChannel, {
             action: 'delete',
             data: result,

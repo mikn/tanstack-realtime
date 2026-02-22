@@ -7,6 +7,7 @@ import type {
 } from './types.js'
 import { hasPresence } from './types.js'
 import { serializeKey } from './serializeKey.js'
+import { generateClientId } from './crdt.js'
 
 /** Throw a consistent error when a non-presence transport is used for presence. */
 function presenceNotSupported(method: string): never {
@@ -56,7 +57,10 @@ export function createRealtimeClient(
   // Subscribe immediately so the store reflects transport state from the start.
   ensureStatusSubscription()
 
+  const clientId = generateClientId()
+
   const client: RealtimeClient = {
+    clientId,
     store,
 
     async connect() {

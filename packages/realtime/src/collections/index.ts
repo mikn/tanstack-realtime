@@ -27,3 +27,13 @@ export type {
   StreamItem,
   StreamStatus,
 } from './streamChannelOptions.js'
+
+// CRDT standalone channel definitions
+export { defineSyncedCounter } from './syncedCounter.js'
+export type { SyncedCounterConfig, SyncedCounterDef } from './syncedCounter.js'
+
+export { defineSyncedValue } from './syncedValue.js'
+export type { SyncedValueConfig, SyncedValueDef } from './syncedValue.js'
+
+export { defineSyncedSet } from './syncedSet.js'
+export type { SyncedSetConfig, SyncedSetDef } from './syncedSet.js'

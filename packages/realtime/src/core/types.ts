@@ -193,6 +193,16 @@ export interface RealtimeClientOptions {
 
 export interface RealtimeClient {
   /**
+   * Stable, session-unique identifier for this client.
+   *
+   * Generated once when `createRealtimeClient` is called. Used internally
+   * for CRDT tie-breaking (LWW) and per-client counter vectors (PN-Counter).
+   * Expose it to your server if you need to associate realtime events with
+   * a specific browser tab or user session.
+   */
+  readonly clientId: string
+
+  /**
    * TanStack Store holding `{ status: ConnectionStatus }`.
    * Observe this with `useStore` in React (or the equivalent in other
    * frameworks) to reactively track the connection state.

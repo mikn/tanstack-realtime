@@ -24,6 +24,40 @@ export type {
   RealtimeClientOptions,
 } from './core/types.js'
 
+// CRDT primitives — field types, merge functions, and wire format types.
+// Import these when building custom integrations or transport adapters.
+export type {
+  CrdtFieldType,
+  CrdtFields,
+  CrdtRowState,
+  CrdtFieldState,
+  CrdtFieldWire,
+  CrdtMessageHeader,
+  LwwState,
+  LwwWire,
+  PnState,
+  PnWire,
+  OrEntry,
+  OrState,
+  OrWire,
+} from './core/crdt.js'
+export {
+  generateClientId,
+  tickClock,
+  advanceClock,
+  lwwWins,
+  pnValue,
+  mergePn,
+  pnIncrement,
+  pnDecrement,
+  orValues,
+  mergeOr,
+  orAdd,
+  orRemove,
+  orHas,
+  initOrFromArray,
+} from './core/crdt.js'
+
 // Collection sources
 export {
   realtimeCollectionOptions,
@@ -33,6 +67,9 @@ export {
   ephemeralLiveOptions,
   streamChannelOptions,
   createStreamChannel,
+  defineSyncedCounter,
+  defineSyncedValue,
+  defineSyncedSet,
 } from './collections/index.js'
 export type {
   RealtimeCollectionConfig,
@@ -47,6 +84,12 @@ export type {
   StreamChannelDefConfig,
   StreamItem,
   StreamStatus,
+  SyncedCounterConfig,
+  SyncedCounterDef,
+  SyncedValueConfig,
+  SyncedValueDef,
+  SyncedSetConfig,
+  SyncedSetDef,
 } from './collections/index.js'
 
 // Core utilities
