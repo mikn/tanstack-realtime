@@ -49,10 +49,11 @@ export interface GapRecoveryTransport extends RealtimeTransport {
  * @example
  * const transport = withGapRecovery(innerTransport, {
  *   onGap: async (channel) => {
- *     // Re-fetch the channel's data from the server
- *     const data = await fetchChannelData(channel)
- *     collection.reload(data)
- *   }
+ *     // Re-fetch missed data however makes sense for your app — e.g. re-run
+ *     // the collection's queryFn, invalidate a TanStack Query cache entry, or
+ *     // bump a local revision counter to trigger a fresh server round-trip.
+ *     await refetchChannelData(channel)
+ *   },
  * })
  */
 export function withGapRecovery(

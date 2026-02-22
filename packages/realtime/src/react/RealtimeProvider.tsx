@@ -10,7 +10,8 @@ export interface RealtimeProviderProps {
 
 /**
  * Provides a `RealtimeClient` to the component tree.
- * Place this inside `QueryClientProvider` and `DBProvider`.
+ * Place this inside `<DBProvider>` — and inside `<QueryClientProvider>` too
+ * if you are also using TanStack Query alongside TanStack DB.
  *
  * @example
  * const realtimeClient = createRealtimeClient({ transport: nodeTransport() })

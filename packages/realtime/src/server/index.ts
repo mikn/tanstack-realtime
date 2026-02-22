@@ -60,7 +60,8 @@ export type AuthorizeFn = (
  *
  * @example
  * // server/functions/ai.ts
- * import { publish } from '@tanstack/realtime'
+ * // `publish` is provided by your preset — e.g. @tanstack/realtime-preset-node
+ * import { publish } from '../realtime.server.js'
  *
  * for await (const chunk of stream) {
  *   await publish(['ai-stream', { sessionId }], { type: 'token', content: chunk })

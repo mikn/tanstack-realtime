@@ -5,8 +5,10 @@
  * When a message arrives, call `seen(id)` — returns `true` if the ID
  * has already been processed (duplicate), `false` if it is new.
  *
- * The window is capped at `maxSize` entries per channel using LRU eviction.
- * Old entries are automatically pruned when the cap is reached.
+ * The window is capped at `maxSize` entries per channel using FIFO eviction:
+ * the oldest-inserted ID is dropped when the cap is reached. Seeing a
+ * duplicate does not refresh its position — the eviction order is strictly
+ * by insertion time.
  */
 
 // ---------------------------------------------------------------------------
