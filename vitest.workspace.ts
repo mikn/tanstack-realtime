@@ -23,6 +23,10 @@ const sourceAliases = [
     find: /^@tanstack\/realtime-adapter-centrifugo$/,
     replacement: resolve(root, 'packages/realtime-adapter-centrifugo/src/index.ts'),
   },
+  {
+    find: /^@tanstack\/realtime-adapter-sse$/,
+    replacement: resolve(root, 'packages/realtime-adapter-sse/src/index.ts'),
+  },
 ]
 
 export default defineWorkspace([
@@ -50,6 +54,7 @@ export default defineWorkspace([
         'packages/__tests__/presenceCollection.test.ts',
         'packages/__tests__/ephemeralLive.test.ts',
         'packages/__tests__/sharedWorkerFallback.test.ts',
+        'packages/__tests__/sse.test.ts',
       ],
       pool: 'forks',
       poolOptions: { forks: { singleFork: true } },

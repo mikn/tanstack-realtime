@@ -26,6 +26,15 @@ export interface NodeTransportOptions {
    * Must match the `path` passed to `createNodeServer`. Defaults to `/_realtime`.
    */
   path?: string
+  /**
+   * Async function that returns an auth token appended to the WebSocket URL
+   * as `?token=<value>`. Called once per connection attempt so short-lived
+   * tokens (e.g. JWTs) are refreshed on every reconnect.
+   *
+   * @example
+   * getToken: () => fetch('/api/realtime-token').then((r) => r.text())
+   */
+  getToken?: () => string | Promise<string>
   /** Reconnection: initial back-off delay in ms. Defaults to `1000`. */
   initialDelay?: number
   /** Reconnection: maximum back-off delay in ms. Defaults to `30000`. */
@@ -68,6 +77,7 @@ export function nodeTransport(options: NodeTransportOptions = {}): RealtimeTrans
   const {
     url,
     path = '/_realtime',
+    getToken,
     initialDelay = 1000,
     maxDelay = 30000,
     jitter = 0.25,
@@ -89,15 +99,19 @@ export function nodeTransport(options: NodeTransportOptions = {}): RealtimeTrans
   let intentionalClose = false
   let selfConnectionId: string | null = null
 
-  function resolveUrl(): string {
-    if (url) return url.replace(/\/?$/, '') + path
-    if (typeof window !== 'undefined') {
+  function resolveUrl(token?: string): string {
+    let base: string
+    if (url) {
+      base = url.replace(/\/?$/, '') + path
+    } else if (typeof window !== 'undefined') {
       const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      return `${proto}//${window.location.host}${path}`
+      base = `${proto}//${window.location.host}${path}`
+    } else {
+      throw new Error(
+        '[realtime:node] No WebSocket URL provided. Pass `url` to nodeTransport().',
+      )
     }
-    throw new Error(
-      '[realtime:node] No WebSocket URL provided. Pass `url` to nodeTransport().',
-    )
+    return token ? `${base}?token=${encodeURIComponent(token)}` : base
   }
 
   function send(msg: object) {
@@ -148,13 +162,26 @@ export function nodeTransport(options: NodeTransportOptions = {}): RealtimeTrans
     }
   }
 
-  function openSocket() {
+  async function openSocket() {
     selfConnectionId = null // reset until the server echoes our connectionId
-    const wsUrl = resolveUrl()
+    store.setState(() => 'connecting')
+
+    let token: string | undefined
+    if (getToken) {
+      try {
+        token = await getToken()
+      } catch {
+        // Token fetch failed; schedule reconnect without updating state.
+        if (!intentionalClose) scheduleReconnect()
+        return
+      }
+    }
+
+    if (intentionalClose) return
+
+    const wsUrl = resolveUrl(token)
     const ws = new WS(wsUrl)
     socket = ws
-
-    store.setState(() => 'connecting')
 
     ws.addEventListener('open', () => {
       reconnectAttempt = 0
@@ -195,7 +222,7 @@ export function nodeTransport(options: NodeTransportOptions = {}): RealtimeTrans
     const delay = base * (1 + jitter * (Math.random() * 2 - 1))
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null
-      if (!intentionalClose) openSocket()
+      if (!intentionalClose) void openSocket()
     }, delay)
   }
 
@@ -231,7 +258,7 @@ export function nodeTransport(options: NodeTransportOptions = {}): RealtimeTrans
       if (current !== 'disconnected') return awaitConnection()
 
       intentionalClose = false
-      openSocket()
+      void openSocket()
       return awaitConnection()
     },
 

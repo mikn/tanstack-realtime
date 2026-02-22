@@ -19,3 +19,9 @@ export { usePublish } from './usePublish.js'
 
 export { useStream } from './useStream.js'
 export type { UseStreamOptions, UseStreamResult } from './useStream.js'
+
+export { useRealtimeCollection } from './useRealtimeCollection.js'
+export type { UseRealtimeCollectionConfig } from './useRealtimeCollection.js'
+
+export { useLiveChannel } from './useLiveChannel.js'
+export type { UseLiveChannelConfig } from './useLiveChannel.js'
