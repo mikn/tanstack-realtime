@@ -245,7 +245,7 @@ export function centrifugoTransport(
   }
 
   function send(cmd: CentrifugoCommand): void {
-    if (socket?.readyState === WebSocket.OPEN) {
+    if (socket?.readyState === WebSocketImpl.OPEN) {
       socket.send(JSON.stringify(cmd))
     }
   }
