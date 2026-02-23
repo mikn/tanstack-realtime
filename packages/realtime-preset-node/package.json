@@ -1,0 +1,26 @@
+{
+  "name": "@tanstack/realtime-preset-node",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Local dev / export preset for TanStack Realtime (in-process WS + EventEmitter)",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "browser": {
+    "ws": false
+  },
+  "scripts": {
+    "build": "tsup"
+  },
+  "dependencies": {
+    "@tanstack/realtime": "*",
+    "@tanstack/store": "*",
+    "ws": "*"
+  }
+}

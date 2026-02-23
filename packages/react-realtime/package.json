@@ -1,0 +1,27 @@
+{
+  "name": "@tanstack/react-realtime",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "React hooks and provider for @tanstack/realtime",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsup"
+  },
+  "dependencies": {
+    "@tanstack/realtime": "*",
+    "@tanstack/db": "*"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "@tanstack/react-store": ">=0.0.0"
+  },
+  "sideEffects": false
+}

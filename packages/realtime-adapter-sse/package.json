@@ -1,0 +1,22 @@
+{
+  "name": "@tanstack/realtime-adapter-sse",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Server-Sent Events (SSE) transport adapter for @tanstack/realtime",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsup"
+  },
+  "dependencies": {
+    "@tanstack/realtime": "*",
+    "@tanstack/store": "*"
+  }
+}

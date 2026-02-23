@@ -1,0 +1,146 @@
+/**
+ * @tanstack/realtime
+ *
+ * Framework-agnostic realtime client, collection helpers, CRDT primitives,
+ * and presence for TanStack DB.
+ *
+ * For React hooks and provider, use @tanstack/react-realtime.
+ * For the Node.js preset, use @tanstack/realtime-preset-node.
+ */
+
+// Core primitives
+export { serializeKey, parseChannel } from './core/serializeKey.js'
+export { createRealtimeClient } from './core/client.js'
+export { hasPresence } from './core/types.js'
+export type {
+  ConnectionStatus,
+  PresenceUser,
+  ParsedChannel,
+  QueryKey,
+  // Core transport interface (no presence required for custom implementations)
+  RealtimeTransport,
+  // Optional presence extension — implement alongside RealtimeTransport
+  PresenceCapable,
+  RealtimeClient,
+  RealtimeClientOptions,
+} from './core/types.js'
+
+// CRDT primitives — field types, merge functions, and wire format types.
+// Import these when building custom integrations or transport adapters.
+export type {
+  CrdtFieldType,
+  CrdtFields,
+  CrdtRowState,
+  CrdtFieldState,
+  CrdtFieldWire,
+  CrdtMessageHeader,
+  LwwState,
+  LwwWire,
+  PnState,
+  PnWire,
+  OrEntry,
+  OrState,
+  OrWire,
+} from './core/crdt.js'
+export {
+  generateClientId,
+  tickClock,
+  advanceClock,
+  lwwWins,
+  pnValue,
+  mergePn,
+  pnIncrement,
+  pnDecrement,
+  orValues,
+  mergeOr,
+  orAdd,
+  orRemove,
+  orHas,
+  initOrFromArray,
+} from './core/crdt.js'
+
+// Collection sources
+export {
+  realtimeCollectionOptions,
+  liveChannelOptions,
+  createPresenceChannel,
+  presenceChannelOptions,
+  ephemeralLiveOptions,
+  streamChannelOptions,
+  createStreamChannel,
+  defineSyncedCounter,
+  defineSyncedValue,
+  defineSyncedSet,
+} from './collections/index.js'
+export type {
+  RealtimeCollectionConfig,
+  RealtimeChannelMessage,
+  LiveChannelConfig,
+  PresenceChannelConfig,
+  PresenceChannelDef,
+  PresenceCollectionConfig,
+  EphemeralLiveConfig,
+  StreamChannelConfig,
+  StreamChannelDef,
+  StreamChannelDefConfig,
+  StreamItem,
+  StreamStatus,
+  SyncedCounterConfig,
+  SyncedCounterDef,
+  SyncedValueConfig,
+  SyncedValueDef,
+  SyncedSetConfig,
+  SyncedSetDef,
+} from './collections/index.js'
+
+// Core utilities
+export { createDedup } from './core/dedup.js'
+export type { DedupOptions, DeduplicationFilter } from './core/dedup.js'
+
+export { createOfflineQueue } from './core/offlineQueue.js'
+export type {
+  QueuedMessage,
+  OfflineQueueState,
+  OfflineQueueOptions,
+  OfflineQueueTransport,
+} from './core/offlineQueue.js'
+
+export { throttle } from './core/throttle.js'
+export type { ThrottleOptions, ThrottledFn } from './core/throttle.js'
+
+export { createEphemeralMap } from './core/ephemeral.js'
+export type {
+  EphemeralMapOptions,
+  EphemeralEntry,
+  EphemeralMap,
+} from './core/ephemeral.js'
+
+export { withGapRecovery } from './core/gapRecovery.js'
+export type {
+  GapRecoveryOptions,
+  GapRecoveryTransport,
+} from './core/gapRecovery.js'
+
+// SharedWorker-based multi-tab transport.
+// Tab side: createSharedWorkerTransport(workerUrl)
+// Worker side: createSharedWorkerServer(innerTransport) — call in the SharedWorker file.
+export {
+  createSharedWorkerTransport,
+  createSharedWorkerServer,
+  isSharedWorkerSupported,
+} from './core/sharedWorkerTransport.js'
+export type {
+  SharedWorkerTransportOptions,
+  SharedWorkerServerOptions,
+  SharedWorkerServer,
+  TabToWorkerMsg,
+  WorkerToTabMsg,
+} from './core/sharedWorkerTransport.js'
+
+// Server-side types — transport-agnostic, exported from core so any preset
+// can implement the same contract without an additional import path.
+export type {
+  ChannelPermissions,
+  AuthorizeFn,
+  PublishFn,
+} from './server/index.js'
