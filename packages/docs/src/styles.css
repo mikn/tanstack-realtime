@@ -721,6 +721,221 @@ code {
 }
 
 /* ---------------------------------------------------------------------------
+   Before / After comparison blocks
+   --------------------------------------------------------------------------- */
+
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+}
+
+.ba-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ba-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 0.3em 0.75em;
+  border-radius: 6px;
+  display: inline-block;
+  align-self: flex-start;
+}
+
+.ba-before {
+  color: #ef4444;
+  background: color-mix(in srgb, #ef4444 10%, transparent);
+  border: 1px solid color-mix(in srgb, #ef4444 25%, transparent);
+}
+
+.ba-after {
+  color: #22c55e;
+  background: color-mix(in srgb, #22c55e 10%, transparent);
+  border: 1px solid color-mix(in srgb, #22c55e 25%, transparent);
+}
+
+/* ---------------------------------------------------------------------------
+   Feature cards — problem / solution
+   --------------------------------------------------------------------------- */
+
+.feature-problem {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.55;
+  font-style: italic;
+  margin-bottom: 0.4rem;
+}
+
+.feature-problem::before {
+  content: '✗ ';
+  color: #ef4444;
+  font-style: normal;
+}
+
+.feature-solution {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.feature-solution::before {
+  content: '✓ ';
+  color: #22c55e;
+}
+
+/* ---------------------------------------------------------------------------
+   Resilience grid
+   --------------------------------------------------------------------------- */
+
+.resilience-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.resilience-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.resilience-card h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.resilience-card > p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+
+.resilience-card code {
+  color: var(--accent-1);
+  background: color-mix(in srgb, var(--accent-1) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent-1) 20%, transparent);
+}
+
+.resilience-card-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-2) 25%, transparent);
+  border-radius: 10px;
+}
+
+/* ---------------------------------------------------------------------------
+   Database Integration
+   --------------------------------------------------------------------------- */
+
+.callout {
+  background: color-mix(in srgb, var(--accent-1) 6%, var(--bg-elevated));
+  border: 1px solid color-mix(in srgb, var(--accent-1) 25%, transparent);
+  border-left: 3px solid var(--accent-1);
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 3rem;
+}
+
+.callout-label {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-1);
+  margin-bottom: 0.6rem;
+}
+
+.callout p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.7;
+  max-width: 56rem;
+}
+
+.callout code {
+  color: var(--accent-1);
+  background: color-mix(in srgb, var(--accent-1) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent-1) 20%, transparent);
+}
+
+.use-cases {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.use-case {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 2rem;
+}
+
+.use-case-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.use-case-number {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-2) 20%, transparent);
+  padding: 0.3em 0.65em;
+  border-radius: 6px;
+  margin-top: 0.2rem;
+}
+
+.use-case-header h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.use-case-header > div > p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+
+.use-case-header code {
+  color: var(--accent-1);
+  background: color-mix(in srgb, var(--accent-1) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent-1) 20%, transparent);
+}
+
+.use-case-codes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+/* ---------------------------------------------------------------------------
    Responsive
    --------------------------------------------------------------------------- */
 
@@ -745,7 +960,10 @@ code {
   .features-grid,
   .crdt-grid,
   .transport-grid,
-  .hooks-grid {
+  .hooks-grid,
+  .use-case-codes,
+  .before-after,
+  .resilience-grid {
     grid-template-columns: 1fr;
   }
 

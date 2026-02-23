@@ -59,6 +59,8 @@ export default defineWorkspace([
         'packages/__tests__/sharedWorkerFallback.test.ts',
         'packages/__tests__/sse.test.ts',
         'packages/__tests__/reconnect-edge-cases.test.ts',
+        'packages/__tests__/spectrum.test.ts',
+        'packages/__tests__/docs-examples.test.ts',
       ],
       pool: 'forks',
       poolOptions: { forks: { singleFork: true } },
