@@ -170,14 +170,14 @@ function createMockInnerTransport(): (RealtimeTransport & PresenceCapable) & {
 const TEST_URL = 'https://worker.example.com/realtime.js'
 
 function setupWorker(
-  inner?: RealtimeTransport & PresenceCapable,
+  inner?: ReturnType<typeof createMockInnerTransport>,
   options?: SharedWorkerServerOptions,
 ) {
   const transport = inner ?? createMockInnerTransport()
   const server = createSharedWorkerServer(transport, options)
   workerServers.set(TEST_URL, server)
   return {
-    transport: transport as ReturnType<typeof createMockInnerTransport>,
+    transport,
     server,
   }
 }
