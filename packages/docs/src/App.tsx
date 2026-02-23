@@ -68,6 +68,25 @@ function SpectrumStep({
 // Sections
 // ---------------------------------------------------------------------------
 
+function DisclaimerBar() {
+  return (
+    <div className="disclaimer-bar">
+      <span>
+        ⚠️ <strong>Unofficial project</strong> — This is a vibe-coded library
+        exploring an architecture and structure for TanStack Realtime. Not
+        affiliated with or endorsed by TanStack.{' '}
+        <a
+          href="https://github.com/mikn/tanstack-realtime"
+          target="_blank"
+          rel="noopener"
+        >
+          View on GitHub →
+        </a>
+      </span>
+    </div>
+  )
+}
+
 function Nav() {
   return (
     <nav className="nav">
@@ -82,7 +101,7 @@ function Nav() {
           <a href="#crdts">CRDTs</a>
           <a href="#quickstart">Quick Start</a>
           <a
-            href="https://github.com/tanstack/realtime"
+            href="https://github.com/mikn/tanstack-realtime"
             className="nav-github"
             target="_blank"
             rel="noopener"
@@ -635,7 +654,7 @@ function Footer() {
           <div>
             <h4>Community</h4>
             <a
-              href="https://github.com/tanstack/realtime"
+              href="https://github.com/mikn/tanstack-realtime"
               target="_blank"
               rel="noopener"
             >
@@ -673,7 +692,10 @@ function Footer() {
           </div>
         </div>
         <div className="footer-bottom">
-          <p>&copy; {new Date().getFullYear()} TanStack. MIT License.</p>
+          <p>
+            &copy; {new Date().getFullYear()} mikn. MIT License. Not an official
+            TanStack project.
+          </p>
         </div>
       </div>
     </footer>
@@ -687,6 +709,7 @@ function Footer() {
 export function App() {
   return (
     <>
+      <DisclaimerBar />
       <Nav />
       <Hero />
       <Features />

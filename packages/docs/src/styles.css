@@ -31,6 +31,7 @@
   /* Spacing */
   --section-y: 7rem;
   --container-max: 72rem;
+  --disclaimer-height: 38px;
 }
 
 /* ---------------------------------------------------------------------------
@@ -109,12 +110,49 @@ code {
 }
 
 /* ---------------------------------------------------------------------------
+   Disclaimer bar
+   --------------------------------------------------------------------------- */
+
+.disclaimer-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1001;
+  height: var(--disclaimer-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 0.78rem;
+  padding: 0 1rem;
+  background: color-mix(in srgb, var(--accent-2) 12%, var(--bg-elevated));
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-2) 30%, transparent);
+  color: var(--text-secondary);
+  gap: 0.4rem;
+}
+
+.disclaimer-bar strong {
+  color: var(--accent-2);
+}
+
+.disclaimer-bar a {
+  color: var(--accent-1);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.disclaimer-bar a:hover {
+  color: var(--text-primary);
+}
+
+/* ---------------------------------------------------------------------------
    Nav
    --------------------------------------------------------------------------- */
 
 .nav {
   position: fixed;
-  top: 0;
+  top: var(--disclaimer-height);
   left: 0;
   right: 0;
   z-index: 100;
@@ -169,7 +207,7 @@ code {
 
 .hero {
   position: relative;
-  padding: 10rem 0 6rem;
+  padding: calc(10rem + var(--disclaimer-height)) 0 6rem;
   text-align: center;
   overflow: hidden;
 }
@@ -692,7 +730,7 @@ code {
   }
 
   .hero {
-    padding: 7rem 0 3rem;
+    padding: calc(7rem + var(--disclaimer-height)) 0 3rem;
   }
 
   .nav-links {
