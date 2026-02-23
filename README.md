@@ -3,8 +3,14 @@
 > Framework-agnostic realtime primitives — live collections, pub/sub messaging, presence, and CRDT state — built for [TanStack DB](https://github.com/TanStack/db).
 
 [![npm version](https://img.shields.io/npm/v/@tanstack/realtime)](https://www.npmjs.com/package/@tanstack/realtime)
-[![License](https://img.shields.io/github/license/TanStack/realtime)](LICENSE)
-[![CI](https://github.com/TanStack/realtime/actions/workflows/ci.yml/badge.svg)](https://github.com/TanStack/realtime/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/mikn/tanstack-realtime)](LICENSE)
+[![CI](https://github.com/mikn/tanstack-realtime/actions/workflows/ci.yml/badge.svg)](https://github.com/mikn/tanstack-realtime/actions/workflows/ci.yml)
+
+> [!WARNING]
+> This is **not** an official [TanStack](https://tanstack.com) project. It is a
+> vibe-coded library that explores an architecture and structure for what a
+> TanStack Realtime library could look like. Use it to experiment, get inspired,
+> or contribute ideas — but do not rely on it in production.
 
 - **Transport-agnostic** — works with WebSockets (Node.js), Server-Sent Events, or Centrifugo out of the box; bring your own transport for anything else
 - **Live collections** — wire TanStack DB collections to realtime channels with a single config object
@@ -467,4 +473,4 @@ realtimeCollectionOptions<Counter, string>({
 
 ## License
 
-[MIT](LICENSE) © [TanStack](https://tanstack.com)
+[MIT](LICENSE) © [mikn](https://github.com/mikn) — Not affiliated with or endorsed by TanStack.
