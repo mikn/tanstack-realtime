@@ -433,13 +433,11 @@ describe('sseTransport', () => {
     handler = createSseHandler({ pingInterval: 0 })
     savedFetch = globalThis.fetch
     // Wire fetch() to the handler so no real network is needed.
-    globalThis.fetch = vi.fn(
-      (input: RequestInfo | URL, init?: RequestInit) => {
-        const req =
-          input instanceof Request ? input : new Request(input as string, init)
-        return Promise.resolve(handler.handle(req))
-      },
-    )
+    globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const req =
+        input instanceof Request ? input : new Request(input as string, init)
+      return Promise.resolve(handler.handle(req))
+    })
   })
 
   afterEach(() => {

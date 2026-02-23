@@ -590,7 +590,11 @@ describe('Authorization', () => {
 
     const harness = await createTestHarness((userId, channel) => {
       calls.push({ userId, channel })
-      return Promise.resolve({ subscribe: true, publish: false, presence: false })
+      return Promise.resolve({
+        subscribe: true,
+        publish: false,
+        presence: false,
+      })
     })
 
     const client = connectClient(harness.port)

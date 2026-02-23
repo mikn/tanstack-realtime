@@ -191,7 +191,8 @@ describe('realtimeCollectionOptions — lifecycle', () => {
   it('server-only mode works without client or channel', () => {
     const config = realtimeCollectionOptions<Doc, string>({
       getKey: (d) => d.id,
-      queryFn: () => Promise.resolve([{ id: '1', title: 'from-server', version: 1 }]),
+      queryFn: () =>
+        Promise.resolve([{ id: '1', title: 'from-server', version: 1 }]),
     })
     const { isReady } = driveSync(config)
 

@@ -86,7 +86,8 @@ describe('spectrum step 1: queryFn only (server data)', () => {
   it('loads data from the server without a client or channel', async () => {
     const config = realtimeCollectionOptions<Todo, string>({
       getKey: (t) => t.id,
-      queryFn: () => Promise.resolve([{ id: '1', title: 'Buy milk', votes: 0, tags: [] }]),
+      queryFn: () =>
+        Promise.resolve([{ id: '1', title: 'Buy milk', votes: 0, tags: [] }]),
     })
     const { ops, isReady } = driveSync(config)
     await new Promise((r) => setTimeout(r, 0))
@@ -161,7 +162,8 @@ describe('spectrum step 3: + client + channel (realtime peer sync)', () => {
       client,
       channel: 'todos',
       getKey: (t) => t.id,
-      onInsert: () => Promise.resolve({ id: '1', title: 'Created', votes: 0, tags: [] }),
+      onInsert: () =>
+        Promise.resolve({ id: '1', title: 'Created', votes: 0, tags: [] }),
     })
     driveSync(config)
 
