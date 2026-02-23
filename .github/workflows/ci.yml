@@ -85,7 +85,7 @@ jobs:
   preview:
     name: Preview
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    if: false # TODO: re-enable once publishing is configured
 
     steps:
       - uses: actions/checkout@v4
