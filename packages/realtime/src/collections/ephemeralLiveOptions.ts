@@ -1,8 +1,8 @@
-import type { CollectionConfig, SyncConfig } from '@tanstack/db'
-import type { StandardSchemaV1 } from '@standard-schema/spec'
-import type { RealtimeClient, QueryKey } from '../core/types.js'
 import { createEphemeralMap } from '../core/ephemeral.js'
 import { serializeKey } from '../core/serializeKey.js'
+import type { CollectionConfig, SyncConfig } from '@tanstack/db'
+import type { StandardSchemaV1 } from '@standard-schema/spec'
+import type { QueryKey, RealtimeClient } from '../core/types.js'
 
 // ---------------------------------------------------------------------------
 // Types

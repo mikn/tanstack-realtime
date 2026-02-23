@@ -12,13 +12,13 @@
  *   - presence sidecar channel ($prs:{channel})
  */
 
-import { createServer } from 'http'
-import type { Server as HttpServer } from 'http'
-import { WebSocket as WsWebSocket, WebSocketServer } from 'ws'
-import type { WebSocket as WsSocket } from 'ws'
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { createServer } from 'node:http'
+import { WebSocketServer, WebSocket as WsWebSocket } from 'ws'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
 import { createRealtimeClient } from '@tanstack/realtime'
+import type { WebSocket as WsSocket } from 'ws'
+import type { Server as HttpServer } from 'node:http'
 
 // In Node < 21 there is no global WebSocket. Pass the ws package's
 // implementation so tests work across all supported Node versions.
@@ -59,7 +59,12 @@ async function createMiniCentrifugo(): Promise<MiniCentrifugoServer> {
         const id = msg['id'] as number | undefined
 
         if (msg['connect'] !== undefined) {
-          ws.send(JSON.stringify({ id, connect: { client: clientId, version: '4.0.0' } }))
+          ws.send(
+            JSON.stringify({
+              id,
+              connect: { client: clientId, version: '4.0.0' },
+            }),
+          )
         } else if (msg['subscribe'] !== undefined) {
           const ch = (msg['subscribe'] as { channel: string }).channel
           subscribed.add(ch)
@@ -72,7 +77,10 @@ async function createMiniCentrifugo(): Promise<MiniCentrifugoServer> {
           channelSockets.get(ch)?.delete(ws)
           ws.send(JSON.stringify({ id, unsubscribe: {} }))
         } else if (msg['publish'] !== undefined) {
-          const { channel: ch, data } = msg['publish'] as { channel: string; data: unknown }
+          const { channel: ch, data } = msg['publish'] as {
+            channel: string
+            data: unknown
+          }
           ws.send(JSON.stringify({ id, publish: {} }))
           // Echo publication as push to all subscribers of that channel
           const push = JSON.stringify({ push: { channel: ch, pub: { data } } })
@@ -162,7 +170,10 @@ describe('centrifugoTransport', () => {
   // ── Module interface ─────────────────────────────────────────────────────
 
   it('exposes the complete RealtimeTransport interface', () => {
-    const transport = centrifugoTransport({ url: 'ws://localhost:9999', WebSocket: NodeWebSocket })
+    const transport = centrifugoTransport({
+      url: 'ws://localhost:9999',
+      WebSocket: NodeWebSocket,
+    })
     expect(typeof transport.connect).toBe('function')
     expect(typeof transport.disconnect).toBe('function')
     expect(typeof transport.subscribe).toBe('function')
@@ -175,7 +186,10 @@ describe('centrifugoTransport', () => {
   })
 
   it('starts disconnected before connect()', () => {
-    const transport = centrifugoTransport({ url: 'ws://localhost:9999', WebSocket: NodeWebSocket })
+    const transport = centrifugoTransport({
+      url: 'ws://localhost:9999',
+      WebSocket: NodeWebSocket,
+    })
     expect(transport.store.state).toBe('disconnected')
   })
 
@@ -276,7 +290,10 @@ describe('centrifugoTransport', () => {
 
     // client1 should see bob arrive (alice's own join is filtered as "self" if matching clientId,
     // but here client1 sees client2's prs:join on the sidecar channel)
-    const seenUsers = presenceUpdates.flatMap((u) => u as Array<{ data: { name: string } }>)
+    const seenUsers = presenceUpdates.flatMap(
+      (u) => u as Array<{ data: { name: string } }>,
+    )
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     const names = seenUsers.map((u) => u.data?.name)
     expect(names.some((n) => n === 'bob')).toBe(true)
 

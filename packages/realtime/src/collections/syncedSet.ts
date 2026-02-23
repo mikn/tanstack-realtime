@@ -1,5 +1,5 @@
-import type { QueryKey } from '../core/types.js'
 import { serializeKey } from '../core/serializeKey.js'
+import type { QueryKey } from '../core/types.js'
 
 export interface SyncedSetConfig<
   TParams extends Record<string, unknown> = Record<string, unknown>,
@@ -24,7 +24,7 @@ export interface SyncedSetDef<
   TParams extends Record<string, unknown> = Record<string, unknown>,
 > {
   readonly id: string
-  resolveChannel(params: TParams): string
+  resolveChannel: (params: TParams) => string
   /** @internal — phantom type marker only, never has a runtime value */
   readonly _type?: T
 }

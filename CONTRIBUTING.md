@@ -6,12 +6,12 @@ Thanks for your interest in contributing! Please read this guide before opening 
 
 This is an npm workspace monorepo containing three packages:
 
-| Directory | Package |
-|---|---|
-| `packages/realtime` | `@tanstack/realtime` — core client and types |
-| `packages/react-realtime` | `@tanstack/react-realtime` — React hooks and provider |
+| Directory                       | Package                                                                 |
+| ------------------------------- | ----------------------------------------------------------------------- |
+| `packages/realtime`             | `@tanstack/realtime` — core client and types                            |
+| `packages/react-realtime`       | `@tanstack/react-realtime` — React hooks and provider                   |
 | `packages/realtime-preset-node` | `@tanstack/realtime-preset-node` — WebSocket transport + Node.js server |
-| `packages/__tests__` | Integration test suite (not published) |
+| `packages/__tests__`            | Integration test suite (not published)                                  |
 
 ## Development setup
 

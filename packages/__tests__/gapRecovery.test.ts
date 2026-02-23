@@ -2,10 +2,14 @@
  * Tests for gap recovery (withGapRecovery).
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Store } from '@tanstack/store'
 import { withGapRecovery } from '@tanstack/realtime'
-import type { RealtimeTransport, PresenceCapable, ConnectionStatus } from '@tanstack/realtime'
+import type {
+  ConnectionStatus,
+  PresenceCapable,
+  RealtimeTransport,
+} from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Mock transport
@@ -40,7 +44,8 @@ function createMockTransport(): RealtimeTransport & {
   }
 }
 
-function createPresenceMockTransport(): (RealtimeTransport & PresenceCapable) & {
+function createPresenceMockTransport(): (RealtimeTransport &
+  PresenceCapable) & {
   setStatus: (s: ConnectionStatus) => void
   subscriptions: Map<string, Set<(data: unknown) => void>>
 } {
@@ -223,7 +228,7 @@ describe('withGapRecovery', () => {
     const inner = createMockTransport()
     const transport = withGapRecovery(inner, { onGap: vi.fn() })
 
-    const received: unknown[] = []
+    const received: Array<unknown> = []
     transport.subscribe('ch', (msg) => received.push(msg))
 
     // Emit directly through the inner transport's subscription set.
@@ -274,7 +279,9 @@ describe('withGapRecovery', () => {
   it('calls onGapError when onGap throws synchronously', async () => {
     const inner = createMockTransport()
     const err = new Error('sync failure')
-    const onGap = vi.fn(() => { throw err })
+    const onGap = vi.fn(() => {
+      throw err
+    })
     const onGapError = vi.fn()
 
     const transport = withGapRecovery(inner, { onGap, onGapError })

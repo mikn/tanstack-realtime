@@ -17,7 +17,18 @@
  *  - reconnectAttempt counter resets to 0 on successful connection
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
+
+// Import AFTER vi.hoisted so transport.ts picks up MockWebSocket as `WS`.
+import { nodeTransport } from '@tanstack/realtime-preset-node'
 
 // ---------------------------------------------------------------------------
 // vi.hoisted() runs before module imports, giving us a chance to replace
@@ -26,7 +37,7 @@ import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vites
 // ---------------------------------------------------------------------------
 
 const { MockWebSocket, restoreGlobalWs } = vi.hoisted(() => {
-  type EventListener = (...args: unknown[]) => void
+  type EventListener = (...args: Array<unknown>) => void
 
   class MockWebSocket {
     static CONNECTING = 0
@@ -35,7 +46,7 @@ const { MockWebSocket, restoreGlobalWs } = vi.hoisted(() => {
     static CLOSED = 3
 
     /** All instances created during the current test — reset in beforeEach. */
-    static instances: MockWebSocket[] = []
+    static instances: Array<MockWebSocket> = []
 
     readyState: number = MockWebSocket.CONNECTING
     readonly url: string
@@ -76,7 +87,7 @@ const { MockWebSocket, restoreGlobalWs } = vi.hoisted(() => {
       this._emit('close')
     }
 
-    private _emit(event: string, ...args: unknown[]): void {
+    private _emit(event: string, ...args: Array<unknown>): void {
       for (const cb of this._listeners.get(event) ?? []) cb(...args)
     }
   }
@@ -97,9 +108,6 @@ const { MockWebSocket, restoreGlobalWs } = vi.hoisted(() => {
 
   return { MockWebSocket, restoreGlobalWs }
 })
-
-// Import AFTER vi.hoisted so transport.ts picks up MockWebSocket as `WS`.
-import { nodeTransport } from '@tanstack/realtime-preset-node'
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -139,7 +147,7 @@ describe('nodeTransport — reconnect edge cases', () => {
     expect(MockWebSocket.instances.length).toBe(1)
 
     // Attempt 1 → delay = 50 ms.
-    MockWebSocket.instances[0]!._closeUnexpectedly()
+    MockWebSocket.instances[0]._closeUnexpectedly()
     await Promise.resolve()
     await vi.advanceTimersByTimeAsync(49) // 1 ms short → no reconnect yet
     await Promise.resolve()
@@ -149,7 +157,7 @@ describe('nodeTransport — reconnect edge cases', () => {
     expect(MockWebSocket.instances.length).toBe(2)
 
     // Attempt 2 → delay = 100 ms.
-    MockWebSocket.instances[1]!._closeUnexpectedly()
+    MockWebSocket.instances[1]._closeUnexpectedly()
     await Promise.resolve()
     await vi.advanceTimersByTimeAsync(99)
     await Promise.resolve()
@@ -159,7 +167,7 @@ describe('nodeTransport — reconnect edge cases', () => {
     expect(MockWebSocket.instances.length).toBe(3)
 
     // Attempt 3 → delay = min(200, 200) = 200 ms — first capped value.
-    MockWebSocket.instances[2]!._closeUnexpectedly()
+    MockWebSocket.instances[2]._closeUnexpectedly()
     await Promise.resolve()
     await vi.advanceTimersByTimeAsync(199)
     await Promise.resolve()
@@ -169,7 +177,7 @@ describe('nodeTransport — reconnect edge cases', () => {
     expect(MockWebSocket.instances.length).toBe(4)
 
     // Attempt 4 → delay = min(400, 200) = 200 ms — still capped at maxDelay.
-    MockWebSocket.instances[3]!._closeUnexpectedly()
+    MockWebSocket.instances[3]._closeUnexpectedly()
     await Promise.resolve()
     await vi.advanceTimersByTimeAsync(199)
     await Promise.resolve()
@@ -195,7 +203,7 @@ describe('nodeTransport — reconnect edge cases', () => {
     await Promise.resolve() // let openSocket() create the first socket
 
     expect(MockWebSocket.instances.length).toBe(1)
-    const ws = MockWebSocket.instances[0]!
+    const ws = MockWebSocket.instances[0]
 
     // Emit close three times rapidly. Only the first call to scheduleReconnect
     // should set a timer; the rest are no-ops (guard: if (reconnectTimer) return).
@@ -226,7 +234,7 @@ describe('nodeTransport — reconnect edge cases', () => {
     await Promise.resolve()
 
     // Trigger a reconnect cycle.
-    MockWebSocket.instances[0]!._closeUnexpectedly()
+    MockWebSocket.instances[0]._closeUnexpectedly()
     await Promise.resolve()
     expect(transport.store.get()).toBe('reconnecting')
 
@@ -292,19 +300,23 @@ describe('nodeTransport — reconnect edge cases', () => {
 
     // Fail twice to push reconnectAttempt up to 2.
     for (let i = 0; i < 2; i++) {
-      MockWebSocket.instances[MockWebSocket.instances.length - 1]!._closeUnexpectedly()
+      MockWebSocket.instances[
+        MockWebSocket.instances.length - 1
+      ]._closeUnexpectedly()
       await Promise.resolve()
       await vi.advanceTimersByTimeAsync(500)
       await Promise.resolve()
     }
 
     // Open the third socket successfully — should reset reconnectAttempt to 0.
-    MockWebSocket.instances[MockWebSocket.instances.length - 1]!._open()
+    MockWebSocket.instances[MockWebSocket.instances.length - 1]._open()
     await Promise.resolve()
     expect(transport.store.get()).toBe('connected')
 
     // Immediately fail this connection.
-    MockWebSocket.instances[MockWebSocket.instances.length - 1]!._closeUnexpectedly()
+    MockWebSocket.instances[
+      MockWebSocket.instances.length - 1
+    ]._closeUnexpectedly()
     await Promise.resolve()
     expect(transport.store.get()).toBe('reconnecting')
 

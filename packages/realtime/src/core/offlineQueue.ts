@@ -7,13 +7,13 @@
  */
 
 import { Store } from '@tanstack/store'
+import { hasPresence } from './types.js'
 import type {
-  RealtimeTransport,
   ConnectionStatus,
   PresenceCapable,
   PresenceUser,
+  RealtimeTransport,
 } from './types.js'
-import { hasPresence } from './types.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -57,7 +57,7 @@ export interface OfflineQueueTransport extends RealtimeTransport {
   /** TanStack Store holding the queue state. */
   readonly queueStore: Store<OfflineQueueState>
   /** Discard all pending messages without sending them. */
-  clearQueue(): void
+  clearQueue: () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ export function createOfflineQueue(
 
     queueStore.setState((s) => ({ ...s, isFlushing: true }))
 
-    const retry: QueuedMessage[] = []
+    const retry: Array<QueuedMessage> = []
     let flushedCount = 0
 
     for (const msg of pending) {

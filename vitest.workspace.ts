@@ -1,7 +1,7 @@
+import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineWorkspace } from 'vitest/config'
 import { defineWorkersProject } from '@cloudflare/vitest-pool-workers/config'
-import { resolve } from 'path'
-import { fileURLToPath } from 'url'
 
 const root = fileURLToPath(new URL('.', import.meta.url))
 
@@ -21,7 +21,10 @@ const sourceAliases = [
   },
   {
     find: /^@tanstack\/realtime-adapter-centrifugo$/,
-    replacement: resolve(root, 'packages/realtime-adapter-centrifugo/src/index.ts'),
+    replacement: resolve(
+      root,
+      'packages/realtime-adapter-centrifugo/src/index.ts',
+    ),
   },
   {
     find: /^@tanstack\/realtime-adapter-sse$/,

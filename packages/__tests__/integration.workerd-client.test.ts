@@ -29,7 +29,7 @@
  * communication; overriding it corrupts that channel (causes "Stack underflow").
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { nodeTransport } from '@tanstack/realtime-preset-node'
 
 describe('nodeTransport — workerd runtime compatibility', () => {

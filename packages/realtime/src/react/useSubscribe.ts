@@ -1,7 +1,7 @@
 import { use, useEffect } from 'react'
-import type { QueryKey } from '../core/types.js'
 import { serializeKey } from '../core/serializeKey.js'
 import { RealtimeContext } from './context.js'
+import type { QueryKey } from '../core/types.js'
 
 /**
  * Subscribes to raw channel events for the lifetime of the component.

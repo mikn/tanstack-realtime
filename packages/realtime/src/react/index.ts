@@ -19,10 +19,7 @@ export type {
   UseSyncedValueResult,
 } from './useSyncedValue.js'
 export { useSyncedSet } from './useSyncedSet.js'
-export type {
-  UseSyncedSetOptions,
-  UseSyncedSetResult,
-} from './useSyncedSet.js'
+export type { UseSyncedSetOptions, UseSyncedSetResult } from './useSyncedSet.js'
 
 // Re-export createRealtimeClient from core so consumers can import it from /react
 export { createRealtimeClient } from '../core/client.js'

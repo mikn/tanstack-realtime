@@ -1,6 +1,6 @@
-import { type ReactNode } from 'react'
-import type { RealtimeClient } from '../core/types.js'
 import { RealtimeContext } from './context.js'
+import type { ReactNode } from 'react'
+import type { RealtimeClient } from '../core/types.js'
 
 export interface RealtimeProviderProps {
   /** The realtime client created with `createRealtimeClient`. */

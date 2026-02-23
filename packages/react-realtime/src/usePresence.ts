@@ -1,6 +1,6 @@
 import { use, useCallback, useEffect, useRef, useState } from 'react'
-import type { PresenceUser, PresenceChannelDef } from '@tanstack/realtime'
 import { RealtimeContext } from './context.js'
+import type { PresenceChannelDef, PresenceUser } from '@tanstack/realtime'
 
 export interface UsePresenceOptions<
   TData extends object = Record<string, unknown>,
@@ -30,7 +30,7 @@ export interface UsePresenceResult<
    * Only the provided fields are merged into the server-stored state;
    * all other fields remain unchanged.
    */
-  updatePresence(delta: Partial<TData>): void
+  updatePresence: (delta: Partial<TData>) => void
 }
 
 /**

@@ -1,24 +1,4 @@
-import type {
-  CollectionConfig,
-  InsertMutationFn,
-  UpdateMutationFn,
-  DeleteMutationFn,
-  SyncConfig,
-} from '@tanstack/db'
-import type { StandardSchemaV1 } from '@standard-schema/spec'
-import type { RealtimeClient, QueryKey } from '../core/types.js'
 import { serializeKey } from '../core/serializeKey.js'
-import type {
-  CrdtFields,
-  CrdtMessageHeader,
-  CrdtRowState,
-  LwwState,
-  LwwWire,
-  OrState,
-  OrWire,
-  PnState,
-  PnWire,
-} from '../core/crdt.js'
 import {
   advanceClock,
   initOrFromArray,
@@ -32,6 +12,26 @@ import {
   pnIncrement,
   pnValue,
   tickClock,
+} from '../core/crdt.js'
+import type {
+  CollectionConfig,
+  DeleteMutationFn,
+  InsertMutationFn,
+  SyncConfig,
+  UpdateMutationFn,
+} from '@tanstack/db'
+import type { StandardSchemaV1 } from '@standard-schema/spec'
+import type { QueryKey, RealtimeClient } from '../core/types.js'
+import type {
+  CrdtFields,
+  CrdtMessageHeader,
+  CrdtRowState,
+  LwwState,
+  LwwWire,
+  OrState,
+  OrWire,
+  PnState,
+  PnWire,
 } from '../core/crdt.js'
 
 // ---------------------------------------------------------------------------
@@ -132,7 +132,7 @@ export interface RealtimeCollectionConfig<
    * Called on mount to populate the collection with initial data.
    * The promise resolves to an array of rows.
    */
-  queryFn?: () => Promise<T[]>
+  queryFn?: () => Promise<Array<T>>
 
   /**
    * When `true`, `queryFn` is automatically re-called after every reconnection
@@ -250,7 +250,10 @@ function mergeCrdtRow<T extends object>(
         advanceClock(wire.clock)
         if (!prevState || lwwWins(prevState, wire)) {
           result[field] = wire.value
-          newCrdt[field] = { clock: wire.clock, clientId: wire.clientId } satisfies LwwState
+          newCrdt[field] = {
+            clock: wire.clock,
+            clientId: wire.clientId,
+          } satisfies LwwState
         } else {
           result[field] = prevRow[field]
         }
@@ -264,7 +267,9 @@ function mergeCrdtRow<T extends object>(
     }
 
     if (fieldType === 'pn-counter') {
-      const prevState: PnState = (prevEntry.crdt[field] as PnState | undefined) ?? {
+      const prevState: PnState = (prevEntry.crdt[field] as
+        | PnState
+        | undefined) ?? {
         inc: {},
         dec: {},
       }
@@ -281,7 +286,9 @@ function mergeCrdtRow<T extends object>(
     }
 
     if (fieldType === 'or-set') {
-      const prevState: OrState = (prevEntry.crdt[field] as OrState | undefined) ?? {
+      const prevState: OrState = (prevEntry.crdt[field] as
+        | OrState
+        | undefined) ?? {
         entries: [],
       }
       const wire = crdtHeader?.fields[field] as OrWire | undefined
@@ -319,7 +326,12 @@ function buildCrdtFields<T extends object>(
 
     if (fieldType === 'lww') {
       const clock = tickClock()
-      crdtFields[field] = { type: 'lww', value: newRow[field], clock, clientId } satisfies LwwWire
+      crdtFields[field] = {
+        type: 'lww',
+        value: newRow[field],
+        clock,
+        clientId,
+      } satisfies LwwWire
       entry.crdt[field] = { clock, clientId } satisfies LwwState
       continue
     }
@@ -329,39 +341,52 @@ function buildCrdtFields<T extends object>(
         inc: {},
         dec: {},
       }
-      const prevNum = typeof prevRow[field] === 'number' ? (prevRow[field] as number) : 0
-      const newNum = typeof newRow[field] === 'number' ? (newRow[field] as number) : 0
+      const prevNum = typeof prevRow[field] === 'number' ? prevRow[field] : 0
+      const newNum = typeof newRow[field] === 'number' ? newRow[field] : 0
       const delta = newNum - prevNum
       const newState =
         delta >= 0
           ? pnIncrement(prevState, clientId, delta)
           : pnDecrement(prevState, clientId, -delta)
       entry.crdt[field] = newState
-      crdtFields[field] = { type: 'pn', inc: newState.inc, dec: newState.dec } satisfies PnWire
+      crdtFields[field] = {
+        type: 'pn',
+        inc: newState.inc,
+        dec: newState.dec,
+      } satisfies PnWire
       continue
     }
 
     if (fieldType === 'or-set') {
-      const prevState: OrState = (entry.crdt[field] as OrState | undefined) ?? { entries: [] }
+      const prevState: OrState = (entry.crdt[field] as OrState | undefined) ?? {
+        entries: [],
+      }
       const prevKeys = new Set(
-        (Array.isArray(prevRow[field]) ? (prevRow[field] as unknown[]) : []).map((v) =>
-          JSON.stringify(v),
-        ),
+        (Array.isArray(prevRow[field])
+          ? (prevRow[field] as Array<unknown>)
+          : []
+        ).map((v) => JSON.stringify(v)),
       )
       const newKeys = new Set(
-        (Array.isArray(newRow[field]) ? (newRow[field] as unknown[]) : []).map((v) =>
-          JSON.stringify(v),
-        ),
+        (Array.isArray(newRow[field])
+          ? (newRow[field] as Array<unknown>)
+          : []
+        ).map((v) => JSON.stringify(v)),
       )
       let newState = prevState
       for (const k of prevKeys) {
-        if (!newKeys.has(k)) newState = orRemove(newState, JSON.parse(k) as unknown)
+        if (!newKeys.has(k))
+          newState = orRemove(newState, JSON.parse(k) as unknown)
       }
       for (const k of newKeys) {
-        if (!prevKeys.has(k)) newState = orAdd(newState, JSON.parse(k) as unknown)
+        if (!prevKeys.has(k))
+          newState = orAdd(newState, JSON.parse(k) as unknown)
       }
       entry.crdt[field] = newState
-      crdtFields[field] = { type: 'or', entries: newState.entries } satisfies OrWire
+      crdtFields[field] = {
+        type: 'or',
+        entries: newState.entries,
+      } satisfies OrWire
     }
   }
 
@@ -461,7 +486,7 @@ export function realtimeCollectionOptions<
       : serializeKey(channel)
     : undefined
 
-  const allChannels: string[] = [
+  const allChannels: Array<string> = [
     ...(primaryChannel ? [primaryChannel] : []),
     ...(additionalChannels ?? []).map((ch) =>
       typeof ch === 'string' ? ch : serializeKey(ch),
@@ -486,27 +511,36 @@ export function realtimeCollectionOptions<
     if (!msg || typeof msg.action !== 'string') return
 
     if (msg.action === 'delete') {
-      const key = getKey(msg.data as T)
+      const key = getKey(msg.data)
       write({ type: 'delete', key })
       syncedEntries.delete(key)
       return
     }
 
-    const incoming = msg.data as T
+    const incoming = msg.data
     const key = getKey(incoming)
     const existing = syncedEntries.get(key)
 
     if (!existing || !fields) {
       // First time we see this key, or no CRDT fields declared: seed from incoming.
       const crdt = initCrdtFromRow(incoming, fields)
-      write({ type: msg.action === 'insert' ? 'insert' : 'update', value: incoming })
+      write({
+        type: msg.action === 'insert' ? 'insert' : 'update',
+        value: incoming,
+      })
       syncedEntries.set(key, { row: incoming, crdt })
       return
     }
 
     const crdtHeader = (raw as Partial<RealtimeChannelMessage<T>>)._crdt
     // `fields` requires `client` (validated above), so client is guaranteed here.
-    const merged = mergeCrdtRow(existing, incoming, crdtHeader, fields, client!.clientId)
+    const merged = mergeCrdtRow(
+      existing,
+      incoming,
+      crdtHeader,
+      fields,
+      client!.clientId,
+    )
     write({ type: 'update', value: merged.row })
     syncedEntries.set(key, merged)
   }
@@ -557,7 +591,7 @@ export function realtimeCollectionOptions<
         markReady()
       }
 
-      let statusSub: { unsubscribe(): void } | null = null
+      let statusSub: { unsubscribe: () => void } | null = null
       if (refetchOnReconnect && queryFn && client) {
         let wasGapped = false
 
@@ -573,7 +607,13 @@ export function realtimeCollectionOptions<
             const existing = syncedEntries.get(key)
 
             if (existing && fields) {
-              const merged = mergeCrdtRow(existing, row, undefined, fields, client!.clientId)
+              const merged = mergeCrdtRow(
+                existing,
+                row,
+                undefined,
+                fields,
+                client!.clientId,
+              )
               write({ type: 'update', value: merged.row })
               syncedEntries.set(key, merged)
             } else {
@@ -583,7 +623,9 @@ export function realtimeCollectionOptions<
             }
           }
 
-          const staleKeys = [...syncedEntries.keys()].filter((k) => !newKeys.has(k))
+          const staleKeys = [...syncedEntries.keys()].filter(
+            (k) => !newKeys.has(k),
+          )
           for (const key of staleKeys) {
             write({ type: 'delete', key })
             syncedEntries.delete(key)
@@ -592,7 +634,8 @@ export function realtimeCollectionOptions<
         }
 
         statusSub = client.store.subscribe(({ status }) => {
-          if (status === 'reconnecting' || status === 'disconnected') wasGapped = true
+          if (status === 'reconnecting' || status === 'disconnected')
+            wasGapped = true
           if (status === 'connected' && wasGapped) {
             wasGapped = false
             if (!stopped) {
@@ -622,7 +665,10 @@ export function realtimeCollectionOptions<
         const result = await onInsert(params)
         if (result != null) {
           const key = getKey(result)
-          const entry: RowEntry<T> = { row: result, crdt: initCrdtFromRow(result, fields) }
+          const entry: RowEntry<T> = {
+            row: result,
+            crdt: initCrdtFromRow(result, fields),
+          }
           syncedEntries.set(key, entry)
 
           if (primaryChannel && client) {
@@ -632,7 +678,9 @@ export function realtimeCollectionOptions<
             await client.publish(primaryChannel, {
               action: 'insert',
               data: stripLocalFields(result, fields),
-              ...(Object.keys(crdtFields).length > 0 && { _crdt: { fields: crdtFields } }),
+              ...(Object.keys(crdtFields).length > 0 && {
+                _crdt: { fields: crdtFields },
+              }),
             } satisfies RealtimeChannelMessage)
           }
         }
@@ -659,7 +707,9 @@ export function realtimeCollectionOptions<
             await client.publish(primaryChannel, {
               action: 'update',
               data: stripLocalFields(result, fields),
-              ...(Object.keys(crdtFields).length > 0 && { _crdt: { fields: crdtFields } }),
+              ...(Object.keys(crdtFields).length > 0 && {
+                _crdt: { fields: crdtFields },
+              }),
             } satisfies RealtimeChannelMessage)
           }
         }

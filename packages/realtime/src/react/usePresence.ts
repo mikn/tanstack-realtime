@@ -1,7 +1,7 @@
 import { use, useCallback, useEffect, useRef, useState } from 'react'
+import { RealtimeContext } from './context.js'
 import type { PresenceUser } from '../core/types.js'
 import type { PresenceChannelDef } from '../collections/presenceChannel.js'
-import { RealtimeContext } from './context.js'
 
 export interface UsePresenceOptions<
   TData extends object = Record<string, unknown>,
@@ -22,7 +22,7 @@ export interface UsePresenceResult<
    * Update the current user's presence data.
    * Sends a delta — only the provided fields are merged into the stored state.
    */
-  updatePresence(delta: Partial<TData>): void
+  updatePresence: (delta: Partial<TData>) => void
 }
 
 /**

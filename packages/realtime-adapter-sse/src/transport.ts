@@ -131,7 +131,7 @@ export function sseTransport(options: SseTransportOptions): RealtimeTransport {
    */
   function parseEvent(raw: string): ServerEvent | null {
     const lines = raw.split('\n')
-    const dataLines: string[] = []
+    const dataLines: Array<string> = []
     for (const line of lines) {
       if (line.startsWith('data:')) {
         dataLines.push(line.slice(5).trimStart())
@@ -190,7 +190,7 @@ export function sseTransport(options: SseTransportOptions): RealtimeTransport {
     // Read chunks continuously.
     const readLoop = async (): Promise<void> => {
       try {
-        while (true) {
+        for (;;) {
           const { done, value } = await reader.read()
           if (done) break
 

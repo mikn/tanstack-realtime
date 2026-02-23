@@ -1,8 +1,8 @@
 import { use, useCallback, useEffect, useRef, useState } from 'react'
-import type { SyncedCounterDef } from '../collections/syncedCounter.js'
-import type { PnState } from '../core/crdt.js'
 import { mergePn, pnDecrement, pnIncrement, pnValue } from '../core/crdt.js'
 import { RealtimeContext } from './context.js'
+import type { SyncedCounterDef } from '../collections/syncedCounter.js'
+import type { PnState } from '../core/crdt.js'
 
 export interface UseSyncedCounterOptions<
   TParams extends Record<string, unknown> = Record<string, unknown>,
@@ -27,12 +27,12 @@ export interface UseSyncedCounterResult {
    * Applied instantly and broadcast to all peers.
    * Safe to call concurrently from multiple clients — increments always add up.
    */
-  increment(by?: number): void
+  increment: (by?: number) => void
   /**
    * Decrement the counter by `by` (default 1).
    * Applied instantly and broadcast to all peers.
    */
-  decrement(by?: number): void
+  decrement: (by?: number) => void
 }
 
 /**
@@ -90,8 +90,12 @@ export function useSyncedCounter<
     setValue(initialRef.current)
 
     const unsub = client.subscribe(channelRef.current, (raw) => {
-      const msg = raw as { _crdt?: string; inc?: Record<string, number>; dec?: Record<string, number> }
-      if (msg?._crdt !== 'pn') return
+      const msg = raw as {
+        _crdt?: string
+        inc?: Record<string, number>
+        dec?: Record<string, number>
+      }
+      if (msg._crdt !== 'pn') return
 
       // Merge server state with any local ops we already applied.
       const serverState: PnState = { inc: msg.inc ?? {}, dec: msg.dec ?? {} }

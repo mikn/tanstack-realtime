@@ -14,20 +14,20 @@ export interface SseHandler {
    *
    * All other methods receive a `405 Method Not Allowed` response.
    */
-  handle(req: Request): Promise<Response>
+  handle: (req: Request) => Promise<Response>
 
   /**
    * Push a message to all connections subscribed to `channel`.
    * Useful for server-initiated broadcasts (e.g. from a database trigger or
    * server function).
    */
-  broadcast(channel: string, data: unknown): void
+  broadcast: (channel: string, data: unknown) => void
 
   /**
    * Return the current number of active SSE connections.
    * Useful for health checks and tests.
    */
-  connectionCount(): number
+  connectionCount: () => number
 }
 
 export interface SseHandlerOptions {
@@ -77,7 +77,11 @@ export interface SseHandlerOptions {
    */
   getUser?: (
     req: Request,
-  ) => { userId: string } | null | undefined | Promise<{ userId: string } | null | undefined>
+  ) =>
+    | { userId: string }
+    | null
+    | undefined
+    | Promise<{ userId: string } | null | undefined>
 
   /**
    * Authorize a `subscribe` or `publish` action for an already-authenticated
@@ -216,9 +220,7 @@ export function createSseHandler(options: SseHandlerOptions = {}): SseHandler {
   }
 
   /** Resolve the user from the request, or null if not authenticated. */
-  async function resolveUser(
-    req: Request,
-  ): Promise<{ userId: string } | null> {
+  async function resolveUser(req: Request): Promise<{ userId: string } | null> {
     if (!getUser) return { userId: 'anonymous' }
     const user = await getUser(req)
     return user ?? null
@@ -256,9 +258,7 @@ export function createSseHandler(options: SseHandlerOptions = {}): SseHandler {
         controllers.set(connectionId, ctrl)
 
         // Send the "connected" event so the client learns its connectionId.
-        ctrl.enqueue(
-          sseChunk({ type: 'connected', connectionId }),
-        )
+        ctrl.enqueue(sseChunk({ type: 'connected', connectionId }))
 
         // Periodic pings to keep the connection alive through proxies.
         if (pingInterval > 0) {

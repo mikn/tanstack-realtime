@@ -29,31 +29,33 @@ export interface EphemeralEntry<T> {
 
 export interface EphemeralMap<T> {
   /** Set or refresh a key. Resets the expiry timer. */
-  set(key: string, value: T): void
+  set: (key: string, value: T) => void
 
   /** Remove a key immediately (before its TTL). */
-  delete(key: string): void
+  delete: (key: string) => void
 
   /** Get the current value for a key, or undefined if expired/absent. */
-  get(key: string): T | undefined
+  get: (key: string) => T | undefined
 
   /** Whether the key exists and has not expired. */
-  has(key: string): boolean
+  has: (key: string) => boolean
 
   /** Snapshot of all live entries. */
-  entries(): ReadonlyArray<EphemeralEntry<T>>
+  entries: () => ReadonlyArray<EphemeralEntry<T>>
 
   /** Number of live entries. */
-  size(): number
+  size: () => number
 
   /** Subscribe to changes. Returns an unsubscribe function. */
-  subscribe(callback: (entries: ReadonlyArray<EphemeralEntry<T>>) => void): () => void
+  subscribe: (
+    callback: (entries: ReadonlyArray<EphemeralEntry<T>>) => void,
+  ) => () => void
 
   /** Remove all entries and cancel all timers. */
-  clear(): void
+  clear: () => void
 
   /** Cancel all timers (call on teardown to prevent leaks). */
-  destroy(): void
+  destroy: () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -83,10 +85,12 @@ export function createEphemeralMap<T>(
 
   const entries = new Map<string, { value: T; updatedAt: number }>()
   const timers = new Map<string, ReturnType<typeof setTimeout>>()
-  const listeners = new Set<(entries: ReadonlyArray<EphemeralEntry<T>>) => void>()
+  const listeners = new Set<
+    (entries: ReadonlyArray<EphemeralEntry<T>>) => void
+  >()
 
   function snapshot(): ReadonlyArray<EphemeralEntry<T>> {
-    const result: EphemeralEntry<T>[] = []
+    const result: Array<EphemeralEntry<T>> = []
     for (const [key, entry] of entries) {
       result.push({ key, value: entry.value, updatedAt: entry.updatedAt })
     }

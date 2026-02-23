@@ -2,7 +2,7 @@
  * Tests for the ephemeral map (createEphemeralMap).
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createEphemeralMap } from '@tanstack/realtime'
 
 describe('createEphemeralMap', () => {
@@ -67,7 +67,7 @@ describe('createEphemeralMap', () => {
 
   it('delete is a no-op for missing keys', () => {
     const map = createEphemeralMap<string>()
-    map.delete('nope') // should not throw
+    expect(() => map.delete('nope')).not.toThrow()
   })
 
   it('entries() returns a snapshot of all live entries', () => {
@@ -89,8 +89,8 @@ describe('createEphemeralMap', () => {
 
     map.set('a', 'hello')
     expect(cb).toHaveBeenCalledTimes(1)
-    expect(cb.mock.calls[0]![0]).toHaveLength(1)
-    expect(cb.mock.calls[0]![0][0].key).toBe('a')
+    expect(cb.mock.calls[0][0]).toHaveLength(1)
+    expect(cb.mock.calls[0][0][0].key).toBe('a')
   })
 
   it('subscribe is called on delete', () => {
@@ -102,7 +102,7 @@ describe('createEphemeralMap', () => {
 
     map.delete('a')
     expect(cb).toHaveBeenCalledTimes(1)
-    expect(cb.mock.calls[0]![0]).toHaveLength(0)
+    expect(cb.mock.calls[0][0]).toHaveLength(0)
   })
 
   it('subscribe is called on auto-expiry', () => {
@@ -115,7 +115,7 @@ describe('createEphemeralMap', () => {
 
     vi.advanceTimersByTime(1000)
     expect(cb).toHaveBeenCalledTimes(2)
-    expect(cb.mock.calls[1]![0]).toHaveLength(0) // expired
+    expect(cb.mock.calls[1][0]).toHaveLength(0) // expired
   })
 
   it('unsubscribe stops notifications', () => {
@@ -143,7 +143,7 @@ describe('createEphemeralMap', () => {
     map.clear()
     expect(map.size()).toBe(0)
     expect(cb).toHaveBeenCalledTimes(1)
-    expect(cb.mock.calls[0]![0]).toHaveLength(0)
+    expect(cb.mock.calls[0][0]).toHaveLength(0)
 
     // Expired timers should not fire after clear.
     vi.advanceTimersByTime(2000)

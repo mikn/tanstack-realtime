@@ -44,7 +44,12 @@
  */
 
 import { Store } from '@tanstack/store'
-import type { RealtimeTransport, PresenceCapable, ConnectionStatus, PresenceUser } from './types.js'
+import type {
+  ConnectionStatus,
+  PresenceCapable,
+  PresenceUser,
+  RealtimeTransport,
+} from './types.js'
 
 // ---------------------------------------------------------------------------
 // Wire protocol — messages between tab (port) and worker (server)
@@ -82,7 +87,7 @@ export interface SharedWorkerServer {
    * @example
    * self.addEventListener('connect', (e) => server.connect(e.ports[0]))
    */
-  connect(port: MessagePort): void
+  connect: (port: MessagePort) => void
 }
 
 export interface SharedWorkerServerOptions {
@@ -197,7 +202,11 @@ export function createSharedWorkerServer(
     channelUnsubs.set(channel, unsub)
   }
 
-  function cleanupChannelPort(port: MessagePort, channel: string, listenerId: string): void {
+  function cleanupChannelPort(
+    port: MessagePort,
+    channel: string,
+    listenerId: string,
+  ): void {
     const subs = channelPorts.get(channel)
     if (!subs) return
 
@@ -234,7 +243,11 @@ export function createSharedWorkerServer(
     presenceUnsubs.set(channel, unsub)
   }
 
-  function cleanupPresencePort(port: MessagePort, channel: string, listenerId: string): void {
+  function cleanupPresencePort(
+    port: MessagePort,
+    channel: string,
+    listenerId: string,
+  ): void {
     const subs = presencePorts.get(channel)
     if (!subs) return
 
@@ -262,7 +275,8 @@ export function createSharedWorkerServer(
     const channelSubs: Array<{ channel: string; listenerId: string }> = []
     for (const [channel, subs] of channelPorts) {
       for (const sub of subs) {
-        if (sub.port === port) channelSubs.push({ channel, listenerId: sub.listenerId })
+        if (sub.port === port)
+          channelSubs.push({ channel, listenerId: sub.listenerId })
       }
     }
     for (const { channel, listenerId } of channelSubs) {
@@ -272,7 +286,8 @@ export function createSharedWorkerServer(
     const presenceSubs: Array<{ channel: string; listenerId: string }> = []
     for (const [channel, subs] of presencePorts) {
       for (const sub of subs) {
-        if (sub.port === port) presenceSubs.push({ channel, listenerId: sub.listenerId })
+        if (sub.port === port)
+          presenceSubs.push({ channel, listenerId: sub.listenerId })
       }
     }
     for (const { channel, listenerId } of presenceSubs) {
@@ -344,13 +359,19 @@ export function createSharedWorkerServer(
         if (!presencePorts.has(msg.channel)) {
           presencePorts.set(msg.channel, new Set())
         }
-        presencePorts.get(msg.channel)!.add({ port, listenerId: msg.listenerId })
+        presencePorts
+          .get(msg.channel)!
+          .add({ port, listenerId: msg.listenerId })
         ensurePresenceSubscription(msg.channel)
         // Replay the last known presence snapshot so the new subscriber
         // doesn't start blind waiting for the next change event.
         const cached = presenceCache.get(msg.channel)
         if (cached !== undefined) {
-          postToPort(port, { type: 'presence', channel: msg.channel, users: cached })
+          postToPort(port, {
+            type: 'presence',
+            channel: msg.channel,
+            users: cached,
+          })
         }
         break
       }
@@ -457,7 +478,9 @@ export function isSharedWorkerSupported(): boolean {
  */
 export function createSharedWorkerTransport(
   options: SharedWorkerTransportOptions | string | URL,
-  fallback?: (options: SharedWorkerTransportOptions | string | URL) => RealtimeTransport & PresenceCapable,
+  fallback?: (
+    options: SharedWorkerTransportOptions | string | URL,
+  ) => RealtimeTransport & PresenceCapable,
 ): RealtimeTransport & PresenceCapable {
   // Surface environment incompatibility early with a clear error (or fallback).
   if (!isSharedWorkerSupported()) {
@@ -476,7 +499,7 @@ export function createSharedWorkerTransport(
       ? { url: options, publishTimeout: 10_000 }
       : options
 
-  const worker = new SharedWorker(url as string | URL)
+  const worker = new SharedWorker(url)
   const port = worker.port
 
   const store = new Store<ConnectionStatus>('disconnected')
@@ -493,7 +516,11 @@ export function createSharedWorkerTransport(
   // Pending publish promise handlers.
   const pendingPublishes = new Map<
     string,
-    { resolve: () => void; reject: (err: Error) => void; timer: ReturnType<typeof setTimeout> }
+    {
+      resolve: () => void
+      reject: (err: Error) => void
+      timer: ReturnType<typeof setTimeout>
+    }
   >()
 
   let listenerCounter = 0
@@ -588,7 +615,11 @@ export function createSharedWorkerTransport(
       return new Promise<void>((resolve, reject) => {
         const timer = setTimeout(() => {
           pendingPublishes.delete(requestId)
-          reject(new Error(`[SharedWorkerTransport] publish timed out after ${publishTimeout}ms`))
+          reject(
+            new Error(
+              `[SharedWorkerTransport] publish timed out after ${publishTimeout}ms`,
+            ),
+          )
         }, publishTimeout)
 
         pendingPublishes.set(requestId, { resolve, reject, timer })
@@ -603,15 +634,26 @@ export function createSharedWorkerTransport(
     },
 
     joinPresence(channel, data) {
-      port.postMessage({ type: 'joinPresence', channel, data } satisfies TabToWorkerMsg)
+      port.postMessage({
+        type: 'joinPresence',
+        channel,
+        data,
+      } satisfies TabToWorkerMsg)
     },
 
     updatePresence(channel, data) {
-      port.postMessage({ type: 'updatePresence', channel, data } satisfies TabToWorkerMsg)
+      port.postMessage({
+        type: 'updatePresence',
+        channel,
+        data,
+      } satisfies TabToWorkerMsg)
     },
 
     leavePresence(channel) {
-      port.postMessage({ type: 'leavePresence', channel } satisfies TabToWorkerMsg)
+      port.postMessage({
+        type: 'leavePresence',
+        channel,
+      } satisfies TabToWorkerMsg)
     },
 
     onPresenceChange(channel, callback) {

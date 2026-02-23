@@ -15,7 +15,7 @@
  * See centrifugo.globalSetup.ts for the full config.
  */
 
-import { describe, it, expect, beforeEach, afterEach, inject } from 'vitest'
+import { afterEach, beforeEach, describe, expect, inject, it } from 'vitest'
 import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
 import { createRealtimeClient } from '@tanstack/realtime'
 
@@ -174,9 +174,13 @@ describe('centrifugoTransport — real Centrifugo binary', () => {
     const client2 = makeClient(port)
     await client2.connect()
 
-    const presenceUpdates: Array<Array<{ connectionId: string; data: unknown }>> = []
+    const presenceUpdates: Array<
+      Array<{ connectionId: string; data: unknown }>
+    > = []
     client.onPresenceChange('e2e-prs', (users) =>
-      presenceUpdates.push(users as Array<{ connectionId: string; data: unknown }>),
+      presenceUpdates.push(
+        users as Array<{ connectionId: string; data: unknown }>,
+      ),
     )
 
     // client joins presence so it subscribes to the sidecar channel
@@ -200,7 +204,8 @@ describe('centrifugoTransport — real Centrifugo binary', () => {
     const client2 = makeClient(port)
     await client2.connect()
 
-    const updates: Array<Array<{ data: { name: string; status?: string } }>> = []
+    const updates: Array<Array<{ data: { name: string; status?: string } }>> =
+      []
     client.onPresenceChange('e2e-prs-update', (users) =>
       updates.push(users as Array<{ data: { name: string; status?: string } }>),
     )
@@ -216,6 +221,7 @@ describe('centrifugoTransport — real Centrifugo binary', () => {
     // Find an update where bob has status: 'typing'
     const withStatus = updates
       .flatMap((u) => u)
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       .find((u) => u.data?.name === 'bob' && u.data?.status === 'typing')
     expect(withStatus).toBeDefined()
 

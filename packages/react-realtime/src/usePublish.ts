@@ -1,7 +1,7 @@
 import { use, useCallback } from 'react'
-import type { QueryKey } from '@tanstack/realtime'
 import { serializeKey } from '@tanstack/realtime'
 import { RealtimeContext } from './context.js'
+import type { QueryKey } from '@tanstack/realtime'
 
 /**
  * Returns a stable `publish` function bound to `channel`.
@@ -34,7 +34,7 @@ export function usePublish(channel: QueryKey | string) {
 
   return useCallback(
     (data: unknown): Promise<void> => client.publish(serializedChannel, data),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
     [client, serializedChannel],
   )
 }

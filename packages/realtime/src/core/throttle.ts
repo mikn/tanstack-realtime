@@ -26,9 +26,9 @@ export interface ThrottledFn<TArgs extends Array<unknown>> {
   /** Call the throttled function. */
   (...args: TArgs): void
   /** Cancel any pending trailing call. */
-  cancel(): void
+  cancel: () => void
   /** Immediately fire the pending trailing call (if any) and reset. */
-  flush(): void
+  flush: () => void
 }
 
 // ---------------------------------------------------------------------------

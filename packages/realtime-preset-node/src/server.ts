@@ -1,8 +1,12 @@
-import { WebSocketServer, WebSocket } from 'ws'
-import { randomBytes } from 'crypto'
-import type { IncomingMessage, Server } from 'http'
+import { randomBytes } from 'node:crypto'
+import { WebSocket, WebSocketServer } from 'ws'
 import { parseChannel } from '@tanstack/realtime'
-import type { ChannelPermissions, ParsedChannel, PresenceUser } from '@tanstack/realtime'
+import type { IncomingMessage, Server } from 'node:http'
+import type {
+  ChannelPermissions,
+  ParsedChannel,
+  PresenceUser,
+} from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Wire protocol
@@ -21,7 +25,11 @@ type ServerMsg =
   | { type: 'subscribe:ok'; channel: string }
   | { type: 'subscribe:error'; channel: string; code: number; reason: string }
   | { type: 'message'; channel: string; data: unknown }
-  | { type: 'presence:update'; channel: string; users: ReadonlyArray<PresenceUser> }
+  | {
+      type: 'presence:update'
+      channel: string
+      users: ReadonlyArray<PresenceUser>
+    }
 
 // ---------------------------------------------------------------------------
 // Options
@@ -38,21 +46,24 @@ export interface NodeServerOptions {
    * Identical to the authorize function used in production presets
    * so that local dev and production share the same auth logic.
    */
-  authorize: (userId: string, channel: ParsedChannel) => Promise<ChannelPermissions>
+  authorize: (
+    userId: string,
+    channel: ParsedChannel,
+  ) => Promise<ChannelPermissions>
   /** WebSocket path. Defaults to `/_realtime`. */
   path?: string
 }
 
 export interface NodeServer {
   /** Attach to a running HTTP server. Call once during startup. */
-  attach(server: Server): void
+  attach: (server: Server) => void
   /**
    * Publish data to a channel from server code (e.g. server functions).
    * Sends to all subscribers with `subscribe: true` for this channel.
    */
-  publish(channel: string, data: unknown): void
+  publish: (channel: string, data: unknown) => void
   /** Close all connections and shut down. */
-  close(): Promise<void>
+  close: () => Promise<void>
 }
 
 // ---------------------------------------------------------------------------
@@ -113,7 +124,11 @@ export function createNodeServer(options: NodeServerOptions): NodeServer {
     }
   }
 
-  function fanOut(channel: string, data: unknown, excludeConnectionId?: string) {
+  function fanOut(
+    channel: string,
+    data: unknown,
+    excludeConnectionId?: string,
+  ) {
     for (const conn of connections.values()) {
       if (conn.connectionId === excludeConnectionId) continue
       const perms = conn.authorizedChannels.get(channel)
@@ -126,7 +141,7 @@ export function createNodeServer(options: NodeServerOptions): NodeServer {
   function broadcastPresence(channel: string) {
     const channelMap = presenceChannels.get(channel)
     if (!channelMap) return
-    const users: PresenceUser[] = Array.from(channelMap.entries()).map(
+    const users: Array<PresenceUser> = Array.from(channelMap.entries()).map(
       ([connectionId, data]) => ({ connectionId, data }),
     )
     for (const conn of connections.values()) {
@@ -212,8 +227,11 @@ export function createNodeServer(options: NodeServerOptions): NodeServer {
         // Merge delta into stored state
         const existing = channelMap.get(conn.connectionId) ?? {}
         const merged =
-          typeof existing === 'object' && existing !== null
-            ? { ...(existing as Record<string, unknown>), ...(msg.data as Record<string, unknown>) }
+          typeof existing === 'object'
+            ? {
+                ...(existing as Record<string, unknown>),
+                ...(msg.data as Record<string, unknown>),
+              }
             : msg.data
         channelMap.set(conn.connectionId, merged)
         conn.presenceChannels.set(msg.channel, merged)

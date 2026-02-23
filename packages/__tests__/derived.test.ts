@@ -9,10 +9,13 @@
  * those are intentionally NOT covered here.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Store } from '@tanstack/store'
-import { realtimeCollectionOptions, createRealtimeClient } from '@tanstack/realtime'
-import type { RealtimeTransport, ConnectionStatus } from '@tanstack/realtime'
+import {
+  createRealtimeClient,
+  realtimeCollectionOptions,
+} from '@tanstack/realtime'
+import type { ConnectionStatus, RealtimeTransport } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Mock transport
@@ -21,7 +24,7 @@ import type { RealtimeTransport, ConnectionStatus } from '@tanstack/realtime'
 function createMockTransport(): RealtimeTransport & {
   emit: (channel: string, data: unknown) => void
   publishCalls: Array<{ channel: string; data: unknown }>
-  subscribedChannels: () => string[]
+  subscribedChannels: () => Array<string>
   setStatus: (s: ConnectionStatus) => void
 } {
   const listeners = new Map<string, Set<(data: unknown) => void>>()
@@ -31,7 +34,9 @@ function createMockTransport(): RealtimeTransport & {
   return {
     store,
     publishCalls,
-    setStatus(s: ConnectionStatus) { store.setState(() => s) },
+    setStatus(s: ConnectionStatus) {
+      store.setState(() => s)
+    },
     async connect() {},
     disconnect() {},
     subscribe(channel, onMessage) {
@@ -67,17 +72,17 @@ interface Order {
 
 type WriteOp = { type: string; value?: unknown; key?: unknown }
 
-function driveSync(
-  config: ReturnType<typeof realtimeCollectionOptions>,
-): { ops: WriteOp[]; stop: () => void } {
-  const ops: WriteOp[] = []
-  const stop =
-    config.sync!.sync({
-      begin: () => {},
-      write: (op: WriteOp) => ops.push(op),
-      commit: () => {},
-      markReady: () => {},
-    }) ?? (() => {})
+function driveSync(config: ReturnType<typeof realtimeCollectionOptions>): {
+  ops: Array<WriteOp>
+  stop: () => void
+} {
+  const ops: Array<WriteOp> = []
+  const stop = config.sync.sync({
+    begin: () => {},
+    write: (op: WriteOp) => ops.push(op),
+    commit: () => {},
+    markReady: () => {},
+  })
   return { ops, stop }
 }
 
@@ -98,7 +103,10 @@ describe('realtimeCollectionOptions — channels fan-in', () => {
     })
     driveSync(config)
 
-    expect(subscribeSpy).toHaveBeenCalledWith('us-east:orders', expect.any(Function))
+    expect(subscribeSpy).toHaveBeenCalledWith(
+      'us-east:orders',
+      expect.any(Function),
+    )
   })
 
   it('subscribes to every channel in the channels[] array', () => {
@@ -114,7 +122,10 @@ describe('realtimeCollectionOptions — channels fan-in', () => {
     })
     driveSync(config)
 
-    expect(subscribeSpy).toHaveBeenCalledWith('us-east:orders', expect.any(Function))
+    expect(subscribeSpy).toHaveBeenCalledWith(
+      'us-east:orders',
+      expect.any(Function),
+    )
     expect(subscribeSpy).toHaveBeenCalledWith('eu:orders', expect.any(Function))
     expect(subscribeSpy).toHaveBeenCalledWith('ap:orders', expect.any(Function))
     expect(subscribeSpy).toHaveBeenCalledTimes(3)
@@ -132,14 +143,23 @@ describe('realtimeCollectionOptions — channels fan-in', () => {
     })
     const { ops } = driveSync(config)
 
-    transport.emit('us-east:orders', { action: 'insert', data: { id: '1', region: 'us', amount: 100 } })
-    transport.emit('eu:orders', { action: 'insert', data: { id: '2', region: 'eu', amount: 200 } })
-    transport.emit('ap:orders', { action: 'insert', data: { id: '3', region: 'ap', amount: 300 } })
+    transport.emit('us-east:orders', {
+      action: 'insert',
+      data: { id: '1', region: 'us', amount: 100 },
+    })
+    transport.emit('eu:orders', {
+      action: 'insert',
+      data: { id: '2', region: 'eu', amount: 200 },
+    })
+    transport.emit('ap:orders', {
+      action: 'insert',
+      data: { id: '3', region: 'ap', amount: 300 },
+    })
 
     expect(ops).toHaveLength(3)
-    expect((ops[0]!.value as Order).region).toBe('us')
-    expect((ops[1]!.value as Order).region).toBe('eu')
-    expect((ops[2]!.value as Order).region).toBe('ap')
+    expect((ops[0].value as Order).region).toBe('us')
+    expect((ops[1].value as Order).region).toBe('eu')
+    expect((ops[2].value as Order).region).toBe('ap')
   })
 
   it('fan-in channels each support insert, update, and delete', () => {
@@ -154,14 +174,23 @@ describe('realtimeCollectionOptions — channels fan-in', () => {
     })
     const { ops } = driveSync(config)
 
-    transport.emit('secondary', { action: 'insert', data: { id: 'A', region: 'x', amount: 1 } })
-    transport.emit('secondary', { action: 'update', data: { id: 'A', region: 'x', amount: 2 } })
-    transport.emit('secondary', { action: 'delete', data: { id: 'A', region: 'x', amount: 0 } })
+    transport.emit('secondary', {
+      action: 'insert',
+      data: { id: 'A', region: 'x', amount: 1 },
+    })
+    transport.emit('secondary', {
+      action: 'update',
+      data: { id: 'A', region: 'x', amount: 2 },
+    })
+    transport.emit('secondary', {
+      action: 'delete',
+      data: { id: 'A', region: 'x', amount: 0 },
+    })
 
-    expect(ops[0]!.type).toBe('insert')
-    expect(ops[1]!.type).toBe('update')
-    expect(ops[2]!.type).toBe('delete')
-    expect(ops[2]!.key).toBe('A')
+    expect(ops[0].type).toBe('insert')
+    expect(ops[1].type).toBe('update')
+    expect(ops[2].type).toBe('delete')
+    expect(ops[2].key).toBe('A')
   })
 
   it('publish-back after a mutation goes ONLY to the primary channel', async () => {
@@ -179,12 +208,18 @@ describe('realtimeCollectionOptions — channels fan-in', () => {
 
     await config.onInsert!({
       transaction: {
-        mutations: [{ modified: { id: '1', region: 'us', amount: 50 } as unknown, key: '1', original: {} }],
+        mutations: [
+          {
+            modified: { id: '1', region: 'us', amount: 50 } as unknown,
+            key: '1',
+            original: {},
+          },
+        ],
       },
     } as any)
 
     expect(transport.publishCalls).toHaveLength(1)
-    expect(transport.publishCalls[0]!.channel).toBe('primary')
+    expect(transport.publishCalls[0].channel).toBe('primary')
   })
 
   it('channels-only (no primary channel) works and disables publish-back', async () => {
@@ -199,15 +234,27 @@ describe('realtimeCollectionOptions — channels fan-in', () => {
     })
     const { ops } = driveSync(config)
 
-    transport.emit('shard-a', { action: 'insert', data: { id: '1', region: 'a', amount: 10 } })
-    transport.emit('shard-b', { action: 'insert', data: { id: '2', region: 'b', amount: 20 } })
+    transport.emit('shard-a', {
+      action: 'insert',
+      data: { id: '1', region: 'a', amount: 10 },
+    })
+    transport.emit('shard-b', {
+      action: 'insert',
+      data: { id: '2', region: 'b', amount: 20 },
+    })
 
     expect(ops).toHaveLength(2)
 
     // No publish-back because there's no primary channel.
     await config.onInsert!({
       transaction: {
-        mutations: [{ modified: { id: '3', region: 'us', amount: 50 } as unknown, key: '3', original: {} }],
+        mutations: [
+          {
+            modified: { id: '3', region: 'us', amount: 50 } as unknown,
+            key: '3',
+            original: {},
+          },
+        ],
       },
     } as any)
     expect(transport.publishCalls).toHaveLength(0)
@@ -235,7 +282,10 @@ describe('realtimeCollectionOptions — channels fan-in', () => {
     })
     driveSync(config)
 
-    expect(subscribeSpy).toHaveBeenCalledWith('region:id=eu', expect.any(Function))
+    expect(subscribeSpy).toHaveBeenCalledWith(
+      'region:id=eu',
+      expect.any(Function),
+    )
   })
 
   it('serializes the primary channel QueryKey array', () => {
@@ -250,7 +300,10 @@ describe('realtimeCollectionOptions — channels fan-in', () => {
     })
     driveSync(config)
 
-    expect(subscribeSpy).toHaveBeenCalledWith('orders:region=us', expect.any(Function))
+    expect(subscribeSpy).toHaveBeenCalledWith(
+      'orders:region=us',
+      expect.any(Function),
+    )
   })
 
   it('cleanup unsubscribes from ALL channels', () => {
@@ -268,9 +321,18 @@ describe('realtimeCollectionOptions — channels fan-in', () => {
     stop()
 
     const countBefore = ops.length
-    transport.emit('ch-a', { action: 'insert', data: { id: '1', region: 'a', amount: 1 } })
-    transport.emit('ch-b', { action: 'insert', data: { id: '2', region: 'b', amount: 2 } })
-    transport.emit('ch-c', { action: 'insert', data: { id: '3', region: 'c', amount: 3 } })
+    transport.emit('ch-a', {
+      action: 'insert',
+      data: { id: '1', region: 'a', amount: 1 },
+    })
+    transport.emit('ch-b', {
+      action: 'insert',
+      data: { id: '2', region: 'b', amount: 2 },
+    })
+    transport.emit('ch-c', {
+      action: 'insert',
+      data: { id: '3', region: 'c', amount: 3 },
+    })
 
     expect(ops.length).toBe(countBefore)
   })
@@ -288,9 +350,18 @@ describe('realtimeCollectionOptions — channels fan-in', () => {
     const { ops } = driveSync(config)
 
     // Interleave messages across three channels.
-    transport.emit('ch-3', { action: 'insert', data: { id: 'C', region: 'c', amount: 3 } })
-    transport.emit('ch-1', { action: 'insert', data: { id: 'A', region: 'a', amount: 1 } })
-    transport.emit('ch-2', { action: 'insert', data: { id: 'B', region: 'b', amount: 2 } })
+    transport.emit('ch-3', {
+      action: 'insert',
+      data: { id: 'C', region: 'c', amount: 3 },
+    })
+    transport.emit('ch-1', {
+      action: 'insert',
+      data: { id: 'A', region: 'a', amount: 1 },
+    })
+    transport.emit('ch-2', {
+      action: 'insert',
+      data: { id: 'B', region: 'b', amount: 2 },
+    })
 
     expect(ops.map((op) => (op.value as Order).id)).toEqual(['C', 'A', 'B'])
   })
@@ -301,8 +372,12 @@ describe('realtimeCollectionOptions — channels fan-in', () => {
 // ---------------------------------------------------------------------------
 
 describe('realtimeCollectionOptions — refetchOnReconnect', () => {
-  beforeEach(() => { vi.useFakeTimers() })
-  afterEach(() => { vi.useRealTimers() })
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
 
   it('re-calls queryFn after a reconnect gap (reconnecting → connected)', async () => {
     const transport = createMockTransport()
@@ -313,7 +388,10 @@ describe('realtimeCollectionOptions — refetchOnReconnect', () => {
       client,
       channel: 'orders',
       getKey: (o) => o.id,
-      queryFn: async () => { fetchCount++; return [] },
+      queryFn: async () => {
+        fetchCount++
+        return []
+      },
       refetchOnReconnect: true,
     })
     driveSync(config)
@@ -330,7 +408,7 @@ describe('realtimeCollectionOptions — refetchOnReconnect', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
 
-    let serverData: Order[] = [{ id: '1', region: 'us', amount: 100 }]
+    let serverData: Array<Order> = [{ id: '1', region: 'us', amount: 100 }]
     const config = realtimeCollectionOptions<Order, string>({
       client,
       channel: 'orders',
@@ -351,7 +429,9 @@ describe('realtimeCollectionOptions — refetchOnReconnect', () => {
     transport.setStatus('connected')
     await vi.advanceTimersByTimeAsync(0)
 
-    const insertOps = ops.filter((o) => o.type === 'insert').map((o) => (o.value as Order).id)
+    const insertOps = ops
+      .filter((o) => o.type === 'insert')
+      .map((o) => (o.value as Order).id)
     expect(insertOps).toContain('2')
   })
 
@@ -359,7 +439,7 @@ describe('realtimeCollectionOptions — refetchOnReconnect', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
 
-    let serverData: Order[] = [{ id: '1', region: 'us', amount: 100 }]
+    let serverData: Array<Order> = [{ id: '1', region: 'us', amount: 100 }]
     const config = realtimeCollectionOptions<Order, string>({
       client,
       channel: 'orders',
@@ -377,7 +457,9 @@ describe('realtimeCollectionOptions — refetchOnReconnect', () => {
     transport.setStatus('connected')
     await vi.advanceTimersByTimeAsync(0)
 
-    const updateOp = ops.find((o) => o.type === 'update' && (o.value as Order).id === '1')
+    const updateOp = ops.find(
+      (o) => o.type === 'update' && (o.value as Order).id === '1',
+    )
     expect(updateOp).toBeDefined()
     expect((updateOp!.value as Order).amount).toBe(999)
   })
@@ -386,7 +468,7 @@ describe('realtimeCollectionOptions — refetchOnReconnect', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
 
-    let serverData: Order[] = [
+    let serverData: Array<Order> = [
       { id: '1', region: 'us', amount: 100 },
       { id: '2', region: 'eu', amount: 200 },
     ]
@@ -420,7 +502,10 @@ describe('realtimeCollectionOptions — refetchOnReconnect', () => {
       client,
       channel: 'orders',
       getKey: (o) => o.id,
-      queryFn: async () => { fetchCount++; return [] },
+      queryFn: async () => {
+        fetchCount++
+        return []
+      },
       // refetchOnReconnect omitted — defaults to false
     })
     driveSync(config)
@@ -442,7 +527,10 @@ describe('realtimeCollectionOptions — refetchOnReconnect', () => {
       client,
       channel: 'orders',
       getKey: (o) => o.id,
-      queryFn: async () => { fetchCount++; return [] },
+      queryFn: async () => {
+        fetchCount++
+        return []
+      },
       refetchOnReconnect: true,
     })
     const { stop } = driveSync(config)
@@ -455,5 +543,4 @@ describe('realtimeCollectionOptions — refetchOnReconnect', () => {
     await vi.advanceTimersByTimeAsync(0)
     expect(fetchCount).toBe(1) // only initial; no fetch after stop
   })
-
 })

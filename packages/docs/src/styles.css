@@ -24,7 +24,8 @@
   --text-muted: #5f5f78;
 
   /* Typography */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-sans:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
 
   /* Spacing */
@@ -82,7 +83,12 @@ code {
 }
 
 .gradient-text {
-  background: linear-gradient(135deg, var(--accent-1), var(--accent-2), var(--accent-3));
+  background: linear-gradient(
+    135deg,
+    var(--accent-1),
+    var(--accent-2),
+    var(--accent-3)
+  );
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -301,7 +307,9 @@ code {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 1.5rem;
-  transition: border-color 0.2s, translate 0.2s;
+  transition:
+    border-color 0.2s,
+    translate 0.2s;
 }
 
 .feature-card:hover {

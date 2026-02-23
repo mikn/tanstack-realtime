@@ -2,10 +2,14 @@
  * Tests for the offline queue (createOfflineQueue).
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Store } from '@tanstack/store'
 import { createOfflineQueue } from '@tanstack/realtime'
-import type { RealtimeTransport, PresenceCapable, ConnectionStatus } from '@tanstack/realtime'
+import type {
+  ConnectionStatus,
+  PresenceCapable,
+  RealtimeTransport,
+} from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Mock transport with controllable connection status
@@ -18,8 +22,10 @@ function createMockTransport(): RealtimeTransport & {
 } {
   const store = new Store<ConnectionStatus>('disconnected')
   const publishCalls: Array<{ channel: string; data: unknown }> = []
-  let publishImpl: (channel: string, data: unknown) => Promise<void> =
-    async () => {}
+  let publishImpl: (
+    channel: string,
+    data: unknown,
+  ) => Promise<void> = async () => {}
 
   return {
     store,
@@ -45,7 +51,8 @@ function createMockTransport(): RealtimeTransport & {
   }
 }
 
-function createPresenceMockTransport(): (RealtimeTransport & PresenceCapable) & {
+function createPresenceMockTransport(): (RealtimeTransport &
+  PresenceCapable) & {
   setStatus: (s: ConnectionStatus) => void
   publishCalls: Array<{ channel: string; data: unknown }>
   publishImpl: (channel: string, data: unknown) => Promise<void>
@@ -105,8 +112,8 @@ describe('createOfflineQueue', () => {
     await vi.advanceTimersByTimeAsync(0)
 
     expect(inner.publishCalls).toHaveLength(2)
-    expect(inner.publishCalls[0]!.data).toEqual({ msg: 1 })
-    expect(inner.publishCalls[1]!.data).toEqual({ msg: 2 })
+    expect(inner.publishCalls[0].data).toEqual({ msg: 1 })
+    expect(inner.publishCalls[1].data).toEqual({ msg: 2 })
     expect(queue.queueStore.state.pending).toHaveLength(0)
     expect(queue.queueStore.state.flushed).toBe(2)
   })
@@ -327,6 +334,8 @@ describe('createOfflineQueue', () => {
     // 'first' was published before the drop; 'second' and 'third' are re-queued.
     expect(inner.publishCalls).toHaveLength(1)
     expect(queue.queueStore.state.pending).toHaveLength(2)
-    expect((queue.queueStore.state.pending[0] as { data: string }).data).toBe('second')
+    expect((queue.queueStore.state.pending[0] as { data: string }).data).toBe(
+      'second',
+    )
   })
 })

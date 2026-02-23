@@ -1,7 +1,7 @@
+import { serializeKey } from '../core/serializeKey.js'
 import type { CollectionConfig, SyncConfig } from '@tanstack/db'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
-import type { RealtimeClient, QueryKey } from '../core/types.js'
-import { serializeKey } from '../core/serializeKey.js'
+import type { QueryKey, RealtimeClient } from '../core/types.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -99,7 +99,7 @@ export interface StreamChannelDef<
 > {
   readonly id: string
   /** Resolve the serialized channel key for a given set of params. */
-  resolveChannel(params: TParams): string
+  resolveChannel: (params: TParams) => string
   readonly initial: TState
   readonly reduce: (state: TState, event: TEvent) => TState
   /** Receives post-reduce state. See `StreamChannelConfig.isDone`. */
@@ -246,7 +246,11 @@ export function streamChannelOptions<
       begin()
       write({
         type: 'insert',
-        value: { id: serializedChannel, state: currentState, status: 'pending' },
+        value: {
+          id: serializedChannel,
+          state: currentState,
+          status: 'pending',
+        },
       })
       commit()
       markReady()

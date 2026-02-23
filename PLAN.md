@@ -62,12 +62,12 @@ Queries work normally without an active WebSocket connection. They simply aren't
 
 ```typescript
 // realtime.ts
-import { createRealtimeClient } from '@tanstack/realtime-client';
+import { createRealtimeClient } from '@tanstack/realtime-client'
 
 export const realtimeClient = createRealtimeClient({
   // Defaults to same origin. Override for multi-tenant gateway.
   url: import.meta.env.VITE_REALTIME_URL,
-});
+})
 ```
 
 ```typescript
@@ -114,24 +114,27 @@ function AuthProvider({ children }) {
 ```
 
 **✅ CORRECT — connect after auth, disconnect before clearing session:**
+
 ```typescript
-await login(credentials);
-realtime.connect();
+await login(credentials)
+realtime.connect()
 ```
 
 **❌ WRONG — connecting before auth exists:**
+
 ```typescript
-realtime.connect();       // no cookie yet — connection will be rejected
-await login(credentials);
+realtime.connect() // no cookie yet — connection will be rejected
+await login(credentials)
 ```
 
 **❌ WRONG — auto-connecting on mount:**
+
 ```typescript
 // Do NOT configure the client to auto-connect.
 // The connection must be explicitly opened after auth.
 const realtimeClient = createRealtimeClient({
   autoConnect: true, // ← this option does not exist by design
-});
+})
 ```
 
 ### Reactive Queries
@@ -139,15 +142,15 @@ const realtimeClient = createRealtimeClient({
 The primary API is `useRealtimeQuery` — a thin wrapper around `useQuery` that subscribes to its own query key over the WebSocket.
 
 ```typescript
-import { useRealtimeQuery } from '@tanstack/realtime-react';
+import { useRealtimeQuery } from '@tanstack/realtime-react'
 
 function TodoList({ projectId }) {
   const { data, isLoading } = useRealtimeQuery({
     queryKey: ['todos', { projectId }],
     queryFn: () => api.getTodos(projectId),
-  });
+  })
 
-  return /* render todos */;
+  return /* render todos */
 }
 ```
 
@@ -160,17 +163,19 @@ This is the only change needed to make a query live. The hook:
 5. Unsubscribes when the component unmounts
 
 **✅ CORRECT — useRealtimeQuery has the same signature as useQuery:**
+
 ```typescript
 // Everything you can do with useQuery works with useRealtimeQuery.
 const { data, isLoading, error, refetch } = useRealtimeQuery({
   queryKey: ['todos', { projectId }],
   queryFn: () => api.getTodos(projectId),
   staleTime: 30_000,
-  select: (data) => data.filter(t => !t.completed),
-});
+  select: (data) => data.filter((t) => !t.completed),
+})
 ```
 
 **✅ CORRECT — queries work without a WebSocket connection:**
+
 ```typescript
 // If realtime is not connected (before auth, during reconnect),
 // this behaves exactly like useQuery. No errors, no degradation.
@@ -178,37 +183,42 @@ const { data, isLoading, error, refetch } = useRealtimeQuery({
 const { data } = useRealtimeQuery({
   queryKey: ['todos', { projectId }],
   queryFn: () => api.getTodos(projectId),
-});
+})
 ```
 
 **❌ WRONG — specifying channel names manually:**
+
 ```typescript
 const { data } = useRealtimeQuery({
   queryKey: ['todos', { projectId }],
   queryFn: () => api.getTodos(projectId),
   channel: 'todos:123', // ← does not exist. The query key IS the channel.
-});
+})
 ```
 
 **❌ WRONG — using useRealtimeQuery for data that doesn't need to be live:**
+
 ```typescript
 // Static reference data that never changes at runtime.
 // Just use useQuery. Don't subscribe to channels unnecessarily.
 const { data } = useRealtimeQuery({
   queryKey: ['countries'],
   queryFn: () => api.getCountries(), // ← this table changes once a year
-});
+})
 ```
 
 **❌ WRONG — expecting data payloads over the WebSocket:**
+
 ```typescript
 // The WebSocket carries invalidation signals, not data.
 // There is no onMessage callback with the new data.
 const { data } = useRealtimeQuery({
   queryKey: ['todos', { projectId }],
   queryFn: () => api.getTodos(projectId),
-  onRealtimeEvent: (newTodo) => { /* ← does not exist */ },
-});
+  onRealtimeEvent: (newTodo) => {
+    /* ← does not exist */
+  },
+})
 ```
 
 ### Granular Invalidation and Key Matching
@@ -228,26 +238,29 @@ useRealtimeQuery({ queryKey: ['todos', { projectId: '456' }], ... });
 ```
 
 **✅ CORRECT — publish at the right granularity:**
+
 ```typescript
 // Mutation affects one project's todos. Publish at the project level.
-await db.insert(todos).values(newTodo);
-await realtime.publish(['todos', { projectId }]);
+await db.insert(todos).values(newTodo)
+await realtime.publish(['todos', { projectId }])
 ```
 
 **❌ WRONG — publishing too broadly:**
+
 ```typescript
 // This invalidates ALL todo queries for ALL projects.
 // Every connected user refetches. Wasteful.
-await db.insert(todos).values(newTodo);
-await realtime.publish(['todos']);
+await db.insert(todos).values(newTodo)
+await realtime.publish(['todos'])
 ```
 
 **❌ WRONG — publishing too narrowly when multiple views need updating:**
+
 ```typescript
 // A dashboard and a list view both show todos for this project.
 // Publishing only the specific item misses the list view.
-await db.insert(todos).values(newTodo);
-await realtime.publish(['todos', { projectId, id: newTodo.id }]);
+await db.insert(todos).values(newTodo)
+await realtime.publish(['todos', { projectId, id: newTodo.id }])
 // ← the list query ['todos', { projectId }] is NOT invalidated
 ```
 
@@ -281,35 +294,39 @@ function CollaborativeEditor({ documentId }) {
 The `key` follows the same convention — it's a query key shape that identifies the channel. Presence channels and query channels are independent; subscribing to presence on `['document', { documentId }]` doesn't affect query invalidation for that key.
 
 **✅ CORRECT — presence for ephemeral, high-frequency state:**
+
 ```typescript
 const { others, updatePresence } = usePresence({
   key: ['document', { documentId }],
   initial: { cursor: null, status: 'viewing' },
-});
+})
 // Update on user action
-updatePresence({ status: 'editing' });
+updatePresence({ status: 'editing' })
 ```
 
 **✅ CORRECT — throttled updates for continuous state:**
+
 ```typescript
 // updatePresence is automatically throttled (default: 50ms).
 // Safe to call on every mousemove.
 function handleMouseMove(e) {
-  updatePresence({ cursor: { x: e.clientX, y: e.clientY } });
+  updatePresence({ cursor: { x: e.clientX, y: e.clientY } })
 }
 ```
 
 **❌ WRONG — storing persistent data in presence:**
+
 ```typescript
 // Presence is ephemeral. It disappears when the user disconnects.
 // Don't use it for data that should survive a page refresh.
 const { updatePresence } = usePresence({
   key: ['todos', { projectId }],
   initial: { newTodoText: '' }, // ← this is form state, not presence
-});
+})
 ```
 
 **❌ WRONG — using presence without a corresponding data query:**
+
 ```typescript
 // Presence tells you who else is HERE. "Here" should be defined
 // by a resource the user has authorized access to.
@@ -319,7 +336,7 @@ const { others } = usePresence({
   key: ['secret-project', { id: '123' }],
   initial: { name: 'spy' },
   // ← no useRealtimeQuery for this key means no server-side auth check
-});
+})
 ```
 
 ### Presence Lifecycle and Cleanup
@@ -330,14 +347,14 @@ When a connection drops, the server removes that user from all presence channels
 
 ```typescript
 type PresenceUser<T> = {
-  connectionId: string;
-  data: T;
-};
+  connectionId: string
+  data: T
+}
 
-const { others } = usePresence<{ cursor: { x: number, y: number } | null }>({
+const { others } = usePresence<{ cursor: { x: number; y: number } | null }>({
   key: ['document', { documentId }],
   initial: { cursor: null },
-});
+})
 
 // others: PresenceUser<{ cursor: { x: number, y: number } | null }>[]
 ```
@@ -347,26 +364,30 @@ const { others } = usePresence<{ cursor: { x: number, y: number } | null }>({
 ### Publish (TanStack Start server functions)
 
 ```typescript
-import { createServerFn } from '@tanstack/start';
-import { realtime } from './realtime.server';
-import { db } from './db';
-import { todos } from './schema';
+import { createServerFn } from '@tanstack/start'
+import { realtime } from './realtime.server'
+import { db } from './db'
+import { todos } from './schema'
 
 export const addTodo = createServerFn({ method: 'POST' })
   .validator(z.object({ projectId: z.string(), text: z.string() }))
   .handler(async ({ data }) => {
-    const newTodo = await db.insert(todos).values({
-      projectId: data.projectId,
-      text: data.text,
-    }).returning();
+    const newTodo = await db
+      .insert(todos)
+      .values({
+        projectId: data.projectId,
+        text: data.text,
+      })
+      .returning()
 
-    await realtime.publish(['todos', { projectId: data.projectId }]);
+    await realtime.publish(['todos', { projectId: data.projectId }])
 
-    return newTodo;
-  });
+    return newTodo
+  })
 ```
 
 **✅ CORRECT — publish after successful mutation:**
+
 ```typescript
 .handler(async ({ data }) => {
   const result = await db.insert(todos).values(data).returning();
@@ -376,6 +397,7 @@ export const addTodo = createServerFn({ method: 'POST' })
 ```
 
 **❌ WRONG — publishing before the mutation commits:**
+
 ```typescript
 .handler(async ({ data }) => {
   await realtime.publish(['todos', { projectId: data.projectId }]);
@@ -386,6 +408,7 @@ export const addTodo = createServerFn({ method: 'POST' })
 ```
 
 **❌ WRONG — publishing inside a transaction before commit:**
+
 ```typescript
 .handler(async ({ data }) => {
   await db.transaction(async (tx) => {
@@ -398,6 +421,7 @@ export const addTodo = createServerFn({ method: 'POST' })
 ```
 
 **✅ CORRECT — publishing after transaction commits:**
+
 ```typescript
 .handler(async ({ data }) => {
   const result = await db.transaction(async (tx) => {
@@ -410,10 +434,14 @@ export const addTodo = createServerFn({ method: 'POST' })
 ```
 
 **❌ WRONG — sending data payloads through publish:**
+
 ```typescript
 // publish() sends invalidation signals, not data.
 // There is no payload parameter.
-await realtime.publish(['todos', { projectId }], { action: 'insert', data: newTodo });
+await realtime.publish(['todos', { projectId }], {
+  action: 'insert',
+  data: newTodo,
+})
 // ← second argument does not exist
 ```
 
@@ -421,7 +449,7 @@ await realtime.publish(['todos', { projectId }], { action: 'insert', data: newTo
 
 ```typescript
 // realtime.server.ts
-import { createRealtimeServer } from '@tanstack/realtime-server';
+import { createRealtimeServer } from '@tanstack/realtime-server'
 
 export const realtime = createRealtimeServer({
   // Default: in-process EventEmitter (single instance)
@@ -429,18 +457,18 @@ export const realtime = createRealtimeServer({
   adapter: process.env.NATS_URL
     ? natsAdapter({ url: process.env.NATS_URL })
     : undefined,
-});
+})
 ```
 
 The realtime server attaches to the application's HTTP server to handle WebSocket upgrades. In TanStack Start / Nitro, this is automatic via a server plugin:
 
 ```typescript
 // server/plugins/realtime.ts
-import { realtime } from '../realtime.server';
+import { realtime } from '../realtime.server'
 
 export default defineNitroPlugin((nitro) => {
-  realtime.attach(nitro);
-});
+  realtime.attach(nitro)
+})
 ```
 
 ### Cookie Verification
@@ -452,30 +480,32 @@ export const realtime = createRealtimeServer({
   authenticate: async (request) => {
     // Extract and verify session from cookie.
     // Return a user identifier or null to reject.
-    const session = await getSession(request);
-    if (!session) return null;
-    return { userId: session.userId };
+    const session = await getSession(request)
+    if (!session) return null
+    return { userId: session.userId }
   },
-});
+})
 ```
 
 **✅ CORRECT — authenticate returns user context:**
+
 ```typescript
 authenticate: async (request) => {
-  const session = await auth.getSession(request);
-  if (!session) return null;
-  return { userId: session.userId };
+  const session = await auth.getSession(request)
+  if (!session) return null
+  return { userId: session.userId }
 }
 ```
 
 **❌ WRONG — skipping authentication:**
+
 ```typescript
 // Every WebSocket connection must be authenticated.
 // An unauthenticated connection can subscribe to any key
 // and receive invalidation signals, which leak information
 // about when data changes even if the data itself isn't sent.
 authenticate: async () => {
-  return { userId: 'anonymous' }; // ← don't do this
+  return { userId: 'anonymous' } // ← don't do this
 }
 ```
 
@@ -486,26 +516,39 @@ A single multiplexed WebSocket connection carries all messages. Messages are JSO
 ### Client → Server
 
 **Subscribe to query invalidation:**
+
 ```json
 { "type": "subscribe", "key": "[\"todos\",{\"projectId\":\"123\"}]" }
 ```
 
 **Unsubscribe from query invalidation:**
+
 ```json
 { "type": "unsubscribe", "key": "[\"todos\",{\"projectId\":\"123\"}]" }
 ```
 
 **Join presence channel:**
+
 ```json
-{ "type": "presence:join", "key": "[\"document\",{\"documentId\":\"456\"}]", "data": { "cursor": null, "name": "Alice" } }
+{
+  "type": "presence:join",
+  "key": "[\"document\",{\"documentId\":\"456\"}]",
+  "data": { "cursor": null, "name": "Alice" }
+}
 ```
 
 **Update presence:**
+
 ```json
-{ "type": "presence:update", "key": "[\"document\",{\"documentId\":\"456\"}]", "data": { "cursor": { "x": 100, "y": 200 } } }
+{
+  "type": "presence:update",
+  "key": "[\"document\",{\"documentId\":\"456\"}]",
+  "data": { "cursor": { "x": 100, "y": 200 } }
+}
 ```
 
 **Leave presence channel:**
+
 ```json
 { "type": "presence:leave", "key": "[\"document\",{\"documentId\":\"456\"}]" }
 ```
@@ -513,31 +556,57 @@ A single multiplexed WebSocket connection carries all messages. Messages are JSO
 ### Server → Client
 
 **Invalidation signal:**
+
 ```json
 { "type": "invalidate", "key": "[\"todos\",{\"projectId\":\"123\"}]" }
 ```
 
 **Presence: user joined:**
+
 ```json
-{ "type": "presence:join", "key": "[\"document\",{\"documentId\":\"456\"}]", "connectionId": "abc", "data": { "cursor": null, "name": "Bob" } }
+{
+  "type": "presence:join",
+  "key": "[\"document\",{\"documentId\":\"456\"}]",
+  "connectionId": "abc",
+  "data": { "cursor": null, "name": "Bob" }
+}
 ```
 
 **Presence: user updated:**
+
 ```json
-{ "type": "presence:update", "key": "[\"document\",{\"documentId\":\"456\"}]", "connectionId": "abc", "data": { "cursor": { "x": 150, "y": 250 } } }
+{
+  "type": "presence:update",
+  "key": "[\"document\",{\"documentId\":\"456\"}]",
+  "connectionId": "abc",
+  "data": { "cursor": { "x": 150, "y": 250 } }
+}
 ```
 
 **Presence: user left:**
+
 ```json
-{ "type": "presence:leave", "key": "[\"document\",{\"documentId\":\"456\"}]", "connectionId": "abc" }
+{
+  "type": "presence:leave",
+  "key": "[\"document\",{\"documentId\":\"456\"}]",
+  "connectionId": "abc"
+}
 ```
 
 **Presence: full sync (sent on join to provide current state):**
+
 ```json
-{ "type": "presence:sync", "key": "[\"document\",{\"documentId\":\"456\"}]", "users": [
-  { "connectionId": "abc", "data": { "cursor": { "x": 150, "y": 250 }, "name": "Bob" } },
-  { "connectionId": "def", "data": { "cursor": null, "name": "Carol" } }
-] }
+{
+  "type": "presence:sync",
+  "key": "[\"document\",{\"documentId\":\"456\"}]",
+  "users": [
+    {
+      "connectionId": "abc",
+      "data": { "cursor": { "x": 150, "y": 250 }, "name": "Bob" }
+    },
+    { "connectionId": "def", "data": { "cursor": null, "name": "Carol" } }
+  ]
+}
 ```
 
 ### Key Serialization
@@ -558,6 +627,7 @@ When the WebSocket disconnects unexpectedly:
 4. Presence channels receive a full `presence:sync` on rejoin
 
 **✅ CORRECT — the library handles reconnection automatically:**
+
 ```typescript
 // No reconnection logic needed in application code.
 // useRealtimeQuery hooks remain mounted, the library handles
@@ -565,11 +635,12 @@ When the WebSocket disconnects unexpectedly:
 ```
 
 **❌ WRONG — manually managing reconnection:**
+
 ```typescript
 // Don't do this. The library manages the connection.
 realtimeClient.on('disconnect', () => {
-  setTimeout(() => realtimeClient.connect(), 1000);
-});
+  setTimeout(() => realtimeClient.connect(), 1000)
+})
 ```
 
 ### Window Focus
@@ -577,17 +648,17 @@ realtimeClient.on('disconnect', () => {
 When the window regains focus after being backgrounded:
 
 1. The library checks if the WebSocket is still alive (ping/pong)
-When the window regains focus after being backgrounded:
-The library checks if the WebSocket is still alive (ping/pong)
-If dead, triggers reconnection flow above
-If alive, invalidates all active realtime queries (since events may have been missed while throttled in background)
-This integrates with TanStack Query's existing refetchOnWindowFocus behavior. When both are enabled, Realtime defers to Query's focus handler to avoid double-refetching.
-Explicit Lifecycle
-const realtime = useRealtime();
+   When the window regains focus after being backgrounded:
+   The library checks if the WebSocket is still alive (ping/pong)
+   If dead, triggers reconnection flow above
+   If alive, invalidates all active realtime queries (since events may have been missed while throttled in background)
+   This integrates with TanStack Query's existing refetchOnWindowFocus behavior. When both are enabled, Realtime defers to Query's focus handler to avoid double-refetching.
+   Explicit Lifecycle
+   const realtime = useRealtime();
 
-realtime.connect();          // open WebSocket
-realtime.disconnect();       // close WebSocket, clear subscriptions
-realtime.status;             // 'connecting' | 'connected' | 'disconnected' | 'reconnecting'
+realtime.connect(); // open WebSocket
+realtime.disconnect(); // close WebSocket, clear subscriptions
+realtime.status; // 'connecting' | 'connected' | 'disconnected' | 'reconnecting'
 State transitions:
 disconnected → connect() → connecting → connected
 connected → disconnect() → disconnected
@@ -595,27 +666,27 @@ connected → unexpected close → reconnecting → connected
 connected → disconnect() during reconnecting → disconnected
 Hooks observe status reactively:
 function ConnectionStatus() {
-  const { status } = useRealtime();
-  if (status === 'connected') return null;
-  return <Banner>Reconnecting...</Banner>;
+const { status } = useRealtime();
+if (status === 'connected') return null;
+return <Banner>Reconnecting...</Banner>;
 }
 Adapter Interface
 The default adapter is an in-process EventEmitter. For multi-instance deployments, a pluggable adapter distributes messages across processes.
 interface RealtimeAdapter {
-  // Publish an invalidation signal to all instances
-  publish(serializedKey: string): Promise<void>;
+// Publish an invalidation signal to all instances
+publish(serializedKey: string): Promise<void>;
 
-  // Subscribe to invalidation signals from other instances
-  subscribe(callback: (serializedKey: string) => void): Promise<void>;
+// Subscribe to invalidation signals from other instances
+subscribe(callback: (serializedKey: string) => void): Promise<void>;
 
-  // Publish presence update to all instances
-  publishPresence(channel: string, event: PresenceEvent): Promise<void>;
+// Publish presence update to all instances
+publishPresence(channel: string, event: PresenceEvent): Promise<void>;
 
-  // Subscribe to presence events from other instances
-  subscribePresence(callback: (channel: string, event: PresenceEvent) => void): Promise<void>;
+// Subscribe to presence events from other instances
+subscribePresence(callback: (channel: string, event: PresenceEvent) => void): Promise<void>;
 
-  // Cleanup
-  close(): Promise<void>;
+// Cleanup
+close(): Promise<void>;
 }
 Built-in adapters:
 memoryAdapter() — default, in-process, single instance
@@ -625,7 +696,7 @@ natsAdapter({ url }) — NATS pub/sub for multi-instance
 const realtime = createRealtimeServer();
 ✅ CORRECT — multi-instance (production):
 const realtime = createRealtimeServer({
-  adapter: natsAdapter({ url: process.env.NATS_URL }),
+adapter: natsAdapter({ url: process.env.NATS_URL }),
 });
 ❌ WRONG — using memory adapter with multiple instances:
 // Two app instances behind a load balancer.
@@ -636,32 +707,32 @@ const realtime = createRealtimeServer({
 Deployment Models
 Single process (export / self-host)
 ┌─────────────────────────────────┐
-│ Node/Bun process                │
-│  HTTP server + WebSocket server │
-│  TanStack Start (server fns)    │
-│  In-memory adapter              │
+│ Node/Bun process │
+│ HTTP server + WebSocket server │
+│ TanStack Start (server fns) │
+│ In-memory adapter │
 └──────────────┬──────────────────┘
-               │
-          ┌────┴────┐
-          │ Postgres │
-          └─────────┘
+│
+┌────┴────┐
+│ Postgres │
+└─────────┘
 Everything runs in one process. No external dependencies beyond Postgres. The docker-compose file has no realtime service — it's the app.
 Multi-tenant platform (Lovable)
-┌──────────────┐    ┌──────────────┐
-│ WS Gateway 1 │    │ WS Gateway 2 │   (stateless, holds connections)
-└──────┬───────┘    └──────┬───────┘
-       │                   │
-       └─────────┬─────────┘
-                 │
-            ┌────┴────┐
-            │  NATS    │                (fan-out across gateways)
-            └────┬────┘
-                 │
-    ┌────────────┼────────────┐
-    │            │            │
-┌───┴───┐  ┌───┴───┐  ┌───┴───┐
-│Worker1│  │Worker2│  │Worker3│     (server fns, publish to NATS)
-└───────┘  └───────┘  └───────┘
+┌──────────────┐ ┌──────────────┐
+│ WS Gateway 1 │ │ WS Gateway 2 │ (stateless, holds connections)
+└──────┬───────┘ └──────┬───────┘
+│ │
+└─────────┬─────────┘
+│
+┌────┴────┐
+│ NATS │ (fan-out across gateways)
+└────┬────┘
+│
+┌────────────┼────────────┐
+│ │ │
+┌───┴───┐ ┌───┴───┐ ┌───┴───┐
+│Worker1│ │Worker2│ │Worker3│ (server fns, publish to NATS)
+└───────┘ └───────┘ └───────┘
 Workers (server functions) publish to NATS. Gateways subscribe to NATS and fan out to connected WebSocket clients. The generated application code is identical in both models — the adapter config is the only difference.
 What This Library Is Not
 Not a database change stream. It doesn't watch the Postgres WAL. Invalidation happens explicitly in server functions. If data changes through a direct SQL session or migration, connected clients won't know. This is a deliberate tradeoff for simplicity and portability.

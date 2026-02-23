@@ -1,5 +1,5 @@
-import type { QueryKey } from '../core/types.js'
 import { serializeKey } from '../core/serializeKey.js'
+import type { QueryKey } from '../core/types.js'
 
 export interface PresenceChannelConfig<
   TParams extends Record<string, unknown> = Record<string, unknown>,
@@ -23,7 +23,7 @@ export interface PresenceChannelDef<
 > {
   readonly id: string
   /** Resolve the serialized channel key for a given set of params. */
-  resolveChannel(params: TParams): string
+  resolveChannel: (params: TParams) => string
 }
 
 /**

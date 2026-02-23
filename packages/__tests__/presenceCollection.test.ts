@@ -13,10 +13,18 @@
  *  - cleanup: unsubscribes on stop, stopped flag prevents post-stop callbacks
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Store } from '@tanstack/store'
-import { presenceChannelOptions, createRealtimeClient } from '@tanstack/realtime'
-import type { PresenceUser, RealtimeTransport, PresenceCapable, ConnectionStatus } from '@tanstack/realtime'
+import {
+  createRealtimeClient,
+  presenceChannelOptions,
+} from '@tanstack/realtime'
+import type {
+  ConnectionStatus,
+  PresenceCapable,
+  PresenceUser,
+  RealtimeTransport,
+} from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Mock transport with controllable presence events
@@ -24,7 +32,10 @@ import type { PresenceUser, RealtimeTransport, PresenceCapable, ConnectionStatus
 
 function createMockTransport(): (RealtimeTransport & PresenceCapable) & {
   triggerPresence: (channel: string, users: ReadonlyArray<PresenceUser>) => void
-  presenceListeners: Map<string, Set<(users: ReadonlyArray<PresenceUser>) => void>>
+  presenceListeners: Map<
+    string,
+    Set<(users: ReadonlyArray<PresenceUser>) => void>
+  >
 } {
   const presenceListeners = new Map<
     string,
@@ -45,7 +56,8 @@ function createMockTransport(): (RealtimeTransport & PresenceCapable) & {
     updatePresence() {},
     leavePresence() {},
     onPresenceChange(channel, cb) {
-      if (!presenceListeners.has(channel)) presenceListeners.set(channel, new Set())
+      if (!presenceListeners.has(channel))
+        presenceListeners.set(channel, new Set())
       presenceListeners.get(channel)!.add(cb)
       return () => {
         presenceListeners.get(channel)?.delete(cb)
@@ -66,17 +78,16 @@ type UserData = { name: string; avatar: string }
 type WriteOp = { type: string; value?: unknown; key?: unknown }
 
 function driveSync(config: ReturnType<typeof presenceChannelOptions>): {
-  ops: WriteOp[]
+  ops: Array<WriteOp>
   stop: () => void
 } {
-  const ops: WriteOp[] = []
-  const stop =
-    config.sync!.sync({
-      begin: (_opts?: unknown) => {},
-      write: (op: WriteOp) => ops.push(op),
-      commit: () => {},
-      markReady: () => {},
-    }) ?? (() => {})
+  const ops: Array<WriteOp> = []
+  const stop = config.sync.sync({
+    begin: (_opts?: unknown) => {},
+    write: (op: WriteOp) => ops.push(op),
+    commit: () => {},
+    markReady: () => {},
+  })
   return { ops, stop }
 }
 
@@ -95,7 +106,10 @@ describe('presenceChannelOptions — collection id', () => {
   it('uses default id derived from QueryKey array', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
-    const config = presenceChannelOptions({ client, channel: ['room', { id: '123' }] })
+    const config = presenceChannelOptions({
+      client,
+      channel: ['room', { id: '123' }],
+    })
     // Should start with 'presence:' and contain the serialized channel.
     expect(config.id).toMatch(/^presence:/)
     expect(config.id).toContain('room')
@@ -104,7 +118,11 @@ describe('presenceChannelOptions — collection id', () => {
   it('respects a custom id', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
-    const config = presenceChannelOptions({ client, channel: 'ch', id: 'my-viewers' })
+    const config = presenceChannelOptions({
+      client,
+      channel: 'ch',
+      id: 'my-viewers',
+    })
     expect(config.id).toBe('my-viewers')
   })
 })
@@ -135,8 +153,14 @@ describe('presenceChannelOptions — sync write operations', () => {
     ])
 
     expect(ops).toHaveLength(2)
-    expect(ops[0]).toMatchObject({ type: 'insert', value: { connectionId: 'c1' } })
-    expect(ops[1]).toMatchObject({ type: 'insert', value: { connectionId: 'c2' } })
+    expect(ops[0]).toMatchObject({
+      type: 'insert',
+      value: { connectionId: 'c1' },
+    })
+    expect(ops[1]).toMatchObject({
+      type: 'insert',
+      value: { connectionId: 'c2' },
+    })
     stop()
   })
 
@@ -224,7 +248,7 @@ describe('presenceChannelOptions — sync write operations', () => {
     // Alice updates, Bob leaves, Carol joins.
     transport.triggerPresence('ch', [
       { connectionId: 'c1', data: { name: 'Alice *', avatar: 'a.png' } }, // update
-      { connectionId: 'c3', data: { name: 'Carol', avatar: 'c.png' } },   // insert
+      { connectionId: 'c3', data: { name: 'Carol', avatar: 'c.png' } }, // insert
       // c2 is absent → delete
     ])
 
@@ -232,10 +256,16 @@ describe('presenceChannelOptions — sync write operations', () => {
     expect(types).toEqual(['delete', 'insert', 'update'])
 
     const insertOp = ops.find((o) => o.type === 'insert')
-    expect(insertOp).toMatchObject({ type: 'insert', value: { connectionId: 'c3' } })
+    expect(insertOp).toMatchObject({
+      type: 'insert',
+      value: { connectionId: 'c3' },
+    })
 
     const updateOp = ops.find((o) => o.type === 'update')
-    expect(updateOp).toMatchObject({ type: 'update', value: { connectionId: 'c1' } })
+    expect(updateOp).toMatchObject({
+      type: 'update',
+      value: { connectionId: 'c1' },
+    })
 
     const deleteOp = ops.find((o) => o.type === 'delete')
     expect(deleteOp).toMatchObject({ type: 'delete', key: 'c2' })
@@ -249,7 +279,9 @@ describe('presenceChannelOptions — sync write operations', () => {
     const config = presenceChannelOptions<UserData>({ client, channel: 'ch' })
     const { ops, stop } = driveSync(config)
 
-    const users = [{ connectionId: 'c1', data: { name: 'Alice', avatar: 'a.png' } }]
+    const users = [
+      { connectionId: 'c1', data: { name: 'Alice', avatar: 'a.png' } },
+    ]
 
     transport.triggerPresence('ch', users)
     ops.length = 0
@@ -278,7 +310,9 @@ describe('presenceChannelOptions — cleanup', () => {
     stop()
 
     // After stop, presence callbacks should not fire.
-    transport.triggerPresence('ch', [{ connectionId: 'c1', data: { name: 'X', avatar: '' } }])
+    transport.triggerPresence('ch', [
+      { connectionId: 'c1', data: { name: 'X', avatar: '' } },
+    ])
     expect(ops).toHaveLength(0)
   })
 
@@ -307,7 +341,7 @@ describe('presenceChannelOptions — channel serialization', () => {
     // Find the actual channel the transport registered listeners on.
     const registeredChannels = Array.from(transport.presenceListeners.keys())
     expect(registeredChannels).toHaveLength(1)
-    const serializedChannel = registeredChannels[0]!
+    const serializedChannel = registeredChannels[0]
 
     // Emitting to the serialized channel delivers data.
     transport.triggerPresence(serializedChannel, [
@@ -325,13 +359,12 @@ describe('presenceChannelOptions — markReady called', () => {
     const config = presenceChannelOptions<UserData>({ client, channel: 'ch' })
 
     const markReady = vi.fn()
-    const stop =
-      config.sync!.sync({
-        begin: () => {},
-        write: () => {},
-        commit: () => {},
-        markReady,
-      }) ?? (() => {})
+    const stop = config.sync.sync({
+      begin: () => {},
+      write: () => {},
+      commit: () => {},
+      markReady,
+    })
 
     expect(markReady).toHaveBeenCalledTimes(1)
     stop()

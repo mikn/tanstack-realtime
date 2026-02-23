@@ -1,5 +1,5 @@
-import type { QueryKey } from '../core/types.js'
 import { serializeKey } from '../core/serializeKey.js'
+import type { QueryKey } from '../core/types.js'
 
 export interface SyncedCounterConfig<
   TParams extends Record<string, unknown> = Record<string, unknown>,
@@ -22,7 +22,7 @@ export interface SyncedCounterDef<
   TParams extends Record<string, unknown> = Record<string, unknown>,
 > {
   readonly id: string
-  resolveChannel(params: TParams): string
+  resolveChannel: (params: TParams) => string
 }
 
 /**

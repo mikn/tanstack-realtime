@@ -8,12 +8,12 @@
 
 ## Packages
 
-| Package | Description |
-|---|---|
-| [`@tanstack/realtime`](#tanstackrealtime) | Core client, live collection helpers, and type definitions |
-| [`@tanstack/react-realtime`](#tanstackreact-realtime) | React hooks and provider (`useSubscribe`, `usePresence`, `usePublish`, `useRealtime`) |
-| [`@tanstack/realtime-preset-node`](#tanstackrealtime-preset-node) | WebSocket transport + Node.js server for local dev and self-hosted deployments |
-| [`@tanstack/realtime-preset-workerd`](#tanstackrealtime-preset-workerd) | Cloudflare Workers transport + Durable Object server for edge deployments |
+| Package                                                                 | Description                                                                           |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| [`@tanstack/realtime`](#tanstackrealtime)                               | Core client, live collection helpers, and type definitions                            |
+| [`@tanstack/react-realtime`](#tanstackreact-realtime)                   | React hooks and provider (`useSubscribe`, `usePresence`, `usePublish`, `useRealtime`) |
+| [`@tanstack/realtime-preset-node`](#tanstackrealtime-preset-node)       | WebSocket transport + Node.js server for local dev and self-hosted deployments        |
+| [`@tanstack/realtime-preset-workerd`](#tanstackrealtime-preset-workerd) | Cloudflare Workers transport + Durable Object server for edge deployments             |
 
 ---
 
@@ -77,7 +77,13 @@ function Chat({ roomId }: { roomId: string }) {
     setMessages((prev) => [...prev, String(msg)])
   })
 
-  return <ul>{messages.map((m, i) => <li key={i}>{m}</li>)}</ul>
+  return (
+    <ul>
+      {messages.map((m, i) => (
+        <li key={i}>{m}</li>
+      ))}
+    </ul>
+  )
 }
 ```
 
@@ -97,15 +103,27 @@ import { presenceChannel, usePresence } from '@tanstack/react-realtime'
 
 const editorPresence = presenceChannel<{ documentId: string }>()
 
-function Editor({ documentId, userName }: { documentId: string; userName: string }) {
+function Editor({
+  documentId,
+  userName,
+}: {
+  documentId: string
+  userName: string
+}) {
   const { others, updatePresence } = usePresence(editorPresence, {
     params: { documentId },
     initial: { cursor: null, name: userName },
   })
 
   return (
-    <div onMouseMove={(e) => updatePresence({ cursor: { x: e.clientX, y: e.clientY } })}>
-      {others.map((u) => <Cursor key={u.connectionId} user={u} />)}
+    <div
+      onMouseMove={(e) =>
+        updatePresence({ cursor: { x: e.clientX, y: e.clientY } })
+      }
+    >
+      {others.map((u) => (
+        <Cursor key={u.connectionId} user={u} />
+      ))}
     </div>
   )
 }
@@ -123,12 +141,12 @@ function StatusBar() {
 
 ### Hooks
 
-| Hook | Description |
-|---|---|
-| `useSubscribe(channel, onMessage)` | Subscribe to a channel; callback fires on every message |
-| `usePublish(channel)` | Returns a stable publish function for a channel |
+| Hook                               | Description                                                  |
+| ---------------------------------- | ------------------------------------------------------------ |
+| `useSubscribe(channel, onMessage)` | Subscribe to a channel; callback fires on every message      |
+| `usePublish(channel)`              | Returns a stable publish function for a channel              |
 | `usePresence(channelDef, options)` | Join a presence channel; returns `others` + `updatePresence` |
-| `useRealtime()` | Returns `{ status, connect, disconnect, client }` |
+| `useRealtime()`                    | Returns `{ status, connect, disconnect, client }`            |
 
 ---
 
@@ -180,7 +198,7 @@ import { nodeTransport } from '@tanstack/realtime-preset-node'
 
 export const client = createRealtimeClient({
   transport: nodeTransport({
-    url: 'ws://localhost:3000',  // Omit in a browser — derived from window.location
+    url: 'ws://localhost:3000', // Omit in a browser — derived from window.location
     path: '/_realtime',
   }),
 })

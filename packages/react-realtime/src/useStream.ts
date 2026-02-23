@@ -1,6 +1,6 @@
 import { use, useEffect, useRef, useState } from 'react'
-import type { StreamChannelDef, StreamStatus } from '@tanstack/realtime'
 import { RealtimeContext } from './context.js'
+import type { StreamChannelDef, StreamStatus } from '@tanstack/realtime'
 
 export interface UseStreamOptions<
   TParams extends Record<string, unknown> = Record<string, unknown>,

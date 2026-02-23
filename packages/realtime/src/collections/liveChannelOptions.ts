@@ -1,7 +1,7 @@
+import { serializeKey } from '../core/serializeKey.js'
 import type { CollectionConfig, SyncConfig } from '@tanstack/db'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
-import type { RealtimeClient, QueryKey } from '../core/types.js'
-import { serializeKey } from '../core/serializeKey.js'
+import type { QueryKey, RealtimeClient } from '../core/types.js'
 
 export interface LiveChannelConfig<
   T extends object = Record<string, unknown>,
@@ -25,7 +25,7 @@ export interface LiveChannelConfig<
    * Optional. Load historical data on mount (e.g. chat history).
    * The promise resolves to an array of rows to pre-populate the collection.
    */
-  initialData?: () => Promise<T[]>
+  initialData?: () => Promise<Array<T>>
   /**
    * Called for every channel event. Return the row to insert into the
    * collection, or `null` / `undefined` to ignore the event.
@@ -78,7 +78,7 @@ export function liveChannelOptions<
       // that history always precedes live events in the collection.  Without
       // this, a message arriving 1 ms before the history fetch completes would
       // appear *before* older messages loaded from the server.
-      const pending: unknown[] = []
+      const pending: Array<unknown> = []
       let initialized = !initialData // true immediately when there is no history
 
       // Subscribe to incoming channel events.
@@ -122,7 +122,7 @@ export function liveChannelOptions<
             // Replay buffered events even when history loading failed so
             // live data is not silently dropped.
             for (const raw of pending) {
-              if (stopped) break
+              if (stopped as boolean) break
               const row = onEvent(raw)
               if (row == null) continue
               begin({ immediate: true })

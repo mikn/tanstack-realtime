@@ -1,10 +1,10 @@
 import { use, useEffect, useRef } from 'react'
 import { createCollection } from '@tanstack/db'
 import { realtimeCollectionOptions } from '@tanstack/realtime'
+import { RealtimeContext } from './context.js'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { Collection } from '@tanstack/db'
 import type { RealtimeCollectionConfig } from '@tanstack/realtime'
-import { RealtimeContext } from './context.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -61,9 +61,7 @@ export function useRealtimeCollection<
   T extends object = Record<string, unknown>,
   TKey extends string | number = string,
   TSchema extends StandardSchemaV1 = StandardSchemaV1,
->(
-  config: UseRealtimeCollectionConfig<T, TKey, TSchema>,
-): Collection<T, TKey> {
+>(config: UseRealtimeCollectionConfig<T, TKey, TSchema>): Collection<T, TKey> {
   const client = use(RealtimeContext)
   if (!client) {
     throw new Error(

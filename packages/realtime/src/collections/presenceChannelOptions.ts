@@ -1,7 +1,7 @@
+import { serializeKey } from '../core/serializeKey.js'
 import type { CollectionConfig, SyncConfig } from '@tanstack/db'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
-import type { RealtimeClient, PresenceUser, QueryKey } from '../core/types.js'
-import { serializeKey } from '../core/serializeKey.js'
+import type { PresenceUser, QueryKey, RealtimeClient } from '../core/types.js'
 
 // ---------------------------------------------------------------------------
 // Types

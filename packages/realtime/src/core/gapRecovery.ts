@@ -8,12 +8,12 @@
  * every active channel so the application can re-fetch missed data.
  */
 
+import { hasPresence } from './types.js'
 import type {
-  RealtimeTransport,
   PresenceCapable,
   PresenceUser,
+  RealtimeTransport,
 } from './types.js'
-import { hasPresence } from './types.js'
 
 // ---------------------------------------------------------------------------
 // Types

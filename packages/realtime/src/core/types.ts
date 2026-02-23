@@ -66,13 +66,13 @@ export interface RealtimeTransport {
    * If a reconnect cycle is already in progress, returns a Promise that
    * settles once it completes rather than opening a second socket.
    */
-  connect(): Promise<void>
+  connect: () => Promise<void>
 
   /**
    * Close the connection immediately. No automatic reconnect will occur.
    * Calling `connect()` again after this starts a fresh connection.
    */
-  disconnect(): void
+  disconnect: () => void
 
   /**
    * Subscribe to messages on `channel`. Returns an unsubscribe function.
@@ -86,13 +86,13 @@ export interface RealtimeTransport {
    * listener for a channel is removed the transport sends `unsubscribe` to
    * the server.
    */
-  subscribe(channel: string, onMessage: (data: unknown) => void): () => void
+  subscribe: (channel: string, onMessage: (data: unknown) => void) => () => void
 
   /**
    * Publish `data` to `channel`.
    * Silently dropped if the transport is not currently connected.
    */
-  publish(channel: string, data: unknown): Promise<void>
+  publish: (channel: string, data: unknown) => Promise<void>
 
   /** TanStack Store holding the current connection status. */
   readonly store: Store<ConnectionStatus>
@@ -122,21 +122,21 @@ export interface PresenceCapable {
    * Requires the channel to have been subscribed first — the server silently
    * drops `presence:join` from connections that are not authorized on this channel.
    */
-  joinPresence(channel: string, data: unknown): void
+  joinPresence: (channel: string, data: unknown) => void
 
   /**
    * Merge `data` into the current user's stored presence state and broadcast
    * the updated list to all members of `channel`.
    * Only the supplied fields are updated; all others are preserved.
    */
-  updatePresence(channel: string, data: unknown): void
+  updatePresence: (channel: string, data: unknown) => void
 
   /**
    * Leave the presence set for `channel`.
    * The server removes this connection from the member list and broadcasts
    * the updated list to all remaining members.
    */
-  leavePresence(channel: string): void
+  leavePresence: (channel: string) => void
 
   /**
    * Subscribe to presence changes on `channel`. Returns an unsubscribe fn.
@@ -145,10 +145,10 @@ export interface PresenceCapable {
    * whenever the presence set changes. The calling connection is always
    * excluded from the list.
    */
-  onPresenceChange(
+  onPresenceChange: (
     channel: string,
     callback: (users: ReadonlyArray<PresenceUser>) => void,
-  ): () => void
+  ) => () => void
 }
 
 /**
@@ -171,7 +171,9 @@ export interface PresenceCapable {
 export function hasPresence(
   transport: RealtimeTransport,
 ): transport is RealtimeTransport & PresenceCapable {
-  return typeof (transport as Partial<PresenceCapable>).joinPresence === 'function'
+  return (
+    typeof (transport as Partial<PresenceCapable>).joinPresence === 'function'
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -217,13 +219,13 @@ export interface RealtimeClient {
    * called, making the client safe to reconnect after teardown (e.g. in
    * React Strict Mode where effects fire twice).
    */
-  connect(): Promise<void>
+  connect: () => Promise<void>
 
   /**
    * Close the connection. No reconnect will be attempted.
    * Collections stop receiving live updates until `connect()` is called again.
    */
-  disconnect(): void
+  disconnect: () => void
 
   /**
    * Release the internal status-store subscription.
@@ -236,21 +238,21 @@ export interface RealtimeClient {
    * the provider will call `destroy()` for you on unmount. It is safe to
    * reconnect the same client instance after `destroy()`.
    */
-  destroy(): void
+  destroy: () => void
 
   /**
    * Subscribe to a serialized channel string. Returns an unsubscribe function.
    * Prefer `realtimeCollectionOptions` or `liveChannelOptions` for
    * collection-backed subscriptions.
    */
-  subscribe(channel: string, onMessage: (data: unknown) => void): () => void
+  subscribe: (channel: string, onMessage: (data: unknown) => void) => () => void
 
   /**
    * Publish `data` to a channel.
    * Accepts either a pre-serialized channel string or a `QueryKey` array
    * (which is serialized via `serializeKey` before sending).
    */
-  publish(key: QueryKey | string, data: unknown): Promise<void>
+  publish: (key: QueryKey | string, data: unknown) => Promise<void>
 
   /**
    * Join the presence set for `channel` with the given `data`.
@@ -259,7 +261,7 @@ export interface RealtimeClient {
    *
    * @throws {Error} if the underlying transport does not implement {@link PresenceCapable}.
    */
-  joinPresence(channel: string, data: unknown): void
+  joinPresence: (channel: string, data: unknown) => void
 
   /**
    * Merge `data` into the current user's stored presence state for `channel`.
@@ -267,7 +269,7 @@ export interface RealtimeClient {
    *
    * @throws {Error} if the underlying transport does not implement {@link PresenceCapable}.
    */
-  updatePresence(channel: string, data: unknown): void
+  updatePresence: (channel: string, data: unknown) => void
 
   /**
    * Leave the presence set for `channel`.
@@ -276,7 +278,7 @@ export interface RealtimeClient {
    *
    * @throws {Error} if the underlying transport does not implement {@link PresenceCapable}.
    */
-  leavePresence(channel: string): void
+  leavePresence: (channel: string) => void
 
   /**
    * Subscribe to presence changes on `channel`. Returns an unsubscribe fn.
@@ -285,8 +287,8 @@ export interface RealtimeClient {
    *
    * @throws {Error} if the underlying transport does not implement {@link PresenceCapable}.
    */
-  onPresenceChange(
+  onPresenceChange: (
     channel: string,
     callback: (users: ReadonlyArray<PresenceUser>) => void,
-  ): () => void
+  ) => () => void
 }

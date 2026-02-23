@@ -29,16 +29,16 @@ export interface DeduplicationFilter {
    * Returns `true` if `id` has already been seen on `channel` (duplicate).
    * Returns `false` and records the ID if it is new.
    */
-  seen(channel: string, id: string): boolean
+  seen: (channel: string, id: string) => boolean
 
   /** Remove all tracked IDs for a specific channel. */
-  resetChannel(channel: string): void
+  resetChannel: (channel: string) => void
 
   /** Remove all tracked IDs across all channels. */
-  reset(): void
+  reset: () => void
 
   /** Number of IDs currently tracked for a channel (for testing). */
-  size(channel: string): number
+  size: (channel: string) => number
 }
 
 // ---------------------------------------------------------------------------

@@ -8,18 +8,22 @@
  * the actual wire protocol without any mocking.
  */
 
-import { createServer } from 'http'
-import type { Server } from 'http'
+import { createServer } from 'node:http'
 import {
-  serializeKey,
-  parseChannel,
   createRealtimeClient,
-  realtimeCollectionOptions,
   liveChannelOptions,
+  parseChannel,
+  realtimeCollectionOptions,
+  serializeKey,
 } from '@tanstack/realtime'
-import type { ParsedChannel, PresenceUser, RealtimeClient } from '@tanstack/realtime'
-import type { ChannelPermissions } from '@tanstack/realtime'
 import { createNodeServer, nodeTransport } from '@tanstack/realtime-preset-node'
+import type { Server } from 'node:http'
+import type {
+  ChannelPermissions,
+  ParsedChannel,
+  PresenceUser,
+  RealtimeClient,
+} from '@tanstack/realtime'
 import type { NodeServer } from '@tanstack/realtime-preset-node'
 
 // ---------------------------------------------------------------------------
@@ -84,10 +88,7 @@ function waitFor(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-function nextStatus(
-  client: RealtimeClient,
-  target: string,
-): Promise<string> {
+function nextStatus(client: RealtimeClient, target: string): Promise<string> {
   if (client.store.get().status === target) return Promise.resolve(target)
   return new Promise((resolve) => {
     const sub = client.store.subscribe((state) => {
@@ -211,7 +212,11 @@ describe('Connection lifecycle', () => {
     const httpServer2 = createServer()
     const nodeServer2 = createNodeServer({
       getUser: async () => null,
-      authorize: async () => ({ subscribe: true, publish: true, presence: true }),
+      authorize: async () => ({
+        subscribe: true,
+        publish: true,
+        presence: true,
+      }),
     })
     nodeServer2.attach(httpServer2)
     await new Promise<void>((resolve) => httpServer2.listen(0, resolve))
@@ -220,6 +225,7 @@ describe('Connection lifecycle', () => {
     const rejectClient = connectClient(port2)
     rejectClient.connect()
     await nextStatus(rejectClient, 'reconnecting')
+    expect(rejectClient.store.get().status).toBe('reconnecting')
     rejectClient.disconnect()
 
     await nodeServer2.close()
@@ -261,7 +267,10 @@ describe('Publish / Subscribe', () => {
     })
 
     await waitFor(30) // let subscribe message reach server
-    harness.nodeServer.publish(channel, { action: 'insert', data: { id: '1', text: 'hello' } })
+    harness.nodeServer.publish(channel, {
+      action: 'insert',
+      data: { id: '1', text: 'hello' },
+    })
 
     const msg = await received
     expect(msg).toEqual({ action: 'insert', data: { id: '1', text: 'hello' } })
@@ -275,10 +284,16 @@ describe('Publish / Subscribe', () => {
     const channel = serializeKey(['shared', { room: 'main' }])
 
     const r1 = new Promise<unknown>((resolve) => {
-      const unsub = client.subscribe(channel, (d) => { unsub(); resolve(d) })
+      const unsub = client.subscribe(channel, (d) => {
+        unsub()
+        resolve(d)
+      })
     })
     const r2 = new Promise<unknown>((resolve) => {
-      const unsub = client2.subscribe(channel, (d) => { unsub(); resolve(d) })
+      const unsub = client2.subscribe(channel, (d) => {
+        unsub()
+        resolve(d)
+      })
     })
 
     await waitFor(30)
@@ -299,7 +314,10 @@ describe('Publish / Subscribe', () => {
 
     // client2 subscribes and listens
     const received = new Promise<unknown>((resolve) => {
-      const unsub = client2.subscribe(channel, (d) => { unsub(); resolve(d) })
+      const unsub = client2.subscribe(channel, (d) => {
+        unsub()
+        resolve(d)
+      })
     })
 
     await waitFor(30)
@@ -316,7 +334,9 @@ describe('Publish / Subscribe', () => {
     const channel = serializeKey(['events'])
 
     let received = false
-    const unsub = client.subscribe(channel, () => { received = true })
+    const unsub = client.subscribe(channel, () => {
+      received = true
+    })
 
     await waitFor(20)
     unsub()
@@ -342,7 +362,9 @@ describe('Publish / Subscribe', () => {
     const denied = serializeKey(['denied'])
 
     let received = false
-    restrictedClient.subscribe(denied, () => { received = true })
+    restrictedClient.subscribe(denied, () => {
+      received = true
+    })
     await waitFor(50)
 
     harness2.nodeServer.publish(denied, { secret: true })
@@ -398,20 +420,28 @@ describe('Presence', () => {
 
     await subscribeAndJoin(client1, channel, { name: 'Alice' })
 
-    const presenceUpdate = new Promise<ReadonlyArray<PresenceUser>>((resolve) => {
-      const unsub = client1.onPresenceChange(channel, (users) => {
-        // Wait until we see at least one other user (Bob)
-        if (users.some((u) => (u.data as Record<string, unknown>).name === 'Bob')) {
-          unsub()
-          resolve(users)
-        }
-      })
-    })
+    const presenceUpdate = new Promise<ReadonlyArray<PresenceUser>>(
+      (resolve) => {
+        const unsub = client1.onPresenceChange(channel, (users) => {
+          // Wait until we see at least one other user (Bob)
+          if (
+            users.some(
+              (u) => (u.data as Record<string, unknown>).name === 'Bob',
+            )
+          ) {
+            unsub()
+            resolve(users)
+          }
+        })
+      },
+    )
 
     await subscribeAndJoin(client2, channel, { name: 'Bob' })
 
     const users = await presenceUpdate
-    expect(users.some((u) => (u.data as Record<string, unknown>).name === 'Bob')).toBe(true)
+    expect(
+      users.some((u) => (u.data as Record<string, unknown>).name === 'Bob'),
+    ).toBe(true)
   })
 
   it('updates are merged and broadcast', async () => {
@@ -420,23 +450,32 @@ describe('Presence', () => {
     await subscribeAndJoin(client1, channel, { name: 'Alice', cursor: null })
     await subscribeAndJoin(client2, channel, { name: 'Bob', cursor: null })
 
-    const updateReceived = new Promise<ReadonlyArray<PresenceUser>>((resolve) => {
-      const unsub = client1.onPresenceChange(channel, (users) => {
-        const bob = users.find(
-          (u) => (u.data as Record<string, unknown>).name === 'Bob',
-        )
-        if ((bob?.data as Record<string, unknown> | undefined)?.cursor != null) {
-          unsub()
-          resolve(users)
-        }
-      })
-    })
+    const updateReceived = new Promise<ReadonlyArray<PresenceUser>>(
+      (resolve) => {
+        const unsub = client1.onPresenceChange(channel, (users) => {
+          const bob = users.find(
+            (u) => (u.data as Record<string, unknown>).name === 'Bob',
+          )
+          if (
+            (bob?.data as Record<string, unknown> | undefined)?.cursor != null
+          ) {
+            unsub()
+            resolve(users)
+          }
+        })
+      },
+    )
 
     client2.updatePresence(channel, { cursor: { x: 100, y: 200 } })
 
     const users = await updateReceived
-    const bob = users.find((u) => (u.data as Record<string, unknown>).name === 'Bob')
-    expect((bob!.data as Record<string, unknown>).cursor).toEqual({ x: 100, y: 200 })
+    const bob = users.find(
+      (u) => (u.data as Record<string, unknown>).name === 'Bob',
+    )
+    expect((bob!.data as Record<string, unknown>).cursor).toEqual({
+      x: 100,
+      y: 200,
+    })
   })
 
   it('removes user from presence when they leave', async () => {
@@ -445,19 +484,27 @@ describe('Presence', () => {
     await subscribeAndJoin(client1, channel, { name: 'Alice' })
     await subscribeAndJoin(client2, channel, { name: 'Bob' })
 
-    const leaveReceived = new Promise<ReadonlyArray<PresenceUser>>((resolve) => {
-      const unsub = client1.onPresenceChange(channel, (users) => {
-        if (!users.some((u) => (u.data as Record<string, unknown>).name === 'Bob')) {
-          unsub()
-          resolve(users)
-        }
-      })
-    })
+    const leaveReceived = new Promise<ReadonlyArray<PresenceUser>>(
+      (resolve) => {
+        const unsub = client1.onPresenceChange(channel, (users) => {
+          if (
+            !users.some(
+              (u) => (u.data as Record<string, unknown>).name === 'Bob',
+            )
+          ) {
+            unsub()
+            resolve(users)
+          }
+        })
+      },
+    )
 
     client2.leavePresence(channel)
 
     const users = await leaveReceived
-    expect(users.some((u) => (u.data as Record<string, unknown>).name === 'Bob')).toBe(false)
+    expect(
+      users.some((u) => (u.data as Record<string, unknown>).name === 'Bob'),
+    ).toBe(false)
   })
 })
 
@@ -484,7 +531,11 @@ describe('Reconnection', () => {
     // Restart the server on the same port
     const newNodeServer = createNodeServer({
       getUser: async () => ({ userId: 'test-user' }),
-      authorize: async () => ({ subscribe: true, publish: true, presence: true }),
+      authorize: async () => ({
+        subscribe: true,
+        publish: true,
+        presence: true,
+      }),
     })
     newNodeServer.attach(harness.httpServer)
 
@@ -493,7 +544,10 @@ describe('Reconnection', () => {
 
     // After reconnect, the subscription should be reestablished
     const received = new Promise<unknown>((resolve) => {
-      const unsub = client.subscribe(channel, (d) => { unsub(); resolve(d) })
+      const unsub = client.subscribe(channel, (d) => {
+        unsub()
+        resolve(d)
+      })
     })
     await waitFor(30)
     newNodeServer.publish(channel, { ping: true })
@@ -621,9 +675,9 @@ describe('Channel isolation', () => {
   })
 
   it('messages only reach subscribers of the exact channel', async () => {
-    const ch1: unknown[] = []
-    const ch2: unknown[] = []
-    const ch3: unknown[] = []
+    const ch1: Array<unknown> = []
+    const ch2: Array<unknown> = []
+    const ch3: Array<unknown> = []
 
     client.subscribe('channel1', (msg) => ch1.push(msg))
     client.subscribe('channel2', (msg) => ch2.push(msg))
@@ -641,8 +695,8 @@ describe('Channel isolation', () => {
   })
 
   it('channels with different param values are fully isolated', async () => {
-    const proj1: unknown[] = []
-    const proj2: unknown[] = []
+    const proj1: Array<unknown> = []
+    const proj2: Array<unknown> = []
 
     client.subscribe('todos:projectId=proj1', (msg) => proj1.push(msg))
     client.subscribe('todos:projectId=proj2', (msg) => proj2.push(msg))
@@ -662,8 +716,8 @@ describe('Channel isolation', () => {
     await nextStatus(client2, 'connected')
 
     const channel = 'chat'
-    const client1Received: unknown[] = []
-    const client2Received: unknown[] = []
+    const client1Received: Array<unknown> = []
+    const client2Received: Array<unknown> = []
 
     client.subscribe(channel, (msg) => client1Received.push(msg))
     client2.subscribe(channel, (msg) => client2Received.push(msg))
@@ -701,9 +755,9 @@ describe('Subscription semantics', () => {
 
   it('all listeners on the same channel receive each message', async () => {
     const channel = 'shared'
-    const r1: unknown[] = []
-    const r2: unknown[] = []
-    const r3: unknown[] = []
+    const r1: Array<unknown> = []
+    const r2: Array<unknown> = []
+    const r3: Array<unknown> = []
 
     const unsub1 = client.subscribe(channel, (msg) => r1.push(msg))
     const unsub2 = client.subscribe(channel, (msg) => r2.push(msg))
@@ -735,7 +789,7 @@ describe('Subscription semantics', () => {
     // should not be delivered. Verify by re-subscribing after a publish and
     // confirming the publish before re-subscribe was not buffered.
     const channel = 'ephemeral'
-    const received: unknown[] = []
+    const received: Array<unknown> = []
 
     const unsub = client.subscribe(channel, (msg) => received.push(msg))
     await waitFor(50)
@@ -791,7 +845,11 @@ describe('Connection races', () => {
     // Restart the server so the pending reconnect can succeed.
     const newNodeServer = createNodeServer({
       getUser: async () => ({ userId: 'test-user' }),
-      authorize: async () => ({ subscribe: true, publish: true, presence: true }),
+      authorize: async () => ({
+        subscribe: true,
+        publish: true,
+        presence: true,
+      }),
     })
     newNodeServer.attach(harness.httpServer)
 
@@ -818,7 +876,7 @@ describe('Client lifecycle', () => {
     await nextStatus(client, 'connected')
 
     // Record updates on the *client* store from this point forward.
-    const updates: string[] = []
+    const updates: Array<string> = []
     const sub = client.store.subscribe((state) => updates.push(state.status))
 
     // Destroy releases the internal transport → client store subscription.
@@ -881,7 +939,7 @@ describe('Presence correctness', () => {
     await waitFor(80)
 
     // client1 should see its own join but NOT the unauthorized client2.
-    const users: ReadonlyArray<PresenceUser>[] = []
+    const users: Array<ReadonlyArray<PresenceUser>> = []
     client1.onPresenceChange(channel, (u) => users.push(u))
     await waitFor(50)
 
@@ -897,7 +955,11 @@ describe('Presence correctness', () => {
     // Both clients subscribe then join with full initial state.
     client1.subscribe(channel, () => {})
     await waitFor(30)
-    client1.joinPresence(channel, { name: 'Alice', cursor: null, color: 'blue' })
+    client1.joinPresence(channel, {
+      name: 'Alice',
+      cursor: null,
+      color: 'blue',
+    })
     await waitFor(30)
 
     client2.subscribe(channel, () => {})
@@ -906,7 +968,7 @@ describe('Presence correctness', () => {
     await waitFor(50)
 
     // Collect updates visible to client1.
-    const updates: ReadonlyArray<PresenceUser>[] = []
+    const updates: Array<ReadonlyArray<PresenceUser>> = []
     client1.onPresenceChange(channel, (u) => updates.push(u))
     await waitFor(30)
 
@@ -920,8 +982,8 @@ describe('Presence correctness', () => {
     expect(bob).toBeDefined()
     const data = bob!.data as Record<string, unknown>
     expect(data.cursor).toEqual({ x: 42, y: 7 }) // Updated field
-    expect(data.color).toBe('red')                // Preserved from join
-    expect(data.name).toBe('Bob')                 // Preserved from join
+    expect(data.color).toBe('red') // Preserved from join
+    expect(data.name).toBe('Bob') // Preserved from join
   })
 
   it('onPresenceChange delivers others only — self is always excluded', async () => {
@@ -938,7 +1000,7 @@ describe('Presence correctness', () => {
     await waitFor(50)
 
     // Capture all snapshots received by client1.
-    const snapshots: ReadonlyArray<PresenceUser>[] = []
+    const snapshots: Array<ReadonlyArray<PresenceUser>> = []
     client1.onPresenceChange(channel, (users) => snapshots.push(users))
 
     // Trigger a broadcast by having client2 send an update.
@@ -949,11 +1011,15 @@ describe('Presence correctness', () => {
     for (const snapshot of snapshots) {
       // 'Alice' is client1 (self) — must never appear in client1's own list.
       expect(
-        snapshot.some((u) => (u.data as Record<string, unknown>).name === 'Alice'),
+        snapshot.some(
+          (u) => (u.data as Record<string, unknown>).name === 'Alice',
+        ),
       ).toBe(false)
       // 'Bob' is a different connection — must always be present.
       expect(
-        snapshot.some((u) => (u.data as Record<string, unknown>).name === 'Bob'),
+        snapshot.some(
+          (u) => (u.data as Record<string, unknown>).name === 'Bob',
+        ),
       ).toBe(true)
     }
   })
@@ -971,9 +1037,9 @@ describe('Reconnection — resubscription', () => {
     await nextStatus(client, 'connected')
 
     // Set up three distinct channel listeners before the disconnect.
-    const ch1: unknown[] = []
-    const ch2: unknown[] = []
-    const ch3: unknown[] = []
+    const ch1: Array<unknown> = []
+    const ch2: Array<unknown> = []
+    const ch3: Array<unknown> = []
     client.subscribe('recon1', (msg) => ch1.push(msg))
     client.subscribe('recon2', (msg) => ch2.push(msg))
     client.subscribe('recon3', (msg) => ch3.push(msg))
@@ -986,7 +1052,11 @@ describe('Reconnection — resubscription', () => {
     // Restart on the same port so the transport reconnects automatically.
     const newNodeServer = createNodeServer({
       getUser: async () => ({ userId: 'test-user' }),
-      authorize: async () => ({ subscribe: true, publish: true, presence: true }),
+      authorize: async () => ({
+        subscribe: true,
+        publish: true,
+        presence: true,
+      }),
     })
     newNodeServer.attach(harness.httpServer)
     await nextStatus(client, 'connected')
@@ -1016,7 +1086,7 @@ describe('Reconnection — resubscription', () => {
 
 function createMockRealtimeClient() {
   const listeners = new Map<string, Set<(data: unknown) => void>>()
-  const published: { channel: string; data: unknown }[] = []
+  const published: Array<{ channel: string; data: unknown }> = []
 
   return {
     store: {
@@ -1061,8 +1131,8 @@ describe('realtimeCollectionOptions — SyncConfig invariants', () => {
       getKey: (x: { id: string }) => x.id,
     })
 
-    const written: unknown[] = []
-    const cleanup = config.sync!.sync!({
+    const written: Array<unknown> = []
+    const cleanup = config.sync.sync({
       begin: () => {},
       write: (msg) => written.push(msg),
       commit: () => {},
@@ -1093,7 +1163,7 @@ describe('realtimeCollectionOptions — SyncConfig invariants', () => {
     })
 
     let readyCalled = false
-    config.sync!.sync!({
+    config.sync.sync({
       begin: () => {},
       write: () => {},
       commit: () => {},
@@ -1115,7 +1185,7 @@ describe('realtimeCollectionOptions — SyncConfig invariants', () => {
     })
 
     let readyCalled = false
-    config.sync!.sync!({
+    config.sync.sync({
       begin: () => {},
       write: () => {},
       commit: () => {},
@@ -1137,9 +1207,9 @@ describe('realtimeCollectionOptions — SyncConfig invariants', () => {
       queryFn: async () => rows,
     })
 
-    const written: unknown[] = []
+    const written: Array<unknown> = []
     let readyCalled = false
-    config.sync!.sync!({
+    config.sync.sync({
       begin: () => {},
       write: (msg) => written.push(msg),
       commit: () => {},
@@ -1161,8 +1231,8 @@ describe('realtimeCollectionOptions — SyncConfig invariants', () => {
       getKey: (x: { id: string }) => x.id,
     })
 
-    const written: unknown[] = []
-    config.sync!.sync!({
+    const written: Array<unknown> = []
+    config.sync.sync({
       begin: () => {},
       write: (msg) => written.push(msg),
       commit: () => {},
@@ -1261,8 +1331,8 @@ describe('liveChannelOptions — SyncConfig invariants', () => {
       },
     })
 
-    const written: unknown[] = []
-    config.sync!.sync!({
+    const written: Array<unknown> = []
+    config.sync.sync({
       begin: () => {},
       write: (msg) => written.push(msg),
       commit: () => {},
@@ -1284,8 +1354,8 @@ describe('liveChannelOptions — SyncConfig invariants', () => {
       onEvent: (e) => e as { id: string },
     })
 
-    const written: unknown[] = []
-    const cleanup = config.sync!.sync!({
+    const written: Array<unknown> = []
+    const cleanup = config.sync.sync({
       begin: () => {},
       write: (msg) => written.push(msg),
       commit: () => {},
@@ -1311,7 +1381,7 @@ describe('liveChannelOptions — SyncConfig invariants', () => {
     })
 
     let readyCalled = false
-    config.sync!.sync!({
+    config.sync.sync({
       begin: () => {},
       write: () => {},
       commit: () => {},
@@ -1333,9 +1403,9 @@ describe('liveChannelOptions — SyncConfig invariants', () => {
       initialData: async () => [{ id: 'a' }, { id: 'b' }],
     })
 
-    const written: unknown[] = []
+    const written: Array<unknown> = []
     let readyCalled = false
-    config.sync!.sync!({
+    config.sync.sync({
       begin: () => {},
       write: (msg) => written.push(msg),
       commit: () => {},
@@ -1363,7 +1433,7 @@ describe('liveChannelOptions — SyncConfig invariants', () => {
     })
 
     let readyCalled = false
-    config.sync!.sync!({
+    config.sync.sync({
       begin: () => {},
       write: () => {},
       commit: () => {},
@@ -1399,7 +1469,7 @@ describe('Authorization — publish permission', () => {
     ])
 
     const channel = 'restricted'
-    const received: unknown[] = []
+    const received: Array<unknown> = []
     receiver.subscribe(channel, (msg) => received.push(msg))
     sender.subscribe(channel, () => {})
     await waitFor(50)
@@ -1442,7 +1512,7 @@ describe('Authorization — presence permission', () => {
     client2.subscribe(channel, () => {})
     await waitFor(30)
 
-    const presenceSnapshots: ReadonlyArray<PresenceUser>[] = []
+    const presenceSnapshots: Array<ReadonlyArray<PresenceUser>> = []
     client1.onPresenceChange(channel, (u) => presenceSnapshots.push(u))
 
     client1.joinPresence(channel, { name: 'Alice' })
@@ -1487,7 +1557,7 @@ describe('Presence — membership cleared on disconnect', () => {
     await waitFor(50)
 
     // Collect presence state visible to observer
-    const snapshots: ReadonlyArray<PresenceUser>[] = []
+    const snapshots: Array<ReadonlyArray<PresenceUser>> = []
     observer.onPresenceChange(channel, (u) => snapshots.push(u))
     await waitFor(30)
 
@@ -1517,7 +1587,7 @@ describe('subscribe() while disconnected', () => {
     const client = connectClient(harness.port)
 
     // Register before connecting
-    const received: unknown[] = []
+    const received: Array<unknown> = []
     client.subscribe('preconnect', (msg) => received.push(msg))
 
     // Now connect
@@ -1546,7 +1616,7 @@ describe('connect() idempotency', () => {
     client.connect()
     await nextStatus(client, 'connected')
 
-    const statusChanges: string[] = []
+    const statusChanges: Array<string> = []
     const sub = client.store.subscribe((s) => statusChanges.push(s.status))
 
     // Second connect() — already connected, must resolve immediately

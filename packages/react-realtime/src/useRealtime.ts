@@ -1,7 +1,7 @@
 import { use, useCallback } from 'react'
 import { useStore } from '@tanstack/react-store'
-import type { ConnectionStatus, RealtimeClient } from '@tanstack/realtime'
 import { RealtimeContext } from './context.js'
+import type { ConnectionStatus, RealtimeClient } from '@tanstack/realtime'
 
 export interface UseRealtimeResult {
   /**
@@ -10,12 +10,12 @@ export interface UseRealtimeResult {
    */
   status: ConnectionStatus
   /** Open the WebSocket connection. Resolves once `status` is `'connected'`. */
-  connect(): Promise<void>
+  connect: () => Promise<void>
   /**
    * Close the connection immediately. No reconnect will occur.
    * Collections retain their current data but stop receiving live updates.
    */
-  disconnect(): void
+  disconnect: () => void
   /**
    * The underlying `RealtimeClient` instance. Use this for operations not
    * covered by the hooks, such as manually calling `joinPresence` or

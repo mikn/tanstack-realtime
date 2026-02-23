@@ -19,13 +19,13 @@
  *      requires subscription tokens even in insecure mode)
  */
 
-import { spawn, execFileSync } from 'child_process'
-import type { ChildProcess } from 'child_process'
-import { existsSync, writeFileSync, unlinkSync } from 'fs'
-import { createServer } from 'net'
-import { join } from 'path'
-import { tmpdir } from 'os'
-import { fileURLToPath } from 'url'
+import { execFileSync, spawn } from 'node:child_process'
+import { existsSync, unlinkSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:net'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { fileURLToPath } from 'node:url'
+import type { ChildProcess } from 'node:child_process'
 import type { GlobalSetupContext } from 'vitest/node'
 
 // ---------------------------------------------------------------------------
@@ -37,7 +37,12 @@ const root = fileURLToPath(new URL('../..', import.meta.url))
 const IS_WINDOWS = process.platform === 'win32'
 const BINARY =
   process.env['CENTRIFUGO_BIN'] ??
-  join(root, '.cache', 'centrifugo', IS_WINDOWS ? 'centrifugo.exe' : 'centrifugo')
+  join(
+    root,
+    '.cache',
+    'centrifugo',
+    IS_WINDOWS ? 'centrifugo.exe' : 'centrifugo',
+  )
 
 // ---------------------------------------------------------------------------
 // Config builder
@@ -121,7 +126,9 @@ let configFile: string | undefined
 export default async function setup({ provide }: GlobalSetupContext) {
   // ── 1. Ensure binary is present (download if necessary) ─────────────────
   if (!existsSync(BINARY)) {
-    console.log('[centrifugo-e2e] Binary not cached — downloading via download-centrifugo.mjs…')
+    console.log(
+      '[centrifugo-e2e] Binary not cached — downloading via download-centrifugo.mjs…',
+    )
     execFileSync(
       process.execPath, // the `node` binary running this process
       [join(root, 'scripts', 'download-centrifugo.mjs')],
@@ -142,7 +149,7 @@ export default async function setup({ provide }: GlobalSetupContext) {
     env: { ...process.env },
   })
 
-  const stderr: string[] = []
+  const stderr: Array<string> = []
   proc.stderr?.on('data', (chunk: Buffer) => stderr.push(chunk.toString()))
   proc.stdout?.on('data', () => {}) // drain stdout
 

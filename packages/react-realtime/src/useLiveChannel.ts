@@ -1,10 +1,10 @@
 import { use, useEffect, useRef } from 'react'
 import { createCollection } from '@tanstack/db'
 import { liveChannelOptions } from '@tanstack/realtime'
+import { RealtimeContext } from './context.js'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { Collection } from '@tanstack/db'
 import type { LiveChannelConfig } from '@tanstack/realtime'
-import { RealtimeContext } from './context.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -66,9 +66,7 @@ export function useLiveChannel<
   T extends object = Record<string, unknown>,
   TKey extends string | number = string,
   TSchema extends StandardSchemaV1 = StandardSchemaV1,
->(
-  config: UseLiveChannelConfig<T, TKey, TSchema>,
-): Collection<T, TKey> {
+>(config: UseLiveChannelConfig<T, TKey, TSchema>): Collection<T, TKey> {
   const client = use(RealtimeContext)
   if (!client) {
     throw new Error(

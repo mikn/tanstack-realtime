@@ -1,15 +1,15 @@
 import { use, useCallback } from 'react'
 import { useStore } from '@tanstack/react-store'
-import type { ConnectionStatus, RealtimeClient } from '../core/types.js'
 import { RealtimeContext } from './context.js'
+import type { ConnectionStatus, RealtimeClient } from '../core/types.js'
 
 export interface UseRealtimeResult {
   /** Current connection status, reactive. */
   status: ConnectionStatus
   /** Open the connection. Collections start receiving live data. */
-  connect(): Promise<void>
+  connect: () => Promise<void>
   /** Close the connection. Collections fall back to `queryFn` data. */
-  disconnect(): void
+  disconnect: () => void
   /** Access the full client for advanced use cases. */
   client: RealtimeClient
 }

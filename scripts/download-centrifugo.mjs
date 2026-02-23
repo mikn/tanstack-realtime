@@ -16,7 +16,13 @@
  */
 
 import { execSync } from 'child_process'
-import { mkdirSync, existsSync, chmodSync, writeFileSync, readFileSync } from 'fs'
+import {
+  mkdirSync,
+  existsSync,
+  chmodSync,
+  writeFileSync,
+  readFileSync,
+} from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { tmpdir } from 'os'
@@ -63,12 +69,16 @@ function curlJson(url) {
 
 function curlDownload(url, dest) {
   console.log(`Downloading ${url}`)
-  execSync(`curl -sL --fail -o "${dest}" "${url}"`, { stdio: ['ignore', 'ignore', 'inherit'] })
+  execSync(`curl -sL --fail -o "${dest}" "${url}"`, {
+    stdio: ['ignore', 'ignore', 'inherit'],
+  })
 }
 
 function getLatestVersion() {
   console.log('Fetching latest Centrifugo release from GitHub…')
-  const data = curlJson('https://api.github.com/repos/centrifugal/centrifugo/releases/latest')
+  const data = curlJson(
+    'https://api.github.com/repos/centrifugal/centrifugo/releases/latest',
+  )
   return data.tag_name // e.g. "v5.4.8"
 }
 
@@ -85,7 +95,9 @@ function buildDownloadUrl(version, os, arch) {
 
 function extract(archivePath, ext, destDir) {
   if (ext === 'tar.gz') {
-    execSync(`tar -xzf "${archivePath}" -C "${destDir}" centrifugo`, { stdio: 'inherit' })
+    execSync(`tar -xzf "${archivePath}" -C "${destDir}" centrifugo`, {
+      stdio: 'inherit',
+    })
   } else {
     execSync(
       `powershell -Command "Expand-Archive -Path '${archivePath}' -DestinationPath '${destDir}' -Force"`,
@@ -109,7 +121,9 @@ function main() {
       console.log(`✓ Centrifugo ${version} already cached at ${BINARY}`)
       return
     }
-    console.log(`Cached version is ${cached}, want ${version} — re-downloading.`)
+    console.log(
+      `Cached version is ${cached}, want ${version} — re-downloading.`,
+    )
   }
 
   const { os, arch } = getPlatformSlug()

@@ -24,9 +24,8 @@
  *  - sseTransport: ping events are silently ignored
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { createSseHandler } from '@tanstack/realtime-adapter-sse'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createSseHandler, sseTransport } from '@tanstack/realtime-adapter-sse'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -56,8 +55,12 @@ async function readSseEvents(
       for (const line of trimmed.split('\n')) {
         if (line.startsWith('data:')) {
           try {
-            events.push(JSON.parse(line.slice(5).trim()) as Record<string, unknown>)
-          } catch { /* ignore */ }
+            events.push(
+              JSON.parse(line.slice(5).trim()) as Record<string, unknown>,
+            )
+          } catch {
+            /* ignore */
+          }
         }
       }
     }
@@ -89,8 +92,12 @@ async function readEvents(
       for (const line of trimmed.split('\n')) {
         if (line.startsWith('data:')) {
           try {
-            events.push(JSON.parse(line.slice(5).trim()) as Record<string, unknown>)
-          } catch { /* ignore */ }
+            events.push(
+              JSON.parse(line.slice(5).trim()) as Record<string, unknown>,
+            )
+          } catch {
+            /* ignore */
+          }
         }
       }
     }
@@ -119,22 +126,28 @@ describe('createSseHandler', () => {
     const res = await handler.handle(req)
     const events = await readSseEvents(res, 1)
     expect(events).toHaveLength(1)
-    expect(events[0]!.type).toBe('connected')
-    expect(typeof events[0]!.connectionId).toBe('string')
+    expect(events[0].type).toBe('connected')
+    expect(typeof events[0].connectionId).toBe('string')
   })
 
   it('POST subscribe returns 204', async () => {
     const handler = createSseHandler({ pingInterval: 0 })
     // Open stream first to register the connection.
-    const streamRes = await handler.handle(new Request(SSE_URL, { method: 'GET' }))
+    const streamRes = await handler.handle(
+      new Request(SSE_URL, { method: 'GET' }),
+    )
     const [connEvent] = await readSseEvents(streamRes, 1)
-    const cid = connEvent!.connectionId as string
+    const cid = connEvent.connectionId as string
 
     const res = await handler.handle(
       new Request(SSE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'subscribe', connectionId: cid, channel: 'todos' }),
+        body: JSON.stringify({
+          action: 'subscribe',
+          connectionId: cid,
+          channel: 'todos',
+        }),
       }),
     )
     expect(res.status).toBe(204)
@@ -145,19 +158,25 @@ describe('createSseHandler', () => {
     const handler = createSseHandler({ pingInterval: 0 })
 
     // Open SSE stream.
-    const streamRes = await handler.handle(new Request(SSE_URL, { method: 'GET' }))
+    const streamRes = await handler.handle(
+      new Request(SSE_URL, { method: 'GET' }),
+    )
     const reader = streamRes.body!.getReader()
 
     // Read "connected" event.
     const initialEvents = await readEvents(reader, 1)
-    const cid = initialEvents[0]!.connectionId as string
+    const cid = initialEvents[0].connectionId as string
 
     // Subscribe to channel.
     await handler.handle(
       new Request(SSE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'subscribe', connectionId: cid, channel: 'chat' }),
+        body: JSON.stringify({
+          action: 'subscribe',
+          connectionId: cid,
+          channel: 'chat',
+        }),
       }),
     )
 
@@ -166,13 +185,21 @@ describe('createSseHandler', () => {
       new Request(SSE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'publish', channel: 'chat', data: { text: 'hello' } }),
+        body: JSON.stringify({
+          action: 'publish',
+          channel: 'chat',
+          data: { text: 'hello' },
+        }),
       }),
     )
 
     // Read the message event.
     const msgEvents = await readEvents(reader, 1)
-    expect(msgEvents[0]).toMatchObject({ type: 'message', channel: 'chat', data: { text: 'hello' } })
+    expect(msgEvents[0]).toMatchObject({
+      type: 'message',
+      channel: 'chat',
+      data: { text: 'hello' },
+    })
 
     reader.releaseLock()
     await streamRes.body?.cancel()
@@ -181,18 +208,24 @@ describe('createSseHandler', () => {
   it('POST unsubscribe stops delivering messages', async () => {
     const handler = createSseHandler({ pingInterval: 0 })
 
-    const streamRes = await handler.handle(new Request(SSE_URL, { method: 'GET' }))
+    const streamRes = await handler.handle(
+      new Request(SSE_URL, { method: 'GET' }),
+    )
     const reader = streamRes.body!.getReader()
 
     const initial = await readEvents(reader, 1)
-    const cid = initial[0]!.connectionId as string
+    const cid = initial[0].connectionId as string
 
     // Subscribe.
     await handler.handle(
       new Request(SSE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'subscribe', connectionId: cid, channel: 'events' }),
+        body: JSON.stringify({
+          action: 'subscribe',
+          connectionId: cid,
+          channel: 'events',
+        }),
       }),
     )
 
@@ -201,7 +234,11 @@ describe('createSseHandler', () => {
       new Request(SSE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'unsubscribe', connectionId: cid, channel: 'events' }),
+        body: JSON.stringify({
+          action: 'unsubscribe',
+          connectionId: cid,
+          channel: 'events',
+        }),
       }),
     )
 
@@ -210,7 +247,11 @@ describe('createSseHandler', () => {
       new Request(SSE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'publish', channel: 'events', data: { x: 1 } }),
+        body: JSON.stringify({
+          action: 'publish',
+          channel: 'events',
+          data: { x: 1 },
+        }),
       }),
     )
 
@@ -240,21 +281,33 @@ describe('createSseHandler', () => {
       readEvents(reader1, 1),
       readEvents(reader2, 1),
     ])
-    const cid1 = init1[0]!.connectionId as string
-    const cid2 = init2[0]!.connectionId as string
+    const cid1 = init1[0].connectionId as string
+    const cid2 = init2[0].connectionId as string
 
     // Subscribe both to the same channel.
     await Promise.all([
-      handler.handle(new Request(SSE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'subscribe', connectionId: cid1, channel: 'news' }),
-      })),
-      handler.handle(new Request(SSE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'subscribe', connectionId: cid2, channel: 'news' }),
-      })),
+      handler.handle(
+        new Request(SSE_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'subscribe',
+            connectionId: cid1,
+            channel: 'news',
+          }),
+        }),
+      ),
+      handler.handle(
+        new Request(SSE_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'subscribe',
+            connectionId: cid2,
+            channel: 'news',
+          }),
+        }),
+      ),
     ])
 
     handler.broadcast('news', { headline: 'Big news' })
@@ -264,8 +317,16 @@ describe('createSseHandler', () => {
       readEvents(reader2, 1),
     ])
 
-    expect(ev1[0]).toMatchObject({ type: 'message', channel: 'news', data: { headline: 'Big news' } })
-    expect(ev2[0]).toMatchObject({ type: 'message', channel: 'news', data: { headline: 'Big news' } })
+    expect(ev1[0]).toMatchObject({
+      type: 'message',
+      channel: 'news',
+      data: { headline: 'Big news' },
+    })
+    expect(ev2[0]).toMatchObject({
+      type: 'message',
+      channel: 'news',
+      data: { headline: 'Big news' },
+    })
 
     reader1.releaseLock()
     reader2.releaseLock()
@@ -312,7 +373,9 @@ describe('createSseHandler', () => {
 
   it('OPTIONS returns CORS preflight headers', async () => {
     const handler = createSseHandler({ pingInterval: 0 })
-    const res = await handler.handle(new Request(SSE_URL, { method: 'OPTIONS' }))
+    const res = await handler.handle(
+      new Request(SSE_URL, { method: 'OPTIONS' }),
+    )
     expect(res.status).toBe(204)
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*')
   })
@@ -325,16 +388,24 @@ describe('createSseHandler', () => {
 
   it('message is not delivered to a non-subscribed channel', async () => {
     const handler = createSseHandler({ pingInterval: 0 })
-    const streamRes = await handler.handle(new Request(SSE_URL, { method: 'GET' }))
+    const streamRes = await handler.handle(
+      new Request(SSE_URL, { method: 'GET' }),
+    )
     const reader = streamRes.body!.getReader()
     const initial = await readEvents(reader, 1)
-    const cid = initial[0]!.connectionId as string
+    const cid = initial[0].connectionId as string
 
-    await handler.handle(new Request(SSE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'subscribe', connectionId: cid, channel: 'ch-a' }),
-    }))
+    await handler.handle(
+      new Request(SSE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'subscribe',
+          connectionId: cid,
+          channel: 'ch-a',
+        }),
+      }),
+    )
 
     // Publish to a different channel.
     handler.broadcast('ch-b', { x: 1 })
@@ -362,10 +433,13 @@ describe('sseTransport', () => {
     handler = createSseHandler({ pingInterval: 0 })
     savedFetch = globalThis.fetch
     // Wire fetch() to the handler so no real network is needed.
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const req = input instanceof Request ? input : new Request(input as string, init)
-      return handler.handle(req)
-    })
+    globalThis.fetch = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const req =
+          input instanceof Request ? input : new Request(input as string, init)
+        return handler.handle(req)
+      },
+    )
   })
 
   afterEach(() => {
@@ -397,7 +471,7 @@ describe('sseTransport', () => {
     const transport = sseTransport({ url: SSE_URL })
     await transport.connect()
 
-    const received: unknown[] = []
+    const received: Array<unknown> = []
     transport.subscribe('orders', (data) => received.push(data))
 
     // Wait a tick for the subscribe POST to be sent.
@@ -417,7 +491,7 @@ describe('sseTransport', () => {
     const transport = sseTransport({ url: SSE_URL })
     await transport.connect()
 
-    const received: unknown[] = []
+    const received: Array<unknown> = []
     const unsub = transport.subscribe('ch', (data) => received.push(data))
     await new Promise((r) => setTimeout(r, 20))
 
@@ -442,7 +516,10 @@ describe('sseTransport', () => {
 
     const postCalls = fetchMock.mock.calls
       .slice(callsBefore)
-      .filter(([, init]: [unknown, RequestInit | undefined]) => init?.method === 'POST')
+      .filter(
+        ([, init]: [unknown, RequestInit | undefined]) =>
+          init?.method === 'POST',
+      )
 
     expect(postCalls.length).toBeGreaterThanOrEqual(1)
     transport.disconnect()
@@ -458,8 +535,11 @@ describe('sseTransport', () => {
 
     // Check that the GET (stream) request had the Authorization header.
     const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>
-    const getCall = (fetchMock.mock.calls as Array<[RequestInfo | URL, RequestInit | undefined]>)
-      .find(([, init]) => !init?.method || init.method === 'GET')
+    const getCall = (
+      fetchMock.mock.calls as Array<
+        [RequestInfo | URL, RequestInit | undefined]
+      >
+    ).find(([, init]) => !init?.method || init.method === 'GET')
 
     const headers = getCall?.[1]?.headers as Record<string, string> | undefined
     expect(headers?.['Authorization']).toBe('Bearer my-token')
@@ -475,17 +555,21 @@ describe('sseTransport', () => {
 
     // Wrap handle so GET responses inject a ping event right after connected.
     vi.mocked(globalThis.fetch).mockImplementation(async (input, init) => {
-      const req = input instanceof Request ? input : new Request(input as string, init)
+      const req =
+        input instanceof Request ? input : new Request(input as string, init)
       if (req.method !== 'GET') return originalHandle(req)
 
       const baseRes = await originalHandle(req)
       const baseReader = baseRes.body!.getReader()
 
-      const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>()
+      const { readable, writable } = new TransformStream<
+        Uint8Array,
+        Uint8Array
+      >()
       const writer = writable.getWriter()
 
       ;(async () => {
-        while (true) {
+        for (;;) {
           const { done, value } = await baseReader.read()
           if (done) break
           await writer.write(value)
@@ -499,7 +583,7 @@ describe('sseTransport', () => {
     })
 
     const transport = sseTransport({ url: SSE_URL })
-    const received: unknown[] = []
+    const received: Array<unknown> = []
     await transport.connect()
     transport.subscribe('pings', (d) => received.push(d))
 
@@ -513,8 +597,8 @@ describe('sseTransport', () => {
     const transport = sseTransport({ url: SSE_URL })
     await transport.connect()
 
-    const r1: unknown[] = []
-    const r2: unknown[] = []
+    const r1: Array<unknown> = []
+    const r2: Array<unknown> = []
     transport.subscribe('shared', (d) => r1.push(d))
     transport.subscribe('shared', (d) => r2.push(d))
     await new Promise((r) => setTimeout(r, 20))
@@ -570,7 +654,11 @@ describe('createSseHandler — auth', () => {
       new Request(SSE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'subscribe', connectionId: 'c1', channel: 'ch' }),
+        body: JSON.stringify({
+          action: 'subscribe',
+          connectionId: 'c1',
+          channel: 'ch',
+        }),
       }),
     )
     expect(res.status).toBe(401)
@@ -604,7 +692,11 @@ describe('createSseHandler — auth', () => {
       new Request(SSE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'unsubscribe', connectionId: 'c1', channel: 'ch' }),
+        body: JSON.stringify({
+          action: 'unsubscribe',
+          connectionId: 'c1',
+          channel: 'ch',
+        }),
       }),
     )
     // Current design: unsubscribe also requires auth. Status 401.
@@ -621,7 +713,11 @@ describe('createSseHandler — auth', () => {
       new Request(SSE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'subscribe', connectionId: 'c1', channel: 'private' }),
+        body: JSON.stringify({
+          action: 'subscribe',
+          connectionId: 'c1',
+          channel: 'private',
+        }),
       }),
     )
     expect(res.status).toBe(403)
@@ -637,7 +733,11 @@ describe('createSseHandler — auth', () => {
       new Request(SSE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'publish', channel: 'private', data: {} }),
+        body: JSON.stringify({
+          action: 'publish',
+          channel: 'private',
+          data: {},
+        }),
       }),
     )
     expect(res.status).toBe(403)
@@ -652,15 +752,21 @@ describe('createSseHandler — auth', () => {
     })
 
     // Open stream first.
-    const streamRes = await handler.handle(new Request(SSE_URL, { method: 'GET' }))
+    const streamRes = await handler.handle(
+      new Request(SSE_URL, { method: 'GET' }),
+    )
     const [connEvent] = await readSseEvents(streamRes, 1)
-    const cid = connEvent!.connectionId as string
+    const cid = connEvent.connectionId as string
 
     await handler.handle(
       new Request(SSE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'subscribe', connectionId: cid, channel: 'orders' }),
+        body: JSON.stringify({
+          action: 'subscribe',
+          connectionId: cid,
+          channel: 'orders',
+        }),
       }),
     )
 

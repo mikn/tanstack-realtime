@@ -1,6 +1,7 @@
-import { type ReactNode, useEffect } from 'react'
-import type { RealtimeClient } from '@tanstack/realtime'
+import { useEffect } from 'react'
 import { RealtimeContext } from './context.js'
+import type { ReactNode } from 'react'
+import type { RealtimeClient } from '@tanstack/realtime'
 
 export interface RealtimeProviderProps {
   /** The realtime client created with `createRealtimeClient`. */

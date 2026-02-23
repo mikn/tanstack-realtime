@@ -8,10 +8,13 @@
  * correct behaviour of the `stopped` guard.
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { Store } from '@tanstack/store'
-import { realtimeCollectionOptions, createRealtimeClient } from '@tanstack/realtime'
-import type { RealtimeTransport, ConnectionStatus } from '@tanstack/realtime'
+import {
+  createRealtimeClient,
+  realtimeCollectionOptions,
+} from '@tanstack/realtime'
+import type { ConnectionStatus, RealtimeTransport } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Mock transport
@@ -58,18 +61,21 @@ interface Doc {
 
 type WriteOp = { type: string; value?: unknown; key?: unknown }
 
-function driveSync(
-  config: ReturnType<typeof realtimeCollectionOptions>,
-): { ops: WriteOp[]; stop: () => void; isReady: () => boolean } {
-  const ops: WriteOp[] = []
+function driveSync(config: ReturnType<typeof realtimeCollectionOptions>): {
+  ops: Array<WriteOp>
+  stop: () => void
+  isReady: () => boolean
+} {
+  const ops: Array<WriteOp> = []
   let ready = false
-  const stop =
-    config.sync!.sync({
-      begin: () => {},
-      write: (op: WriteOp) => ops.push(op),
-      commit: () => {},
-      markReady: () => { ready = true },
-    }) ?? (() => {})
+  const stop = config.sync.sync({
+    begin: () => {},
+    write: (op: WriteOp) => ops.push(op),
+    commit: () => {},
+    markReady: () => {
+      ready = true
+    },
+  })
   return { ops, stop, isReady: () => ready }
 }
 
@@ -83,12 +89,17 @@ describe('realtimeCollectionOptions — lifecycle', () => {
     const client = createRealtimeClient({ transport })
 
     const config = realtimeCollectionOptions<Doc, string>({
-      client, channel: 'docs', getKey: (d) => d.id,
+      client,
+      channel: 'docs',
+      getKey: (d) => d.id,
     })
     const { ops, stop } = driveSync(config)
 
     stop()
-    transport.emit('docs', { action: 'insert', data: { id: '1', title: 'late', version: 1 } })
+    transport.emit('docs', {
+      action: 'insert',
+      data: { id: '1', title: 'late', version: 1 },
+    })
 
     expect(ops).toHaveLength(0)
   })
@@ -101,7 +112,9 @@ describe('realtimeCollectionOptions — lifecycle', () => {
       client,
       channel: 'docs',
       getKey: (d) => d.id,
-      queryFn: async () => { throw new Error('network error') },
+      queryFn: async () => {
+        throw new Error('network error')
+      },
     })
     const { isReady } = driveSync(config)
 
@@ -115,7 +128,9 @@ describe('realtimeCollectionOptions — lifecycle', () => {
     const client = createRealtimeClient({ transport })
 
     const config = realtimeCollectionOptions<Doc, string>({
-      client, channel: 'docs', getKey: (d) => d.id,
+      client,
+      channel: 'docs',
+      getKey: (d) => d.id,
     })
     const { isReady } = driveSync(config)
 
@@ -127,7 +142,9 @@ describe('realtimeCollectionOptions — lifecycle', () => {
     const client = createRealtimeClient({ transport })
 
     const config = realtimeCollectionOptions<Doc, string>({
-      client, channel: 'docs', getKey: (d) => d.id,
+      client,
+      channel: 'docs',
+      getKey: (d) => d.id,
     })
     const { ops } = driveSync(config)
 
@@ -144,8 +161,10 @@ describe('realtimeCollectionOptions — lifecycle', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
 
-    let resolveQueryFn!: (rows: Doc[]) => void
-    const queryFnPromise = new Promise<Doc[]>((r) => { resolveQueryFn = r })
+    let resolveQueryFn!: (rows: Array<Doc>) => void
+    const queryFnPromise = new Promise<Array<Doc>>((r) => {
+      resolveQueryFn = r
+    })
 
     const config = realtimeCollectionOptions<Doc, string>({
       client,
@@ -156,15 +175,18 @@ describe('realtimeCollectionOptions — lifecycle', () => {
     const { ops } = driveSync(config)
 
     // Live message arrives before queryFn resolves.
-    transport.emit('docs', { action: 'insert', data: { id: '99', title: 'live', version: 1 } })
+    transport.emit('docs', {
+      action: 'insert',
+      data: { id: '99', title: 'live', version: 1 },
+    })
     expect(ops).toHaveLength(1)
-    expect((ops[0]!.value as Doc).id).toBe('99')
+    expect((ops[0].value as Doc).id).toBe('99')
 
     // queryFn resolves after.
     resolveQueryFn([{ id: '1', title: 'db', version: 0 }])
     await new Promise((r) => setTimeout(r, 0))
     expect(ops).toHaveLength(2)
-    expect((ops[1]!.value as Doc).id).toBe('1')
+    expect((ops[1].value as Doc).id).toBe('1')
   })
 
   it('server-only mode works without client or channel', () => {
@@ -184,14 +206,19 @@ describe('realtimeCollectionOptions — lifecycle', () => {
 // ---------------------------------------------------------------------------
 
 describe('realtimeCollectionOptions — numeric keys', () => {
-  interface NumericDoc { id: number; title: string }
+  interface NumericDoc {
+    id: number
+    title: string
+  }
 
   it('numeric primary keys (TKey = number) are tracked correctly', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
 
     const config = realtimeCollectionOptions<NumericDoc, number>({
-      client, channel: 'docs', getKey: (d) => d.id,
+      client,
+      channel: 'docs',
+      getKey: (d) => d.id,
     })
     const { ops } = driveSync(config)
 
@@ -199,9 +226,9 @@ describe('realtimeCollectionOptions — numeric keys', () => {
     transport.emit('docs', { action: 'update', data: { id: 1, title: 'v2' } })
 
     expect(ops).toHaveLength(2)
-    expect(ops[0]!.type).toBe('insert')
-    expect(ops[1]!.type).toBe('update')
-    expect((ops[1]!.value as NumericDoc).title).toBe('v2')
+    expect(ops[0].type).toBe('insert')
+    expect(ops[1].type).toBe('update')
+    expect((ops[1].value as NumericDoc).title).toBe('v2')
   })
 
   it('numeric key 0 is treated as a valid key (not falsy-ignored)', () => {
@@ -209,15 +236,20 @@ describe('realtimeCollectionOptions — numeric keys', () => {
     const client = createRealtimeClient({ transport })
 
     const config = realtimeCollectionOptions<NumericDoc, number>({
-      client, channel: 'docs', getKey: (d) => d.id,
+      client,
+      channel: 'docs',
+      getKey: (d) => d.id,
     })
     const { ops } = driveSync(config)
 
     transport.emit('docs', { action: 'insert', data: { id: 0, title: 'zero' } })
-    transport.emit('docs', { action: 'update', data: { id: 0, title: 'zero-updated' } })
+    transport.emit('docs', {
+      action: 'update',
+      data: { id: 0, title: 'zero-updated' },
+    })
 
     expect(ops).toHaveLength(2)
-    expect((ops[1]!.value as NumericDoc).title).toBe('zero-updated')
+    expect((ops[1].value as NumericDoc).title).toBe('zero-updated')
   })
 })
 
@@ -240,7 +272,13 @@ describe('realtimeCollectionOptions — mutation wrappers', () => {
 
     await config.onInsert!({
       transaction: {
-        mutations: [{ modified: { id: '1', title: 'draft', version: 1 } as unknown, key: '1', original: {} }],
+        mutations: [
+          {
+            modified: { id: '1', title: 'draft', version: 1 } as unknown,
+            key: '1',
+            original: {},
+          },
+        ],
       },
     } as any)
 
@@ -261,7 +299,13 @@ describe('realtimeCollectionOptions — mutation wrappers', () => {
 
     await config.onUpdate!({
       transaction: {
-        mutations: [{ modified: { id: '1', title: 'draft', version: 1 } as unknown, key: '1', original: {} }],
+        mutations: [
+          {
+            modified: { id: '1', title: 'draft', version: 1 } as unknown,
+            key: '1',
+            original: {},
+          },
+        ],
       },
     } as any)
 
@@ -282,17 +326,22 @@ describe('realtimeCollectionOptions — mutation wrappers', () => {
     driveSync(config)
 
     // Seed the key first so internal state has an entry for it.
-    transport.emit('docs', { action: 'insert', data: { id: '1', title: 'v1', version: 1 } })
+    transport.emit('docs', {
+      action: 'insert',
+      data: { id: '1', title: 'v1', version: 1 },
+    })
 
     await config.onDelete!({
       transaction: {
-        mutations: [{ modified: { id: '1' } as unknown, key: '1', original: {} }],
+        mutations: [
+          { modified: { id: '1' } as unknown, key: '1', original: {} },
+        ],
       },
     } as any)
 
     // Delete was published to the primary channel.
     expect(transport.publishCalls).toHaveLength(1)
-    expect((transport.publishCalls[0]!.data as any).action).toBe('delete')
+    expect((transport.publishCalls[0].data as any).action).toBe('delete')
   })
 
   it('onInsert publishes with action: insert and onUpdate with action: update', async () => {
@@ -311,12 +360,16 @@ describe('realtimeCollectionOptions — mutation wrappers', () => {
     })
     driveSync(config)
 
-    await config.onInsert!({ transaction: { mutations: [{ modified: {}, key: '1', original: {} }] } } as any)
-    await config.onUpdate!({ transaction: { mutations: [{ modified: {}, key: '1', original: {} }] } } as any)
+    await config.onInsert!({
+      transaction: { mutations: [{ modified: {}, key: '1', original: {} }] },
+    } as any)
+    await config.onUpdate!({
+      transaction: { mutations: [{ modified: {}, key: '1', original: {} }] },
+    } as any)
 
     expect(transport.publishCalls).toHaveLength(2)
-    expect((transport.publishCalls[0]!.data as any).action).toBe('insert')
-    expect((transport.publishCalls[1]!.data as any).action).toBe('update')
+    expect((transport.publishCalls[0].data as any).action).toBe('insert')
+    expect((transport.publishCalls[1].data as any).action).toBe('update')
   })
 
   it('onInsert without a primary channel (channels-only mode) does not publish', async () => {
@@ -331,7 +384,9 @@ describe('realtimeCollectionOptions — mutation wrappers', () => {
     })
     driveSync(config)
 
-    await config.onInsert!({ transaction: { mutations: [{ modified: {}, key: '1', original: {} }] } } as any)
+    await config.onInsert!({
+      transaction: { mutations: [{ modified: {}, key: '1', original: {} }] },
+    } as any)
 
     expect(transport.publishCalls).toHaveLength(0)
   })

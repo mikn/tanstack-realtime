@@ -365,8 +365,8 @@ function Transports() {
           <div className="transport-card">
             <h3>Node.js Preset</h3>
             <p>
-              Built-in WebSocket server + client. Zero config. Perfect for
-              local development and single-server deployments.
+              Built-in WebSocket server + client. Zero config. Perfect for local
+              development and single-server deployments.
             </p>
             <CodeBlock
               code={`import { nodeTransport } from '@tanstack/realtime-preset-node'
@@ -575,9 +575,7 @@ function Ecosystem() {
     <section className="section">
       <div className="container ecosystem-section">
         <Badge>TanStack Ecosystem</Badge>
-        <h2>
-          Fits right in.
-        </h2>
+        <h2>Fits right in.</h2>
         <p className="section-sub">
           TanStack Realtime is designed to compose with the tools you already
           use.
@@ -636,13 +634,25 @@ function Footer() {
           </div>
           <div>
             <h4>Community</h4>
-            <a href="https://github.com/tanstack/realtime" target="_blank" rel="noopener">
+            <a
+              href="https://github.com/tanstack/realtime"
+              target="_blank"
+              rel="noopener"
+            >
               GitHub
             </a>
-            <a href="https://discord.com/invite/WrRKjPJ" target="_blank" rel="noopener">
+            <a
+              href="https://discord.com/invite/WrRKjPJ"
+              target="_blank"
+              rel="noopener"
+            >
               Discord
             </a>
-            <a href="https://twitter.com/tanaboraso" target="_blank" rel="noopener">
+            <a
+              href="https://twitter.com/tanaboraso"
+              target="_blank"
+              rel="noopener"
+            >
               Twitter
             </a>
           </div>

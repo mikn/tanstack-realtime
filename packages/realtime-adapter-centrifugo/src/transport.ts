@@ -1,5 +1,10 @@
 import { Store } from '@tanstack/store'
-import type { ConnectionStatus, PresenceCapable, PresenceUser, RealtimeTransport } from '@tanstack/realtime'
+import type {
+  ConnectionStatus,
+  PresenceCapable,
+  PresenceUser,
+  RealtimeTransport,
+} from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Options
@@ -295,7 +300,10 @@ export function centrifugoTransport(
         break
       case 'prs:update': {
         const existing = map.get(msg.clientId) ?? {}
-        map.set(msg.clientId, { ...(existing as object), ...(msg.data as object) })
+        map.set(msg.clientId, {
+          ...(existing as object),
+          ...(msg.data as object),
+        })
         break
       }
       case 'prs:leave':
@@ -330,7 +338,10 @@ export function centrifugoTransport(
       // Update the recovery offset for this channel as live publications arrive.
       // Only track data channels (not presence sidecars) and only when we have
       // a recovery position (i.e. the channel is marked recoverable by the server).
-      if (!channel.startsWith(presencePrefix) && push.pub.offset !== undefined) {
+      if (
+        !channel.startsWith(presencePrefix) &&
+        push.pub.offset !== undefined
+      ) {
         const existing = channelRecovery.get(channel)
         if (existing) {
           channelRecovery.set(channel, {
@@ -398,12 +409,10 @@ export function centrifugoTransport(
         if (sub.recoverable && sub.epoch !== undefined) {
           // The offset to store is the last offset among the recovered
           // publications (if any), otherwise the channel's current offset.
-          const lastPub =
-            sub.publications?.length
-              ? sub.publications[sub.publications.length - 1]
-              : undefined
-          const storedOffset =
-            lastPub?.offset ?? sub.offset ?? 0
+          const lastPub = sub.publications?.length
+            ? sub.publications[sub.publications.length - 1]
+            : undefined
+          const storedOffset = lastPub?.offset ?? sub.offset ?? 0
 
           channelRecovery.set(channel, {
             epoch: sub.epoch,
@@ -467,13 +476,14 @@ export function centrifugoTransport(
         // so Centrifugo can replay only the missed publications.
         cmdChannels.set(id, channel)
         // Use sendCmd so we can process the reply (recovered publications).
-        void sendCmd({ id, subscribe: { channel, recover: true, ...recovery } }).catch(
-          () => {
-            // Recovery failed (e.g. TTL expired) — fall back to a plain subscribe
-            // and discard the stored position so the next reconnect doesn't retry.
-            channelRecovery.delete(channel)
-          },
-        )
+        void sendCmd({
+          id,
+          subscribe: { channel, recover: true, ...recovery },
+        }).catch(() => {
+          // Recovery failed (e.g. TTL expired) — fall back to a plain subscribe
+          // and discard the stored position so the next reconnect doesn't retry.
+          channelRecovery.delete(channel)
+        })
       } else {
         // Plain subscribe — server will replay nothing (normal behaviour).
         cmdChannels.set(id, channel)
@@ -512,8 +522,7 @@ export function centrifugoTransport(
             connect: {
               ...(token !== undefined
                 ? {
-                    token:
-                      typeof token === 'function' ? await token() : token,
+                    token: typeof token === 'function' ? await token() : token,
                   }
                 : {}),
               ...(connectData ? { data: connectData } : {}),
@@ -654,22 +663,34 @@ export function centrifugoTransport(
       }
 
       // Broadcast our join data to the presence channel.
-      const clientId = centrifugoClientId ?? `local-${Math.random().toString(36).slice(2)}`
+      const clientId =
+        centrifugoClientId ?? `local-${Math.random().toString(36).slice(2)}`
       // fire-and-forget; suppress unhandled rejection if socket closes before reply
-      void this.publish(prs, { type: 'prs:join', clientId, data } satisfies PrsJoin).catch(() => {})
+      void this.publish(prs, {
+        type: 'prs:join',
+        clientId,
+        data,
+      } satisfies PrsJoin).catch(() => {})
     },
 
     updatePresence(channel, data) {
       const prs = presenceChannel(channel)
       const clientId = centrifugoClientId ?? ''
-      void this.publish(prs, { type: 'prs:update', clientId, data } satisfies PrsUpdate).catch(() => {})
+      void this.publish(prs, {
+        type: 'prs:update',
+        clientId,
+        data,
+      } satisfies PrsUpdate).catch(() => {})
     },
 
     leavePresence(channel) {
       const prs = presenceChannel(channel)
       const clientId = centrifugoClientId ?? ''
 
-      void this.publish(prs, { type: 'prs:leave', clientId } satisfies PrsLeave).catch(() => {})
+      void this.publish(prs, {
+        type: 'prs:leave',
+        clientId,
+      } satisfies PrsLeave).catch(() => {})
 
       // Clean up sidecar subscription
       if (subscriptions.has(prs)) {

@@ -1,8 +1,15 @@
 import { use, useCallback, useEffect, useRef, useState } from 'react'
+import {
+  initOrFromArray,
+  mergeOr,
+  orAdd,
+  orHas,
+  orRemove,
+  orValues,
+} from '../core/crdt.js'
+import { RealtimeContext } from './context.js'
 import type { SyncedSetDef } from '../collections/syncedSet.js'
 import type { OrState } from '../core/crdt.js'
-import { initOrFromArray, mergeOr, orAdd, orHas, orRemove, orValues } from '../core/crdt.js'
-import { RealtimeContext } from './context.js'
 
 export interface UseSyncedSetOptions<
   T,
@@ -17,29 +24,29 @@ export interface UseSyncedSetOptions<
    *
    * @default []
    */
-  initial?: T[]
+  initial?: Array<T>
 }
 
 export interface UseSyncedSetResult<T> {
   /** Current set elements, reactive. */
-  values: T[]
+  values: Array<T>
   /**
    * Add an element to the set and broadcast to all peers.
    * Applied instantly. Concurrent `add()` calls from any client always
    * survive — an add always wins over a concurrent `remove()`.
    */
-  add(item: T): void
+  add: (item: T) => void
   /**
    * Remove an element from the set and broadcast to all peers.
    * Applied instantly. If another client concurrently adds the same element,
    * the add wins and the element remains in the set.
    */
-  remove(item: T): void
+  remove: (item: T) => void
   /**
    * Returns true if `item` is currently in the set.
    * Uses structural equality (JSON.stringify) so objects are compared by value.
    */
-  has(item: T): boolean
+  has: (item: T) => boolean
 }
 
 /**
@@ -86,7 +93,7 @@ export function useSyncedSet<
   // Entries get fresh unique tags — same as if each item had been `add()`ed.
   const crdtRef = useRef<OrState>(initOrFromArray(initial))
 
-  const [values, setValues] = useState<T[]>(initial)
+  const [values, setValues] = useState<Array<T>>(initial)
 
   const channelRef = useRef(channel)
   channelRef.current = channel
@@ -102,7 +109,7 @@ export function useSyncedSet<
         _crdt?: string
         entries?: Array<{ key: string; value: unknown; tag: string }>
       }
-      if (msg?._crdt !== 'or') return
+      if (msg._crdt !== 'or') return
 
       const incoming: OrState = { entries: msg.entries ?? [] }
       const merged = mergeOr(crdtRef.current, incoming)

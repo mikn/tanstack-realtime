@@ -14,10 +14,10 @@
  *  - multiple concurrent entries
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Store } from '@tanstack/store'
-import { ephemeralLiveOptions, createRealtimeClient } from '@tanstack/realtime'
-import type { RealtimeTransport, ConnectionStatus } from '@tanstack/realtime'
+import { createRealtimeClient, ephemeralLiveOptions } from '@tanstack/realtime'
+import type { ConnectionStatus, RealtimeTransport } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Mock transport with synchronous emit
@@ -36,7 +36,8 @@ function createMockTransport(): RealtimeTransport & {
     async connect() {},
     disconnect() {},
     subscribe(channel, onMessage) {
-      if (!channelListeners.has(channel)) channelListeners.set(channel, new Set())
+      if (!channelListeners.has(channel))
+        channelListeners.set(channel, new Set())
       channelListeners.get(channel)!.add(onMessage)
       return () => {
         channelListeners.get(channel)?.delete(onMessage)
@@ -57,17 +58,16 @@ type TypingUser = { userId: string; name: string }
 type WriteOp = { type: string; value?: unknown; key?: unknown }
 
 function driveSync(config: ReturnType<typeof ephemeralLiveOptions>): {
-  ops: WriteOp[]
+  ops: Array<WriteOp>
   stop: () => void
 } {
-  const ops: WriteOp[] = []
-  const stop =
-    config.sync!.sync({
-      begin: (_opts?: unknown) => {},
-      write: (op: WriteOp) => ops.push(op),
-      commit: () => {},
-      markReady: () => {},
-    }) ?? (() => {})
+  const ops: Array<WriteOp> = []
+  const stop = config.sync.sync({
+    begin: (_opts?: unknown) => {},
+    write: (op: WriteOp) => ops.push(op),
+    commit: () => {},
+    markReady: () => {},
+  })
   return { ops, stop }
 }
 
@@ -151,7 +151,10 @@ describe('ephemeralLiveOptions — event handling', () => {
     transport.emit('ch', { userId: 'u1', name: 'Alice' })
 
     expect(ops).toHaveLength(1)
-    expect(ops[0]).toMatchObject({ type: 'insert', value: { userId: 'u1', name: 'Alice' } })
+    expect(ops[0]).toMatchObject({
+      type: 'insert',
+      value: { userId: 'u1', name: 'Alice' },
+    })
     stop()
   })
 
@@ -173,7 +176,10 @@ describe('ephemeralLiveOptions — event handling', () => {
     transport.emit('ch', { userId: 'u1', name: 'Alice (typing...)' })
 
     expect(ops).toHaveLength(1)
-    expect(ops[0]).toMatchObject({ type: 'update', value: { userId: 'u1', name: 'Alice (typing...)' } })
+    expect(ops[0]).toMatchObject({
+      type: 'update',
+      value: { userId: 'u1', name: 'Alice (typing...)' },
+    })
     stop()
   })
 
@@ -353,10 +359,15 @@ describe('ephemeralLiveOptions — onEvent filtering', () => {
     transport.emit('ch', { type: 'typing', userId: 'u3', name: 'Carol' })
     // Carol is inserted; Alice (still live) is emitted as an update in the same diff.
     const insertOp = ops.find((o) => o.type === 'insert')
-    const cursorOp = ops.find((o) => (o.value as TypingUser | undefined)?.userId === 'u2')
+    const cursorOp = ops.find(
+      (o) => (o.value as TypingUser | undefined)?.userId === 'u2',
+    )
 
     expect(opsAfterFirst).toHaveLength(1)
-    expect(opsAfterFirst[0]).toMatchObject({ type: 'insert', value: { userId: 'u1' } })
+    expect(opsAfterFirst[0]).toMatchObject({
+      type: 'insert',
+      value: { userId: 'u1' },
+    })
     expect(insertOp).toMatchObject({ type: 'insert', value: { userId: 'u3' } })
     expect(cursorOp).toBeUndefined() // cursor event (u2) never entered the collection
     stop()
@@ -457,13 +468,12 @@ describe('ephemeralLiveOptions — cleanup', () => {
     })
 
     const markReady = vi.fn()
-    const stop =
-      config.sync!.sync({
-        begin: () => {},
-        write: () => {},
-        commit: () => {},
-        markReady,
-      }) ?? (() => {})
+    const stop = config.sync.sync({
+      begin: () => {},
+      write: () => {},
+      commit: () => {},
+      markReady,
+    })
 
     expect(markReady).toHaveBeenCalledTimes(1)
     stop()
@@ -485,7 +495,7 @@ describe('ephemeralLiveOptions — channel serialization', () => {
     // Discover the actual subscribed channel key.
     const registeredChannels = Array.from(transport.channelListeners.keys())
     expect(registeredChannels).toHaveLength(1)
-    const serializedChannel = registeredChannels[0]!
+    const serializedChannel = registeredChannels[0]
 
     transport.emit(serializedChannel, { userId: 'u1', name: 'Alice' })
     expect(ops).toHaveLength(1)

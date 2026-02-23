@@ -1,13 +1,12 @@
 import { Store } from '@tanstack/store'
-import type {
-  ConnectionStatus,
-  QueryKey,
-  RealtimeClient,
-  RealtimeClientOptions,
-} from './types.js'
 import { hasPresence } from './types.js'
 import { serializeKey } from './serializeKey.js'
 import { generateClientId } from './crdt.js'
+import type {
+  ConnectionStatus,
+  RealtimeClient,
+  RealtimeClientOptions,
+} from './types.js'
 
 /** Throw a consistent error when a non-presence transport is used for presence. */
 function presenceNotSupported(method: string): never {
@@ -45,7 +44,7 @@ export function createRealtimeClient(
   // round-trips are safe — the client can be destroyed and reconnected without
   // creating a second instance. This is important for React Strict Mode where
   // provider effects fire twice (mount → unmount → remount).
-  let statusSub: { unsubscribe(): void } | null = null
+  let statusSub: { unsubscribe: () => void } | null = null
 
   function ensureStatusSubscription(): void {
     if (statusSub !== null) return

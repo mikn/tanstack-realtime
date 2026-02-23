@@ -10,10 +10,13 @@
  *  - Multiple channels (channels[]) all go through onMessage
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Store } from '@tanstack/store'
-import { realtimeCollectionOptions, createRealtimeClient } from '@tanstack/realtime'
-import type { RealtimeTransport, ConnectionStatus } from '@tanstack/realtime'
+import {
+  createRealtimeClient,
+  realtimeCollectionOptions,
+} from '@tanstack/realtime'
+import type { ConnectionStatus, RealtimeTransport } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Mock transport with synchronous emit
@@ -50,17 +53,16 @@ type Todo = { id: string; text: string }
 
 // Drive the sync function synchronously, collecting all write operations.
 function driveSync(config: ReturnType<typeof realtimeCollectionOptions>): {
-  ops: WriteOp[]
+  ops: Array<WriteOp>
   stop: () => void
 } {
-  const ops: WriteOp[] = []
-  const stop =
-    config.sync!.sync({
-      begin: (_opts?: unknown) => {},
-      write: (op: WriteOp) => ops.push(op),
-      commit: () => {},
-      markReady: () => {},
-    }) ?? (() => {})
+  const ops: Array<WriteOp> = []
+  const stop = config.sync.sync({
+    begin: (_opts?: unknown) => {},
+    write: (op: WriteOp) => ops.push(op),
+    commit: () => {},
+    markReady: () => {},
+  })
   return { ops, stop }
 }
 
@@ -79,10 +81,16 @@ describe('realtimeCollectionOptions — default (no onMessage)', () => {
     })
     const { ops, stop } = driveSync(config)
 
-    transport.emit('todos', { action: 'insert', data: { id: 'a', text: 'Buy milk' } })
+    transport.emit('todos', {
+      action: 'insert',
+      data: { id: 'a', text: 'Buy milk' },
+    })
 
     expect(ops).toHaveLength(1)
-    expect(ops[0]).toMatchObject({ type: 'insert', value: { id: 'a', text: 'Buy milk' } })
+    expect(ops[0]).toMatchObject({
+      type: 'insert',
+      value: { id: 'a', text: 'Buy milk' },
+    })
     stop()
   })
 
@@ -96,10 +104,16 @@ describe('realtimeCollectionOptions — default (no onMessage)', () => {
     })
     const { ops, stop } = driveSync(config)
 
-    transport.emit('todos', { action: 'update', data: { id: 'a', text: 'Buy oat milk' } })
+    transport.emit('todos', {
+      action: 'update',
+      data: { id: 'a', text: 'Buy oat milk' },
+    })
 
     expect(ops).toHaveLength(1)
-    expect(ops[0]).toMatchObject({ type: 'update', value: { id: 'a', text: 'Buy oat milk' } })
+    expect(ops[0]).toMatchObject({
+      type: 'update',
+      value: { id: 'a', text: 'Buy oat milk' },
+    })
     stop()
   })
 
@@ -135,8 +149,8 @@ describe('realtimeCollectionOptions — default (no onMessage)', () => {
     // Unknown actions are still dispatched — the library doesn't restrict to insert/update/delete
     // at the applyMessage level. But 'noop' should produce a write op with type 'noop'.
     // This documents current behaviour: only 'delete' is special-cased; others fall through.
+    expect(ops).toHaveLength(1)
     stop()
-    // Test passes if no exception is thrown.
   })
 
   it('ignores messages without an action field', () => {
@@ -181,7 +195,11 @@ describe('realtimeCollectionOptions — onMessage transform hook', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
 
-    type SupabaseEvent = { eventType: 'INSERT' | 'UPDATE' | 'DELETE'; new: Todo; old: Todo }
+    type SupabaseEvent = {
+      eventType: 'INSERT' | 'UPDATE' | 'DELETE'
+      new: Todo
+      old: Todo
+    }
 
     const config = realtimeCollectionOptions<Todo>({
       client,
@@ -191,19 +209,36 @@ describe('realtimeCollectionOptions — onMessage transform hook', () => {
         const e = raw as SupabaseEvent
         if (e.eventType === 'INSERT') return { action: 'insert', data: e.new }
         if (e.eventType === 'UPDATE') return { action: 'update', data: e.new }
-        if (e.eventType === 'DELETE') return { action: 'delete', data: e.old }
-        return null
+        return { action: 'delete', data: e.old }
       },
     })
     const { ops, stop } = driveSync(config)
 
-    transport.emit('todos', { eventType: 'INSERT', new: { id: 'x', text: 'Walk dog' }, old: {} })
-    transport.emit('todos', { eventType: 'UPDATE', new: { id: 'x', text: 'Walk the dog' }, old: {} })
-    transport.emit('todos', { eventType: 'DELETE', new: {}, old: { id: 'x', text: 'Walk the dog' } })
+    transport.emit('todos', {
+      eventType: 'INSERT',
+      new: { id: 'x', text: 'Walk dog' },
+      old: {},
+    })
+    transport.emit('todos', {
+      eventType: 'UPDATE',
+      new: { id: 'x', text: 'Walk the dog' },
+      old: {},
+    })
+    transport.emit('todos', {
+      eventType: 'DELETE',
+      new: {},
+      old: { id: 'x', text: 'Walk the dog' },
+    })
 
     expect(ops).toHaveLength(3)
-    expect(ops[0]).toMatchObject({ type: 'insert', value: { id: 'x', text: 'Walk dog' } })
-    expect(ops[1]).toMatchObject({ type: 'update', value: { id: 'x', text: 'Walk the dog' } })
+    expect(ops[0]).toMatchObject({
+      type: 'insert',
+      value: { id: 'x', text: 'Walk dog' },
+    })
+    expect(ops[1]).toMatchObject({
+      type: 'update',
+      value: { id: 'x', text: 'Walk the dog' },
+    })
     expect(ops[2]).toMatchObject({ type: 'delete', key: 'x' })
     stop()
   })
@@ -253,9 +288,11 @@ describe('realtimeCollectionOptions — onMessage transform hook', () => {
       channel: 'todos',
       getKey: (t) => t.id,
       onMessage: (_raw) =>
-        ({ data: { id: 'a', text: 'x' } } as unknown as ReturnType<
-          NonNullable<Parameters<typeof realtimeCollectionOptions>[0]['onMessage']>
-        >),
+        ({ data: { id: 'a', text: 'x' } }) as unknown as ReturnType<
+          NonNullable<
+            Parameters<typeof realtimeCollectionOptions>[0]['onMessage']
+          >
+        >,
     })
     const { ops, stop } = driveSync(config)
 
@@ -271,7 +308,8 @@ describe('realtimeCollectionOptions — onMessage transform hook', () => {
 
     const onMessage = vi.fn((raw: unknown) => {
       const e = raw as { type: string; payload: Todo }
-      if (e.type === 'todo:created') return { action: 'insert' as const, data: e.payload }
+      if (e.type === 'todo:created')
+        return { action: 'insert' as const, data: e.payload }
       return null // ignore other event types
     })
 
@@ -283,9 +321,18 @@ describe('realtimeCollectionOptions — onMessage transform hook', () => {
     })
     const { ops, stop } = driveSync(config)
 
-    transport.emit('todos', { type: 'todo:created', payload: { id: 'b', text: 'Water plants' } })
-    transport.emit('todos', { type: 'cursor:moved', payload: { x: 100, y: 200 } }) // should be filtered
-    transport.emit('todos', { type: 'todo:created', payload: { id: 'c', text: 'Feed cat' } })
+    transport.emit('todos', {
+      type: 'todo:created',
+      payload: { id: 'b', text: 'Water plants' },
+    })
+    transport.emit('todos', {
+      type: 'cursor:moved',
+      payload: { x: 100, y: 200 },
+    }) // should be filtered
+    transport.emit('todos', {
+      type: 'todo:created',
+      payload: { id: 'c', text: 'Feed cat' },
+    })
 
     expect(ops).toHaveLength(2)
     expect(ops[0]).toMatchObject({ type: 'insert', value: { id: 'b' } })
@@ -329,14 +376,19 @@ describe('realtimeCollectionOptions — onMessage transform hook', () => {
       onMessage: (raw) => {
         const e = raw as RawEvent
         if (e.op === 'add') return { action: 'insert', data: e.item }
-        if (e.op === 'rm') return { action: 'delete', data: e.item }
-        return null
+        return { action: 'delete', data: e.item }
       },
     })
     const { ops, stop } = driveSync(config)
 
-    transport.emit('todos:us', { op: 'add', item: { id: '1', text: 'US task' } })
-    transport.emit('todos:eu', { op: 'add', item: { id: '2', text: 'EU task' } })
+    transport.emit('todos:us', {
+      op: 'add',
+      item: { id: '1', text: 'US task' },
+    })
+    transport.emit('todos:eu', {
+      op: 'add',
+      item: { id: '2', text: 'EU task' },
+    })
     transport.emit('todos:ap', { op: 'rm', item: { id: '1', text: 'US task' } })
 
     expect(ops).toHaveLength(3)
@@ -362,7 +414,10 @@ describe('realtimeCollectionOptions — onMessage transform hook', () => {
     stop()
 
     // After stopping, no more messages should be processed.
-    transport.emit('todos', { action: 'insert', data: { id: 'z', text: 'ignored' } })
+    transport.emit('todos', {
+      action: 'insert',
+      data: { id: 'z', text: 'ignored' },
+    })
     expect(onMessage).not.toHaveBeenCalled()
   })
 })

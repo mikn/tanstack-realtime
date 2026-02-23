@@ -5,9 +5,9 @@
  * still loading.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Store } from '@tanstack/store'
-import { liveChannelOptions, createRealtimeClient } from '@tanstack/realtime'
+import { createRealtimeClient, liveChannelOptions } from '@tanstack/realtime'
 import type { RealtimeTransport } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
@@ -18,7 +18,9 @@ function createMockTransport(): RealtimeTransport & {
   emit: (channel: string, data: unknown) => void
 } {
   const listeners = new Map<string, Set<(data: unknown) => void>>()
-  const store = new Store<'disconnected' | 'connected' | 'connecting' | 'reconnecting'>('connected')
+  const store = new Store<
+    'disconnected' | 'connected' | 'connecting' | 'reconnecting'
+  >('connected')
 
   return {
     store,
@@ -27,7 +29,9 @@ function createMockTransport(): RealtimeTransport & {
     subscribe(channel, onMessage) {
       if (!listeners.has(channel)) listeners.set(channel, new Set())
       listeners.get(channel)!.add(onMessage)
-      return () => { listeners.get(channel)?.delete(onMessage) }
+      return () => {
+        listeners.get(channel)?.delete(onMessage)
+      }
     },
     async publish() {},
     emit(channel, data) {
@@ -40,17 +44,16 @@ function createMockTransport(): RealtimeTransport & {
 type WriteOp = { type: string; value?: unknown; key?: unknown }
 
 function driveSync(config: ReturnType<typeof liveChannelOptions>): {
-  ops: WriteOp[]
+  ops: Array<WriteOp>
   stop: () => void
 } {
-  const ops: WriteOp[] = []
-  const stop =
-    config.sync!.sync({
-      begin: () => {},
-      write: (op: WriteOp) => ops.push(op),
-      commit: () => {},
-      markReady: () => {},
-    }) ?? (() => {})
+  const ops: Array<WriteOp> = []
+  const stop = config.sync.sync({
+    begin: () => {},
+    write: (op: WriteOp) => ops.push(op),
+    commit: () => {},
+    markReady: () => {},
+  })
   return { ops, stop }
 }
 
@@ -70,8 +73,12 @@ function deferred<T>() {
 // ---------------------------------------------------------------------------
 
 describe('liveChannelOptions — ordering guarantee', () => {
-  beforeEach(() => { vi.useFakeTimers() })
-  afterEach(() => { vi.useRealTimers() })
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
 
   it('history rows appear before buffered live events', async () => {
     const transport = createMockTransport()
@@ -102,10 +109,10 @@ describe('liveChannelOptions — ordering guarantee', () => {
 
     expect(ops).toHaveLength(3)
     // History must come first.
-    expect((ops[0]!.value as { id: string }).id).toBe('h-1')
-    expect((ops[1]!.value as { id: string }).id).toBe('h-2')
+    expect((ops[0].value as { id: string }).id).toBe('h-1')
+    expect((ops[1].value as { id: string }).id).toBe('h-2')
     // Live event is replayed after history, in arrival order.
-    expect((ops[2]!.value as { id: string }).id).toBe('live-1')
+    expect((ops[2].value as { id: string }).id).toBe('live-1')
   })
 
   it('multiple buffered events are replayed in arrival order after history', async () => {
@@ -132,8 +139,8 @@ describe('liveChannelOptions — ordering guarantee', () => {
     await vi.advanceTimersByTimeAsync(0)
 
     expect(ops.map((o) => (o.value as { id: string }).id)).toEqual([
-      'h1',   // history
-      'e1',   // buffered, replayed in arrival order
+      'h1', // history
+      'e1', // buffered, replayed in arrival order
       'e2',
       'e3',
     ])

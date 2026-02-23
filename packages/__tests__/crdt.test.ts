@@ -7,23 +7,23 @@
  * - Correctness: operations produce the expected values
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import {
-  tickClock,
   advanceClock,
-  lwwWins,
-  pnValue,
-  mergePn,
-  pnIncrement,
-  pnDecrement,
-  orValues,
-  mergeOr,
-  orAdd,
-  orRemove,
-  orHas,
   initOrFromArray,
+  lwwWins,
+  mergeOr,
+  mergePn,
+  orAdd,
+  orHas,
+  orRemove,
+  orValues,
+  pnDecrement,
+  pnIncrement,
+  pnValue,
+  tickClock,
 } from '@tanstack/realtime'
-import type { LwwState, PnState, OrState } from '@tanstack/realtime'
+import type { LwwState, OrState, PnState } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Lamport clock

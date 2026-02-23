@@ -19,7 +19,8 @@
  * Used for LWW tie-breaking and PN-Counter per-client vectors.
  */
 export function generateClientId(): string {
-  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+  return typeof crypto !== 'undefined' &&
+    typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
 }
@@ -188,17 +189,17 @@ export interface OrEntry {
 }
 
 export interface OrState {
-  entries: OrEntry[]
+  entries: Array<OrEntry>
 }
 
 /** Wire payload for one OR-Set field or a standalone synced-set channel. */
 export interface OrWire {
   type: 'or'
-  entries: OrEntry[]
+  entries: Array<OrEntry>
 }
 
 /** Derive the current set values (deduped by key). */
-export function orValues<T>(state: OrState): T[] {
+export function orValues<T>(state: OrState): Array<T> {
   const seen = new Map<string, T>()
   for (const e of state.entries) seen.set(e.key, e.value as T)
   return Array.from(seen.values())
@@ -239,7 +240,7 @@ export function orHas(state: OrState, value: unknown): boolean {
  * Each element gets a fresh unique tag, as if it had been `orAdd`ed.
  * Use this when seeding OR-Set state from a `queryFn` result or `initial` value.
  */
-export function initOrFromArray(items: unknown[]): OrState {
+export function initOrFromArray(items: Array<unknown>): OrState {
   let state: OrState = { entries: [] }
   for (const item of items) state = orAdd(state, item)
   return state

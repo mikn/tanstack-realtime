@@ -6,10 +6,13 @@
  * Read these tests top-to-bottom as a learning guide.
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Store } from '@tanstack/store'
-import { realtimeCollectionOptions, createRealtimeClient } from '@tanstack/realtime'
-import type { RealtimeTransport, ConnectionStatus } from '@tanstack/realtime'
+import {
+  createRealtimeClient,
+  realtimeCollectionOptions,
+} from '@tanstack/realtime'
+import type { ConnectionStatus, RealtimeTransport } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -19,7 +22,7 @@ interface Todo {
   id: string
   title: string
   votes: number
-  tags: string[]
+  tags: Array<string>
 }
 
 type WriteOp = { type: string; value?: unknown; key?: unknown }
@@ -36,7 +39,9 @@ function createMockTransport(): RealtimeTransport & {
   return {
     store,
     publishCalls,
-    setStatus(s: ConnectionStatus) { store.setState(() => s) },
+    setStatus(s: ConnectionStatus) {
+      store.setState(() => s)
+    },
     async connect() {},
     disconnect() {},
     subscribe(channel, onMessage) {
@@ -54,18 +59,21 @@ function createMockTransport(): RealtimeTransport & {
   }
 }
 
-function driveSync(
-  config: ReturnType<typeof realtimeCollectionOptions>,
-): { ops: WriteOp[]; stop: () => void; isReady: () => boolean } {
-  const ops: WriteOp[] = []
+function driveSync(config: ReturnType<typeof realtimeCollectionOptions>): {
+  ops: Array<WriteOp>
+  stop: () => void
+  isReady: () => boolean
+} {
+  const ops: Array<WriteOp> = []
   let ready = false
-  const stop =
-    config.sync!.sync({
-      begin: () => {},
-      write: (op: WriteOp) => ops.push(op),
-      commit: () => {},
-      markReady: () => { ready = true },
-    }) ?? (() => {})
+  const stop = config.sync.sync({
+    begin: () => {},
+    write: (op: WriteOp) => ops.push(op),
+    commit: () => {},
+    markReady: () => {
+      ready = true
+    },
+  })
   return { ops, stop, isReady: () => ready }
 }
 
@@ -77,16 +85,14 @@ describe('spectrum step 1: queryFn only (server data)', () => {
   it('loads data from the server without a client or channel', async () => {
     const config = realtimeCollectionOptions<Todo, string>({
       getKey: (t) => t.id,
-      queryFn: async () => [
-        { id: '1', title: 'Buy milk', votes: 0, tags: [] },
-      ],
+      queryFn: async () => [{ id: '1', title: 'Buy milk', votes: 0, tags: [] }],
     })
     const { ops, isReady } = driveSync(config)
     await new Promise((r) => setTimeout(r, 0))
 
     expect(isReady()).toBe(true)
     expect(ops).toHaveLength(1)
-    expect((ops[0]!.value as Todo).title).toBe('Buy milk')
+    expect((ops[0].value as Todo).title).toBe('Buy milk')
   })
 })
 
@@ -96,7 +102,7 @@ describe('spectrum step 1: queryFn only (server data)', () => {
 
 describe('spectrum step 2: + mutations (server-persisted writes)', () => {
   it('mutations persist via callbacks without publishing to any channel', async () => {
-    const persisted: Todo[] = []
+    const persisted: Array<Todo> = []
 
     const config = realtimeCollectionOptions<Todo, string>({
       getKey: (t) => t.id,
@@ -143,7 +149,7 @@ describe('spectrum step 3: + client + channel (realtime peer sync)', () => {
     })
 
     expect(ops).toHaveLength(1)
-    expect((ops[0]!.value as Todo).title).toBe('From peer')
+    expect((ops[0].value as Todo).title).toBe('From peer')
   })
 
   it('publishes back to the channel after a successful mutation', async () => {
@@ -165,7 +171,7 @@ describe('spectrum step 3: + client + channel (realtime peer sync)', () => {
     } as any)
 
     expect(transport.publishCalls).toHaveLength(1)
-    expect((transport.publishCalls[0]!.data as any).action).toBe('insert')
+    expect((transport.publishCalls[0].data as any).action).toBe('insert')
   })
 })
 
@@ -202,12 +208,17 @@ describe('spectrum step 4: + fields (CRDT convergence)', () => {
       data: { id: '1', title: 'Renamed', votes: 5, tags: ['bug'] },
       _crdt: {
         fields: {
-          title: { type: 'lww', value: 'Renamed', clock: 100, clientId: 'peer-1' },
+          title: {
+            type: 'lww',
+            value: 'Renamed',
+            clock: 100,
+            clientId: 'peer-1',
+          },
         },
       },
     })
 
-    const lastOp = ops[ops.length - 1]!
+    const lastOp = ops[ops.length - 1]
     expect((lastOp.value as Todo).title).toBe('Renamed')
   })
 
@@ -215,7 +226,9 @@ describe('spectrum step 4: + fields (CRDT convergence)', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
 
-    interface TodoWithDraft extends Todo { draft?: boolean }
+    interface TodoWithDraft extends Todo {
+      draft?: boolean
+    }
 
     const config = realtimeCollectionOptions<TodoWithDraft, string>({
       client,
@@ -226,7 +239,11 @@ describe('spectrum step 4: + fields (CRDT convergence)', () => {
         draft: 'local',
       },
       onUpdate: async () => ({
-        id: '1', title: 'Updated', votes: 0, tags: [], draft: true,
+        id: '1',
+        title: 'Updated',
+        votes: 0,
+        tags: [],
+        draft: true,
       }),
     })
     driveSync(config)
@@ -243,7 +260,12 @@ describe('spectrum step 4: + fields (CRDT convergence)', () => {
       data: { id: '1', title: 'Peer edit', votes: 0, tags: [] },
       _crdt: {
         fields: {
-          title: { type: 'lww', value: 'Peer edit', clock: 50, clientId: 'peer' },
+          title: {
+            type: 'lww',
+            value: 'Peer edit',
+            clock: 50,
+            clientId: 'peer',
+          },
         },
       },
     })
@@ -255,7 +277,7 @@ describe('spectrum step 4: + fields (CRDT convergence)', () => {
       },
     } as any)
 
-    const published = transport.publishCalls[0]!.data as any
+    const published = transport.publishCalls[0].data as any
     expect(published.data.draft).toBeUndefined()
   })
 })
@@ -275,7 +297,10 @@ describe('spectrum step 5: + refetchOnReconnect (gap recovery)', () => {
       client,
       channel: 'todos',
       getKey: (t) => t.id,
-      queryFn: async () => { fetchCount++; return [] },
+      queryFn: async () => {
+        fetchCount++
+        return []
+      },
       refetchOnReconnect: true,
     })
     driveSync(config)

@@ -2,7 +2,7 @@
  * Tests for the deduplication filter (createDedup).
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { createDedup } from '@tanstack/realtime'
 
 describe('createDedup', () => {

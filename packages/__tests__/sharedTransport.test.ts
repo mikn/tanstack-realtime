@@ -7,17 +7,17 @@
  * exercise the real coordination logic without any network I/O.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Store } from '@tanstack/store'
 import {
   createSharedWorkerServer,
   createSharedWorkerTransport,
 } from '@tanstack/realtime'
 import type {
-  RealtimeTransport,
-  PresenceCapable,
   ConnectionStatus,
+  PresenceCapable,
   PresenceUser,
+  RealtimeTransport,
   SharedWorkerServerOptions,
 } from '@tanstack/realtime'
 
@@ -30,7 +30,7 @@ class MockMessagePort {
   private partner: MockMessagePort | null = null
   private closeListeners: Array<() => void> = []
   private started = false
-  private queue: unknown[] = []
+  private queue: Array<unknown> = []
 
   static pair(): [MockMessagePort, MockMessagePort] {
     const a = new MockMessagePort()
@@ -75,7 +75,10 @@ class MockMessagePort {
 // SharedWorker mock — uses a URL registry to connect tabs to servers
 // ---------------------------------------------------------------------------
 
-const workerServers = new Map<string, ReturnType<typeof createSharedWorkerServer>>()
+const workerServers = new Map<
+  string,
+  ReturnType<typeof createSharedWorkerServer>
+>()
 
 class MockSharedWorker {
   readonly port: MockMessagePort
@@ -85,7 +88,8 @@ class MockSharedWorker {
   constructor(url: string | URL) {
     const key = String(url)
     const server = workerServers.get(key)
-    if (!server) throw new Error(`No SharedWorker server registered for: ${key}`)
+    if (!server)
+      throw new Error(`No SharedWorker server registered for: ${key}`)
 
     const [tabPort, workerPort] = MockMessagePort.pair()
     this.port = tabPort
@@ -109,15 +113,22 @@ function createMockInnerTransport(): (RealtimeTransport & PresenceCapable) & {
   setStatus: (s: ConnectionStatus) => void
 } {
   const listeners = new Map<string, Set<(data: unknown) => void>>()
-  const presenceListeners = new Map<string, Set<(users: ReadonlyArray<PresenceUser>) => void>>()
+  const presenceListeners = new Map<
+    string,
+    Set<(users: ReadonlyArray<PresenceUser>) => void>
+  >()
   const store = new Store<ConnectionStatus>('connected')
   const publishCalls: Array<{ channel: string; data: unknown }> = []
 
   return {
     store,
     publishCalls,
-    async connect() { store.setState(() => 'connected') },
-    disconnect() { store.setState(() => 'disconnected') },
+    async connect() {
+      store.setState(() => 'connected')
+    },
+    disconnect() {
+      store.setState(() => 'disconnected')
+    },
     subscribe(channel, onMessage) {
       if (!listeners.has(channel)) listeners.set(channel, new Set())
       listeners.get(channel)!.add(onMessage)
@@ -133,7 +144,8 @@ function createMockInnerTransport(): (RealtimeTransport & PresenceCapable) & {
     updatePresence() {},
     leavePresence() {},
     onPresenceChange(channel, callback) {
-      if (!presenceListeners.has(channel)) presenceListeners.set(channel, new Set())
+      if (!presenceListeners.has(channel))
+        presenceListeners.set(channel, new Set())
       presenceListeners.get(channel)!.add(callback)
       return () => presenceListeners.get(channel)?.delete(callback)
     },
@@ -141,7 +153,9 @@ function createMockInnerTransport(): (RealtimeTransport & PresenceCapable) & {
       const cbs = listeners.get(channel)
       if (cbs) for (const cb of cbs) cb(data)
     },
-    setStatus(s) { store.setState(() => s) },
+    setStatus(s) {
+      store.setState(() => s)
+    },
     emitPresence(channel, users) {
       const cbs = presenceListeners.get(channel)
       if (cbs) for (const cb of cbs) cb(users)
@@ -155,11 +169,17 @@ function createMockInnerTransport(): (RealtimeTransport & PresenceCapable) & {
 
 const TEST_URL = 'https://worker.example.com/realtime.js'
 
-function setupWorker(inner?: RealtimeTransport & PresenceCapable, options?: SharedWorkerServerOptions) {
+function setupWorker(
+  inner?: RealtimeTransport & PresenceCapable,
+  options?: SharedWorkerServerOptions,
+) {
   const transport = inner ?? createMockInnerTransport()
-  const server = createSharedWorkerServer(transport as RealtimeTransport & PresenceCapable, options)
+  const server = createSharedWorkerServer(transport, options)
   workerServers.set(TEST_URL, server)
-  return { transport: transport as ReturnType<typeof createMockInnerTransport>, server }
+  return {
+    transport: transport as ReturnType<typeof createMockInnerTransport>,
+    server,
+  }
 }
 
 function connectTab() {
@@ -318,16 +338,23 @@ describe('createSharedWorkerServer', () => {
     await tab.publish('ch', { payload: 42 })
 
     expect(transport.publishCalls).toHaveLength(1)
-    expect(transport.publishCalls[0]).toEqual({ channel: 'ch', data: { payload: 42 } })
+    expect(transport.publishCalls[0]).toEqual({
+      channel: 'ch',
+      data: { payload: 42 },
+    })
   })
 
   it('publish error is returned to the originating tab', async () => {
     const { transport } = setupWorker()
-    vi.spyOn(transport, 'publish').mockRejectedValueOnce(new Error('server error'))
+    vi.spyOn(transport, 'publish').mockRejectedValueOnce(
+      new Error('server error'),
+    )
 
     const tab = connectTab()
 
-    await expect(tab.publish('ch', { bad: true })).rejects.toThrow('server error')
+    await expect(tab.publish('ch', { bad: true })).rejects.toThrow(
+      'server error',
+    )
   })
 
   it('multiple tabs can publish independently', async () => {
@@ -340,7 +367,10 @@ describe('createSharedWorkerServer', () => {
     await tab2.publish('ch', 'from-tab2')
 
     expect(transport.publishCalls).toHaveLength(2)
-    expect(transport.publishCalls.map((c) => c.data)).toEqual(['from-tab1', 'from-tab2'])
+    expect(transport.publishCalls.map((c) => c.data)).toEqual([
+      'from-tab1',
+      'from-tab2',
+    ])
   })
 
   it('two concurrent publish requests both resolve with their own requestIds', async () => {
@@ -353,8 +383,8 @@ describe('createSharedWorkerServer', () => {
       tab.publish('ch', 'b'),
     ])
 
-    expect(results[0]!.status).toBe('fulfilled')
-    expect(results[1]!.status).toBe('fulfilled')
+    expect(results[0].status).toBe('fulfilled')
+    expect(results[1].status).toBe('fulfilled')
     expect(transport.publishCalls).toHaveLength(2)
   })
 
@@ -540,7 +570,10 @@ describe('createSharedWorkerServer', () => {
     tab1.onPresenceChange('ch', vi.fn())
 
     const v1 = [{ connectionId: 'c1', data: {} }]
-    const v2 = [{ connectionId: 'c1', data: {} }, { connectionId: 'c2', data: {} }]
+    const v2 = [
+      { connectionId: 'c1', data: {} },
+      { connectionId: 'c2', data: {} },
+    ]
     inner.emitPresence('ch', v1)
     inner.emitPresence('ch', v2)
 
@@ -723,7 +756,7 @@ describe('createSharedWorkerTransport', () => {
   it('store updates reactively as status changes arrive', () => {
     const { transport } = setupWorker()
     const tab = connectTab()
-    const statuses: string[] = []
+    const statuses: Array<string> = []
     tab.store.subscribe((s) => statuses.push(s))
 
     transport.setStatus('reconnecting')
@@ -801,7 +834,7 @@ describe('createSharedWorkerTransport', () => {
 
     const tab = connectTab()
     await expect(tab.publish('ch', { data: 1 })).resolves.toBeUndefined()
-    expect(transport.publishCalls[0]!.data).toEqual({ data: 1 })
+    expect(transport.publishCalls[0].data).toEqual({ data: 1 })
   })
 
   it('connect triggers inner transport connect', async () => {
@@ -874,7 +907,10 @@ describe('createSharedWorkerTransport', () => {
 
   it('accepts SharedWorkerTransportOptions object', () => {
     setupWorker()
-    const tab = createSharedWorkerTransport({ url: TEST_URL, publishTimeout: 5000 })
+    const tab = createSharedWorkerTransport({
+      url: TEST_URL,
+      publishTimeout: 5000,
+    })
     expect(tab.store).toBeDefined()
   })
 
@@ -885,12 +921,17 @@ describe('createSharedWorkerTransport', () => {
     setupWorker(inner)
 
     vi.useFakeTimers()
-    const tab = createSharedWorkerTransport({ url: TEST_URL, publishTimeout: 1000 })
+    const tab = createSharedWorkerTransport({
+      url: TEST_URL,
+      publishTimeout: 1000,
+    })
     const publishPromise = tab.publish('ch', { data: 1 })
 
     vi.advanceTimersByTime(1001)
 
-    await expect(publishPromise).rejects.toThrow('[SharedWorkerTransport] publish timed out after 1000ms')
+    await expect(publishPromise).rejects.toThrow(
+      '[SharedWorkerTransport] publish timed out after 1000ms',
+    )
     vi.useRealTimers()
   })
 })

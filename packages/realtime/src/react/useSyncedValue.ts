@@ -1,8 +1,8 @@
 import { use, useCallback, useEffect, useRef, useState } from 'react'
-import type { SyncedValueDef } from '../collections/syncedValue.js'
-import type { LwwState } from '../core/crdt.js'
 import { advanceClock, lwwWins, tickClock } from '../core/crdt.js'
 import { RealtimeContext } from './context.js'
+import type { SyncedValueDef } from '../collections/syncedValue.js'
+import type { LwwState } from '../core/crdt.js'
 
 export interface UseSyncedValueOptions<
   T,
@@ -26,7 +26,7 @@ export interface UseSyncedValueResult<T> {
    * Applied instantly. Uses a Lamport clock with clientId tie-breaking so
    * concurrent writes from multiple clients always converge to the same value.
    */
-  set(value: T): void
+  set: (value: T) => void
 }
 
 /**
@@ -83,7 +83,7 @@ export function useSyncedValue<
         clock?: number
         clientId?: string
       }
-      if (msg?._crdt !== 'lww') return
+      if (msg._crdt !== 'lww') return
 
       const incoming = {
         clock: msg.clock ?? 0,

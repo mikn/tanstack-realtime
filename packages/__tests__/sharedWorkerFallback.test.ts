@@ -15,10 +15,17 @@
  * to control the presence/absence of the global, ensuring isolation.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Store } from '@tanstack/store'
-import { isSharedWorkerSupported, createSharedWorkerTransport } from '@tanstack/realtime'
-import type { RealtimeTransport, PresenceCapable, ConnectionStatus } from '@tanstack/realtime'
+import {
+  createSharedWorkerTransport,
+  isSharedWorkerSupported,
+} from '@tanstack/realtime'
+import type {
+  ConnectionStatus,
+  PresenceCapable,
+  RealtimeTransport,
+} from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Minimal RealtimeTransport & PresenceCapable stub for fallback testing
@@ -110,11 +117,15 @@ describe('isSharedWorkerSupported', () => {
     const saved = removeSharedWorker()
     try {
       // Without SharedWorker
-      expect(isSharedWorkerSupported()).toBe(typeof SharedWorker !== 'undefined')
+      expect(isSharedWorkerSupported()).toBe(
+        typeof SharedWorker !== 'undefined',
+      )
 
       // With SharedWorker
       ;(globalThis as Record<string, unknown>)['SharedWorker'] = class {}
-      expect(isSharedWorkerSupported()).toBe(typeof SharedWorker !== 'undefined')
+      expect(isSharedWorkerSupported()).toBe(
+        typeof SharedWorker !== 'undefined',
+      )
     } finally {
       restoreSharedWorker(saved)
     }
@@ -194,16 +205,18 @@ describe('createSharedWorkerTransport — fallback when SharedWorker is unavaila
     const fallbackTransport = createFallbackTransport()
     const fallback = vi.fn(() => fallbackTransport)
 
-    const result = createSharedWorkerTransport('wss://example.com/worker.js', fallback)
+    const result = createSharedWorkerTransport(
+      'wss://example.com/worker.js',
+      fallback,
+    )
 
     expect(result).toBe(fallbackTransport)
   })
 
   it('does not throw when a fallback is provided', () => {
     expect(() => {
-      createSharedWorkerTransport(
-        'wss://example.com/worker.js',
-        () => createFallbackTransport(),
+      createSharedWorkerTransport('wss://example.com/worker.js', () =>
+        createFallbackTransport(),
       )
     }).not.toThrow()
   })
@@ -245,7 +258,10 @@ describe('createSharedWorkerTransport — fallback is not called when SharedWork
 
     try {
       // May throw because the mock needs a server registration — that's fine.
-      createSharedWorkerTransport('wss://not-registered.example.com/worker.js', fallback)
+      createSharedWorkerTransport(
+        'wss://not-registered.example.com/worker.js',
+        fallback,
+      )
     } catch {
       // Expected: MockSharedWorker throws "No SharedWorker server registered".
       // The important thing is that the fallback was NOT called.

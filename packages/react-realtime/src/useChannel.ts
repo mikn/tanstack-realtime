@@ -1,7 +1,7 @@
 import { use, useCallback, useEffect, useRef } from 'react'
-import type { QueryKey } from '@tanstack/realtime'
 import { serializeKey } from '@tanstack/realtime'
 import { RealtimeContext } from './context.js'
+import type { QueryKey } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -81,8 +81,8 @@ export function useChannel(
     return client.subscribe(serializedChannel, (data) =>
       onMessageRef.current?.(data),
     )
-  // Re-subscribe only when the channel string or client instance changes.
-  }, [client, serializedChannel, Boolean(onMessage)])  // eslint-disable-line react-hooks/exhaustive-deps
+    // Re-subscribe only when the channel string or client instance changes.
+  }, [client, serializedChannel, Boolean(onMessage)]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const publish = useCallback(
     (data: unknown): Promise<void> => client.publish(serializedChannel, data),

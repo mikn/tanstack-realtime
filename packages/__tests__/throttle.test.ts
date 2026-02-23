@@ -2,7 +2,7 @@
  * Tests for the throttle utility.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { throttle } from '@tanstack/realtime'
 
 describe('throttle', () => {

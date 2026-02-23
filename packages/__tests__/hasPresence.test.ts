@@ -9,10 +9,28 @@
  *  - destroy() + connect() lifecycle is safe (React Strict Mode)
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Store } from '@tanstack/store'
-import { hasPresence, createRealtimeClient } from '@tanstack/realtime'
-import type { RealtimeTransport, PresenceCapable, ConnectionStatus } from '@tanstack/realtime'
+import {
+  createOfflineQueue,
+  createRealtimeClient,
+  hasPresence,
+  withGapRecovery,
+} from '@tanstack/realtime'
+
+// ---------------------------------------------------------------------------
+// withGapRecovery — throws on presence when inner is base-only
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// createOfflineQueue — throws on presence when inner is base-only
+// ---------------------------------------------------------------------------
+
+import type {
+  ConnectionStatus,
+  PresenceCapable,
+  RealtimeTransport,
+} from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Mock transports
@@ -97,12 +115,18 @@ describe('hasPresence', () => {
     if (hasPresence(t)) {
       // TypeScript narrowed to RealtimeTransport & PresenceCapable inside this block.
       // If this compiles without error the narrowing works.
+      // eslint-disable-next-line vitest/no-conditional-expect
       expect(typeof t.joinPresence).toBe('function')
+      // eslint-disable-next-line vitest/no-conditional-expect
       expect(typeof t.updatePresence).toBe('function')
+      // eslint-disable-next-line vitest/no-conditional-expect
       expect(typeof t.leavePresence).toBe('function')
+      // eslint-disable-next-line vitest/no-conditional-expect
       expect(typeof t.onPresenceChange).toBe('function')
     } else {
-      throw new Error('Expected hasPresence to return true for a presence transport')
+      throw new Error(
+        'Expected hasPresence to return true for a presence transport',
+      )
     }
   })
 })
@@ -129,7 +153,9 @@ describe('createRealtimeClient — presence guards (base transport)', () => {
 
   it('throws for onPresenceChange with a descriptive message', () => {
     const client = createRealtimeClient({ transport: createBaseTransport() })
-    expect(() => client.onPresenceChange('ch', vi.fn())).toThrow('PresenceCapable')
+    expect(() => client.onPresenceChange('ch', vi.fn())).toThrow(
+      'PresenceCapable',
+    )
   })
 
   it('error message names the failing method', () => {
@@ -154,7 +180,9 @@ describe('createRealtimeClient — presence delegation (presence transport)', ()
     const transport = createPresenceTransport()
     const client = createRealtimeClient({ transport })
     client.updatePresence('ch', { status: 'busy' })
-    expect(transport.updatePresence).toHaveBeenCalledWith('ch', { status: 'busy' })
+    expect(transport.updatePresence).toHaveBeenCalledWith('ch', {
+      status: 'busy',
+    })
   })
 
   it('delegates leavePresence to the transport', () => {
@@ -243,12 +271,6 @@ describe('createRealtimeClient — lifecycle', () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// withGapRecovery — throws on presence when inner is base-only
-// ---------------------------------------------------------------------------
-
-import { withGapRecovery } from '@tanstack/realtime'
-
 describe('withGapRecovery — presence guards', () => {
   it('throws joinPresence when inner transport is base-only', () => {
     const inner = createBaseTransport()
@@ -271,7 +293,9 @@ describe('withGapRecovery — presence guards', () => {
   it('throws onPresenceChange when inner transport is base-only', () => {
     const inner = createBaseTransport()
     const transport = withGapRecovery(inner, { onGap: vi.fn() })
-    expect(() => transport.onPresenceChange('ch', vi.fn())).toThrow('withGapRecovery')
+    expect(() => transport.onPresenceChange('ch', vi.fn())).toThrow(
+      'withGapRecovery',
+    )
   })
 
   it('delegates presence methods when inner is presence-capable', () => {
@@ -281,12 +305,6 @@ describe('withGapRecovery — presence guards', () => {
     expect(inner.joinPresence).toHaveBeenCalledWith('ch', { id: 1 })
   })
 })
-
-// ---------------------------------------------------------------------------
-// createOfflineQueue — throws on presence when inner is base-only
-// ---------------------------------------------------------------------------
-
-import { createOfflineQueue } from '@tanstack/realtime'
 
 describe('createOfflineQueue — presence guards', () => {
   it('throws joinPresence when inner transport is base-only', () => {
@@ -310,7 +328,9 @@ describe('createOfflineQueue — presence guards', () => {
   it('throws onPresenceChange when inner transport is base-only', () => {
     const inner = createBaseTransport()
     const queue = createOfflineQueue(inner)
-    expect(() => queue.onPresenceChange('ch', vi.fn())).toThrow('createOfflineQueue')
+    expect(() => queue.onPresenceChange('ch', vi.fn())).toThrow(
+      'createOfflineQueue',
+    )
   })
 
   it('delegates presence methods when inner is presence-capable', () => {

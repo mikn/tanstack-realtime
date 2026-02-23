@@ -1,6 +1,11 @@
 import { WebSocket as NodeWebSocket } from 'ws'
 import { Store } from '@tanstack/store'
-import type { ConnectionStatus, PresenceCapable, PresenceUser, RealtimeTransport } from '@tanstack/realtime'
+import type {
+  ConnectionStatus,
+  PresenceCapable,
+  PresenceUser,
+  RealtimeTransport,
+} from '@tanstack/realtime'
 
 // Use the native WebSocket when running in a browser, or the `ws` package in Node.js.
 const WS: typeof WebSocket =
@@ -52,7 +57,11 @@ type ServerMsg =
   | { type: 'subscribe:ok'; channel: string }
   | { type: 'subscribe:error'; channel: string; code: number; reason: string }
   | { type: 'message'; channel: string; data: unknown }
-  | { type: 'presence:update'; channel: string; users: ReadonlyArray<PresenceUser> }
+  | {
+      type: 'presence:update'
+      channel: string
+      users: ReadonlyArray<PresenceUser>
+    }
 
 // ---------------------------------------------------------------------------
 // Transport factory
@@ -73,7 +82,9 @@ type ServerMsg =
  *   transport: nodeTransport({ url: 'ws://localhost:3000' }),
  * })
  */
-export function nodeTransport(options: NodeTransportOptions = {}): RealtimeTransport & PresenceCapable {
+export function nodeTransport(
+  options: NodeTransportOptions = {},
+): RealtimeTransport & PresenceCapable {
   const {
     url,
     path = '/_realtime',
@@ -206,7 +217,8 @@ export function nodeTransport(options: NodeTransportOptions = {}): RealtimeTrans
     ws.addEventListener('message', (event) => {
       let msg: ServerMsg
       try {
-        const raw = typeof event.data === 'string' ? event.data : String(event.data)
+        const raw =
+          typeof event.data === 'string' ? event.data : String(event.data)
         msg = JSON.parse(raw) as ServerMsg
       } catch {
         return
