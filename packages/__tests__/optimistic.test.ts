@@ -38,8 +38,9 @@ function createMockTransport(): RealtimeTransport & {
       listeners.get(channel)!.add(onMessage)
       return () => listeners.get(channel)?.delete(onMessage)
     },
-    async publish(channel, data) {
+    publish(channel, data) {
       publishCalls.push({ channel, data })
+      return Promise.resolve()
     },
     emit(channel: string, data: unknown) {
       const cbs = listeners.get(channel)
@@ -112,9 +113,7 @@ describe('realtimeCollectionOptions — lifecycle', () => {
       client,
       channel: 'docs',
       getKey: (d) => d.id,
-      queryFn: async () => {
-        throw new Error('network error')
-      },
+      queryFn: () => Promise.reject(new Error('network error')),
     })
     const { isReady } = driveSync(config)
 
@@ -192,7 +191,7 @@ describe('realtimeCollectionOptions — lifecycle', () => {
   it('server-only mode works without client or channel', () => {
     const config = realtimeCollectionOptions<Doc, string>({
       getKey: (d) => d.id,
-      queryFn: async () => [{ id: '1', title: 'from-server', version: 1 }],
+      queryFn: () => Promise.resolve([{ id: '1', title: 'from-server', version: 1 }]),
     })
     const { isReady } = driveSync(config)
 
@@ -266,7 +265,7 @@ describe('realtimeCollectionOptions — mutation wrappers', () => {
       client,
       channel: 'docs',
       getKey: (d) => d.id,
-      onInsert: async () => null,
+      onInsert: () => Promise.resolve(null),
     })
     driveSync(config)
 
@@ -293,7 +292,7 @@ describe('realtimeCollectionOptions — mutation wrappers', () => {
       client,
       channel: 'docs',
       getKey: (d) => d.id,
-      onUpdate: async () => null,
+      onUpdate: () => Promise.resolve(null),
     })
     driveSync(config)
 
@@ -321,7 +320,7 @@ describe('realtimeCollectionOptions — mutation wrappers', () => {
       client,
       channel: 'docs',
       getKey: (d) => d.id,
-      onDelete: async () => deletedDoc,
+      onDelete: () => Promise.resolve(deletedDoc),
     })
     driveSync(config)
 
@@ -355,8 +354,8 @@ describe('realtimeCollectionOptions — mutation wrappers', () => {
       client,
       channel: 'docs',
       getKey: (d) => d.id,
-      onInsert: async () => insertResult,
-      onUpdate: async () => updateResult,
+      onInsert: () => Promise.resolve(insertResult),
+      onUpdate: () => Promise.resolve(updateResult),
     })
     driveSync(config)
 
@@ -380,7 +379,7 @@ describe('realtimeCollectionOptions — mutation wrappers', () => {
       client,
       channels: ['shard-a', 'shard-b'],
       getKey: (d) => d.id,
-      onInsert: async () => ({ id: '1', title: 'new', version: 1 }),
+      onInsert: () => Promise.resolve({ id: '1', title: 'new', version: 1 }),
     })
     driveSync(config)
 

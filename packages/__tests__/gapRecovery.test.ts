@@ -148,8 +148,8 @@ describe('withGapRecovery', () => {
 
   it('swallows errors from async onGap', () => {
     const inner = createMockTransport()
-    const onGap = vi.fn(async () => {
-      throw new Error('async gap handler error')
+    const onGap = vi.fn(() => {
+      return Promise.reject(new Error('async gap handler error'))
     })
     const transport = withGapRecovery(inner, { onGap })
 

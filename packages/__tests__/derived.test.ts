@@ -47,8 +47,9 @@ function createMockTransport(): RealtimeTransport & {
         if (listeners.get(channel)?.size === 0) listeners.delete(channel)
       }
     },
-    async publish(channel, data) {
+    publish(channel, data) {
       publishCalls.push({ channel, data })
+      return Promise.resolve()
     },
     emit(channel: string, data: unknown) {
       const cbs = listeners.get(channel)
@@ -202,7 +203,7 @@ describe('realtimeCollectionOptions — channels fan-in', () => {
       channel: 'primary',
       channels: ['secondary', 'tertiary'],
       getKey: (o) => o.id,
-      onInsert: async () => ({ id: '1', region: 'us', amount: 50 }),
+      onInsert: () => Promise.resolve({ id: '1', region: 'us', amount: 50 }),
     })
     driveSync(config)
 
@@ -230,7 +231,7 @@ describe('realtimeCollectionOptions — channels fan-in', () => {
       client,
       channels: ['shard-a', 'shard-b'],
       getKey: (o) => o.id,
-      onInsert: async () => ({ id: '1', region: 'us', amount: 50 }),
+      onInsert: () => Promise.resolve({ id: '1', region: 'us', amount: 50 }),
     })
     const { ops } = driveSync(config)
 
@@ -263,7 +264,7 @@ describe('realtimeCollectionOptions — channels fan-in', () => {
   it('server-only mode works without channel or channels', () => {
     const config = realtimeCollectionOptions<Order, string>({
       getKey: (o) => o.id,
-      queryFn: async () => [{ id: '1', region: 'us', amount: 100 }],
+      queryFn: () => Promise.resolve([{ id: '1', region: 'us', amount: 100 }]),
     })
     // No crash — collection operates in server-only mode.
     expect(config.sync).toBeDefined()
@@ -388,9 +389,9 @@ describe('realtimeCollectionOptions — refetchOnReconnect', () => {
       client,
       channel: 'orders',
       getKey: (o) => o.id,
-      queryFn: async () => {
+      queryFn: () => {
         fetchCount++
-        return []
+        return Promise.resolve([])
       },
       refetchOnReconnect: true,
     })
@@ -413,7 +414,7 @@ describe('realtimeCollectionOptions — refetchOnReconnect', () => {
       client,
       channel: 'orders',
       getKey: (o) => o.id,
-      queryFn: async () => [...serverData],
+      queryFn: () => Promise.resolve([...serverData]),
       refetchOnReconnect: true,
     })
     const { ops } = driveSync(config)
@@ -444,7 +445,7 @@ describe('realtimeCollectionOptions — refetchOnReconnect', () => {
       client,
       channel: 'orders',
       getKey: (o) => o.id,
-      queryFn: async () => [...serverData],
+      queryFn: () => Promise.resolve([...serverData]),
       refetchOnReconnect: true,
     })
     const { ops } = driveSync(config)
@@ -476,7 +477,7 @@ describe('realtimeCollectionOptions — refetchOnReconnect', () => {
       client,
       channel: 'orders',
       getKey: (o) => o.id,
-      queryFn: async () => [...serverData],
+      queryFn: () => Promise.resolve([...serverData]),
       refetchOnReconnect: true,
     })
     const { ops } = driveSync(config)
@@ -502,9 +503,9 @@ describe('realtimeCollectionOptions — refetchOnReconnect', () => {
       client,
       channel: 'orders',
       getKey: (o) => o.id,
-      queryFn: async () => {
+      queryFn: () => {
         fetchCount++
-        return []
+        return Promise.resolve([])
       },
       // refetchOnReconnect omitted — defaults to false
     })
@@ -527,9 +528,9 @@ describe('realtimeCollectionOptions — refetchOnReconnect', () => {
       client,
       channel: 'orders',
       getKey: (o) => o.id,
-      queryFn: async () => {
+      queryFn: () => {
         fetchCount++
-        return []
+        return Promise.resolve([])
       },
       refetchOnReconnect: true,
     })

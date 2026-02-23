@@ -572,8 +572,9 @@ export function createSharedWorkerTransport(
   const transport: RealtimeTransport & PresenceCapable = {
     store,
 
-    async connect() {
+    connect() {
       port.postMessage({ type: 'connect' } satisfies TabToWorkerMsg)
+      return Promise.resolve()
     },
 
     disconnect() {

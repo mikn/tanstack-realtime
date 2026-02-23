@@ -245,7 +245,7 @@ describe('streamChannelOptions', () => {
       client,
       channel: 'err-stream',
       initial: '',
-      reduce: (s: string, e: Ev) => s,
+      reduce: (s: string, _e: Ev) => s,
       isError: (_s, e: Ev) =>
         e.type === 'error' ? (e.message ?? 'Unknown') : false,
     })

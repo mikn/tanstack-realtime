@@ -49,8 +49,9 @@ function createMockTransport(): RealtimeTransport & {
       listeners.get(channel)!.add(onMessage)
       return () => listeners.get(channel)?.delete(onMessage)
     },
-    async publish(channel, data) {
+    publish(channel, data) {
       publishCalls.push({ channel, data })
+      return Promise.resolve()
     },
     emit(channel: string, data: unknown) {
       const cbs = listeners.get(channel)
@@ -85,7 +86,7 @@ describe('spectrum step 1: queryFn only (server data)', () => {
   it('loads data from the server without a client or channel', async () => {
     const config = realtimeCollectionOptions<Todo, string>({
       getKey: (t) => t.id,
-      queryFn: async () => [{ id: '1', title: 'Buy milk', votes: 0, tags: [] }],
+      queryFn: () => Promise.resolve([{ id: '1', title: 'Buy milk', votes: 0, tags: [] }]),
     })
     const { ops, isReady } = driveSync(config)
     await new Promise((r) => setTimeout(r, 0))
@@ -106,11 +107,11 @@ describe('spectrum step 2: + mutations (server-persisted writes)', () => {
 
     const config = realtimeCollectionOptions<Todo, string>({
       getKey: (t) => t.id,
-      queryFn: async () => [],
-      onInsert: async () => {
+      queryFn: () => Promise.resolve([]),
+      onInsert: () => {
         const todo = { id: '1', title: 'New', votes: 0, tags: [] }
         persisted.push(todo)
-        return todo
+        return Promise.resolve(todo)
       },
     })
     driveSync(config)
@@ -160,7 +161,7 @@ describe('spectrum step 3: + client + channel (realtime peer sync)', () => {
       client,
       channel: 'todos',
       getKey: (t) => t.id,
-      onInsert: async () => ({ id: '1', title: 'Created', votes: 0, tags: [] }),
+      onInsert: () => Promise.resolve({ id: '1', title: 'Created', votes: 0, tags: [] }),
     })
     driveSync(config)
 
@@ -238,13 +239,14 @@ describe('spectrum step 4: + fields (CRDT convergence)', () => {
         title: 'lww',
         draft: 'local',
       },
-      onUpdate: async () => ({
-        id: '1',
-        title: 'Updated',
-        votes: 0,
-        tags: [],
-        draft: true,
-      }),
+      onUpdate: () =>
+        Promise.resolve({
+          id: '1',
+          title: 'Updated',
+          votes: 0,
+          tags: [],
+          draft: true,
+        }),
     })
     driveSync(config)
 
@@ -297,9 +299,9 @@ describe('spectrum step 5: + refetchOnReconnect (gap recovery)', () => {
       client,
       channel: 'todos',
       getKey: (t) => t.id,
-      queryFn: async () => {
+      queryFn: () => {
         fetchCount++
-        return []
+        return Promise.resolve([])
       },
       refetchOnReconnect: true,
     })

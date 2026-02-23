@@ -123,8 +123,9 @@ function createMockInnerTransport(): (RealtimeTransport & PresenceCapable) & {
   return {
     store,
     publishCalls,
-    async connect() {
+    connect() {
       store.setState(() => 'connected')
+      return Promise.resolve()
     },
     disconnect() {
       store.setState(() => 'disconnected')
@@ -137,8 +138,9 @@ function createMockInnerTransport(): (RealtimeTransport & PresenceCapable) & {
         if (listeners.get(channel)?.size === 0) listeners.delete(channel)
       }
     },
-    async publish(channel, data) {
+    publish(channel, data) {
       publishCalls.push({ channel, data })
+      return Promise.resolve()
     },
     joinPresence() {},
     updatePresence() {},

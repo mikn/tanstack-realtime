@@ -43,16 +43,17 @@ type AuthorizeFn = (
 ) => Promise<ChannelPermissions>
 
 async function createTestHarness(
-  authorize: AuthorizeFn = async () => ({
-    subscribe: true,
-    publish: true,
-    presence: true,
-  }),
+  authorize: AuthorizeFn = () =>
+    Promise.resolve({
+      subscribe: true,
+      publish: true,
+      presence: true,
+    }),
 ): Promise<TestHarness> {
   const httpServer = createServer()
   const nodeServer = createNodeServer({
     // Default: accept all connections as 'test-user'
-    getUser: async () => ({ userId: 'test-user' }),
+    getUser: () => Promise.resolve({ userId: 'test-user' }),
     authorize,
   })
   nodeServer.attach(httpServer)
@@ -211,12 +212,13 @@ describe('Connection lifecycle', () => {
     // Override to reject
     const httpServer2 = createServer()
     const nodeServer2 = createNodeServer({
-      getUser: async () => null,
-      authorize: async () => ({
-        subscribe: true,
-        publish: true,
-        presence: true,
-      }),
+      getUser: () => Promise.resolve(null),
+      authorize: () =>
+        Promise.resolve({
+          subscribe: true,
+          publish: true,
+          presence: true,
+        }),
     })
     nodeServer2.attach(httpServer2)
     await new Promise<void>((resolve) => httpServer2.listen(0, resolve))
@@ -349,11 +351,13 @@ describe('Publish / Subscribe', () => {
   })
 
   it('subscribe denied by authorize does not deliver messages', async () => {
-    const harness2 = await createTestHarness(async (_, channel) => ({
-      subscribe: channel.namespace === 'allowed',
-      publish: false,
-      presence: false,
-    }))
+    const harness2 = await createTestHarness((_, channel) =>
+      Promise.resolve({
+        subscribe: channel.namespace === 'allowed',
+        publish: false,
+        presence: false,
+      }),
+    )
 
     const restrictedClient = connectClient(harness2.port)
     restrictedClient.connect()
@@ -530,12 +534,13 @@ describe('Reconnection', () => {
 
     // Restart the server on the same port
     const newNodeServer = createNodeServer({
-      getUser: async () => ({ userId: 'test-user' }),
-      authorize: async () => ({
-        subscribe: true,
-        publish: true,
-        presence: true,
-      }),
+      getUser: () => Promise.resolve({ userId: 'test-user' }),
+      authorize: () =>
+        Promise.resolve({
+          subscribe: true,
+          publish: true,
+          presence: true,
+        }),
     })
     newNodeServer.attach(harness.httpServer)
 
@@ -583,9 +588,9 @@ describe('Authorization', () => {
   it('authorize is called with the correct namespace and params', async () => {
     const calls: Array<{ userId: string; channel: ParsedChannel }> = []
 
-    const harness = await createTestHarness(async (userId, channel) => {
+    const harness = await createTestHarness((userId, channel) => {
       calls.push({ userId, channel })
-      return { subscribe: true, publish: false, presence: false }
+      return Promise.resolve({ subscribe: true, publish: false, presence: false })
     })
 
     const client = connectClient(harness.port)
@@ -844,12 +849,13 @@ describe('Connection races', () => {
 
     // Restart the server so the pending reconnect can succeed.
     const newNodeServer = createNodeServer({
-      getUser: async () => ({ userId: 'test-user' }),
-      authorize: async () => ({
-        subscribe: true,
-        publish: true,
-        presence: true,
-      }),
+      getUser: () => Promise.resolve({ userId: 'test-user' }),
+      authorize: () =>
+        Promise.resolve({
+          subscribe: true,
+          publish: true,
+          presence: true,
+        }),
     })
     newNodeServer.attach(harness.httpServer)
 
@@ -1051,12 +1057,13 @@ describe('Reconnection — resubscription', () => {
 
     // Restart on the same port so the transport reconnects automatically.
     const newNodeServer = createNodeServer({
-      getUser: async () => ({ userId: 'test-user' }),
-      authorize: async () => ({
-        subscribe: true,
-        publish: true,
-        presence: true,
-      }),
+      getUser: () => Promise.resolve({ userId: 'test-user' }),
+      authorize: () =>
+        Promise.resolve({
+          subscribe: true,
+          publish: true,
+          presence: true,
+        }),
     })
     newNodeServer.attach(harness.httpServer)
     await nextStatus(client, 'connected')
@@ -1103,8 +1110,9 @@ function createMockRealtimeClient() {
         listeners.get(channel)?.delete(cb)
       }
     },
-    async publish(channel: unknown, data: unknown): Promise<void> {
+    publish(channel: unknown, data: unknown): Promise<void> {
       published.push({ channel: String(channel), data })
+      return Promise.resolve()
     },
     joinPresence: () => {},
     updatePresence: () => {},
@@ -1157,9 +1165,7 @@ describe('realtimeCollectionOptions — SyncConfig invariants', () => {
       client: client as unknown as RealtimeClient,
       channel: 'items',
       getKey: (x: { id: string }) => x.id,
-      queryFn: async () => {
-        throw new Error('network error')
-      },
+      queryFn: () => Promise.reject(new Error('network error')),
     })
 
     let readyCalled = false
@@ -1204,7 +1210,7 @@ describe('realtimeCollectionOptions — SyncConfig invariants', () => {
       client: client as unknown as RealtimeClient,
       channel: 'items',
       getKey: (x: { id: string }) => x.id,
-      queryFn: async () => rows,
+      queryFn: () => Promise.resolve(rows),
     })
 
     const written: Array<unknown> = []
@@ -1250,7 +1256,7 @@ describe('realtimeCollectionOptions — SyncConfig invariants', () => {
       client: client as unknown as RealtimeClient,
       channel: 'items',
       getKey: (x: { id: string }) => x.id,
-      onInsert: async () => savedRow,
+      onInsert: () => Promise.resolve(savedRow),
     })
 
     await (config.onInsert as (p: unknown) => Promise<unknown>)({})
@@ -1269,7 +1275,7 @@ describe('realtimeCollectionOptions — SyncConfig invariants', () => {
       client: client as unknown as RealtimeClient,
       channel: 'items',
       getKey: (x: { id: string }) => x.id,
-      onUpdate: async () => updatedRow,
+      onUpdate: () => Promise.resolve(updatedRow),
     })
 
     await (config.onUpdate as (p: unknown) => Promise<unknown>)({})
@@ -1288,7 +1294,7 @@ describe('realtimeCollectionOptions — SyncConfig invariants', () => {
       client: client as unknown as RealtimeClient,
       channel: 'items',
       getKey: (x: { id: string }) => x.id,
-      onDelete: async () => deletedRow,
+      onDelete: () => Promise.resolve(deletedRow),
     })
 
     await (config.onDelete as (p: unknown) => Promise<unknown>)({})
@@ -1306,7 +1312,7 @@ describe('realtimeCollectionOptions — SyncConfig invariants', () => {
       client: client as unknown as RealtimeClient,
       channel: 'items',
       getKey: (x: { id: string }) => x.id,
-      onInsert: async () => null,
+      onInsert: () => Promise.resolve(null),
     })
 
     await (config.onInsert as (p: unknown) => Promise<unknown>)({})
@@ -1400,7 +1406,7 @@ describe('liveChannelOptions — SyncConfig invariants', () => {
       channel: 'events',
       getKey: (x: { id: string }) => x.id,
       onEvent: (e) => e as { id: string },
-      initialData: async () => [{ id: 'a' }, { id: 'b' }],
+      initialData: () => Promise.resolve([{ id: 'a' }, { id: 'b' }]),
     })
 
     const written: Array<unknown> = []
@@ -1427,9 +1433,7 @@ describe('liveChannelOptions — SyncConfig invariants', () => {
       channel: 'events',
       getKey: (x: { id: string }) => x.id,
       onEvent: (e) => e as { id: string },
-      initialData: async () => {
-        throw new Error('fetch failed')
-      },
+      initialData: () => Promise.reject(new Error('fetch failed')),
     })
 
     let readyCalled = false
@@ -1453,11 +1457,13 @@ describe('liveChannelOptions — SyncConfig invariants', () => {
 
 describe('Authorization — publish permission', () => {
   it('client with publish:false cannot fan out messages to other subscribers', async () => {
-    const harness = await createTestHarness(async (_, channel) => ({
-      subscribe: true,
-      publish: channel.namespace === 'allowed',
-      presence: false,
-    }))
+    const harness = await createTestHarness((_, channel) =>
+      Promise.resolve({
+        subscribe: true,
+        publish: channel.namespace === 'allowed',
+        presence: false,
+      }),
+    )
 
     const sender = connectClient(harness.port)
     const receiver = connectClient(harness.port)
@@ -1492,11 +1498,13 @@ describe('Authorization — publish permission', () => {
 
 describe('Authorization — presence permission', () => {
   it('joinPresence is dropped by server when authorize returns presence:false', async () => {
-    const harness = await createTestHarness(async () => ({
-      subscribe: true,
-      publish: true,
-      presence: false,
-    }))
+    const harness = await createTestHarness(() =>
+      Promise.resolve({
+        subscribe: true,
+        publish: true,
+        presence: false,
+      }),
+    )
 
     const client1 = connectClient(harness.port)
     const client2 = connectClient(harness.port)

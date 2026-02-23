@@ -309,8 +309,9 @@ export function nodeTransport(
       }
     },
 
-    async publish(channel, data) {
+    publish(channel, data) {
       send({ type: 'publish', channel, data })
+      return Promise.resolve()
     },
 
     joinPresence(channel, data) {

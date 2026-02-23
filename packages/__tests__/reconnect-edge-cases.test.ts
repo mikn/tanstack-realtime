@@ -258,10 +258,10 @@ describe('nodeTransport — reconnect edge cases', () => {
       initialDelay: 100,
       maxDelay: 30_000,
       jitter: 0,
-      getToken: async () => {
+      getToken: () => {
         callCount++
-        if (callCount < 3) throw new Error('token fetch failed')
-        return 'valid-token'
+        if (callCount < 3) return Promise.reject(new Error('token fetch failed'))
+        return Promise.resolve('valid-token')
       },
     })
 

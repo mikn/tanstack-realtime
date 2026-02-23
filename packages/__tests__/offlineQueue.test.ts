@@ -173,9 +173,10 @@ describe('createOfflineQueue', () => {
   it('retries on flush error when onFlushError returns true', async () => {
     const inner = createMockTransport()
     let callCount = 0
-    inner.publishImpl = async () => {
+    inner.publishImpl = () => {
       callCount++
-      if (callCount === 1) throw new Error('network error')
+      if (callCount === 1) return Promise.reject(new Error('network error'))
+      return Promise.resolve()
     }
 
     const onFlushError = vi.fn(() => true) // retry
@@ -194,8 +195,8 @@ describe('createOfflineQueue', () => {
 
   it('discards on flush error when onFlushError returns false', async () => {
     const inner = createMockTransport()
-    inner.publishImpl = async () => {
-      throw new Error('fail')
+    inner.publishImpl = () => {
+      return Promise.reject(new Error('fail'))
     }
 
     const onFlushError = vi.fn(() => false) // discard
@@ -316,10 +317,11 @@ describe('createOfflineQueue', () => {
   it('re-queues remaining messages when connection drops mid-flush', async () => {
     const inner = createMockTransport()
     let callCount = 0
-    inner.publishImpl = async () => {
+    inner.publishImpl = () => {
       callCount++
       // Drop connection after first publish so subsequent messages are re-queued.
       if (callCount === 1) inner.setStatus('disconnected')
+      return Promise.resolve()
     }
 
     const queue = createOfflineQueue(inner)

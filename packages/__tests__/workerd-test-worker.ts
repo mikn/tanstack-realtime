@@ -4,7 +4,7 @@
  * client-side compatibility checks that don't use SELF.fetch().
  */
 export default {
-  async fetch(): Promise<Response> {
-    return new Response('ok')
+  fetch(): Promise<Response> {
+    return Promise.resolve(new Response('ok'))
   },
 }

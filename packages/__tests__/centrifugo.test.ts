@@ -321,9 +321,9 @@ describe('centrifugoTransport', () => {
     const tokenClient = createRealtimeClient({
       transport: centrifugoTransport({
         url: `ws://localhost:${server.port}`,
-        token: async () => {
+        token: () => {
           called = true
-          return 'async-jwt'
+          return Promise.resolve('async-jwt')
         },
         WebSocket: NodeWebSocket,
       }),

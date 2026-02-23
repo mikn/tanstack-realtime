@@ -434,10 +434,10 @@ describe('sseTransport', () => {
     savedFetch = globalThis.fetch
     // Wire fetch() to the handler so no real network is needed.
     globalThis.fetch = vi.fn(
-      async (input: RequestInfo | URL, init?: RequestInit) => {
+      (input: RequestInfo | URL, init?: RequestInit) => {
         const req =
           input instanceof Request ? input : new Request(input as string, init)
-        return handler.handle(req)
+        return Promise.resolve(handler.handle(req))
       },
     )
   })

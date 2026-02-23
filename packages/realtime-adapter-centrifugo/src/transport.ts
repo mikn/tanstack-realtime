@@ -464,7 +464,7 @@ export function centrifugoTransport(
   // Reconnection
   // --------------------------------------------------------------------------
 
-  async function resubscribeAll(): Promise<void> {
+  function resubscribeAll(): void {
     for (const [channel, listeners] of subscriptions) {
       if (listeners.size === 0) continue
 
@@ -507,7 +507,7 @@ export function centrifugoTransport(
   // Socket lifecycle
   // --------------------------------------------------------------------------
 
-  async function openSocket(): Promise<void> {
+  function openSocket(): void {
     centrifugoClientId = null
     const ws = new WebSocketImpl(url)
     socket = ws
