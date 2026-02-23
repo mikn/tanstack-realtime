@@ -187,7 +187,7 @@ function Features() {
           <FeatureCard
             icon="*"
             title="TanStack Ecosystem"
-            description="Plugs directly into TanStack DB collections and TanStack Query. One mental model, one devtools story, zero glue code."
+            description="Plugs directly into TanStack DB collections via SyncConfig. Use TanStack Query alongside it for non-realtime data — they work in parallel, each owning its own concerns."
           />
           <FeatureCard
             icon="&"
@@ -229,8 +229,8 @@ function Spectrum() {
         <div className="spectrum-steps">
           <SpectrumStep
             step={1}
-            title="Server-Only (TanStack Query augmentation)"
-            description="Just a queryFn. Data comes from your API. No WebSocket, no client needed."
+            title="Server-Only (no realtime channel)"
+            description="Just a queryFn for initial data. No WebSocket, no client needed. TanStack DB owns the collection."
             code={`const todosOptions = realtimeCollectionOptions({
   key: ['todos'],
   queryFn: () => fetch('/api/todos').then(r => r.json()),
@@ -610,8 +610,9 @@ function Ecosystem() {
           <div className="eco-card">
             <h3>TanStack Query</h3>
             <p>
-              Use <code>liveChannelOptions</code> to keep query caches in sync.
-              Channel messages invalidate queries automatically.
+              Use alongside Realtime for server-fetched data that doesn&rsquo;t
+              need a live channel. They are parallel systems — Query owns its
+              cache, Realtime owns its collections.
             </p>
           </div>
           <div className="eco-card">
