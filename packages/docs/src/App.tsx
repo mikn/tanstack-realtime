@@ -229,7 +229,7 @@ function Spectrum() {
         <div className="spectrum-steps">
           <SpectrumStep
             step={1}
-            title="Server-Only (TanStack Query replacement)"
+            title="Server-Only (TanStack Query augmentation)"
             description="Just a queryFn. Data comes from your API. No WebSocket, no client needed."
             code={`const todosOptions = realtimeCollectionOptions({
   key: ['todos'],
