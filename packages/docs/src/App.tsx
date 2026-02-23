@@ -300,217 +300,201 @@ function DatabaseIntegration() {
           Live UI out.
         </h2>
         <p className="section-sub">
-          Wire TanStack Realtime to Postgres in minutes. Mutations write to the
-          database and broadcast through the library in the same server function
-          &mdash; no separate pipeline required.
+          Wire TanStack Realtime to Postgres in minutes. Your API routes just
+          write to the database and return the saved row &mdash;{' '}
+          <code>realtimeCollectionOptions</code> broadcasts it to every
+          subscriber automatically.
         </p>
 
         <div className="callout">
-          <span className="callout-label">No CDC pipeline needed</span>
+          <span className="callout-label">How auto-broadcast works</span>
           <p>
-            When a user action flows through your server &mdash;{' '}
-            <code>onInsert</code>, <code>onUpdate</code>, or a server function
-            &mdash; write to Postgres and call{' '}
-            <code>nodeServer.publish()</code> in the same request. The library
-            fans out to every subscriber instantly. CDC tools (Debezium,{' '}
-            <code>pg_notify</code>, webhooks) are only needed when changes
-            originate <em>outside</em> your app: migrations, background jobs, or
-            external services writing directly to the database.
+            After <code>onInsert</code> or <code>onUpdate</code> returns a
+            value, <code>realtimeCollectionOptions</code> automatically
+            publishes it to the channel &mdash; no{' '}
+            <code>nodeServer.publish()</code> in your API routes, no CDC
+            pipeline. You only call <code>nodeServer.publish()</code> directly
+            for changes that originate <em>outside</em> a client mutation:
+            background jobs, cron tasks, or external services.
           </p>
         </div>
 
         <div className="use-cases">
-          {/* ── Use Case 1: Task Board ───────────────────────────── */}
+          {/* ── Use Case 1: withRest ─────────────────────────────── */}
           <div className="use-case">
             <div className="use-case-header">
               <span className="use-case-number">01</span>
               <div>
-                <h3>Collaborative Task Board</h3>
+                <h3>
+                  <code>withRest</code> &mdash; the 80% case
+                </h3>
                 <p>
-                  Multiple users editing tasks simultaneously with conflict-free
-                  merges via CRDTs. The server authorizes access via a Postgres
-                  membership check; mutations write to the DB and broadcast in
-                  one step.
+                  Spread <code>withRest</code> into{' '}
+                  <code>realtimeCollectionOptions</code> to get{' '}
+                  <code>getKey</code>, <code>queryFn</code>,{' '}
+                  <code>onInsert</code>, <code>onUpdate</code>, and{' '}
+                  <code>onDelete</code> wired to standard REST/JSON endpoints in
+                  one call. Your server routes are plain CRUD &mdash; no publish
+                  logic anywhere.
                 </p>
               </div>
             </div>
             <div className="use-case-codes">
               <CodeBlock
-                title="server/realtime.ts"
-                code={`import { createNodeServer, serializeKey } from '@tanstack/realtime-preset-node'
-import { db } from './db'
-
-export const nodeServer = createNodeServer({
-  getUser: (req) => verifyJwt(req.headers.authorization),
-
-  authorize: async (userId, channel) => {
-    if (channel.namespace === 'tasks') {
-      // Authorization query hits Postgres — no separate auth service
-      const member = await db.projectMembers.findFirst({
-        where: { projectId: channel.params.projectId, userId },
-      })
-      return { subscribe: !!member, publish: !!member }
-    }
-    return { subscribe: false, publish: false }
-  },
-})`}
-              />
-              <CodeBlock
                 title="features/tasks/collection.ts"
-                code={`export const tasksOptions = (projectId: string) =>
+                code={`import { withRest, realtimeCollectionOptions } from '@tanstack/realtime'
+
+const tasksOptions = (projectId: string) =>
   realtimeCollectionOptions({
+    // withRest provides: getKey, queryFn, onInsert, onUpdate, onDelete
+    ...withRest<Task, string>({
+      url: \`/api/tasks?projectId=\${projectId}\`,
+      getKey: (t) => t.id,
+    }),
     client: realtimeClient,
     channel: ['tasks', { projectId }],
-    getKey: (t) => t.id,
-
-    // Seed from Postgres on mount
-    queryFn: () =>
-      db.tasks.findMany({ where: { projectId }, orderBy: { createdAt: 'asc' } }),
-
-    onInsert: async ({ data }) => {
-      const task = await db.tasks.create({ data: { ...data, projectId } })
-      // Publish through the library — not via a DB trigger
-      await nodeServer.publish(serializeKey(['tasks', { projectId }]),
-        { action: 'insert', data: task })
-      return task
-    },
-
-    onUpdate: async ({ transaction }) => {
-      const patch = transaction.mutations[0].modified
-      const task = await db.tasks.update({ where: { id: patch.id }, data: patch })
-      await nodeServer.publish(serializeKey(['tasks', { projectId }]),
-        { action: 'update', data: task })
-      return task
-    },
-
-    onDelete: async ({ data }) => {
-      await db.tasks.delete({ where: { id: data.id } })
-      await nodeServer.publish(serializeKey(['tasks', { projectId }]),
-        { action: 'delete', data: { id: data.id } })
-    },
-
-    // LWW for text/status, OR-Set for concurrent assignee edits
     fields: { title: 'lww', status: 'lww', assignees: 'or-set' },
-    refetchOnReconnect: true,
   })`}
+              />
+              <CodeBlock
+                title="server/routes/tasks.ts"
+                code={`// Standard REST routes — no publish() needed anywhere.
+// withRest calls these; the returned rows are broadcast automatically.
+
+router.get('/api/tasks', (req) =>
+  db.tasks.findMany({ where: { projectId: req.query.projectId } })
+)
+router.post('/api/tasks', (req) =>
+  db.tasks.create({ data: req.body })
+)
+router.patch('/api/tasks/:id', (req) =>
+  db.tasks.update({ where: { id: req.params.id }, data: req.body })
+)
+router.delete('/api/tasks/:id', async (req) => {
+  await db.tasks.delete({ where: { id: req.params.id } })
+})`}
               />
             </div>
           </div>
 
-          {/* ── Use Case 2: Live Inventory ───────────────────────── */}
+          {/* ── Use Case 2: Custom callbacks ──────────────────────── */}
           <div className="use-case">
             <div className="use-case-header">
               <span className="use-case-number">02</span>
               <div>
-                <h3>Live Inventory Counter</h3>
+                <h3>Custom callbacks &mdash; full control</h3>
                 <p>
-                  Stock counts that update instantly across every browser tab. An
-                  atomic Postgres transaction prevents overselling; one publish
-                  call syncs every connected client.
+                  Write <code>onInsert</code> / <code>onUpdate</code> manually
+                  when you need custom logic: non-standard endpoints, seeding
+                  from a different URL, or composing multiple API calls.{' '}
+                  <strong>Return the saved row</strong> and the library handles
+                  the broadcast.
                 </p>
               </div>
             </div>
             <div className="use-case-codes">
               <CodeBlock
-                title="server/inventory.ts"
-                code={`// Called from an API route or server function
-export async function reserveStock(productId: string, qty: number) {
-  // Atomic decrement — rolls back if stock goes negative
-  const product = await db.$transaction(async (tx) => {
-    const p = await tx.products.update({
-      where: { id: productId },
-      data: { stock: { decrement: qty } },
-    })
-    if (p.stock < 0) throw new Error('Out of stock')
-    return p
-  })
+                title="features/chat/collection.ts"
+                code={`const messagesOptions = (roomId: string) =>
+  realtimeCollectionOptions({
+    client: realtimeClient,
+    channel: ['messages', { roomId }],
+    getKey: (m) => m.id,
 
-  // One publish fans out to every subscriber — no trigger, no CDC
-  await nodeServer.publish(\`products:id=\${productId}\`, {
+    // Seed from Postgres on mount — last 50 messages
+    queryFn: () =>
+      fetch(\`/api/rooms/\${roomId}/messages?limit=50&order=desc\`)
+        .then((r) => r.json()),
+
+    // Persist and return — the library auto-broadcasts the returned message
+    onInsert: async ({ transaction }) => {
+      const data = transaction.mutations[0].modified
+      const res = await fetch(\`/api/rooms/\${roomId}/messages\`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      return res.json() // ← broadcast happens here, automatically
+    },
+  })`}
+              />
+              <CodeBlock
+                title="server/routes/messages.ts"
+                code={`// GET  — load message history
+router.get('/api/rooms/:roomId/messages', (req) =>
+  db.messages.findMany({
+    where: { roomId: req.params.roomId },
+    orderBy: { sentAt: 'desc' },
+    take: Number(req.query.limit ?? 50),
+  })
+)
+
+// POST — save new message and return it
+// No publish() here — the client broadcasts the returned row
+router.post('/api/rooms/:roomId/messages', (req) =>
+  db.messages.create({
+    data: { ...req.body, roomId: req.params.roomId },
+  })
+)`}
+              />
+            </div>
+          </div>
+
+          {/* ── Use Case 3: Server-initiated push ─────────────────── */}
+          <div className="use-case">
+            <div className="use-case-header">
+              <span className="use-case-number">03</span>
+              <div>
+                <h3>Server-initiated push</h3>
+                <p>
+                  The one case where you do call{' '}
+                  <code>nodeServer.publish()</code> directly: changes that
+                  originate outside a client mutation &mdash; background jobs,
+                  cron tasks, webhooks from external services. The collection is
+                  read-only; the server pushes all updates.
+                </p>
+              </div>
+            </div>
+            <div className="use-case-codes">
+              <CodeBlock
+                title="server/jobs/inventorySync.ts"
+                code={`import { nodeServer } from '../realtime'
+import { serializeKey } from '@tanstack/realtime'
+
+// Cron job / webhook — change originates outside any client mutation
+export async function syncInventoryFromWarehouse(productId: string) {
+  const latestStock = await warehouseApi.getStock(productId)
+  const product = await db.products.update({
+    where: { id: productId },
+    data: { stock: latestStock },
+  })
+  // No client initiated this — publish directly to notify all subscribers
+  nodeServer.publish(serializeKey(['products', { id: productId }]), {
     action: 'update',
     data: product,
   })
-  return product
 }`}
               />
               <CodeBlock
                 title="features/inventory/collection.ts"
-                code={`export const productOptions = (productId: string) =>
+                code={`// Read-only — subscribes to server-pushed stock updates
+const productOptions = (productId: string) =>
   realtimeCollectionOptions({
     client: realtimeClient,
     channel: ['products', { id: productId }],
     getKey: (p) => p.id,
 
     queryFn: () =>
-      db.products.findUnique({ where: { id: productId } }),
+      fetch(\`/api/products/\${productId}\`).then((r) => r.json()),
 
-    // PN-Counter merges concurrent inc/dec without losing updates
+    // No onInsert/onUpdate — all changes come from the server
     fields: { stock: 'pn-counter' },
   })
 
-// In your component:
 function StockBadge({ productId }: { productId: string }) {
   const [product] = useCollection(productOptions(productId))
   return <span>{product?.stock ?? 0} in stock</span>
 }`}
-              />
-            </div>
-          </div>
-
-          {/* ── Use Case 3: Chat ─────────────────────────────────── */}
-          <div className="use-case">
-            <div className="use-case-header">
-              <span className="use-case-number">03</span>
-              <div>
-                <h3>Chat with Message History</h3>
-                <p>
-                  Persistent chat where new sessions load the last 50 messages
-                  from Postgres, then live messages arrive over the channel. No
-                  client-side pagination — just a{' '}
-                  <code>queryFn</code> and a channel.
-                </p>
-              </div>
-            </div>
-            <div className="use-case-codes">
-              <CodeBlock
-                title="server/realtime.ts — chat auth"
-                code={`authorize: async (userId, channel) => {
-  if (channel.namespace === 'messages') {
-    const member = await db.roomMembers.findFirst({
-      where: { roomId: channel.params.roomId, userId },
-    })
-    // Clients receive — only the server publishes
-    return { subscribe: !!member, publish: false }
-  }
-  return { subscribe: false, publish: false }
-},`}
-              />
-              <CodeBlock
-                title="features/chat/collection.ts"
-                code={`export const messagesOptions = (roomId: string) =>
-  realtimeCollectionOptions({
-    client: realtimeClient,
-    channel: ['messages', { roomId }],
-    getKey: (m) => m.id,
-
-    // Seed from Postgres on mount — newest 50 messages
-    queryFn: () =>
-      db.messages.findMany({
-        where: { roomId },
-        orderBy: { sentAt: 'desc' },
-        take: 50,
-      }),
-
-    // Write to DB, then publish — same request, no extra round-trip
-    onInsert: async ({ data }) => {
-      const msg = await db.messages.create({ data: { ...data, roomId } })
-      await nodeServer.publish(
-        serializeKey(['messages', { roomId }]),
-        { action: 'insert', data: msg },
-      )
-      return msg
-    },
-  })`}
               />
             </div>
           </div>

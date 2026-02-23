@@ -93,6 +93,10 @@ export type {
   SyncedSetDef,
 } from './collections/index.js'
 
+// REST/DB composition helpers
+export { withRest } from './core/withRest.js'
+export type { WithRestOptions } from './core/withRest.js'
+
 // Core utilities
 export { createDedup } from './core/dedup.js'
 export type { DedupOptions, DeduplicationFilter } from './core/dedup.js'
