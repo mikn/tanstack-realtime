@@ -10,9 +10,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Store } from '@tanstack/store'
 import {
+  createOfflineQueue,
   createRealtimeClient,
   createStreamChannel,
-  createOfflineQueue,
   liveChannelOptions,
   realtimeCollectionOptions,
   streamChannelOptions,
@@ -105,7 +105,9 @@ describe('docs: withRest helper', () => {
     expect(rows).toEqual([{ id: '1', title: 'Task A' }])
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/tasks?projectId=abc',
-      expect.objectContaining({ headers: { 'Content-Type': 'application/json' } }),
+      expect.objectContaining({
+        headers: { 'Content-Type': 'application/json' },
+      }),
     )
   })
 
@@ -123,7 +125,9 @@ describe('docs: withRest helper', () => {
 
     const result = await opts.onInsert({
       transaction: {
-        mutations: [{ modified: { title: 'New task' }, key: '2', original: {} }],
+        mutations: [
+          { modified: { title: 'New task' }, key: '2', original: {} },
+        ],
       },
     } as any)
 
@@ -148,7 +152,9 @@ describe('docs: withRest helper', () => {
 
     await opts.onUpdate({
       transaction: {
-        mutations: [{ modified: { id: '3', title: 'Updated' }, key: '3', original: {} }],
+        mutations: [
+          { modified: { id: '3', title: 'Updated' }, key: '3', original: {} },
+        ],
       },
     } as any)
 
@@ -167,7 +173,9 @@ describe('docs: withRest helper', () => {
 
     await opts.onDelete({
       transaction: {
-        mutations: [{ modified: { id: '4', title: 'Bye' }, key: '4', original: {} }],
+        mutations: [
+          { modified: { id: '4', title: 'Bye' }, key: '4', original: {} },
+        ],
       },
     } as any)
 
@@ -190,7 +198,9 @@ describe('docs: withRest helper', () => {
 
     await opts.onUpdate({
       transaction: {
-        mutations: [{ modified: { id: '5', title: 'x' }, key: '5', original: {} }],
+        mutations: [
+          { modified: { id: '5', title: 'x' }, key: '5', original: {} },
+        ],
       },
     } as any)
 
@@ -251,12 +261,14 @@ describe('docs: auto-broadcast after onInsert / onUpdate', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
 
-    const config = realtimeCollectionOptions<{ id: string; title: string }, string>({
+    const config = realtimeCollectionOptions<
+      { id: string; title: string },
+      string
+    >({
       client,
       channel: 'tasks',
       getKey: (t) => t.id,
-      onInsert: () =>
-        Promise.resolve({ id: '1', title: 'Created by server' }),
+      onInsert: () => Promise.resolve({ id: '1', title: 'Created by server' }),
     })
     driveSync(config)
 
@@ -277,17 +289,21 @@ describe('docs: auto-broadcast after onInsert / onUpdate', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
 
-    const config = realtimeCollectionOptions<{ id: string; title: string }, string>({
+    const config = realtimeCollectionOptions<
+      { id: string; title: string },
+      string
+    >({
       client,
       channel: 'tasks',
       getKey: (t) => t.id,
-      onUpdate: () =>
-        Promise.resolve({ id: '1', title: 'Edited by server' }),
+      onUpdate: () => Promise.resolve({ id: '1', title: 'Edited by server' }),
     })
     driveSync(config)
 
     await config.onUpdate!({
-      transaction: { mutations: [{ modified: { id: '1' }, key: '1', original: {} }] },
+      transaction: {
+        mutations: [{ modified: { id: '1' }, key: '1', original: {} }],
+      },
     } as any)
 
     expect(transport.publishCalls).toHaveLength(1)
@@ -326,7 +342,11 @@ describe('docs: liveChannelOptions', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
 
-    interface Message { id: string; text: string; type: string }
+    interface Message {
+      id: string
+      text: string
+      type: string
+    }
     const ops: Array<{ value?: unknown }> = []
 
     const config = liveChannelOptions<Message, string>({
@@ -348,7 +368,10 @@ describe('docs: liveChannelOptions', () => {
     })
 
     // Live event arrives before history resolves
-    transport.emit('chat:room-1', { type: 'message', message: { id: 'live-1', text: 'Live!', type: 'message' } })
+    transport.emit('chat:room-1', {
+      type: 'message',
+      message: { id: 'live-1', text: 'Live!', type: 'message' },
+    })
     expect(ops).toHaveLength(0) // buffered
 
     await vi.advanceTimersByTimeAsync(0)
@@ -364,7 +387,11 @@ describe('docs: liveChannelOptions', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
 
-    interface Message { id: string; text: string; type: string }
+    interface Message {
+      id: string
+      text: string
+      type: string
+    }
     const ops: Array<{ value?: unknown }> = []
 
     const config = liveChannelOptions<Message, string>({
@@ -386,11 +413,17 @@ describe('docs: liveChannelOptions', () => {
     await vi.advanceTimersByTimeAsync(0)
 
     // A real message — should appear
-    transport.emit('chat:room-1', { type: 'message', message: { id: 'm1', text: 'Hi', type: 'message' } })
+    transport.emit('chat:room-1', {
+      type: 'message',
+      message: { id: 'm1', text: 'Hi', type: 'message' },
+    })
     // A typing indicator — should be filtered out
     transport.emit('chat:room-1', { type: 'typing' })
     // Another real message
-    transport.emit('chat:room-1', { type: 'message', message: { id: 'm2', text: 'Hey', type: 'message' } })
+    transport.emit('chat:room-1', {
+      type: 'message',
+      message: { id: 'm2', text: 'Hey', type: 'message' },
+    })
 
     expect(ops).toHaveLength(2)
     expect((ops[0].value as Message).id).toBe('m1')
@@ -417,7 +450,10 @@ describe('docs: createStreamChannel + streamChannelOptions', () => {
       client,
       channel: ['ai', { requestId: 'req-1' }],
       initial: { content: '' },
-      reduce: (state: { content: string }, event: { type: string; token?: string }) =>
+      reduce: (
+        state: { content: string },
+        event: { type: string; token?: string },
+      ) =>
         event.type === 'token'
           ? { content: state.content + (event.token ?? '') }
           : state,
@@ -431,7 +467,7 @@ describe('docs: createStreamChannel + streamChannelOptions', () => {
     config.sync.sync({
       begin: () => {},
       write: (op: any) => {
-        if (op.value?.state !== undefined) updates.push(op.value as any)
+        if (op.value?.state !== undefined) updates.push(op.value)
       },
       commit: () => {},
       markReady: () => {},
@@ -444,8 +480,13 @@ describe('docs: createStreamChannel + streamChannelOptions', () => {
       id: 'ai-test',
       channel: (params: { requestId: string }) => ['ai', params],
       initial: { content: '' },
-      reduce: (state: { content: string }, event: { type: string; token?: string }) =>
-        event.type === 'token' ? { content: state.content + (event.token ?? '') } : state,
+      reduce: (
+        state: { content: string },
+        event: { type: string; token?: string },
+      ) =>
+        event.type === 'token'
+          ? { content: state.content + (event.token ?? '') }
+          : state,
     })
     const channel = def.resolveChannel({ requestId: 'req-1' })
 
@@ -464,13 +505,20 @@ describe('docs: createStreamChannel + streamChannelOptions', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
 
-    const updates: Array<{ state: { content: string }; status: string; error?: string }> = []
+    const updates: Array<{
+      state: { content: string }
+      status: string
+      error?: string
+    }> = []
 
     const config = streamChannelOptions({
       client,
       channel: ['ai', { requestId: 'err-1' }],
       initial: { content: '' },
-      reduce: (state: { content: string }, event: { type: string; token?: string }) =>
+      reduce: (
+        state: { content: string },
+        event: { type: string; token?: string },
+      ) =>
         event.type === 'token'
           ? { content: state.content + (event.token ?? '') }
           : state,
@@ -484,7 +532,7 @@ describe('docs: createStreamChannel + streamChannelOptions', () => {
     config.sync.sync({
       begin: () => {},
       write: (op: any) => {
-        if (op.value?.state !== undefined) updates.push(op.value as any)
+        if (op.value?.state !== undefined) updates.push(op.value)
       },
       commit: () => {},
       markReady: () => {},
@@ -496,8 +544,13 @@ describe('docs: createStreamChannel + streamChannelOptions', () => {
       id: 'ai-err',
       channel: (params: { requestId: string }) => ['ai', params],
       initial: { content: '' },
-      reduce: (state: { content: string }, event: { type: string; token?: string }) =>
-        event.type === 'token' ? { content: state.content + (event.token ?? '') } : state,
+      reduce: (
+        state: { content: string },
+        event: { type: string; token?: string },
+      ) =>
+        event.type === 'token'
+          ? { content: state.content + (event.token ?? '') }
+          : state,
     })
     const channel = def.resolveChannel({ requestId: 'err-1' })
 
@@ -516,14 +569,14 @@ describe('docs: createStreamChannel + streamChannelOptions', () => {
     const client = createRealtimeClient({ transport })
 
     // Mirrors the documented cpuStream pattern
-    const updates: Array<{ pct: number; samples: number[] }> = []
+    const updates: Array<{ pct: number; samples: Array<number> }> = []
 
     const config = streamChannelOptions({
       client,
       channel: ['metrics:cpu', { serverId: 'srv-1' }],
-      initial: { pct: 0, samples: [] as number[] },
+      initial: { pct: 0, samples: [] as Array<number> },
       reduce: (
-        state: { pct: number; samples: number[] },
+        state: { pct: number; samples: Array<number> },
         event: { pct: number },
       ) => ({
         pct: event.pct,
@@ -546,9 +599,9 @@ describe('docs: createStreamChannel + streamChannelOptions', () => {
     const def = createStreamChannel({
       id: 'cpu',
       channel: (params: { serverId: string }) => ['metrics:cpu', params],
-      initial: { pct: 0, samples: [] as number[] },
+      initial: { pct: 0, samples: [] as Array<number> },
       reduce: (
-        state: { pct: number; samples: number[] },
+        state: { pct: number; samples: Array<number> },
         event: { pct: number },
       ) => ({ pct: event.pct, samples: [...state.samples, event.pct] }),
     })
@@ -577,8 +630,11 @@ describe('docs: onMessage adapter — Supabase format', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
 
-    interface Task { id: string; title: string }
-    const ops: WriteOp[] = []
+    interface Task {
+      id: string
+      title: string
+    }
+    const ops: Array<WriteOp> = []
 
     const config = realtimeCollectionOptions<Task, string>({
       getKey: (t) => t.id,
@@ -602,18 +658,30 @@ describe('docs: onMessage adapter — Supabase format', () => {
     const task = { id: '1', title: 'Ship it' }
 
     // Supabase-style INSERT
-    transport.emit('public:tasks', { eventType: 'INSERT', new: task, old: null })
+    transport.emit('public:tasks', {
+      eventType: 'INSERT',
+      new: task,
+      old: null,
+    })
     expect(ops[0].type).toBe('insert')
     expect((ops[0].value as Task).title).toBe('Ship it')
 
     // Supabase-style UPDATE
     const updated = { id: '1', title: 'Ship it now' }
-    transport.emit('public:tasks', { eventType: 'UPDATE', new: updated, old: task })
+    transport.emit('public:tasks', {
+      eventType: 'UPDATE',
+      new: updated,
+      old: task,
+    })
     expect(ops[1].type).toBe('update')
     expect((ops[1].value as Task).title).toBe('Ship it now')
 
     // Supabase-style DELETE
-    transport.emit('public:tasks', { eventType: 'DELETE', new: null, old: updated })
+    transport.emit('public:tasks', {
+      eventType: 'DELETE',
+      new: null,
+      old: updated,
+    })
     expect(ops[2].type).toBe('delete')
 
     // Unknown event type — discarded (no op added)
@@ -632,8 +700,11 @@ describe('docs: onMessage adapter — CDC (Debezium) format', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
 
-    interface Order { id: string; total: number }
-    const ops: WriteOp[] = []
+    interface Order {
+      id: string
+      total: number
+    }
+    const ops: Array<WriteOp> = []
 
     const config = realtimeCollectionOptions<Order, string>({
       getKey: (o) => o.id,
@@ -643,8 +714,7 @@ describe('docs: onMessage adapter — CDC (Debezium) format', () => {
         const e = raw as { op: 'c' | 'u' | 'd'; after?: Order; before?: Order }
         if (e.op === 'c') return { action: 'insert', data: e.after! }
         if (e.op === 'u') return { action: 'update', data: e.after! }
-        if (e.op === 'd') return { action: 'delete', data: e.before! }
-        return null
+        return { action: 'delete', data: e.before! }
       },
     })
     config.sync.sync({
@@ -701,7 +771,7 @@ describe('docs: createOfflineQueue', () => {
     }
 
     const transport = createOfflineQueue(innerTransport, { maxSize: 500 })
-    const client = createRealtimeClient({ transport })
+    const _client = createRealtimeClient({ transport })
 
     // Publish while disconnected — should be queued
     void transport.publish('ch', { msg: 1 })
@@ -772,7 +842,7 @@ describe('docs: withGapRecovery', () => {
       async publish() {},
     }
 
-    const gapCalls: string[] = []
+    const gapCalls: Array<string> = []
     const transport = withGapRecovery(innerTransport, {
       onGap: async (channel) => {
         gapCalls.push(channel)
@@ -813,7 +883,7 @@ describe('docs: withGapRecovery', () => {
       async publish() {},
     }
 
-    const gapCalls: string[] = []
+    const gapCalls: Array<string> = []
     const transport = withGapRecovery(innerTransport, {
       onGap: async (channel) => {
         gapCalls.push(channel)
@@ -882,7 +952,11 @@ describe('docs: CRDT local fields stripped before publishing', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
 
-    interface Task { id: string; title: string; draft?: boolean }
+    interface Task {
+      id: string
+      title: string
+      draft?: boolean
+    }
 
     const config = realtimeCollectionOptions<Task, string>({
       client,
@@ -901,7 +975,9 @@ describe('docs: CRDT local fields stripped before publishing', () => {
     })
 
     await config.onUpdate!({
-      transaction: { mutations: [{ modified: { id: '1' }, key: '1', original: {} }] },
+      transaction: {
+        mutations: [{ modified: { id: '1' }, key: '1', original: {} }],
+      },
     } as any)
 
     const published = transport.publishCalls[0].data as any

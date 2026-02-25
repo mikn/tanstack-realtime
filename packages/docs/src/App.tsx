@@ -15,7 +15,12 @@ function inferLanguage(code: string, title?: string): string {
     if (ext === 'ts' || ext === 'tsx') return 'tsx'
     if (ext === 'js' || ext === 'jsx') return 'jsx'
   }
-  if (/\bimport\b.*\bfrom\b/.test(code) || /:\s*(string|number|boolean)\b/.test(code) || /<\w+/.test(code)) return 'tsx'
+  if (
+    /\bimport\b.*\bfrom\b/.test(code) ||
+    /:\s*(string|number|boolean)\b/.test(code) ||
+    /<\w+/.test(code)
+  )
+    return 'tsx'
   return 'tsx'
 }
 
@@ -157,8 +162,7 @@ function Hero() {
       <div className="container">
         <Badge>v0.1 &middot; Alpha</Badge>
         <h1>
-          Realtime,{' '}
-          <span className="gradient-text">without the ceremony.</span>
+          Realtime, <span className="gradient-text">without the ceremony.</span>
         </h1>
         <p className="hero-sub">
           Add a <code>channel</code> to your existing <code>queryFn</code>.
@@ -241,8 +245,7 @@ function Features() {
         <Badge>Why TanStack Realtime</Badge>
         <h2>
           Every feature solves
-          <br />
-          a real problem.
+          <br />a real problem.
         </h2>
         <div className="features-grid">
           <FeatureCard
@@ -549,11 +552,11 @@ router.post('/api/rooms/:roomId/messages', (req) =>
               <div>
                 <h3>Server-initiated push</h3>
                 <p>
-                  The one case where you call{' '}
-                  <code>nodeServer.publish()</code> directly: changes that
-                  originate outside a client mutation &mdash; background jobs,
-                  cron tasks, webhooks from external services. The collection is
-                  read-only; the server pushes all updates.
+                  The one case where you call <code>nodeServer.publish()</code>{' '}
+                  directly: changes that originate outside a client mutation
+                  &mdash; background jobs, cron tasks, webhooks from external
+                  services. The collection is read-only; the server pushes all
+                  updates.
                 </p>
               </div>
             </div>
@@ -639,7 +642,9 @@ function CRDTs() {
             />
           </div>
           <div className="ba-col">
-            <div className="ba-label ba-after">With LWW — deterministic winner</div>
+            <div className="ba-label ba-after">
+              With LWW — deterministic winner
+            </div>
             <CodeBlock
               code={`// Same scenario — but now using fields: { title: 'lww' }
 // LWW uses a Lamport clock + clientId tiebreak
@@ -764,8 +769,8 @@ function PresenceSection() {
         <p className="section-sub">
           Define a presence channel once. <code>usePresence</code> joins on
           mount, leaves on unmount, and returns a reactive list of every other
-          connected user. Attach any data &mdash; name, avatar, cursor
-          position, active selection.
+          connected user. Attach any data &mdash; name, avatar, cursor position,
+          active selection.
         </p>
 
         <div className="use-case-codes" style={{ marginBottom: '1.5rem' }}>
@@ -972,8 +977,7 @@ function Streaming() {
         <p className="section-sub">
           Some channels emit a sequence of events that accumulate into a single
           piece of state &mdash; not a list of rows. A <code>reduce</code>{' '}
-          function folds each event into state.{' '}
-          <code>status</code> tracks{' '}
+          function folds each event into state. <code>status</code> tracks{' '}
           <code>'pending'</code> &rarr; <code>'streaming'</code> &rarr;{' '}
           <code>'done'</code> (or <code>'error'</code>).
         </p>
@@ -1658,8 +1662,8 @@ function Footer() {
         </div>
         <div className="footer-bottom">
           <p>
-            &copy; {new Date().getFullYear()} mikn. MIT License. Not an
-            official TanStack project.
+            &copy; {new Date().getFullYear()} mikn. MIT License. Not an official
+            TanStack project.
           </p>
         </div>
       </div>
@@ -1815,14 +1819,14 @@ export function VoteCounter({ postId }: { postId: string }) {
           <span className="callout-label">How the pieces connect</span>
           <p>
             <code>RealtimeProvider</code> makes the client available via
-            context.{' '}
-            <code>realtimeCollectionOptions</code> creates a TanStack DB
-            collection backed by a live channel — so <code>useCollection</code>{' '}
-            returns a reactive array that updates automatically when any client
-            publishes a change. The <code>pn-counter</code> on{' '}
-            <code>votes</code> means two users clicking{' '}
-            <code>+1</code> simultaneously will both have their click counted,
-            even if the messages arrive out of order or overlap in transit.
+            context. <code>realtimeCollectionOptions</code> creates a TanStack
+            DB collection backed by a live channel — so{' '}
+            <code>useCollection</code> returns a reactive array that updates
+            automatically when any client publishes a change. The{' '}
+            <code>pn-counter</code> on <code>votes</code> means two users
+            clicking <code>+1</code> simultaneously will both have their click
+            counted, even if the messages arrive out of order or overlap in
+            transit.
           </p>
         </div>
       </div>
@@ -1845,10 +1849,10 @@ function Positioning() {
           When it does not.
         </h2>
         <p className="section-sub">
-          This is a pub/sub layer between your server and your React
-          components. It is not a database, a CDC pipeline, or a collaborative
-          editing engine. Here is a straightforward description of where it
-          helps and where something else is likely a better fit.
+          This is a pub/sub layer between your server and your React components.
+          It is not a database, a CDC pipeline, or a collaborative editing
+          engine. Here is a straightforward description of where it helps and
+          where something else is likely a better fit.
         </p>
 
         <div className="positioning-grid">
@@ -1856,8 +1860,7 @@ function Positioning() {
             <h3>Reasonable fit</h3>
             <ul>
               <li>
-                You have a Node.js server and want live updates without
-                polling
+                You have a Node.js server and want live updates without polling
               </li>
               <li>
                 You want React collections that update reactively when any
@@ -1868,8 +1871,8 @@ function Positioning() {
                 messaging
               </li>
               <li>
-                You want concurrent edits on simple fields — counters, tag
-                sets, scalar values
+                You want concurrent edits on simple fields — counters, tag sets,
+                scalar values
               </li>
               <li>
                 You want to choose your own transport (WebSocket, SSE,
@@ -1882,11 +1885,13 @@ function Positioning() {
             <h3>Probably not the right fit</h3>
             <ul>
               <li>
-                <strong>You are already using ElectricSQL with TanStack DB.</strong>{' '}
-                ElectricSQL syncs Postgres change streams directly to
-                client collections. If Postgres is your source of truth,
-                that is a better fit than this library — adding a pub/sub
-                layer on top would mostly add complexity without benefit.
+                <strong>
+                  You are already using ElectricSQL with TanStack DB.
+                </strong>{' '}
+                ElectricSQL syncs Postgres change streams directly to client
+                collections. If Postgres is your source of truth, that is a
+                better fit than this library — adding a pub/sub layer on top
+                would mostly add complexity without benefit.
               </li>
               <li>
                 <strong>Postgres is your only source of truth.</strong>{' '}
@@ -1895,17 +1900,16 @@ function Positioning() {
                 broadcasts them — it does not read from Postgres directly.
               </li>
               <li>
-                <strong>You need rich collaborative text editing.</strong>{' '}
-                Yjs and its ecosystem (Hocuspocus, PartyKit) are designed for
-                this. The CRDT primitives here cover counters, sets, and
-                scalar values — not document trees or character-level
-                editing.
+                <strong>You need rich collaborative text editing.</strong> Yjs
+                and its ecosystem (Hocuspocus, PartyKit) are designed for this.
+                The CRDT primitives here cover counters, sets, and scalar values
+                — not document trees or character-level editing.
               </li>
               <li>
-                <strong>Polling is good enough.</strong>{' '}
-                TanStack Query with a reasonable{' '}
-                <code>refetchInterval</code> is simpler and more predictable
-                if your data does not need to update in under a few seconds.
+                <strong>Polling is good enough.</strong> TanStack Query with a
+                reasonable <code>refetchInterval</code> is simpler and more
+                predictable if your data does not need to update in under a few
+                seconds.
               </li>
             </ul>
           </div>
@@ -1914,15 +1918,15 @@ function Positioning() {
         <div className="callout">
           <span className="callout-label">On TanStack DB</span>
           <p>
-            TanStack DB is where collections, optimistic mutations, and
-            derived views live. This library adds a realtime transport layer
-            on top — it tells TanStack DB what changed, not the other way
-            around. If you are already using TanStack DB with ElectricSQL,
-            the ElectricSQL adapter is doing the same job as this library for
-            your Postgres-backed data. You would only add this library if you
-            want to handle a transport that ElectricSQL does not cover (a
-            custom WebSocket server, Centrifugo, SSE) or if you want
-            presence and pub/sub messaging alongside your collections.
+            TanStack DB is where collections, optimistic mutations, and derived
+            views live. This library adds a realtime transport layer on top — it
+            tells TanStack DB what changed, not the other way around. If you are
+            already using TanStack DB with ElectricSQL, the ElectricSQL adapter
+            is doing the same job as this library for your Postgres-backed data.
+            You would only add this library if you want to handle a transport
+            that ElectricSQL does not cover (a custom WebSocket server,
+            Centrifugo, SSE) or if you want presence and pub/sub messaging
+            alongside your collections.
           </p>
         </div>
       </div>

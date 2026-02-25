@@ -105,10 +105,9 @@ async function resolveHeaders(
  *
  * Default `itemUrl`: strips the query string from `url` and appends `/${key}`.
  */
-export function withRest<
-  T extends object,
-  TKey extends string | number,
->(options: WithRestOptions<T, TKey>): {
+export function withRest<T extends object, TKey extends string | number>(
+  options: WithRestOptions<T, TKey>,
+): {
   getKey: (item: T) => TKey
   queryFn: () => Promise<Array<T>>
   onInsert: InsertMutationFn<T, TKey>
