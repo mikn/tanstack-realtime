@@ -936,6 +936,113 @@ code {
 }
 
 /* ---------------------------------------------------------------------------
+   End-to-end example steps
+   --------------------------------------------------------------------------- */
+
+.e2e-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.e2e-step {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.e2e-step-label {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-2) 20%, transparent);
+  padding: 0.25em 0.65em;
+  border-radius: 4px;
+  margin-bottom: 0.75rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Positioning cards
+   --------------------------------------------------------------------------- */
+
+.positioning-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.positioning-card {
+  border-radius: 14px;
+  padding: 1.75rem;
+}
+
+.positioning-card h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.positioning-card ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.positioning-card li {
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  padding-left: 1.4rem;
+  position: relative;
+}
+
+.positioning-card li::before {
+  position: absolute;
+  left: 0;
+  font-size: 0.85rem;
+}
+
+.positioning-good {
+  background: color-mix(in srgb, #22c55e 6%, var(--bg-elevated));
+  border: 1px solid color-mix(in srgb, #22c55e 20%, transparent);
+}
+
+.positioning-good h3 {
+  color: #22c55e;
+}
+
+.positioning-good li::before {
+  content: '✓';
+  color: #22c55e;
+}
+
+.positioning-bad {
+  background: color-mix(in srgb, #ef4444 6%, var(--bg-elevated));
+  border: 1px solid color-mix(in srgb, #ef4444 20%, transparent);
+}
+
+.positioning-bad h3 {
+  color: #ef4444;
+}
+
+.positioning-bad li::before {
+  content: '✗';
+  color: var(--text-muted);
+}
+
+.positioning-bad li strong {
+  color: var(--text-primary);
+}
+
+/* ---------------------------------------------------------------------------
    Responsive
    --------------------------------------------------------------------------- */
 
@@ -963,7 +1070,8 @@ code {
   .hooks-grid,
   .use-case-codes,
   .before-after,
-  .resilience-grid {
+  .resilience-grid,
+  .positioning-grid {
     grid-template-columns: 1fr;
   }
 
