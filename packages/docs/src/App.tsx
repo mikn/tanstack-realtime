@@ -1,4 +1,5 @@
 import './styles.css'
+import { Highlight, themes } from 'prism-react-renderer'
 
 // ---------------------------------------------------------------------------
 // Reusable tiny components
@@ -8,13 +9,37 @@ function Badge({ children }: { children: React.ReactNode }) {
   return <span className="badge">{children}</span>
 }
 
+function inferLanguage(code: string, title?: string): string {
+  if (title) {
+    const ext = title.split('.').pop()?.toLowerCase()
+    if (ext === 'ts' || ext === 'tsx') return 'tsx'
+    if (ext === 'js' || ext === 'jsx') return 'jsx'
+  }
+  if (/\bimport\b.*\bfrom\b/.test(code) || /:\s*(string|number|boolean)\b/.test(code) || /<\w+/.test(code)) return 'tsx'
+  return 'tsx'
+}
+
 function CodeBlock({ code, title }: { code: string; title?: string }) {
+  const language = inferLanguage(code, title)
   return (
     <div className="code-block">
       {title && <div className="code-title">{title}</div>}
-      <pre>
-        <code>{code}</code>
-      </pre>
+      <Highlight theme={themes.nightOwl} code={code.trim()} language={language}>
+        {({ tokens, getLineProps, getTokenProps }) => (
+          <pre>
+            <code>
+              {tokens.map((line, i) => (
+                <span key={i} {...getLineProps({ line })}>
+                  {line.map((token, key) => (
+                    <span key={key} {...getTokenProps({ token })} />
+                  ))}
+                  {'\n'}
+                </span>
+              ))}
+            </code>
+          </pre>
+        )}
+      </Highlight>
     </div>
   )
 }
