@@ -99,11 +99,13 @@ function Nav() {
           <span className="logo-realtime">Realtime</span>
         </a>
         <div className="nav-links">
+          <a href="#example">Example</a>
           <a href="#features">Features</a>
           <a href="#database">Database</a>
           <a href="#crdts">CRDTs</a>
           <a href="#presence">Presence</a>
           <a href="#resilience">Resilience</a>
+          <a href="#when-to-use">When to use</a>
           <a href="#quickstart">Quick Start</a>
           <a
             href="https://github.com/mikn/tanstack-realtime"
@@ -130,13 +132,13 @@ function Hero() {
       <div className="container">
         <Badge>v0.1 &middot; Alpha</Badge>
         <h1>
-          Your data is{' '}
-          <span className="gradient-text">live.</span>
+          Realtime,{' '}
+          <span className="gradient-text">without the ceremony.</span>
         </h1>
         <p className="hero-sub">
           Add a <code>channel</code> to your existing <code>queryFn</code>.
-          Every connected client updates the instant data changes &mdash; no
-          polling, no subscriptions you manage by hand, no CDC pipeline.
+          Connected clients update when data changes — no polling, no
+          subscriptions managed by hand. Built on TanStack DB.
         </p>
 
         <div className="before-after">
@@ -1278,8 +1280,8 @@ function Transports() {
           <div className="transport-card">
             <h3>Node.js Preset</h3>
             <p>
-              Built-in WebSocket server + client. Zero config. Perfect for local
-              development and single-server deployments.
+              Built-in WebSocket server and client. Minimal setup. Suitable for
+              local development and single-server deployments.
             </p>
             <CodeBlock
               code={`import { nodeTransport } from '@tanstack/realtime-preset-node'
@@ -1293,8 +1295,8 @@ const client = createRealtimeClient({
           <div className="transport-card">
             <h3>Centrifugo Adapter</h3>
             <p>
-              Production-grade WebSocket infrastructure. Millions of concurrent
-              connections. Drop in one import.
+              Production WebSocket infrastructure with token auth and
+              server-assisted gap recovery. Drop in one import.
             </p>
             <CodeBlock
               code={`import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
@@ -1407,11 +1409,7 @@ function QuickStart() {
     <section id="quickstart" className="section section-dark">
       <div className="container">
         <Badge>Quick Start</Badge>
-        <h2>
-          Five minutes to
-          <br />
-          <span className="gradient-text">real-time.</span>
-        </h2>
+        <h2>Getting started</h2>
 
         <div className="quickstart-steps">
           <div className="qs-step">
@@ -1580,6 +1578,7 @@ function Footer() {
         <div className="footer-links">
           <div>
             <h4>Library</h4>
+            <a href="#example">End-to-End Example</a>
             <a href="#features">Features</a>
             <a href="#spectrum">Progressive Spectrum</a>
             <a href="#database">Database Integration</a>
@@ -1590,6 +1589,7 @@ function Footer() {
             <a href="#resilience">Resilience</a>
             <a href="#adapters">Message Adapters</a>
             <a href="#quickstart">Quick Start</a>
+            <a href="#when-to-use">When to use</a>
           </div>
           <div>
             <h4>Community</h4>
@@ -1643,6 +1643,269 @@ function Footer() {
 }
 
 // ---------------------------------------------------------------------------
+// End-to-End Example — vote counter, all five files
+// ---------------------------------------------------------------------------
+
+function EndToEndExample() {
+  return (
+    <section id="example" className="section section-dark">
+      <div className="container">
+        <Badge>End-to-End Example</Badge>
+        <h2>
+          A shared counter,
+          <br />
+          all the way through.
+        </h2>
+        <p className="section-sub">
+          Five files. A vote counter where multiple users can click
+          simultaneously and every click is counted — even when two people hit
+          the button at the same time. Shows how server, client, provider,
+          collection, and component connect.
+        </p>
+
+        <div className="e2e-steps">
+          <div className="e2e-step">
+            <div className="e2e-step-label">1 — server</div>
+            <CodeBlock
+              title="server/realtime.ts"
+              code={`import { createServer } from 'node:http'
+import { createNodeServer } from '@tanstack/realtime-preset-node'
+
+export const nodeServer = createNodeServer({
+  // Identify the connecting user — return null to reject the connection
+  getUser: (req) => {
+    const userId = req.headers['x-user-id']
+    return typeof userId === 'string' ? { userId } : null
+  },
+  authorize: async (_userId, _channel) => ({
+    subscribe: true,
+    publish: true,
+    presence: false,
+  }),
+})
+
+const http = createServer(myExpressApp)
+nodeServer.attach(http)
+http.listen(3001)`}
+            />
+          </div>
+
+          <div className="e2e-step">
+            <div className="e2e-step-label">2 — client</div>
+            <CodeBlock
+              title="app/client.ts"
+              code={`import { createRealtimeClient } from '@tanstack/realtime'
+import { nodeTransport } from '@tanstack/realtime-preset-node'
+
+export const realtimeClient = createRealtimeClient({
+  transport: nodeTransport({ url: 'ws://localhost:3001' }),
+})`}
+            />
+          </div>
+
+          <div className="e2e-step">
+            <div className="e2e-step-label">3 — provider</div>
+            <CodeBlock
+              title="app/main.tsx"
+              code={`import { RealtimeProvider } from '@tanstack/react-realtime'
+import { realtimeClient } from './client'
+
+// RealtimeProvider makes the client available via context to all hooks below it.
+// One provider at the root is enough for the whole app.
+export function App() {
+  return (
+    <RealtimeProvider client={realtimeClient}>
+      <VoteCounter postId="post-1" />
+    </RealtimeProvider>
+  )
+}`}
+            />
+          </div>
+
+          <div className="e2e-step">
+            <div className="e2e-step-label">4 — collection</div>
+            <CodeBlock
+              title="features/votes/collection.ts"
+              code={`import { realtimeCollectionOptions } from '@tanstack/realtime'
+import { realtimeClient } from '../../app/client'
+
+interface Post { id: string; title: string; votes: number }
+
+export const postsOptions = (postId: string) =>
+  realtimeCollectionOptions<Post, string>({
+    client: realtimeClient,
+    channel: ['posts', { postId }],
+    getKey: (p) => p.id,
+
+    // Load current state from the server on mount
+    queryFn: () => fetch(\`/api/posts/\${postId}\`).then((r) => r.json()),
+
+    // votes is a PN-counter: concurrent increments from different clients
+    // always add up correctly, regardless of message arrival order
+    fields: { votes: 'pn-counter' },
+
+    onUpdate: async ({ transaction }) => {
+      const patch = transaction.mutations[0].modified
+      const res = await fetch(\`/api/posts/\${postId}\`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      })
+      return res.json() // returned row is broadcast to all subscribers
+    },
+  })`}
+            />
+          </div>
+
+          <div className="e2e-step">
+            <div className="e2e-step-label">5 — component</div>
+            <CodeBlock
+              title="features/votes/VoteCounter.tsx"
+              code={`import { useCollection } from '@tanstack/react-db'
+import { postsOptions } from './collection'
+
+// useCollection returns a reactive array. It re-renders whenever any client
+// publishes a change to this channel — no useEffect, no manual subscription.
+export function VoteCounter({ postId }: { postId: string }) {
+  const [post] = useCollection(postsOptions(postId))
+
+  if (!post) return null
+
+  return (
+    <div>
+      <h2>{post.title}</h2>
+      <div className="vote-row">
+        <button onClick={() => post.update({ votes: post.votes - 1 })}>−</button>
+        <span className="vote-count">{post.votes}</span>
+        <button onClick={() => post.update({ votes: post.votes + 1 })}>+</button>
+      </div>
+    </div>
+  )
+}`}
+            />
+          </div>
+        </div>
+
+        <div className="callout" style={{ marginTop: '2.5rem' }}>
+          <span className="callout-label">How the pieces connect</span>
+          <p>
+            <code>RealtimeProvider</code> makes the client available via
+            context.{' '}
+            <code>realtimeCollectionOptions</code> creates a TanStack DB
+            collection backed by a live channel — so <code>useCollection</code>{' '}
+            returns a reactive array that updates automatically when any client
+            publishes a change. The <code>pn-counter</code> on{' '}
+            <code>votes</code> means two users clicking{' '}
+            <code>+1</code> simultaneously will both have their click counted,
+            even if the messages arrive out of order or overlap in transit.
+          </p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Counter-example — when something else is a better fit
+// ---------------------------------------------------------------------------
+
+function Positioning() {
+  return (
+    <section id="when-to-use" className="section">
+      <div className="container">
+        <Badge>Honest assessment</Badge>
+        <h2>
+          When it fits.
+          <br />
+          When it does not.
+        </h2>
+        <p className="section-sub">
+          This is a pub/sub layer between your server and your React
+          components. It is not a database, a CDC pipeline, or a collaborative
+          editing engine. Here is a straightforward description of where it
+          helps and where something else is likely a better fit.
+        </p>
+
+        <div className="positioning-grid">
+          <div className="positioning-card positioning-good">
+            <h3>Reasonable fit</h3>
+            <ul>
+              <li>
+                You have a Node.js server and want live updates without
+                polling
+              </li>
+              <li>
+                You want React collections that update reactively when any
+                client mutates data
+              </li>
+              <li>
+                You need presence (who is connected) or lightweight pub/sub
+                messaging
+              </li>
+              <li>
+                You want concurrent edits on simple fields — counters, tag
+                sets, scalar values
+              </li>
+              <li>
+                You want to choose your own transport (WebSocket, SSE,
+                Centrifugo) without changing application code
+              </li>
+            </ul>
+          </div>
+
+          <div className="positioning-card positioning-bad">
+            <h3>Probably not the right fit</h3>
+            <ul>
+              <li>
+                <strong>You are already using ElectricSQL with TanStack DB.</strong>{' '}
+                ElectricSQL syncs Postgres change streams directly to
+                client collections. If Postgres is your source of truth,
+                that is a better fit than this library — adding a pub/sub
+                layer on top would mostly add complexity without benefit.
+              </li>
+              <li>
+                <strong>Postgres is your only source of truth.</strong>{' '}
+                ElectricSQL's CDC integration is purpose-built for this. This
+                library assumes a server that receives client mutations and
+                broadcasts them — it does not read from Postgres directly.
+              </li>
+              <li>
+                <strong>You need rich collaborative text editing.</strong>{' '}
+                Yjs and its ecosystem (Hocuspocus, PartyKit) are designed for
+                this. The CRDT primitives here cover counters, sets, and
+                scalar values — not document trees or character-level
+                editing.
+              </li>
+              <li>
+                <strong>Polling is good enough.</strong>{' '}
+                TanStack Query with a reasonable{' '}
+                <code>refetchInterval</code> is simpler and more predictable
+                if your data does not need to update in under a few seconds.
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="callout">
+          <span className="callout-label">On TanStack DB</span>
+          <p>
+            TanStack DB is where collections, optimistic mutations, and
+            derived views live. This library adds a realtime transport layer
+            on top — it tells TanStack DB what changed, not the other way
+            around. If you are already using TanStack DB with ElectricSQL,
+            the ElectricSQL adapter is doing the same job as this library for
+            your Postgres-backed data. You would only add this library if you
+            want to handle a transport that ElectricSQL does not cover (a
+            custom WebSocket server, Centrifugo, SSE) or if you want
+            presence and pub/sub messaging alongside your collections.
+          </p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // App
 // ---------------------------------------------------------------------------
 
@@ -1654,6 +1917,7 @@ export function App() {
       <Hero />
       <Features />
       <Spectrum />
+      <EndToEndExample />
       <DatabaseIntegration />
       <CRDTs />
       <PresenceSection />
@@ -1665,6 +1929,7 @@ export function App() {
       <ReactHooks />
       <QuickStart />
       <Ecosystem />
+      <Positioning />
       <Footer />
     </>
   )
