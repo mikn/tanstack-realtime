@@ -1,8 +1,7 @@
 import { use, useCallback, useEffect, useRef, useState } from 'react'
-import { advanceClock, lwwWins, tickClock } from '../core/crdt.js'
+import { advanceClock, lwwWins, tickClock } from '@tanstack/realtime'
 import { RealtimeContext } from './context.js'
-import type { SyncedValueDef } from '../collections/syncedValue.js'
-import type { LwwState } from '../core/crdt.js'
+import type { LwwState, SyncedValueDef } from '@tanstack/realtime'
 
 export interface UseSyncedValueOptions<
   T,
@@ -63,7 +62,7 @@ export function useSyncedValue<
   const channel = def.resolveChannel(params)
 
   // Current LWW state: { clock, clientId } for the winning value.
-  // Starts at clock=0 so any server message (clock ≥ 1) will win.
+  // Starts at clock=0 so any server message (clock >= 1) will win.
   const lwwRef = useRef<LwwState>({ clock: 0, clientId: '' })
 
   const [value, setValue] = useState<T>(initial)

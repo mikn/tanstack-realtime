@@ -635,6 +635,9 @@ export function centrifugoTransport(
           // Clear any stored recovery position — the channel is no longer
           // actively subscribed, so recovery data is stale.
           channelRecovery.delete(channel)
+          // Clean up any presence state for this channel to avoid leaking
+          // memory when channels are dynamically created (e.g. per-room).
+          presenceState.delete(channel)
           if (store.state === 'connected') {
             const id = nextId()
             send({ id, unsubscribe: { channel } })
@@ -665,12 +668,14 @@ export function centrifugoTransport(
       // Broadcast our join data to the presence channel.
       const clientId =
         centrifugoClientId ?? `local-${Math.random().toString(36).slice(2)}`
-      // fire-and-forget; suppress unhandled rejection if socket closes before reply
+      // fire-and-forget; log errors so presence failures are observable
       void this.publish(prs, {
         type: 'prs:join',
         clientId,
         data,
-      } satisfies PrsJoin).catch(() => {})
+      } satisfies PrsJoin).catch((err) => {
+        console.warn('[realtime:centrifugo] presence join failed', err)
+      })
     },
 
     updatePresence(channel, data) {
@@ -680,7 +685,9 @@ export function centrifugoTransport(
         type: 'prs:update',
         clientId,
         data,
-      } satisfies PrsUpdate).catch(() => {})
+      } satisfies PrsUpdate).catch((err) => {
+        console.warn('[realtime:centrifugo] presence update failed', err)
+      })
     },
 
     leavePresence(channel) {
@@ -690,7 +697,9 @@ export function centrifugoTransport(
       void this.publish(prs, {
         type: 'prs:leave',
         clientId,
-      } satisfies PrsLeave).catch(() => {})
+      } satisfies PrsLeave).catch((err) => {
+        console.warn('[realtime:centrifugo] presence leave failed', err)
+      })
 
       // Clean up sidecar subscription
       if (subscriptions.has(prs)) {

@@ -3,11 +3,9 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
-  "workspaces": [
-    "packages/*"
-  ],
+  "packageManager": "pnpm@10.29.3",
   "scripts": {
-    "build": "npm run build -w @tanstack/realtime && npm run build -w @tanstack/realtime-preset-node && npm run build -w @tanstack/realtime-adapter-centrifugo",
+    "build": "nx run-many --target=build",
     "test": "vitest run --project node --project workerd",
     "test:watch": "vitest --project node --project workerd",
     "test:e2e": "vitest run --project centrifugo-e2e",
@@ -15,10 +13,19 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --build",
+    "knip": "knip",
+    "size": "size-limit",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "pnpm build && changeset publish",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.29.4",
     "@cloudflare/vitest-pool-workers": "^0.12.14",
+    "@size-limit/preset-small-lib": "^11.2.0",
     "@tanstack/db": "^0.5.28",
     "@tanstack/eslint-config": "^0.4.0",
     "@tanstack/react-db": "^0.1.72",
@@ -32,12 +39,28 @@
     "eslint": "^9.39.3",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-unused-imports": "^4.4.1",
+    "husky": "^9.1.7",
+    "knip": "^5.61.2",
+    "nx": "^21.6.2",
     "prettier": "^3.8.1",
     "react": "^19.2.4",
+    "size-limit": "^11.2.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^2.0.0",
     "wrangler": "^4.67.0",
     "ws": "^8.18.0"
-  }
+  },
+  "size-limit": [
+    {
+      "name": "@tanstack/realtime",
+      "path": "packages/realtime/dist/index.js",
+      "limit": "15 kB"
+    },
+    {
+      "name": "@tanstack/react-realtime",
+      "path": "packages/react-realtime/dist/index.js",
+      "limit": "20 kB"
+    }
+  ]
 }

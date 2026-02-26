@@ -1,0 +1,34 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "workspaces": {
+    ".": {
+      "ignoreDependencies": [
+        "@cloudflare/vitest-pool-workers",
+        "@tanstack/react-query",
+        "@tanstack/react-db",
+        "wrangler"
+      ]
+    },
+    "packages/realtime": {
+      "entry": ["src/index.ts"],
+      "ignoreDependencies": ["@standard-schema/spec"]
+    },
+    "packages/react-realtime": {
+      "entry": ["src/index.ts"]
+    },
+    "packages/realtime-preset-node": {
+      "entry": ["src/index.ts"]
+    },
+    "packages/realtime-adapter-centrifugo": {
+      "entry": ["src/index.ts"]
+    },
+    "packages/realtime-adapter-sse": {
+      "entry": ["src/index.ts"]
+    },
+    "packages/__tests__": {
+      "entry": ["**/*.test.ts"],
+      "ignore": ["setup.ts"]
+    }
+  },
+  "ignore": ["packages/docs/**"]
+}

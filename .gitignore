@@ -29,6 +29,9 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
+# Nx
+.nx/
+
 # Misc
 .cache/
 *.tgz

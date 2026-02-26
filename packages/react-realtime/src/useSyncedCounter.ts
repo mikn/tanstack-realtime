@@ -1,8 +1,7 @@
 import { use, useCallback, useEffect, useRef, useState } from 'react'
-import { mergePn, pnDecrement, pnIncrement, pnValue } from '../core/crdt.js'
+import { mergePn, pnDecrement, pnIncrement, pnValue } from '@tanstack/realtime'
 import { RealtimeContext } from './context.js'
-import type { SyncedCounterDef } from '../collections/syncedCounter.js'
-import type { PnState } from '../core/crdt.js'
+import type { PnState, SyncedCounterDef } from '@tanstack/realtime'
 
 export interface UseSyncedCounterOptions<
   TParams extends Record<string, unknown> = Record<string, unknown>,
