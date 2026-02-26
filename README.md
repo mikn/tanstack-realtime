@@ -16,7 +16,7 @@
 - **Live collections** — wire TanStack DB collections to realtime channels with a single config object
 - **Presence** — track who is connected to a channel; current user always excluded from the list
 - **CRDT primitives** — conflict-free last-write-wins, PN-counters, and OR-sets for collaborative state
-- **Resilient by default** — exponential back-off reconnection, offline queue, deduplication, gap recovery, and SharedWorker transport for multi-tab apps
+- **Resilient by default** — exponential back-off reconnection, offline queue, deduplication, gap recovery, and automatic multi-tab coordination (SharedWorker → BroadcastChannel → direct)
 
 ## Packages
 
@@ -24,7 +24,7 @@
 | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | [`@tanstack/realtime`](#tanstackrealtime)                                       | Core client, collection helpers, CRDT primitives, and type definitions         |
 | [`@tanstack/react-realtime`](#tanstackreact-realtime)                           | React hooks and provider                                                       |
-| [`@tanstack/realtime-preset-node`](#tanstackrealtime-preset-node)               | WebSocket transport + Node.js server for local dev and self-hosted deployments |
+| [`@tanstack/realtime-preset-node`](#tanstackrealtime-preset-node)               | Node.js server for local dev and self-hosted deployments                       |
 | [`@tanstack/realtime-adapter-centrifugo`](#tanstackrealtime-adapter-centrifugo) | Transport adapter for [Centrifugo](https://centrifugal.dev)                    |
 | [`@tanstack/realtime-adapter-sse`](#tanstackrealtime-adapter-sse)               | Server-Sent Events transport adapter                                           |
 
@@ -43,10 +43,13 @@ npm install @tanstack/realtime
 ### Creating a client
 
 ```ts
-import { createRealtimeClient, wsTransport } from '@tanstack/realtime'
+import { createCoordinatedTransport, createRealtimeClient, wsTransport } from '@tanstack/realtime'
 
+// Recommended: automatic multi-tab coordination
 export const client = createRealtimeClient({
-  transport: wsTransport({ url: 'ws://localhost:3000' }),
+  transport: createCoordinatedTransport({
+    transport: () => wsTransport({ url: 'ws://localhost:3000' }),
+  }),
 })
 
 await client.connect()
@@ -176,7 +179,7 @@ function StatusBar() {
 
 ## `@tanstack/realtime-preset-node`
 
-Self-contained WebSocket server and matching client transport. Suitable for local development, self-hosted deployments, and server-side tests.
+Node.js WebSocket server for local development, self-hosted deployments, and server-side tests. The client transport (`wsTransport`) lives in the base `@tanstack/realtime` package.
 
 ### Installation
 

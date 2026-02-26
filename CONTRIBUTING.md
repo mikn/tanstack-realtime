@@ -62,7 +62,7 @@ pnpm test
 Use the [Conventional Commits](https://www.conventionalcommits.org/) format:
 
 ```
-feat: add reconnect limit option to nodeTransport
+feat: add reconnect limit option to wsTransport
 fix: prevent stale closure in useSubscribe
 docs: correct onPresenceChange return type
 test: add self-exclusion invariant for presence

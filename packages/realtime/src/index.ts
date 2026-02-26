@@ -130,7 +130,20 @@ export type {
   GapRecoveryTransport,
 } from './core/gapRecovery.js'
 
-// SharedWorker-based multi-tab transport.
+// Multi-tab transport coordination.
+// createCoordinatedTransport() is the recommended entry point — it
+// automatically selects SharedWorker > BroadcastChannel > direct.
+export { createCoordinatedTransport } from './core/coordinatedTransport.js'
+export type { CoordinatedTransportOptions } from './core/coordinatedTransport.js'
+
+// BroadcastChannel-based multi-tab transport — leader election, no worker file.
+export {
+  createBroadcastChannelTransport,
+  isBroadcastChannelSupported,
+} from './core/broadcastChannelTransport.js'
+export type { BroadcastChannelTransportOptions } from './core/broadcastChannelTransport.js'
+
+// SharedWorker-based multi-tab transport — best performance, requires worker file.
 // Tab side: createSharedWorkerTransport(workerUrl)
 // Worker side: createSharedWorkerCoordinator(innerTransport) — call in the SharedWorker file.
 export {

@@ -12,7 +12,11 @@
  * SharedWorker file. It accepts incoming port connections and manages the
  * underlying `RealtimeTransport` on behalf of all tabs.
  *
- * Why SharedWorker instead of BroadcastChannel + leader election?
+ * For most apps, use `createCoordinatedTransport()` instead — it auto-selects
+ * SharedWorker when a `workerUrl` is provided, and falls back to
+ * BroadcastChannel leader election (no worker file needed) otherwise.
+ *
+ * Advantages of SharedWorker over BroadcastChannel:
  *  - The worker lives independently of tabs — it survives tab close/sleep.
  *  - No election protocol, no heartbeat, no race conditions.
  *  - The browser manages the worker's lifetime automatically.

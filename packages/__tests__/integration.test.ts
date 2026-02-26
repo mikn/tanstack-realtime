@@ -2,7 +2,7 @@
  * Integration tests for @tanstack/realtime + @tanstack/realtime-preset-node.
  *
  * Tests exercise the full stack:
- *   createNodeServer → attach → nodeTransport → createRealtimeClient → connect
+ *   createNodeServer → attach → wsTransport → createRealtimeClient → connect
  *
  * We run a real HTTP + WebSocket server in-process so the transport exercises
  * the actual wire protocol without any mocking.
@@ -15,8 +15,9 @@ import {
   parseChannel,
   realtimeCollectionOptions,
   serializeKey,
+  wsTransport,
 } from '@tanstack/realtime'
-import { createNodeServer, nodeTransport } from '@tanstack/realtime-preset-node'
+import { createNodeServer } from '@tanstack/realtime-preset-node'
 import type { Server } from 'node:http'
 import type {
   ChannelPermissions,
@@ -76,7 +77,7 @@ async function createTestHarness(
 
 function connectClient(port: number, jitter = 0): RealtimeClient {
   return createRealtimeClient({
-    transport: nodeTransport({
+    transport: wsTransport({
       url: `ws://localhost:${port}`,
       initialDelay: 100,
       maxDelay: 500,

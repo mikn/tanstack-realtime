@@ -299,9 +299,9 @@ function Features() {
           />
           <FeatureCard
             icon="%"
-            title="Multi-Tab via SharedWorker"
+            title="Multi-Tab Coordination"
             problem="Six browser tabs. Six WebSocket connections. Six times the server cost."
-            solution="createSharedWorkerTransport shares one connection across all tabs. Falls back to a direct transport in environments without SharedWorker support. Zero application code changes."
+            solution="createCoordinatedTransport automatically picks the best strategy: SharedWorker (if available) → BroadcastChannel leader election → direct. One line — zero config."
           />
         </div>
       </div>
@@ -1185,34 +1185,29 @@ const transport = withGapRecovery(
             />
           </div>
 
-          {/* Multi-tab SharedWorker */}
+          {/* Multi-tab coordination */}
           <div className="resilience-card">
             <div className="resilience-card-icon">%</div>
-            <h3>Multi-Tab SharedWorker</h3>
+            <h3>Multi-Tab Coordination</h3>
             <p>
               Six browser tabs. Six WebSocket connections. Six times the server
-              cost. <code>createSharedWorkerTransport</code> shares one
-              connection across all tabs. Falls back to a direct transport
-              in environments without SharedWorker support.
+              cost. <code>createCoordinatedTransport</code> automatically picks
+              the best strategy: SharedWorker &rarr; BroadcastChannel leader
+              election &rarr; direct fallback. Zero config required.
             </p>
             <CodeBlock
-              code={`// worker.ts — the SharedWorker script (one per origin)
-import { createSharedWorkerCoordinator, wsTransport } from '@tanstack/realtime'
+              code={`import { createCoordinatedTransport, wsTransport } from '@tanstack/realtime'
 
-createSharedWorkerCoordinator(
-  wsTransport({ url: 'wss://rt.example.com' }),
-)
+// Automatic — picks BroadcastChannel in most browsers
+const transport = createCoordinatedTransport({
+  transport: () => wsTransport({ url: 'wss://rt.example.com' }),
+})
 
-// app.ts — every tab uses this client, sharing one WebSocket
-import {
-  createSharedWorkerTransport,
-  isSharedWorkerSupported,
-  wsTransport,
-} from '@tanstack/realtime'
-
-const transport = isSharedWorkerSupported()
-  ? createSharedWorkerTransport(new URL('./worker.ts', import.meta.url))
-  : wsTransport({ url: 'wss://rt.example.com' }) // fallback for Safari iOS etc.
+// Best: provide a SharedWorker URL for optimal multi-tab sharing
+const transport = createCoordinatedTransport({
+  transport: () => wsTransport({ url: 'wss://rt.example.com' }),
+  workerUrl: new URL('./realtime.worker.ts', import.meta.url),
+})
 
 const client = createRealtimeClient({ transport })`}
             />
