@@ -2,11 +2,10 @@
  * @tanstack/react-realtime
  *
  * React provider and hooks for @tanstack/realtime.
+ *
+ * Import framework-agnostic primitives (createRealtimeClient, CRDT helpers,
+ * collection options, etc.) directly from `@tanstack/realtime`.
  */
-
-// Re-export everything from the framework-agnostic core so consumers only
-// need a single import: `import { createRealtimeClient, useRealtime } from '@tanstack/react-realtime'`
-export * from '@tanstack/realtime'
 
 export { RealtimeProvider } from './RealtimeProvider.js'
 export type { RealtimeProviderProps } from './RealtimeProvider.js'
