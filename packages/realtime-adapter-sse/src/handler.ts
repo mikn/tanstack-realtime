@@ -1,3 +1,5 @@
+import { createServerStream, serializeKey } from '@tanstack/realtime'
+import type { QueryKey, ServerStream } from '@tanstack/realtime'
 import type { ClientAction, ServerEvent } from './protocol.js'
 
 // ---------------------------------------------------------------------------
@@ -28,6 +30,24 @@ export interface SseHandler {
    * Useful for health checks and tests.
    */
   connectionCount: () => number
+
+  /**
+   * Create a server-side stream for pushing events to a channel.
+   *
+   * The stream handle wraps `broadcast()` and adds sentinel events for
+   * `done()` and `error()`. Clients consume via `streamChannelOptions`.
+   *
+   * @example
+   * const stream = sseHandler.createStream({ channel: ['ai', { sessionId }] })
+   * for await (const chunk of llmResponse) {
+   *   await stream.push({ type: 'token', content: chunk })
+   * }
+   * await stream.done()
+   */
+  createStream: <TEvent = unknown>(options: {
+    channel: QueryKey | string
+    signingKey?: string
+  }) => ServerStream<TEvent>
 }
 
 export interface SseHandlerOptions {
@@ -372,6 +392,22 @@ export function createSseHandler(options: SseHandlerOptions = {}): SseHandler {
 
     connectionCount() {
       return controllers.size
+    },
+
+    createStream<TEvent = unknown>(opts: {
+      channel: QueryKey | string
+      signingKey?: string
+    }): ServerStream<TEvent> {
+      const handler = this
+      return createServerStream<TEvent>({
+        publish: async (ch, data) => {
+          const serialized =
+            typeof ch === 'string' ? ch : serializeKey(ch)
+          handler.broadcast(serialized, data)
+        },
+        channel: opts.channel,
+        signingKey: opts.signingKey,
+      })
     },
   }
 }

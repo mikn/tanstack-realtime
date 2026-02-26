@@ -14,6 +14,7 @@ import type {
   PresenceUser,
   RealtimeTransport,
 } from './types.js'
+import type { OfflineQueueStorage } from './offlineQueueStorage.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,6 +52,19 @@ export interface OfflineQueueOptions {
    * @default () => false (discard on failure)
    */
   onFlushError?: (message: QueuedMessage, error: unknown) => boolean
+
+  /**
+   * Pluggable storage adapter for persisting queued messages across
+   * page refreshes. When omitted, the queue is memory-only (existing behavior).
+   *
+   * @example
+   * import { createIndexedDBStorage, createOfflineQueue } from '@tanstack/realtime'
+   *
+   * const transport = createOfflineQueue(inner, {
+   *   storage: createIndexedDBStorage(),
+   * })
+   */
+  storage?: OfflineQueueStorage
 }
 
 export interface OfflineQueueTransport extends RealtimeTransport {
@@ -93,7 +107,7 @@ export function createOfflineQueue(
   inner: RealtimeTransport,
   options: OfflineQueueOptions = {},
 ): OfflineQueueTransport {
-  const { maxSize = 1000, onFlushError = () => false } = options
+  const { maxSize = 1000, onFlushError = () => false, storage } = options
   let nextId = 1
 
   const queueStore = new Store<OfflineQueueState>({
@@ -101,6 +115,36 @@ export function createOfflineQueue(
     flushed: 0,
     isFlushing: false,
   })
+
+  // Storage initialization: load persisted messages and merge with any
+  // messages that were enqueued before loading completed.
+  let _storageReady = !storage
+  if (storage) {
+    storage
+      .load()
+      .then((persisted) => {
+        if (persisted.length > 0) {
+          const maxPersistedId = Math.max(...persisted.map((m) => m.id))
+          if (maxPersistedId >= nextId) nextId = maxPersistedId + 1
+          queueStore.setState((s) => {
+            // Merge: persisted messages first, then any enqueued during init.
+            const merged = [...persisted, ...s.pending]
+            return { ...s, pending: merged.slice(-maxSize) }
+          })
+        }
+        _storageReady = true
+      })
+      .catch(() => {
+        _storageReady = true
+      })
+  }
+
+  function persistToStorage(): void {
+    if (!storage) return
+    storage.save(queueStore.state.pending).catch(() => {
+      // Silently ignore persistence failures — in-memory queue is canonical.
+    })
+  }
 
   // Flush the queue when the connection becomes 'connected'.
   let previousStatus: ConnectionStatus = inner.store.state
@@ -142,6 +186,7 @@ export function createOfflineQueue(
       flushed: s.flushed + flushedCount,
       isFlushing: false,
     }))
+    persistToStorage()
   }
 
   function enqueue(channel: string, data: unknown): void {
@@ -158,6 +203,7 @@ export function createOfflineQueue(
       if (updated.length > maxSize) updated.shift()
       return { ...s, pending: updated }
     })
+    persistToStorage()
   }
 
   const transport: OfflineQueueTransport = {
@@ -185,6 +231,9 @@ export function createOfflineQueue(
 
     clearQueue() {
       queueStore.setState((s) => ({ ...s, pending: [] }))
+      if (storage) {
+        storage.clear().catch(() => {})
+      }
     },
   }
 

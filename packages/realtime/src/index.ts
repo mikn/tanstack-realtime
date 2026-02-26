@@ -68,6 +68,7 @@ export {
   ephemeralLiveOptions,
   streamChannelOptions,
   createStreamChannel,
+  tickCollectionOptions,
   defineSyncedCounter,
   defineSyncedValue,
   defineSyncedSet,
@@ -85,6 +86,7 @@ export type {
   StreamChannelDefConfig,
   StreamItem,
   StreamStatus,
+  TickCollectionConfig,
   SyncedCounterConfig,
   SyncedCounterDef,
   SyncedValueConfig,
@@ -97,6 +99,18 @@ export type {
 // Connects to a createNodeServer instance using the built-in wire protocol.
 export { wsTransport } from './core/wsTransport.js'
 export type { WsTransportOptions } from './core/wsTransport.js'
+
+// Tick-based transport — batches updates per tick interval for game state.
+export {
+  createTickTransport,
+  computeDelta,
+  applyDelta,
+} from './core/tickTransport.js'
+export type {
+  TickTransportOptions,
+  TickFrame,
+  TickTransport,
+} from './core/tickTransport.js'
 
 // REST/DB composition helpers
 export { withRest } from './core/withRest.js'
@@ -113,6 +127,16 @@ export type {
   OfflineQueueOptions,
   OfflineQueueTransport,
 } from './core/offlineQueue.js'
+
+export {
+  createIndexedDBStorage,
+  createLocalStorageAdapter,
+} from './core/offlineQueueStorage.js'
+export type {
+  OfflineQueueStorage,
+  IndexedDBStorageOptions,
+  LocalStorageOptions,
+} from './core/offlineQueueStorage.js'
 
 export { throttle } from './core/throttle.js'
 export type { ThrottleOptions, ThrottledFn } from './core/throttle.js'
@@ -161,8 +185,20 @@ export type {
 
 // Server-side types — transport-agnostic, exported from core so any preset
 // can implement the same contract without an additional import path.
+export {
+  createValidatedPublish,
+  PublishValidationError,
+  createServerStream,
+  verifyEventSignature,
+} from './server/index.js'
 export type {
   ChannelPermissions,
   AuthorizeFn,
   PublishFn,
+  PublishValidation,
+  PublishValidationResult,
+  ValidatePublishFn,
+  ValidatedPublishOptions,
+  ServerStream,
+  CreateServerStreamOptions,
 } from './server/index.js'

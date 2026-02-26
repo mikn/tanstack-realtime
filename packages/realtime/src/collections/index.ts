@@ -31,6 +31,9 @@ export type {
   StreamStatus,
 } from './streamChannelOptions.js'
 
+export { tickCollectionOptions } from './tickCollectionOptions.js'
+export type { TickCollectionConfig } from './tickCollectionOptions.js'
+
 // CRDT standalone channel definitions
 export { defineSyncedCounter } from './syncedCounter.js'
 export type { SyncedCounterConfig, SyncedCounterDef } from './syncedCounter.js'
