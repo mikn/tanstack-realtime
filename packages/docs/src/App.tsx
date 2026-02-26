@@ -301,7 +301,7 @@ function Features() {
             icon="%"
             title="Multi-Tab via SharedWorker"
             problem="Six browser tabs. Six WebSocket connections. Six times the server cost."
-            solution="createSharedWorkerTransport shares one connection across all tabs. Falls back to BroadcastChannel automatically. Zero application code changes."
+            solution="createSharedWorkerTransport shares one connection across all tabs. Falls back to a direct transport in environments without SharedWorker support. Zero application code changes."
           />
         </div>
       </div>
@@ -1125,12 +1125,11 @@ function Resilience() {
               count reactively via the exposed store.
             </p>
             <CodeBlock
-              code={`import { createOfflineQueue } from '@tanstack/realtime'
-import { nodeTransport } from '@tanstack/realtime-preset-node'
+              code={`import { createOfflineQueue, wsTransport } from '@tanstack/realtime'
 import { useStore } from '@tanstack/react-store'
 
 const transport = createOfflineQueue(
-  nodeTransport({ url: 'wss://rt.example.com' }),
+  wsTransport({ url: 'wss://rt.example.com' }),
   { maxSize: 500 },
 )
 
@@ -1169,10 +1168,10 @@ const tasksOptions = realtimeCollectionOptions({
 })
 
 // Option B — transport level (any subscription)
-import { withGapRecovery } from '@tanstack/realtime'
+import { withGapRecovery, wsTransport } from '@tanstack/realtime'
 
 const transport = withGapRecovery(
-  nodeTransport({ url: 'wss://rt.example.com' }),
+  wsTransport({ url: 'wss://rt.example.com' }),
   {
     onGap: async (channel) => {
       // Called for every active channel after reconnect
@@ -1193,28 +1192,27 @@ const transport = withGapRecovery(
             <p>
               Six browser tabs. Six WebSocket connections. Six times the server
               cost. <code>createSharedWorkerTransport</code> shares one
-              connection across all tabs. Falls back to{' '}
-              <code>BroadcastChannel</code> automatically in environments
-              without SharedWorker support.
+              connection across all tabs. Falls back to a direct transport
+              in environments without SharedWorker support.
             </p>
             <CodeBlock
               code={`// worker.ts — the SharedWorker script (one per origin)
-import { createSharedWorkerServer } from '@tanstack/realtime'
-import { nodeTransport } from '@tanstack/realtime-preset-node'
+import { createSharedWorkerCoordinator, wsTransport } from '@tanstack/realtime'
 
-createSharedWorkerServer(
-  nodeTransport({ url: 'wss://rt.example.com' }),
+createSharedWorkerCoordinator(
+  wsTransport({ url: 'wss://rt.example.com' }),
 )
 
 // app.ts — every tab uses this client, sharing one WebSocket
 import {
   createSharedWorkerTransport,
   isSharedWorkerSupported,
+  wsTransport,
 } from '@tanstack/realtime'
 
 const transport = isSharedWorkerSupported()
   ? createSharedWorkerTransport(new URL('./worker.ts', import.meta.url))
-  : nodeTransport({ url: 'wss://rt.example.com' }) // automatic fallback
+  : wsTransport({ url: 'wss://rt.example.com' }) // fallback for Safari iOS etc.
 
 const client = createRealtimeClient({ transport })`}
             />
@@ -1404,16 +1402,17 @@ function Transports() {
 
         <div className="transport-grid">
           <div className="transport-card">
-            <h3>Node.js Preset</h3>
+            <h3>Built-in WebSocket</h3>
             <p>
-              Built-in WebSocket server and client. Minimal setup. Suitable for
-              local development and single-server deployments.
+              <code>wsTransport</code> lives in the base package &mdash; no
+              extra dependencies. Connects to a <code>createNodeServer</code>{' '}
+              instance. Works in browsers, SharedWorkers, and Node.js.
             </p>
             <CodeBlock
-              code={`import { nodeTransport } from '@tanstack/realtime-preset-node'
+              code={`import { wsTransport } from '@tanstack/realtime'
 
 const client = createRealtimeClient({
-  transport: nodeTransport({ url: 'ws://localhost:3001' }),
+  transport: wsTransport({ url: 'ws://localhost:3001' }),
 })`}
             />
           </div>
@@ -1767,11 +1766,10 @@ httpServer.listen(3001)`}
             <h3>Create the client and wrap your app</h3>
             <CodeBlock
               code={`// app/client.ts
-import { createRealtimeClient } from '@tanstack/realtime'
-import { nodeTransport } from '@tanstack/realtime-preset-node'
+import { createRealtimeClient, wsTransport } from '@tanstack/realtime'
 
 export const realtimeClient = createRealtimeClient({
-  transport: nodeTransport({ url: 'ws://localhost:3001' }),
+  transport: wsTransport({ url: 'ws://localhost:3001' }),
 })
 
 // app/main.tsx
@@ -2012,11 +2010,10 @@ http.listen(3001)`}
             <div className="e2e-step-label">2 — client</div>
             <CodeBlock
               title="app/client.ts"
-              code={`import { createRealtimeClient } from '@tanstack/realtime'
-import { nodeTransport } from '@tanstack/realtime-preset-node'
+              code={`import { createRealtimeClient, wsTransport } from '@tanstack/realtime'
 
 export const realtimeClient = createRealtimeClient({
-  transport: nodeTransport({ url: 'ws://localhost:3001' }),
+  transport: wsTransport({ url: 'ws://localhost:3001' }),
 })`}
             />
           </div>

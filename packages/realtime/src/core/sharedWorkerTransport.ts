@@ -8,7 +8,7 @@
  * It connects to a SharedWorker and implements `RealtimeTransport`. The
  * SharedWorker holds the real connection; this tab's calls are proxied.
  *
- * **Worker side** (`createSharedWorkerServer`) — call this inside the
+ * **Worker side** (`createSharedWorkerCoordinator`) — call this inside the
  * SharedWorker file. It accepts incoming port connections and manages the
  * underlying `RealtimeTransport` on behalf of all tabs.
  *
@@ -30,10 +30,10 @@
  *
  * @example — realtime.worker.ts (SharedWorker file)
  * ```ts
- * import { createSharedWorkerServer } from '@tanstack/realtime'
+ * import { createSharedWorkerCoordinator } from '@tanstack/realtime'
  * import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
  *
- * const server = createSharedWorkerServer(
+ * const server = createSharedWorkerCoordinator(
  *   centrifugoTransport({ url: 'wss://realtime.example.com/connection/websocket' }),
  * )
  *
@@ -79,7 +79,7 @@ export type WorkerToTabMsg =
 // Worker-side server
 // ---------------------------------------------------------------------------
 
-export interface SharedWorkerServer {
+export interface SharedWorkerCoordinator {
   /**
    * Call this from the SharedWorker's `connect` event handler for each new
    * port (tab) that connects.
@@ -90,7 +90,7 @@ export interface SharedWorkerServer {
   connect: (port: MessagePort) => void
 }
 
-export interface SharedWorkerServerOptions {
+export interface SharedWorkerCoordinatorOptions {
   /**
    * Called when the underlying transport's `connect()` rejects.
    *
@@ -101,11 +101,11 @@ export interface SharedWorkerServerOptions {
    * error-reporting pipeline (Sentry, Datadog, etc.).
    *
    * @example
-   * createSharedWorkerServer(transport, {
+   * createSharedWorkerCoordinator(transport, {
    *   onConnectError: (err) => Sentry.captureException(err),
    * })
    *
-   * @default (err) => console.error('[SharedWorkerServer] connect error:', err)
+   * @default (err) => console.error('[SharedWorkerCoordinator] connect error:', err)
    */
   onConnectError?: (err: unknown) => void
 }
@@ -131,13 +131,13 @@ export interface SharedWorkerServerOptions {
  * leaves the channel, so a re-subscription after a quiet period may see an
  * empty initial snapshot until the next change event.
  */
-export function createSharedWorkerServer(
+export function createSharedWorkerCoordinator(
   inner: RealtimeTransport & PresenceCapable,
-  options: SharedWorkerServerOptions = {},
-): SharedWorkerServer {
+  options: SharedWorkerCoordinatorOptions = {},
+): SharedWorkerCoordinator {
   const {
     onConnectError = (err: unknown) =>
-      console.error('[SharedWorkerServer] connect error:', err),
+      console.error('[SharedWorkerCoordinator] connect error:', err),
   } = options
 
   const activePorts = new Set<MessagePort>()
@@ -443,7 +443,7 @@ export function isSharedWorkerSupported(): boolean {
 /**
  * Creates a `RealtimeTransport` that proxies all operations to a SharedWorker.
  *
- * The SharedWorker must call `createSharedWorkerServer(transport).connect(port)`
+ * The SharedWorker must call `createSharedWorkerCoordinator(transport).connect(port)`
  * in its `connect` event handler.
  *
  * The worker connects the inner transport automatically when the first tab
@@ -467,11 +467,11 @@ export function isSharedWorkerSupported(): boolean {
  *
  * @example
  * // With automatic fallback to a direct transport
- * import { nodeTransport } from '@tanstack/realtime-preset-node'
+ * import { wsTransport } from '@tanstack/realtime'
  *
  * const transport = createSharedWorkerTransport(
  *   { url: new URL('./realtime.worker.ts', import.meta.url) },
- *   () => nodeTransport({ url: 'wss://realtime.example.com' }),
+ *   () => wsTransport({ url: 'wss://realtime.example.com' }),
  * )
  * const client = createRealtimeClient({ transport })
  * // No explicit client.connect() needed — the worker auto-connects.

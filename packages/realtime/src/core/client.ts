@@ -22,11 +22,10 @@ function presenceNotSupported(method: string): never {
  * Creates a framework-agnostic realtime client that wraps a transport.
  *
  * @example
- * import { createRealtimeClient } from '@tanstack/realtime'
- * import { nodeTransport } from '@tanstack/realtime-preset-node'
+ * import { createRealtimeClient, wsTransport } from '@tanstack/realtime'
  *
  * export const realtimeClient = createRealtimeClient({
- *   transport: nodeTransport(),
+ *   transport: wsTransport({ url: 'ws://localhost:3001' }),
  * })
  */
 export function createRealtimeClient(

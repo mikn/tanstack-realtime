@@ -43,11 +43,10 @@ npm install @tanstack/realtime
 ### Creating a client
 
 ```ts
-import { createRealtimeClient } from '@tanstack/realtime'
-import { nodeTransport } from '@tanstack/realtime-preset-node'
+import { createRealtimeClient, wsTransport } from '@tanstack/realtime'
 
 export const client = createRealtimeClient({
-  transport: nodeTransport({ url: 'ws://localhost:3000' }),
+  transport: wsTransport({ url: 'ws://localhost:3000' }),
 })
 
 await client.connect()
@@ -218,11 +217,10 @@ realtime.publish('todos:teamId=123', { type: 'created', todo })
 ### Client transport
 
 ```ts
-import { createRealtimeClient } from '@tanstack/realtime'
-import { nodeTransport } from '@tanstack/realtime-preset-node'
+import { createRealtimeClient, wsTransport } from '@tanstack/realtime'
 
 export const client = createRealtimeClient({
-  transport: nodeTransport({
+  transport: wsTransport({
     url: 'ws://localhost:3000', // omit in the browser — derived from window.location
     path: '/_realtime', // default
   }),

@@ -1,5 +1,5 @@
 /**
- * Tests for createSharedWorkerTransport + createSharedWorkerServer.
+ * Tests for createSharedWorkerTransport + createSharedWorkerCoordinator.
  *
  * SharedWorker and MessagePort are unavailable in Node.js, so we use a
  * synchronous bidirectional port mock. Both exports are tested end-to-end:
@@ -10,7 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Store } from '@tanstack/store'
 import {
-  createSharedWorkerServer,
+  createSharedWorkerCoordinator,
   createSharedWorkerTransport,
 } from '@tanstack/realtime'
 import type {
@@ -18,7 +18,7 @@ import type {
   PresenceCapable,
   PresenceUser,
   RealtimeTransport,
-  SharedWorkerServerOptions,
+  SharedWorkerCoordinatorOptions,
 } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ class MockMessagePort {
 
 const workerServers = new Map<
   string,
-  ReturnType<typeof createSharedWorkerServer>
+  ReturnType<typeof createSharedWorkerCoordinator>
 >()
 
 class MockSharedWorker {
@@ -173,10 +173,10 @@ const TEST_URL = 'https://worker.example.com/realtime.js'
 
 function setupWorker(
   inner?: ReturnType<typeof createMockInnerTransport>,
-  options?: SharedWorkerServerOptions,
+  options?: SharedWorkerCoordinatorOptions,
 ) {
   const transport = inner ?? createMockInnerTransport()
-  const server = createSharedWorkerServer(transport, options)
+  const server = createSharedWorkerCoordinator(transport, options)
   workerServers.set(TEST_URL, server)
   return {
     transport,
@@ -205,10 +205,10 @@ afterEach(() => {
 })
 
 // ---------------------------------------------------------------------------
-// createSharedWorkerServer — invariant tests
+// createSharedWorkerCoordinator — invariant tests
 // ---------------------------------------------------------------------------
 
-describe('createSharedWorkerServer', () => {
+describe('createSharedWorkerCoordinator', () => {
   it('sends the current inner transport status to a newly connected port', () => {
     const { transport } = setupWorker()
     transport.setStatus('connected')
@@ -661,10 +661,10 @@ describe('createSharedWorkerServer', () => {
 })
 
 // ---------------------------------------------------------------------------
-// createSharedWorkerServer — onConnectError option
+// createSharedWorkerCoordinator — onConnectError option
 // ---------------------------------------------------------------------------
 
-describe('createSharedWorkerServer — onConnectError', () => {
+describe('createSharedWorkerCoordinator — onConnectError', () => {
   it('connect error is passed to the onConnectError callback', async () => {
     const connectError = new Error('auth failed')
     const inner = createMockInnerTransport()
@@ -694,7 +694,7 @@ describe('createSharedWorkerServer — onConnectError', () => {
     await new Promise((r) => setTimeout(r, 0))
 
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[SharedWorkerServer]'),
+      expect.stringContaining('[SharedWorkerCoordinator]'),
       connectError,
     )
     consoleSpy.mockRestore()

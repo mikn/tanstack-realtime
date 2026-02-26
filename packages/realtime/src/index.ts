@@ -93,6 +93,11 @@ export type {
   SyncedSetDef,
 } from './collections/index.js'
 
+// Built-in WebSocket transport — browser-safe, no Node.js dependencies.
+// Connects to a createNodeServer instance using the built-in wire protocol.
+export { wsTransport } from './core/wsTransport.js'
+export type { WsTransportOptions } from './core/wsTransport.js'
+
 // REST/DB composition helpers
 export { withRest } from './core/withRest.js'
 export type { WithRestOptions } from './core/withRest.js'
@@ -127,16 +132,16 @@ export type {
 
 // SharedWorker-based multi-tab transport.
 // Tab side: createSharedWorkerTransport(workerUrl)
-// Worker side: createSharedWorkerServer(innerTransport) — call in the SharedWorker file.
+// Worker side: createSharedWorkerCoordinator(innerTransport) — call in the SharedWorker file.
 export {
   createSharedWorkerTransport,
-  createSharedWorkerServer,
+  createSharedWorkerCoordinator,
   isSharedWorkerSupported,
 } from './core/sharedWorkerTransport.js'
 export type {
   SharedWorkerTransportOptions,
-  SharedWorkerServerOptions,
-  SharedWorkerServer,
+  SharedWorkerCoordinatorOptions,
+  SharedWorkerCoordinator,
   TabToWorkerMsg,
   WorkerToTabMsg,
 } from './core/sharedWorkerTransport.js'
