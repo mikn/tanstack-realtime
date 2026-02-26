@@ -3,32 +3,24 @@
   "workspaces": {
     ".": {
       "ignoreDependencies": [
-        "@cloudflare/vitest-pool-workers",
         "@tanstack/react-query",
         "@tanstack/react-db",
+        "@tanstack/react-realtime",
+        "@tanstack/react-store",
+        "react",
         "wrangler"
-      ]
+      ],
+      "ignoreBinaries": ["pkg-pr-new"]
     },
-    "packages/realtime": {
-      "entry": ["src/index.ts"],
-      "ignoreDependencies": ["@standard-schema/spec"]
-    },
-    "packages/react-realtime": {
-      "entry": ["src/index.ts"]
-    },
-    "packages/realtime-preset-node": {
-      "entry": ["src/index.ts"]
-    },
-    "packages/realtime-adapter-centrifugo": {
-      "entry": ["src/index.ts"]
-    },
-    "packages/realtime-adapter-sse": {
-      "entry": ["src/index.ts"]
-    },
+    "packages/realtime": {},
+    "packages/react-realtime": {},
+    "packages/realtime-preset-node": {},
+    "packages/realtime-adapter-centrifugo": {},
+    "packages/realtime-adapter-sse": {},
     "packages/__tests__": {
       "entry": ["**/*.test.ts"],
-      "ignore": ["setup.ts"]
+      "ignore": ["setup.ts", "workerd-test-worker.ts"]
     }
   },
-  "ignore": ["packages/docs/**"]
+  "ignore": ["packages/docs/**", "packages/__tests__/workerd-test-worker.ts"]
 }

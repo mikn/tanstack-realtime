@@ -1388,7 +1388,6 @@ describe('liveChannelOptions — SyncConfig invariants', () => {
 
     client.emit('events', { id: '1' })
     expect(written).toHaveLength(1)
-
     ;(cleanup as unknown as () => void)()
 
     client.emit('events', { id: '2' })

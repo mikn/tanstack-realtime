@@ -290,8 +290,7 @@ describe('realtimeCollectionOptions — onMessage transform hook', () => {
       client,
       channel: 'todos',
       getKey: (t) => t.id,
-      onMessage: (_raw) =>
-        ({ data: { id: 'a', text: 'x' } }) as any,
+      onMessage: (_raw) => ({ data: { id: 'a', text: 'x' } }) as any,
     })
     const { ops, stop } = driveSync(config)
 

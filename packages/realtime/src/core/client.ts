@@ -78,10 +78,7 @@ export function createRealtimeClient(
     },
 
     subscribe<T = unknown>(channel: string, onMessage: (data: T) => void) {
-      return transport.subscribe(
-        channel,
-        onMessage as (data: unknown) => void,
-      )
+      return transport.subscribe(channel, onMessage as (data: unknown) => void)
     },
 
     async publish(keyOrChannel, data) {

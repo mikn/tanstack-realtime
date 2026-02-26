@@ -213,7 +213,9 @@ describe('centrifugoTransport — real Centrifugo binary', () => {
     const updates: Array<Array<{ data: { name: string; status?: string } }>> =
       []
     client.onPresenceChange('e2e-prs-update', (users) =>
-      updates.push(users as unknown as Array<{ data: { name: string; status?: string } }>),
+      updates.push(
+        users as unknown as Array<{ data: { name: string; status?: string } }>,
+      ),
     )
     client.joinPresence('e2e-prs-update', { name: 'alice' })
     await wait(60)

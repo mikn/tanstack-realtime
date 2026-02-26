@@ -6,15 +6,15 @@ Thanks for your interest in contributing! Please read this guide before opening 
 
 This is a pnpm workspace monorepo with [Nx](https://nx.dev/) for task orchestration. Published packages:
 
-| Directory                              | Package                                                                    |
-| -------------------------------------- | -------------------------------------------------------------------------- |
-| `packages/realtime`                    | `@tanstack/realtime` — core client, collection helpers, CRDTs, and types   |
-| `packages/react-realtime`              | `@tanstack/react-realtime` — React hooks and provider                      |
-| `packages/realtime-preset-node`        | `@tanstack/realtime-preset-node` — WebSocket transport + Node.js server    |
-| `packages/realtime-adapter-centrifugo` | `@tanstack/realtime-adapter-centrifugo` — Centrifugo transport adapter     |
-| `packages/realtime-adapter-sse`        | `@tanstack/realtime-adapter-sse` — Server-Sent Events transport adapter    |
-| `packages/docs`                        | Documentation site (not published)                                         |
-| `packages/__tests__`                   | Integration test suite (not published)                                     |
+| Directory                              | Package                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------ |
+| `packages/realtime`                    | `@tanstack/realtime` — core client, collection helpers, CRDTs, and types |
+| `packages/react-realtime`              | `@tanstack/react-realtime` — React hooks and provider                    |
+| `packages/realtime-preset-node`        | `@tanstack/realtime-preset-node` — WebSocket transport + Node.js server  |
+| `packages/realtime-adapter-centrifugo` | `@tanstack/realtime-adapter-centrifugo` — Centrifugo transport adapter   |
+| `packages/realtime-adapter-sse`        | `@tanstack/realtime-adapter-sse` — Server-Sent Events transport adapter  |
+| `packages/docs`                        | Documentation site (not published)                                       |
+| `packages/__tests__`                   | Integration test suite (not published)                                   |
 
 ## Development setup
 
