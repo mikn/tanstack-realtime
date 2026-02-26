@@ -61,7 +61,7 @@ export interface BroadcastChannelTransportOptions {
 // ---------------------------------------------------------------------------
 
 /** @internal */
-export type BCMsg =
+type BCMsg =
   // Election & lifecycle
   | { type: 'hello'; tabId: string }
   | { type: 'leader'; tabId: string; status: ConnectionStatus }
@@ -308,7 +308,8 @@ export function createBroadcastChannelTransport(
 
     // Subscribe to this tab's own channels on the inner transport
     for (const channel of localSubs.keys()) subscribeInner(channel)
-    for (const channel of localPresenceSubs.keys()) subscribePresenceInner(channel)
+    for (const channel of localPresenceSubs.keys())
+      subscribePresenceInner(channel)
 
     // Connect the inner transport if the user already called connect()
     if (userCalledConnect) {
@@ -473,8 +474,7 @@ export function createBroadcastChannelTransport(
       case 'register':
         if (isLeader && msg.tabId !== tabId) {
           for (const ch of msg.channels) addTabChannel(msg.tabId, ch)
-          for (const ch of msg.presenceChannels)
-            addTabPresence(msg.tabId, ch)
+          for (const ch of msg.presenceChannels) addTabPresence(msg.tabId, ch)
         }
         break
 

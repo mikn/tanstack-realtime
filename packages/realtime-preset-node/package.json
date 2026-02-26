@@ -27,7 +27,6 @@
   },
   "dependencies": {
     "@tanstack/realtime": "workspace:*",
-    "@tanstack/store": "*",
     "ws": "*"
   }
 }

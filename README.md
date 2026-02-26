@@ -21,13 +21,13 @@
 
 ## Packages
 
-| Package                                                                         | Description                                                                    |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| [`@tanstack/realtime`](#tanstackrealtime)                                       | Core client, collection helpers, CRDT primitives, and type definitions         |
-| [`@tanstack/react-realtime`](#tanstackreact-realtime)                           | React hooks and provider                                                       |
-| [`@tanstack/realtime-preset-node`](#tanstackrealtime-preset-node)               | Node.js server for local dev and self-hosted deployments                       |
-| [`@tanstack/realtime-adapter-centrifugo`](#tanstackrealtime-adapter-centrifugo) | Transport adapter for [Centrifugo](https://centrifugal.dev)                    |
-| [`@tanstack/realtime-adapter-sse`](#tanstackrealtime-adapter-sse)               | Server-Sent Events transport adapter                                           |
+| Package                                                                         | Description                                                            |
+| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| [`@tanstack/realtime`](#tanstackrealtime)                                       | Core client, collection helpers, CRDT primitives, and type definitions |
+| [`@tanstack/react-realtime`](#tanstackreact-realtime)                           | React hooks and provider                                               |
+| [`@tanstack/realtime-preset-node`](#tanstackrealtime-preset-node)               | Node.js server for local dev and self-hosted deployments               |
+| [`@tanstack/realtime-adapter-centrifugo`](#tanstackrealtime-adapter-centrifugo) | Transport adapter for [Centrifugo](https://centrifugal.dev)            |
+| [`@tanstack/realtime-adapter-sse`](#tanstackrealtime-adapter-sse)               | Server-Sent Events transport adapter                                   |
 
 ---
 
@@ -44,7 +44,11 @@ npm install @tanstack/realtime
 ### Creating a client
 
 ```ts
-import { createCoordinatedTransport, createRealtimeClient, wsTransport } from '@tanstack/realtime'
+import {
+  createCoordinatedTransport,
+  createRealtimeClient,
+  wsTransport,
+} from '@tanstack/realtime'
 
 // Recommended: automatic multi-tab coordination
 export const client = createRealtimeClient({
@@ -60,11 +64,11 @@ await client.connect()
 
 When a user opens your app in multiple browser tabs, each tab would normally open its own WebSocket — multiplying server load, bandwidth, and the potential for state conflicts. `createCoordinatedTransport` solves this by sharing a single connection across all tabs. It picks the best available strategy automatically:
 
-| Strategy | When used | How it works |
-| --- | --- | --- |
-| **SharedWorker** | `workerUrl` is provided and `SharedWorker` API is available | The browser spawns a **separate worker process** from the URL you provide. This worker lives independently of any tab — it survives tab close, sleep, and crashes. All tabs connect to it via `MessagePort`. No election, no heartbeat. |
+| Strategy             | When used                                                                              | How it works                                                                                                                                                                                                                                                                       |
+| -------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SharedWorker**     | `workerUrl` is provided and `SharedWorker` API is available                            | The browser spawns a **separate worker process** from the URL you provide. This worker lives independently of any tab — it survives tab close, sleep, and crashes. All tabs connect to it via `MessagePort`. No election, no heartbeat.                                            |
 | **BroadcastChannel** | No `workerUrl` (or `SharedWorker` unavailable) and `BroadcastChannel` API is available | One tab is elected **leader** and holds the real connection. Other tabs proxy through `BroadcastChannel` messages. Includes heartbeat-based failure detection — if the leader tab closes or crashes, a new leader is elected automatically. **Zero config — this is the default.** |
-| **Direct** | Neither API is available | Each tab opens its own connection. No coordination. |
+| **Direct**           | Neither API is available                                                               | Each tab opens its own connection. No coordination.                                                                                                                                                                                                                                |
 
 **Why does SharedWorker need a `workerUrl`?** SharedWorker is a browser API that runs code in a separate thread, shared across tabs. Unlike BroadcastChannel (which is just a messaging API you use inline), the browser needs to **load a separate JavaScript file** to run the worker. That file sets up the coordinator with your transport config:
 

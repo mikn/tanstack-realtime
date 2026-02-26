@@ -163,7 +163,8 @@ function Hero() {
       <div className="container">
         <Badge>v0.1 &middot; Alpha</Badge>
         <h1>
-          Add realtime. <span className="gradient-text">Keep everything else.</span>
+          Add realtime.{' '}
+          <span className="gradient-text">Keep everything else.</span>
         </h1>
         <p className="hero-sub">
           Most realtime frameworks want you to adopt their database, their
@@ -1185,9 +1186,9 @@ const transport = withGapRecovery(
               connection across all tabs automatically.
             </p>
             <p>
-              <strong>Default (BroadcastChannel)</strong> &mdash; one tab is elected
-              leader and holds the connection. Others proxy through it. If the leader
-              closes, a new one is elected. Zero config.
+              <strong>Default (BroadcastChannel)</strong> &mdash; one tab is
+              elected leader and holds the connection. Others proxy through it.
+              If the leader closes, a new one is elected. Zero config.
             </p>
             <CodeBlock
               code={`import { createCoordinatedTransport, wsTransport } from '@tanstack/realtime'
@@ -1199,9 +1200,9 @@ const transport = createCoordinatedTransport({
             />
             <p>
               <strong>SharedWorker (opt-in)</strong> &mdash; the browser runs a
-              separate worker process that survives tab close and crashes. Requires
-              a small worker file because SharedWorker loads code from a URL, not
-              inline. Premium robustness for apps that need it.
+              separate worker process that survives tab close and crashes.
+              Requires a small worker file because SharedWorker loads code from
+              a URL, not inline. Premium robustness for apps that need it.
             </p>
             <CodeBlock
               title="realtime.worker.ts"
@@ -1608,9 +1609,7 @@ function AuditLog({ resourceId }: { resourceId: string }) {
           </div>
         </div>
 
-        <h2 style={{ marginTop: '3rem' }}>
-          Standalone CRDT hooks
-        </h2>
+        <h2 style={{ marginTop: '3rem' }}>Standalone CRDT hooks</h2>
         <p className="section-sub">
           Self-contained hooks for shared counters, values, and sets. No
           collection required &mdash; define the channel once with{' '}

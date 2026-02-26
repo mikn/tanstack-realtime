@@ -7,7 +7,15 @@
  * the same mock BroadcastChannel hub.
  */
 
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import { Store } from '@tanstack/store'
 import type {
   ConnectionStatus,
@@ -82,10 +90,7 @@ const { createBroadcastChannelTransport, isBroadcastChannelSupported } =
 
 interface MockInnerTransport extends RealtimeTransport, PresenceCapable {
   _subs: Map<string, Set<(data: unknown) => void>>
-  _presenceSubs: Map<
-    string,
-    Set<(users: ReadonlyArray<PresenceUser>) => void>
-  >
+  _presenceSubs: Map<string, Set<(users: ReadonlyArray<PresenceUser>) => void>>
   _simulateMessage: (channel: string, data: unknown) => void
   _simulatePresence: (
     channel: string,
@@ -138,10 +143,7 @@ function createMockInner(): MockInnerTransport {
       const listeners = subs.get(channel)
       if (listeners) for (const cb of listeners) cb(data)
     },
-    _simulatePresence(
-      channel: string,
-      users: ReadonlyArray<PresenceUser>,
-    ) {
+    _simulatePresence(channel: string, users: ReadonlyArray<PresenceUser>) {
       const listeners = presenceSubs.get(channel)
       if (listeners) for (const cb of listeners) cb(users)
     },
@@ -205,19 +207,17 @@ describe('BroadcastChannel transport', () => {
     const mockInner = createMockInner()
 
     // Tab 1 — will be leader (tab-001)
-    const tab1 = createBroadcastChannelTransport(
-      () => mockInner,
-      { name: 'test-status' },
-    )
+    const tab1 = createBroadcastChannelTransport(() => mockInner, {
+      name: 'test-status',
+    })
 
     // Wait for tab1 to become leader
     await vi.advanceTimersByTimeAsync(350)
 
     // Tab 2 — will be follower (tab-002)
-    const tab2 = createBroadcastChannelTransport(
-      () => createMockInner(),
-      { name: 'test-status' },
-    )
+    const tab2 = createBroadcastChannelTransport(() => createMockInner(), {
+      name: 'test-status',
+    })
 
     // Tab2's hello triggers leader announcement
     await vi.advanceTimersByTimeAsync(10)
@@ -236,17 +236,13 @@ describe('BroadcastChannel transport', () => {
     const mockInner = createMockInner()
 
     // Tab 1 — leader
-    createBroadcastChannelTransport(
-      () => mockInner,
-      { name: 'test-fanout' },
-    )
+    createBroadcastChannelTransport(() => mockInner, { name: 'test-fanout' })
     await vi.advanceTimersByTimeAsync(350)
 
     // Tab 2 — follower
-    const tab2 = createBroadcastChannelTransport(
-      () => createMockInner(),
-      { name: 'test-fanout' },
-    )
+    const tab2 = createBroadcastChannelTransport(() => createMockInner(), {
+      name: 'test-fanout',
+    })
     await vi.advanceTimersByTimeAsync(10)
 
     const received: Array<unknown> = []
@@ -263,10 +259,9 @@ describe('BroadcastChannel transport', () => {
   it('leader delivers messages to its own local subscribers', async () => {
     const mockInner = createMockInner()
 
-    const tab1 = createBroadcastChannelTransport(
-      () => mockInner,
-      { name: 'test-leader-local' },
-    )
+    const tab1 = createBroadcastChannelTransport(() => mockInner, {
+      name: 'test-leader-local',
+    })
     await vi.advanceTimersByTimeAsync(350)
 
     const received: Array<unknown> = []
@@ -282,10 +277,9 @@ describe('BroadcastChannel transport', () => {
   it('multiple tabs subscribing to the same channel use one inner subscription', async () => {
     const mockInner = createMockInner()
 
-    const tab1 = createBroadcastChannelTransport(
-      () => mockInner,
-      { name: 'test-dedup' },
-    )
+    const tab1 = createBroadcastChannelTransport(() => mockInner, {
+      name: 'test-dedup',
+    })
     await vi.advanceTimersByTimeAsync(350)
 
     // Tab1 (leader) subscribes
@@ -294,10 +288,9 @@ describe('BroadcastChannel transport', () => {
     expect(mockInner._subs.get('ch1')?.size).toBe(1) // one inner sub
 
     // Tab2 (follower) subscribes to same channel
-    const tab2 = createBroadcastChannelTransport(
-      () => createMockInner(),
-      { name: 'test-dedup' },
-    )
+    const tab2 = createBroadcastChannelTransport(() => createMockInner(), {
+      name: 'test-dedup',
+    })
     await vi.advanceTimersByTimeAsync(10)
     tab2.subscribe('ch1', () => {})
     await vi.advanceTimersByTimeAsync(10)
@@ -311,10 +304,9 @@ describe('BroadcastChannel transport', () => {
   it('unsubscribing the last listener tears down the inner subscription', async () => {
     const mockInner = createMockInner()
 
-    const tab1 = createBroadcastChannelTransport(
-      () => mockInner,
-      { name: 'test-unsub' },
-    )
+    const tab1 = createBroadcastChannelTransport(() => mockInner, {
+      name: 'test-unsub',
+    })
     await vi.advanceTimersByTimeAsync(350)
 
     const unsub = tab1.subscribe('ch1', () => {})
@@ -331,16 +323,12 @@ describe('BroadcastChannel transport', () => {
   it('presence changes are broadcast to followers', async () => {
     const mockInner = createMockInner()
 
-    createBroadcastChannelTransport(
-      () => mockInner,
-      { name: 'test-presence' },
-    )
+    createBroadcastChannelTransport(() => mockInner, { name: 'test-presence' })
     await vi.advanceTimersByTimeAsync(350)
 
-    const tab2 = createBroadcastChannelTransport(
-      () => createMockInner(),
-      { name: 'test-presence' },
-    )
+    const tab2 = createBroadcastChannelTransport(() => createMockInner(), {
+      name: 'test-presence',
+    })
     await vi.advanceTimersByTimeAsync(10)
 
     const users: Array<ReadonlyArray<PresenceUser>> = []
@@ -353,9 +341,7 @@ describe('BroadcastChannel transport', () => {
     await vi.advanceTimersByTimeAsync(10)
 
     expect(users).toHaveLength(1)
-    expect(users[0]).toEqual([
-      { connectionId: 'c1', data: { name: 'Alice' } },
-    ])
+    expect(users[0]).toEqual([{ connectionId: 'c1', data: { name: 'Alice' } }])
   })
 
   // ── Connect / disconnect lifecycle ──────────────────────────────────────
@@ -363,10 +349,9 @@ describe('BroadcastChannel transport', () => {
   it('disconnect on leader disconnects inner transport', async () => {
     const mockInner = createMockInner()
 
-    const tab1 = createBroadcastChannelTransport(
-      () => mockInner,
-      { name: 'test-disconnect' },
-    )
+    const tab1 = createBroadcastChannelTransport(() => mockInner, {
+      name: 'test-disconnect',
+    })
     await vi.advanceTimersByTimeAsync(350)
     await tab1.connect()
     expect(mockInner.store.state).toBe('connected')
@@ -382,10 +367,11 @@ describe('BroadcastChannel transport', () => {
     let inner2Created = false
 
     // Tab 1 — leader (tab-001), with fast heartbeat for test
-    const _tab1 = createBroadcastChannelTransport(
-      () => mockInner1,
-      { name: 'test-reelection', heartbeatMs: 100, leaderTimeoutMs: 300 },
-    )
+    const _tab1 = createBroadcastChannelTransport(() => mockInner1, {
+      name: 'test-reelection',
+      heartbeatMs: 100,
+      leaderTimeoutMs: 300,
+    })
     await vi.advanceTimersByTimeAsync(350)
     await _tab1.connect()
 
@@ -422,17 +408,19 @@ describe('BroadcastChannel transport', () => {
     const mockInner2 = createMockInner()
 
     // Tab 1 — leader
-    createBroadcastChannelTransport(
-      () => mockInner1,
-      { name: 'test-reregister', heartbeatMs: 100, leaderTimeoutMs: 300 },
-    )
+    createBroadcastChannelTransport(() => mockInner1, {
+      name: 'test-reregister',
+      heartbeatMs: 100,
+      leaderTimeoutMs: 300,
+    })
     await vi.advanceTimersByTimeAsync(350)
 
     // Tab 2 — follower with a subscription
-    const tab2 = createBroadcastChannelTransport(
-      () => mockInner2,
-      { name: 'test-reregister', heartbeatMs: 100, leaderTimeoutMs: 300 },
-    )
+    const tab2 = createBroadcastChannelTransport(() => mockInner2, {
+      name: 'test-reregister',
+      heartbeatMs: 100,
+      leaderTimeoutMs: 300,
+    })
     await vi.advanceTimersByTimeAsync(10)
     tab2.subscribe('important-channel', () => {})
     await vi.advanceTimersByTimeAsync(10)

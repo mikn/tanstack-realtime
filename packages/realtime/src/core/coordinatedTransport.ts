@@ -42,10 +42,7 @@ import {
 } from './sharedWorkerTransport.js'
 import { hasPresence } from './types.js'
 import type { BroadcastChannelTransportOptions } from './broadcastChannelTransport.js'
-import type {
-  PresenceCapable,
-  RealtimeTransport,
-} from './types.js'
+import type { PresenceCapable, RealtimeTransport } from './types.js'
 
 // ---------------------------------------------------------------------------
 // Options

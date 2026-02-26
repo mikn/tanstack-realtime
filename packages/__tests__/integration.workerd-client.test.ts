@@ -25,7 +25,7 @@
 import { describe, expect, it } from 'vitest'
 import { wsTransport } from '@tanstack/realtime'
 
-describe('wsTransport — workerd runtime compatibility', () => {
+describe('wsTransport - workerd runtime compatibility', () => {
   // ── Module import ─────────────────────────────────────────────────────────
   // wsTransport uses globalThis.WebSocket which exists in workerd.
 
