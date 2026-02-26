@@ -1,0 +1,33 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "jsx": "react-jsx",
+    "types": ["vitest/globals"],
+    "paths": {
+      "@tanstack/realtime": ["./packages/realtime/src/index.ts"],
+      "@tanstack/react-realtime": ["./packages/react-realtime/src/index.ts"],
+      "@tanstack/realtime-preset-node": [
+        "./packages/realtime-preset-node/src/index.ts"
+      ],
+      "@tanstack/realtime-adapter-centrifugo": [
+        "./packages/realtime-adapter-centrifugo/src/index.ts"
+      ],
+      "@tanstack/realtime-adapter-sse": [
+        "./packages/realtime-adapter-sse/src/index.ts"
+      ]
+    }
+  },
+  "include": [
+    "packages/realtime/src",
+    "packages/react-realtime/src",
+    "packages/realtime-preset-node/src",
+    "packages/realtime-adapter-centrifugo/src",
+    "packages/realtime-adapter-sse/src",
+    "packages/__tests__"
+  ],
+  "exclude": ["node_modules", "dist", "packages/docs"]
+}

@@ -8,7 +8,7 @@ import type { PresenceUser, QueryKey, RealtimeClient } from '../core/types.js'
 // ---------------------------------------------------------------------------
 
 export interface PresenceCollectionConfig<
-  TSchema extends StandardSchemaV1 = StandardSchemaV1,
+  TSchema extends StandardSchemaV1 = never,
 > {
   /** The realtime client that manages the underlying transport. */
   client: RealtimeClient
@@ -69,7 +69,7 @@ export interface PresenceCollectionConfig<
  */
 export function presenceChannelOptions<
   TData extends object = Record<string, unknown>,
-  TSchema extends StandardSchemaV1 = StandardSchemaV1,
+  TSchema extends StandardSchemaV1 = never,
 >(
   config: PresenceCollectionConfig<TSchema>,
 ): CollectionConfig<PresenceUser<TData>, string, TSchema> {

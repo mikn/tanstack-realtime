@@ -152,14 +152,14 @@ describe('streamChannelOptions', () => {
 
     opts.sync.sync({
       begin: () => {},
-      write: (op) => written.push(op),
+      write: (op: any) => written.push(op),
       commit: () => {},
       markReady: () => {
         markedReady = true
       },
-      onError: () => {},
-      collection: null as never,
-    })
+      collection: null as any,
+      truncate: () => {},
+    } as any)
 
     expect(markedReady).toBe(true)
     expect(written).toHaveLength(1)
@@ -184,14 +184,14 @@ describe('streamChannelOptions', () => {
     const updates: Array<unknown> = []
     opts.sync.sync({
       begin: () => {},
-      write: (op) => {
+      write: (op: any) => {
         if ((op as { type: string }).type === 'update') updates.push(op)
       },
       commit: () => {},
       markReady: () => {},
-      onError: () => {},
-      collection: null as never,
-    })
+      collection: null as any,
+      truncate: () => {},
+    } as any)
 
     mockTransport.emit('token-stream', 'Hello')
     mockTransport.emit('token-stream', ', World')
@@ -221,15 +221,15 @@ describe('streamChannelOptions', () => {
     const statuses: Array<string> = []
     opts.sync.sync({
       begin: () => {},
-      write: (op) => {
+      write: (op: any) => {
         const o = op as { type: string; value: { status: string } }
         if (o.type === 'update') statuses.push(o.value.status)
       },
       commit: () => {},
       markReady: () => {},
-      onError: () => {},
-      collection: null as never,
-    })
+      collection: null as any,
+      truncate: () => {},
+    } as any)
 
     mockTransport.emit('ai', { type: 'token', token: 'Hi' })
     mockTransport.emit('ai', { type: 'done' })
@@ -253,7 +253,7 @@ describe('streamChannelOptions', () => {
     const updates: Array<{ status: string; error?: string }> = []
     opts.sync.sync({
       begin: () => {},
-      write: (op) => {
+      write: (op: any) => {
         const o = op as {
           type: string
           value: { status: string; error?: string }
@@ -263,9 +263,9 @@ describe('streamChannelOptions', () => {
       },
       commit: () => {},
       markReady: () => {},
-      onError: () => {},
-      collection: null as never,
-    })
+      collection: null as any,
+      truncate: () => {},
+    } as any)
 
     mockTransport.emit('err-stream', {
       type: 'error',
@@ -290,17 +290,17 @@ describe('streamChannelOptions', () => {
     const updates: Array<unknown> = []
     const cleanup = opts.sync.sync({
       begin: () => {},
-      write: (op) => {
+      write: (op: any) => {
         if ((op as { type: string }).type === 'update') updates.push(op)
       },
       commit: () => {},
       markReady: () => {},
-      onError: () => {},
-      collection: null as never,
-    })
+      collection: null as any,
+      truncate: () => {},
+    } as any)
 
     mockTransport.emit('cleanup-ch', null) // one event
-    cleanup!()
+    ;(cleanup as unknown as () => void)()
     mockTransport.emit('cleanup-ch', null) // should be ignored
 
     expect(updates).toHaveLength(1)
@@ -335,15 +335,15 @@ describe('streamChannelOptions', () => {
     const updates: Array<{ status: string }> = []
     opts.sync.sync({
       begin: () => {},
-      write: (op) => {
+      write: (op: any) => {
         const o = op as { type: string; value: { status: string } }
         if (o.type === 'update') updates.push({ status: o.value.status })
       },
       commit: () => {},
       markReady: () => {},
-      onError: () => {},
-      collection: null as never,
-    })
+      collection: null as any,
+      truncate: () => {},
+    } as any)
 
     // Each event should reduce normally (not trigger error).
     mockTransport.emit('falsy-err', { kind: 'token' })
@@ -368,7 +368,7 @@ describe('streamChannelOptions', () => {
     const written: Array<{ status: string; state: string }> = []
     opts.sync.sync({
       begin: () => {},
-      write: (op) => {
+      write: (op: any) => {
         const o = op as {
           type: string
           value: { status: string; state: string }
@@ -378,9 +378,9 @@ describe('streamChannelOptions', () => {
       },
       commit: () => {},
       markReady: () => {},
-      onError: () => {},
-      collection: null as never,
-    })
+      collection: null as any,
+      truncate: () => {},
+    } as any)
 
     mockTransport.emit('pre-reduce-err', { type: 'token', token: 'hello' })
     // Now trigger an error — state must be the post-'hello' state, not mutated further.
@@ -409,15 +409,15 @@ describe('streamChannelOptions', () => {
     const statuses: Array<string> = []
     opts.sync.sync({
       begin: () => {},
-      write: (op) => {
+      write: (op: any) => {
         const o = op as { type: string; value: { status: string } }
         if (o.type === 'update') statuses.push(o.value.status)
       },
       commit: () => {},
       markReady: () => {},
-      onError: () => {},
-      collection: null as never,
-    })
+      collection: null as any,
+      truncate: () => {},
+    } as any)
 
     mockTransport.emit('both-err-done', { type: 'terminal' })
 

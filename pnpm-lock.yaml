@@ -29,9 +29,24 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.90.21
         version: 5.90.21(react@19.2.4)
+      '@tanstack/react-realtime':
+        specifier: workspace:*
+        version: link:packages/react-realtime
       '@tanstack/react-store':
         specifier: ^0.9.1
         version: 0.9.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@tanstack/realtime':
+        specifier: workspace:*
+        version: link:packages/realtime
+      '@tanstack/realtime-adapter-centrifugo':
+        specifier: workspace:*
+        version: link:packages/realtime-adapter-centrifugo
+      '@tanstack/realtime-adapter-sse':
+        specifier: workspace:*
+        version: link:packages/realtime-adapter-sse
+      '@tanstack/realtime-preset-node':
+        specifier: workspace:*
+        version: link:packages/realtime-preset-node
       '@tanstack/store':
         specifier: ^0.9.1
         version: 0.9.1

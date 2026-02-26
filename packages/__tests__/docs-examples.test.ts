@@ -20,6 +20,7 @@ import {
   withRest,
 } from '@tanstack/realtime'
 import type { ConnectionStatus, RealtimeTransport } from '@tanstack/realtime'
+import type { CollectionConfig } from '@tanstack/db'
 
 // ---------------------------------------------------------------------------
 // Shared mock helpers (mirrors the patterns in spectrum.test.ts)
@@ -60,18 +61,20 @@ function createMockTransport(): RealtimeTransport & {
 
 type WriteOp = { type: string; value?: unknown; key?: unknown }
 
-function driveSync(config: ReturnType<typeof realtimeCollectionOptions>): {
+function driveSync(config: CollectionConfig<any, any, any, any>): {
   ops: Array<WriteOp>
   stop: () => void
 } {
   const ops: Array<WriteOp> = []
   const stop = config.sync.sync({
+    collection: null as any,
     begin: () => {},
     write: (op: WriteOp) => ops.push(op),
     commit: () => {},
     markReady: () => {},
+    truncate: () => {},
   })
-  return { ops, stop }
+  return { ops, stop: stop as unknown as () => void }
 }
 
 // ---------------------------------------------------------------------------
@@ -361,10 +364,12 @@ describe('docs: liveChannelOptions', () => {
       },
     })
     config.sync.sync({
+      collection: null as any,
       begin: () => {},
-      write: (op) => ops.push(op),
+      write: (op: any) => ops.push(op),
       commit: () => {},
       markReady: () => {},
+      truncate: () => {},
     })
 
     // Live event arrives before history resolves
@@ -405,10 +410,12 @@ describe('docs: liveChannelOptions', () => {
       },
     })
     config.sync.sync({
+      collection: null as any,
       begin: () => {},
-      write: (op) => ops.push(op),
+      write: (op: any) => ops.push(op),
       commit: () => {},
       markReady: () => {},
+      truncate: () => {},
     })
     await vi.advanceTimersByTimeAsync(0)
 
@@ -471,9 +478,9 @@ describe('docs: createStreamChannel + streamChannelOptions', () => {
       },
       commit: () => {},
       markReady: () => {},
-      onError: () => {},
-      collection: null as never,
-    })
+      truncate: () => {},
+      collection: null as any,
+    } as any)
 
     // The channel is the serialized QueryKey
     const def = createStreamChannel({
@@ -536,9 +543,9 @@ describe('docs: createStreamChannel + streamChannelOptions', () => {
       },
       commit: () => {},
       markReady: () => {},
-      onError: () => {},
-      collection: null as never,
-    })
+      truncate: () => {},
+      collection: null as any,
+    } as any)
 
     const def = createStreamChannel({
       id: 'ai-err',
@@ -585,16 +592,17 @@ describe('docs: createStreamChannel + streamChannelOptions', () => {
       // No isDone — open-ended stream
     })
 
-    const stop = config.sync.sync({
+    const stopFn = config.sync.sync({
       begin: () => {},
       write: (op: any) => {
         if (op.value?.state) updates.push(op.value.state)
       },
       commit: () => {},
       markReady: () => {},
-      onError: () => {},
-      collection: null as never,
-    })
+      truncate: () => {},
+      collection: null as any,
+    } as any)
+    const stop = stopFn as unknown as () => void
 
     const def = createStreamChannel({
       id: 'cpu',
@@ -649,10 +657,12 @@ describe('docs: onMessage adapter — Supabase format', () => {
       },
     })
     config.sync.sync({
+      collection: null as any,
       begin: () => {},
-      write: (op) => ops.push(op),
+      write: (op: any) => ops.push(op),
       commit: () => {},
       markReady: () => {},
+      truncate: () => {},
     })
 
     const task = { id: '1', title: 'Ship it' }
@@ -711,17 +721,20 @@ describe('docs: onMessage adapter — CDC (Debezium) format', () => {
       client,
       channel: 'orders',
       onMessage: (raw) => {
-        const e = raw as { op: 'c' | 'u' | 'd'; after?: Order; before?: Order }
+        const e = raw as { op: string; after?: Order; before?: Order }
         if (e.op === 'c') return { action: 'insert', data: e.after! }
         if (e.op === 'u') return { action: 'update', data: e.after! }
-        return { action: 'delete', data: e.before! }
+        if (e.op === 'd') return { action: 'delete', data: e.before! }
+        return null
       },
     })
     config.sync.sync({
+      collection: null as any,
       begin: () => {},
-      write: (op) => ops.push(op),
+      write: (op: any) => ops.push(op),
       commit: () => {},
       markReady: () => {},
+      truncate: () => {},
     })
 
     const order = { id: 'o1', total: 100 }

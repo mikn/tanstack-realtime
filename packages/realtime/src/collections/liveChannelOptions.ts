@@ -6,7 +6,7 @@ import type { QueryKey, RealtimeClient } from '../core/types.js'
 export interface LiveChannelConfig<
   T extends object = Record<string, unknown>,
   TKey extends string | number = string,
-  TSchema extends StandardSchemaV1 = StandardSchemaV1,
+  TSchema extends StandardSchemaV1 = never,
 > {
   /** The realtime client that manages the underlying transport. */
   client: RealtimeClient
@@ -59,7 +59,7 @@ export interface LiveChannelConfig<
 export function liveChannelOptions<
   T extends object = Record<string, unknown>,
   TKey extends string | number = string,
-  TSchema extends StandardSchemaV1 = StandardSchemaV1,
+  TSchema extends StandardSchemaV1 = never,
 >(
   config: LiveChannelConfig<T, TKey, TSchema>,
 ): CollectionConfig<T, TKey, TSchema> {

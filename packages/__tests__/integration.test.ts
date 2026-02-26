@@ -1145,10 +1145,12 @@ describe('realtimeCollectionOptions — SyncConfig invariants', () => {
 
     const written: Array<unknown> = []
     const cleanup = config.sync.sync({
+      collection: null as any,
       begin: () => {},
       write: (msg) => written.push(msg),
       commit: () => {},
       markReady: () => {},
+      truncate: () => {},
     })
 
     // Message before cleanup → must be written
@@ -1156,7 +1158,7 @@ describe('realtimeCollectionOptions — SyncConfig invariants', () => {
     expect(written).toHaveLength(1)
 
     // Cleanup sets stopped = true
-    cleanup!()
+    ;(cleanup as unknown as () => void)()
 
     // Message after cleanup → must be ignored
     client.emit('items', { action: 'insert', data: { id: '2' } })
@@ -1174,12 +1176,14 @@ describe('realtimeCollectionOptions — SyncConfig invariants', () => {
 
     let readyCalled = false
     config.sync.sync({
+      collection: null as any,
       begin: () => {},
       write: () => {},
       commit: () => {},
       markReady: () => {
         readyCalled = true
       },
+      truncate: () => {},
     })
 
     await waitFor(50)
@@ -1196,12 +1200,14 @@ describe('realtimeCollectionOptions — SyncConfig invariants', () => {
 
     let readyCalled = false
     config.sync.sync({
+      collection: null as any,
       begin: () => {},
       write: () => {},
       commit: () => {},
       markReady: () => {
         readyCalled = true
       },
+      truncate: () => {},
     })
 
     expect(readyCalled).toBe(true) // synchronous — no queryFn
@@ -1220,12 +1226,14 @@ describe('realtimeCollectionOptions — SyncConfig invariants', () => {
     const written: Array<unknown> = []
     let readyCalled = false
     config.sync.sync({
+      collection: null as any,
       begin: () => {},
       write: (msg) => written.push(msg),
       commit: () => {},
       markReady: () => {
         readyCalled = true
       },
+      truncate: () => {},
     })
 
     await waitFor(50)
@@ -1243,10 +1251,12 @@ describe('realtimeCollectionOptions — SyncConfig invariants', () => {
 
     const written: Array<unknown> = []
     config.sync.sync({
+      collection: null as any,
       begin: () => {},
       write: (msg) => written.push(msg),
       commit: () => {},
       markReady: () => {},
+      truncate: () => {},
     })
 
     client.emit('items', { action: 'delete', data: { id: 'abc' } })
@@ -1343,10 +1353,12 @@ describe('liveChannelOptions — SyncConfig invariants', () => {
 
     const written: Array<unknown> = []
     config.sync.sync({
+      collection: null as any,
       begin: () => {},
       write: (msg) => written.push(msg),
       commit: () => {},
       markReady: () => {},
+      truncate: () => {},
     })
 
     client.emit('events', { type: 'typing' }) // null → filtered
@@ -1366,16 +1378,18 @@ describe('liveChannelOptions — SyncConfig invariants', () => {
 
     const written: Array<unknown> = []
     const cleanup = config.sync.sync({
+      collection: null as any,
       begin: () => {},
       write: (msg) => written.push(msg),
       commit: () => {},
       markReady: () => {},
+      truncate: () => {},
     })
 
     client.emit('events', { id: '1' })
     expect(written).toHaveLength(1)
 
-    cleanup!()
+    ;(cleanup as unknown as () => void)()
 
     client.emit('events', { id: '2' })
     expect(written).toHaveLength(1) // not incremented after stop
@@ -1392,12 +1406,14 @@ describe('liveChannelOptions — SyncConfig invariants', () => {
 
     let readyCalled = false
     config.sync.sync({
+      collection: null as any,
       begin: () => {},
       write: () => {},
       commit: () => {},
       markReady: () => {
         readyCalled = true
       },
+      truncate: () => {},
     })
 
     expect(readyCalled).toBe(true)
@@ -1416,12 +1432,14 @@ describe('liveChannelOptions — SyncConfig invariants', () => {
     const written: Array<unknown> = []
     let readyCalled = false
     config.sync.sync({
+      collection: null as any,
       begin: () => {},
       write: (msg) => written.push(msg),
       commit: () => {},
       markReady: () => {
         readyCalled = true
       },
+      truncate: () => {},
     })
 
     expect(readyCalled).toBe(false) // async — not yet
@@ -1442,12 +1460,14 @@ describe('liveChannelOptions — SyncConfig invariants', () => {
 
     let readyCalled = false
     config.sync.sync({
+      collection: null as any,
       begin: () => {},
       write: () => {},
       commit: () => {},
       markReady: () => {
         readyCalled = true
       },
+      truncate: () => {},
     })
 
     await waitFor(50)

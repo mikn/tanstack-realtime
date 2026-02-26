@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Store } from '@tanstack/store'
 import { createRealtimeClient, ephemeralLiveOptions } from '@tanstack/realtime'
 import type { ConnectionStatus, RealtimeTransport } from '@tanstack/realtime'
+import type { CollectionConfig } from '@tanstack/db'
 
 // ---------------------------------------------------------------------------
 // Mock transport with synchronous emit
@@ -57,18 +58,20 @@ function createMockTransport(): RealtimeTransport & {
 type TypingUser = { userId: string; name: string }
 type WriteOp = { type: string; value?: unknown; key?: unknown }
 
-function driveSync(config: ReturnType<typeof ephemeralLiveOptions>): {
+function driveSync(config: CollectionConfig<any, any, any, any>): {
   ops: Array<WriteOp>
   stop: () => void
 } {
   const ops: Array<WriteOp> = []
   const stop = config.sync.sync({
-    begin: (_opts?: unknown) => {},
+    collection: null as any,
+    begin: () => {},
     write: (op: WriteOp) => ops.push(op),
     commit: () => {},
     markReady: () => {},
+    truncate: () => {},
   })
-  return { ops, stop }
+  return { ops, stop: stop as unknown as () => void }
 }
 
 // ---------------------------------------------------------------------------
@@ -468,15 +471,17 @@ describe('ephemeralLiveOptions — cleanup', () => {
     })
 
     const markReady = vi.fn()
-    const stop = config.sync.sync({
+    const stopFn = config.sync.sync({
+      collection: null as any,
       begin: () => {},
       write: () => {},
       commit: () => {},
       markReady,
+      truncate: () => {},
     })
 
     expect(markReady).toHaveBeenCalledTimes(1)
-    stop()
+    ;(stopFn as unknown as () => void)()
   })
 })
 

@@ -53,7 +53,7 @@ export interface RealtimeChannelMessage<T = unknown> {
 export interface RealtimeCollectionConfig<
   T extends object = Record<string, unknown>,
   TKey extends string | number = string,
-  TSchema extends StandardSchemaV1 = StandardSchemaV1,
+  TSchema extends StandardSchemaV1 = never,
 > {
   /**
    * The realtime client that manages the underlying transport.
@@ -449,7 +449,7 @@ function buildCrdtFields<T extends object>(
 export function realtimeCollectionOptions<
   T extends object = Record<string, unknown>,
   TKey extends string | number = string,
-  TSchema extends StandardSchemaV1 = StandardSchemaV1,
+  TSchema extends StandardSchemaV1 = never,
 >(
   config: RealtimeCollectionConfig<T, TKey, TSchema>,
 ): CollectionConfig<T, TKey, TSchema> {

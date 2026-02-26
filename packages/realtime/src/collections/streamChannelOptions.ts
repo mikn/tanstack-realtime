@@ -23,7 +23,7 @@ export interface StreamItem<TState> {
 export interface StreamChannelConfig<
   TState,
   TEvent = unknown,
-  TSchema extends StandardSchemaV1 = StandardSchemaV1,
+  TSchema extends StandardSchemaV1 = never,
 > {
   /** The realtime client that manages the underlying transport. */
   client: RealtimeClient
@@ -225,7 +225,7 @@ export function createStreamChannel<
 export function streamChannelOptions<
   TState,
   TEvent = unknown,
-  TSchema extends StandardSchemaV1 = StandardSchemaV1,
+  TSchema extends StandardSchemaV1 = never,
 >(
   config: StreamChannelConfig<TState, TEvent, TSchema>,
 ): CollectionConfig<StreamItem<TState>, string, TSchema> {

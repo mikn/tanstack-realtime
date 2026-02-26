@@ -11,7 +11,7 @@ import type { QueryKey, RealtimeClient } from '../core/types.js'
 export interface EphemeralLiveConfig<
   T extends object = Record<string, unknown>,
   TKey extends string | number = string,
-  TSchema extends StandardSchemaV1 = StandardSchemaV1,
+  TSchema extends StandardSchemaV1 = never,
 > {
   /** The realtime client that manages the underlying transport. */
   client: RealtimeClient
@@ -88,7 +88,7 @@ export interface EphemeralLiveConfig<
 export function ephemeralLiveOptions<
   T extends object = Record<string, unknown>,
   TKey extends string | number = string,
-  TSchema extends StandardSchemaV1 = StandardSchemaV1,
+  TSchema extends StandardSchemaV1 = never,
 >(
   config: EphemeralLiveConfig<T, TKey, TSchema>,
 ): CollectionConfig<T, TKey, TSchema> {

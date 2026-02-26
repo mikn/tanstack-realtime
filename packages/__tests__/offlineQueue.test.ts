@@ -280,7 +280,7 @@ describe('createOfflineQueue', () => {
   it('delegates joinPresence to inner transport', () => {
     const inner = createPresenceMockTransport()
     const joinSpy = vi.spyOn(inner, 'joinPresence')
-    const queue = createOfflineQueue(inner)
+    const queue = createOfflineQueue(inner) as any
 
     queue.joinPresence('ch', { userId: 'u1' })
     expect(joinSpy).toHaveBeenCalledWith('ch', { userId: 'u1' })
@@ -289,7 +289,7 @@ describe('createOfflineQueue', () => {
   it('delegates updatePresence to inner transport', () => {
     const inner = createPresenceMockTransport()
     const updateSpy = vi.spyOn(inner, 'updatePresence')
-    const queue = createOfflineQueue(inner)
+    const queue = createOfflineQueue(inner) as any
 
     queue.updatePresence('ch', { status: 'away' })
     expect(updateSpy).toHaveBeenCalledWith('ch', { status: 'away' })
@@ -298,7 +298,7 @@ describe('createOfflineQueue', () => {
   it('delegates leavePresence to inner transport', () => {
     const inner = createPresenceMockTransport()
     const leaveSpy = vi.spyOn(inner, 'leavePresence')
-    const queue = createOfflineQueue(inner)
+    const queue = createOfflineQueue(inner) as any
 
     queue.leavePresence('ch')
     expect(leaveSpy).toHaveBeenCalledWith('ch')
@@ -307,7 +307,7 @@ describe('createOfflineQueue', () => {
   it('delegates onPresenceChange to inner transport', () => {
     const inner = createPresenceMockTransport()
     const onPresenceSpy = vi.spyOn(inner, 'onPresenceChange')
-    const queue = createOfflineQueue(inner)
+    const queue = createOfflineQueue(inner) as any
 
     const cb = vi.fn()
     queue.onPresenceChange('ch', cb)

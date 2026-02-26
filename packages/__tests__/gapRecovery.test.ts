@@ -240,7 +240,7 @@ describe('withGapRecovery', () => {
   it('delegates joinPresence to inner transport', () => {
     const inner = createPresenceMockTransport()
     const joinSpy = vi.spyOn(inner, 'joinPresence')
-    const transport = withGapRecovery(inner, { onGap: vi.fn() })
+    const transport: any = withGapRecovery(inner, { onGap: vi.fn() })
 
     transport.joinPresence('ch', { userId: 'u1' })
     expect(joinSpy).toHaveBeenCalledWith('ch', { userId: 'u1' })
@@ -249,7 +249,7 @@ describe('withGapRecovery', () => {
   it('delegates updatePresence to inner transport', () => {
     const inner = createPresenceMockTransport()
     const updateSpy = vi.spyOn(inner, 'updatePresence')
-    const transport = withGapRecovery(inner, { onGap: vi.fn() })
+    const transport: any = withGapRecovery(inner, { onGap: vi.fn() })
 
     transport.updatePresence('ch', { status: 'busy' })
     expect(updateSpy).toHaveBeenCalledWith('ch', { status: 'busy' })
@@ -258,7 +258,7 @@ describe('withGapRecovery', () => {
   it('delegates leavePresence to inner transport', () => {
     const inner = createPresenceMockTransport()
     const leaveSpy = vi.spyOn(inner, 'leavePresence')
-    const transport = withGapRecovery(inner, { onGap: vi.fn() })
+    const transport: any = withGapRecovery(inner, { onGap: vi.fn() })
 
     transport.leavePresence('ch')
     expect(leaveSpy).toHaveBeenCalledWith('ch')
@@ -267,7 +267,7 @@ describe('withGapRecovery', () => {
   it('delegates onPresenceChange to inner transport', () => {
     const inner = createPresenceMockTransport()
     const onPresenceSpy = vi.spyOn(inner, 'onPresenceChange')
-    const transport = withGapRecovery(inner, { onGap: vi.fn() })
+    const transport: any = withGapRecovery(inner, { onGap: vi.fn() })
 
     const cb = vi.fn()
     transport.onPresenceChange('ch', cb)

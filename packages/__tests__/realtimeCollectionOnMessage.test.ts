@@ -17,6 +17,7 @@ import {
   realtimeCollectionOptions,
 } from '@tanstack/realtime'
 import type { ConnectionStatus, RealtimeTransport } from '@tanstack/realtime'
+import type { CollectionConfig } from '@tanstack/db'
 
 // ---------------------------------------------------------------------------
 // Mock transport with synchronous emit
@@ -52,18 +53,20 @@ type WriteOp = { type: string; value?: unknown; key?: unknown }
 type Todo = { id: string; text: string }
 
 // Drive the sync function synchronously, collecting all write operations.
-function driveSync(config: ReturnType<typeof realtimeCollectionOptions>): {
+function driveSync(config: CollectionConfig<any, any, any, any>): {
   ops: Array<WriteOp>
   stop: () => void
 } {
   const ops: Array<WriteOp> = []
   const stop = config.sync.sync({
-    begin: (_opts?: unknown) => {},
+    collection: null as any,
+    begin: () => {},
     write: (op: WriteOp) => ops.push(op),
     commit: () => {},
     markReady: () => {},
+    truncate: () => {},
   })
-  return { ops, stop }
+  return { ops, stop: stop as unknown as () => void }
 }
 
 // ---------------------------------------------------------------------------
@@ -288,11 +291,7 @@ describe('realtimeCollectionOptions — onMessage transform hook', () => {
       channel: 'todos',
       getKey: (t) => t.id,
       onMessage: (_raw) =>
-        ({ data: { id: 'a', text: 'x' } }) as unknown as ReturnType<
-          NonNullable<
-            Parameters<typeof realtimeCollectionOptions>[0]['onMessage']
-          >
-        >,
+        ({ data: { id: 'a', text: 'x' } }) as any,
     })
     const { ops, stop } = driveSync(config)
 
