@@ -1,6 +1,6 @@
 # TanStack Realtime
 
-> Framework-agnostic realtime primitives — live collections, pub/sub messaging, presence, and CRDT state — built for [TanStack DB](https://github.com/TanStack/db).
+> Add realtime to your existing app — keep your server, your database, your deploy target. Live collections, pub/sub, presence, and CRDTs as a transport layer, not a platform. Built for [TanStack DB](https://github.com/TanStack/db).
 
 [![npm version](https://img.shields.io/npm/v/@tanstack/realtime)](https://www.npmjs.com/package/@tanstack/realtime)
 [![License](https://img.shields.io/github/license/mikn/tanstack-realtime)](LICENSE)
@@ -12,11 +12,12 @@
 > TanStack Realtime library could look like. Use it to experiment, get inspired,
 > or contribute ideas — but do not rely on it in production.
 
-- **Transport-agnostic** — works with WebSockets (Node.js), Server-Sent Events, or Centrifugo out of the box; bring your own transport for anything else
-- **Live collections** — wire TanStack DB collections to realtime channels with a single config object
-- **Presence** — track who is connected to a channel; current user always excluded from the list
-- **CRDT primitives** — conflict-free last-write-wins, PN-counters, and OR-sets for collaborative state
-- **Resilient by default** — exponential back-off reconnection, offline queue, deduplication, gap recovery, and automatic multi-tab coordination (SharedWorker → BroadcastChannel → direct)
+- **Keep your backend** — not a platform. Your Express routes, your Postgres, your deploy target stay exactly where they are. Add a `channel` to one collection and it goes live.
+- **One feature at a time** — start with `queryFn`. Add `channel` when ready. Add `fields` for CRDTs when you need conflict resolution. Each step is one config key — stop at any point.
+- **Pub/sub + presence** — chat, typing indicators, live cursors, and activity feeds are first-class. These aren't database rows — they need channels and presence, not table sync.
+- **Client-side CRDTs** — `{ votes: 'pn-counter', tags: 'or-set' }`. Merging happens on the client. Your server just stores and relays — no CRDT logic server-side.
+- **Swap transports, not code** — `wsTransport` → `centrifugoTransport` → `sseTransport`. One import swap. Your collections and hooks don't change.
+- **Resilient by default** — offline queue, gap recovery, deduplication, and automatic multi-tab coordination (SharedWorker → BroadcastChannel → direct)
 
 ## Packages
 

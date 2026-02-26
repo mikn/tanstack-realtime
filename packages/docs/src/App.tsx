@@ -163,40 +163,35 @@ function Hero() {
       <div className="container">
         <Badge>v0.1 &middot; Alpha</Badge>
         <h1>
-          Realtime, <span className="gradient-text">without the ceremony.</span>
+          Add realtime. <span className="gradient-text">Keep everything else.</span>
         </h1>
         <p className="hero-sub">
-          Add a <code>channel</code> to your existing <code>queryFn</code>.
-          Connected clients update when data changes — no polling, no
-          subscriptions managed by hand. Built on TanStack DB.
+          Most realtime frameworks want you to adopt their database, their
+          server, their cloud. This is a transport layer that plugs into
+          whatever you already have. Add a <code>channel</code> to one
+          collection today. Add CRDTs tomorrow. Your Express routes, your
+          Postgres, your deploy target &mdash; all stay exactly where they are.
         </p>
 
         <div className="before-after">
           <div className="ba-col">
-            <div className="ba-label ba-before">Before &mdash; polling</div>
+            <div className="ba-label ba-before">Platform lock-in</div>
             <CodeBlock
-              code={`// Every tab polls every 30 s. Data drifts.
-function TaskList({ projectId }) {
-  const { data: tasks = [] } = useQuery({
-    queryKey: ['tasks', projectId],
-    queryFn: () =>
-      fetch(\`/api/tasks?projectId=\${projectId}\`)
-        .then(r => r.json()),
-    staleTime: 30_000,
-    refetchInterval: 30_000,
-  })
-  return (
-    <ul>
-      {tasks.map(t => <li key={t.id}>{t.title}</li>)}
-    </ul>
-  )
-}`}
+              code={`// Convex: replace your backend entirely
+const tasks = useQuery(api.tasks.list, { projectId })
+
+// ElectricSQL: Postgres CDC only, no pub/sub or presence
+const { results } = useShape({
+  url: 'http://localhost:3000/v1/shape',
+  table: 'tasks',
+  where: \`project_id = '\${projectId}'\`,
+})`}
             />
           </div>
           <div className="ba-col">
-            <div className="ba-label ba-after">After &mdash; live</div>
+            <div className="ba-label ba-after">Your server, live</div>
             <CodeBlock
-              code={`// Every client updates instantly. Zero polling.
+              code={`// TanStack Realtime: keep your REST API, add a channel
 const tasksOptions = (projectId: string) =>
   realtimeCollectionOptions({
     ...withRest({
@@ -207,14 +202,8 @@ const tasksOptions = (projectId: string) =>
     channel: ['tasks', { projectId }],
   })
 
-function TaskList({ projectId }) {
-  const tasks = useCollection(tasksOptions(projectId))
-  return (
-    <ul>
-      {tasks.map(t => <li key={t.id}>{t.title}</li>)}
-    </ul>
-  )
-}`}
+// Your existing /api/tasks endpoint doesn't change.
+// The channel broadcasts mutations automatically.`}
             />
           </div>
         </div>
@@ -245,63 +234,64 @@ function Features() {
       <div className="container">
         <Badge>Why TanStack Realtime</Badge>
         <h2>
-          Every feature solves
-          <br />a real problem.
+          What&rsquo;s awkward
+          <br />
+          everywhere else.
         </h2>
         <div className="features-grid">
           <FeatureCard
-            icon="~"
-            title="Progressive Adoption"
-            problem="You can't rewrite your whole app on day one."
-            solution="Start with queryFn. Add channel when ready. Add CRDTs when you need conflict resolution. Each step is exactly one config key — stop at any point."
-          />
-          <FeatureCard
-            icon="{"
-            title="Type-Safe End to End"
-            problem="Runtime errors in channel keys and message shapes cost you at 2am."
-            solution="Full TypeScript from channel keys to CRDT field definitions. Autocomplete everywhere. Catch mistakes at build time."
-          />
-          <FeatureCard
             icon=">"
-            title="Transport Agnostic"
-            problem="You'll outgrow your local WebSocket server, but your app code shouldn't care."
-            solution="Start with the Node.js preset. Scale to Centrifugo or SSE. One import swap — zero application code changes."
+            title="Keep Your Backend"
+            problem="Convex replaces your server. ElectricSQL requires Postgres CDC. You just want live updates on your existing API."
+            solution="TanStack Realtime is a transport layer. Your Express routes, your database, your deploy target — none of it changes. Add a channel to one collection and your existing endpoints go live."
+          />
+          <FeatureCard
+            icon="~"
+            title="One Feature at a Time"
+            problem="Most realtime frameworks are all-or-nothing. Adopt their model for your whole app, or don't use them at all."
+            solution="Start with queryFn for one collection. Add channel when ready. Add CRDTs when you need conflict resolution. Each step is one config key — stop at any point."
+          />
+          <FeatureCard
+            icon="&"
+            title="Pub/Sub + Presence"
+            problem="Database sync tools don't do messaging. Chat, typing indicators, and live cursors aren't rows in a table — they need pub/sub and presence."
+            solution="Channels, presence, and pub/sub are first-class. usePresence tracks who's online. useSubscribe handles ephemeral events. These work alongside collections, not as an afterthought."
           />
           <FeatureCard
             icon="#"
-            title="Built-in CRDTs"
-            problem="Two users edit the same field at the same time. One change is silently lost."
-            solution="Declare fields: { title: 'lww', votes: 'pn-counter', tags: 'or-set' }. Concurrent edits merge automatically. No manual conflict resolution."
+            title="Client-Side CRDTs"
+            problem="Server-side conflict resolution means changing server code for every field type. Convex requires server mutations. ElectricSQL uses Postgres rules."
+            solution="Declare fields: { votes: 'pn-counter', tags: 'or-set' }. Merging happens on the client — your server just stores and relays. No CRDT logic server-side."
+          />
+          <FeatureCard
+            icon="{"
+            title="Swap Transports, Not Code"
+            problem="You start with a local WebSocket server. In production you need Centrifugo. Behind a corporate proxy you need SSE. Each switch rewrites your app."
+            solution="One import swap. wsTransport → centrifugoTransport → sseTransport. Your collections, hooks, and components don't change. Infrastructure decisions stay separate from app logic."
           />
           <FeatureCard
             icon="@"
-            title="Offline-First"
-            problem="The user submits a form on a train. The network call fails. The change is gone."
-            solution="Wrap any transport with createOfflineQueue. Mutations buffer and replay in FIFO order on reconnect. Show pending count in your UI."
+            title="Offline + Multi-Tab"
+            problem="Six tabs open, each with its own WebSocket. User goes through a tunnel. Messages are lost, connections multiply, state diverges."
+            solution="createOfflineQueue buffers and replays on reconnect. createCoordinatedTransport shares one connection across all tabs automatically. Stack them on any transport."
+          />
+          <FeatureCard
+            icon="+"
+            title="Streaming Reductions"
+            problem="AI token streams, live metrics, progress bars — these aren't collections of rows. They're a sequence of events folded into one piece of state."
+            solution="streamChannelOptions with a reduce function. Status tracks pending → streaming → done. isDone and isError close the stream. Works for any accumulated state."
           />
           <FeatureCard
             icon="*"
             title="TanStack Ecosystem"
             problem="Yet another state layer fighting with your existing cache."
-            solution="Collections plug into TanStack DB via SyncConfig. TanStack Query runs alongside for non-realtime data. They are parallel systems — no conflict."
-          />
-          <FeatureCard
-            icon="&"
-            title="Presence & Cursors"
-            problem="Users have no idea who else is looking at the same document."
-            solution="createPresenceChannel + usePresence. Join with any data — name, cursor, status. Others update reactively. The current user is always excluded from the list."
-          />
-          <FeatureCard
-            icon="+"
-            title="Gap Recovery"
-            problem="The user reconnects after 30 seconds offline and sees stale data."
-            solution="Add refetchOnReconnect: true to re-run queryFn and diff on reconnect. Or use withGapRecovery for custom replay — server-assisted offset recovery, raw subscriptions, or collections without a queryFn."
+            solution="Collections plug into TanStack DB. TanStack Query runs alongside for non-realtime data. They are parallel systems, not competing ones. useStore works everywhere."
           />
           <FeatureCard
             icon="%"
-            title="Multi-Tab Coordination"
-            problem="Six browser tabs. Six WebSocket connections. Six times the server cost."
-            solution="createCoordinatedTransport automatically picks the best strategy: SharedWorker (if available) → BroadcastChannel leader election → direct. One line — zero config."
+            title="Type-Safe Channels"
+            problem="Runtime errors in channel keys and message shapes cost you at 2am."
+            solution="Full TypeScript from channel keys to CRDT field definitions to presence data shapes. Autocomplete everywhere. Catch mistakes at build time, not in production."
           />
         </div>
       </div>
