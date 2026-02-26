@@ -135,6 +135,7 @@ function Nav() {
           <a href="#crdts">CRDTs</a>
           <a href="#presence">Presence</a>
           <a href="#resilience">Resilience</a>
+          <a href="#utilities">Utilities</a>
           <a href="#when-to-use">When to use</a>
           <a href="#quickstart">Quick Start</a>
           <a
@@ -1225,6 +1226,102 @@ const client = createRealtimeClient({ transport })`}
 }
 
 // ---------------------------------------------------------------------------
+// Core Utilities — dedup, throttle, ephemeral
+// ---------------------------------------------------------------------------
+
+function Utilities() {
+  return (
+    <section id="utilities" className="section section-dark">
+      <div className="container">
+        <Badge>Core Utilities</Badge>
+        <h2>
+          Small tools that
+          <br />
+          solve real problems.
+        </h2>
+        <p className="section-sub">
+          Deduplication, throttling, and ephemeral maps &mdash; standalone
+          utilities you can use with any transport or collection.
+        </p>
+
+        <div className="resilience-grid">
+          <div className="resilience-card">
+            <div className="resilience-card-icon">#</div>
+            <h3>createDedup</h3>
+            <p>
+              Bounded deduplication filter. Tracks recently-seen message IDs per
+              channel using FIFO eviction. Call <code>seen(channel, id)</code>{' '}
+              &mdash; returns <code>true</code> for duplicates.
+            </p>
+            <CodeBlock
+              code={`import { createDedup } from '@tanstack/realtime'
+
+const dedup = createDedup({ maxSize: 500 })
+
+transport.subscribe('chat', (msg) => {
+  if (dedup.seen('chat', msg.id)) return // skip duplicate
+  handleMessage(msg)
+})`}
+            />
+          </div>
+
+          <div className="resilience-card">
+            <div className="resilience-card-icon">~</div>
+            <h3>throttle</h3>
+            <p>
+              Trailing-edge throttle for high-frequency publishes. First call
+              fires immediately; subsequent calls within the interval are
+              coalesced. The last value is always sent.
+            </p>
+            <CodeBlock
+              code={`import { throttle } from '@tanstack/realtime'
+
+const throttledPublish = throttle(
+  (pos: { x: number; y: number }) =>
+    client.publish('cursors', pos),
+  { interval: 50 }, // max 20 publishes/sec
+)
+
+// Called on every mouse move
+onMouseMove = (e) =>
+  throttledPublish({ x: e.clientX, y: e.clientY })`}
+            />
+          </div>
+
+          <div className="resilience-card">
+            <div className="resilience-card-icon">*</div>
+            <h3>createEphemeralMap</h3>
+            <p>
+              Key-value store where entries auto-expire after a TTL. Perfect for
+              typing indicators, &ldquo;user is viewing&rdquo; badges, and
+              cursor positions that should disappear when the user goes silent.
+            </p>
+            <CodeBlock
+              code={`import { createEphemeralMap } from '@tanstack/realtime'
+
+const typingUsers = createEphemeralMap<{ name: string }>({
+  ttl: 3000, // entries expire after 3 seconds
+})
+
+// Update on every keystroke — resets the timer
+typingUsers.set(userId, { name: 'Alice' })
+
+// Subscribe to changes (entries auto-removed on timeout)
+typingUsers.subscribe((entries) => {
+  setTyping(entries.map((e) => e.value.name))
+})
+
+// Cleanup on teardown
+typingUsers.destroy()`}
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Message Adapters — onMessage
 // ---------------------------------------------------------------------------
 
@@ -1423,6 +1520,197 @@ function ReactHooks() {
 }`}
             />
           </div>
+
+          <div className="hook-example">
+            <h3>useChannel</h3>
+            <p>
+              Combines subscribe + publish for one channel. Omit the callback
+              for publish-only.
+            </p>
+            <CodeBlock
+              code={`function ChatRoom({ roomId }) {
+  const [messages, setMessages] = useState<Message[]>([])
+  const { publish } = useChannel(
+    ['chat', { roomId }],
+    (raw) => setMessages((prev) => [...prev, raw as Message]),
+  )
+
+  return (
+    <>
+      {messages.map((m) => <p key={m.id}>{m.text}</p>)}
+      <button onClick={() => publish({ id: crypto.randomUUID(), text: 'Hi!' })}>
+        Send
+      </button>
+    </>
+  )
+}`}
+            />
+          </div>
+
+          <div className="hook-example">
+            <h3>useRealtimeCollection</h3>
+            <p>
+              Creates a CRDT-backed TanStack DB collection. Client is sourced
+              from context &mdash; no need to pass it manually.
+            </p>
+            <CodeBlock
+              code={`import { useRealtimeCollection } from '@tanstack/react-realtime'
+import { useLiveQuery } from '@tanstack/react-db'
+
+function TodoList({ projectId }: { projectId: string }) {
+  const todos = useRealtimeCollection<Todo>({
+    channel: ['todos', { projectId }],
+    getKey: (t) => t.id,
+    queryFn: () => fetchTodos(projectId),
+  })
+
+  const { data } = useLiveQuery((q) =>
+    q.from({ todos }).select()
+  )
+
+  return <ul>{data.map((t) => <li key={t.id}>{t.text}</li>)}</ul>
+}`}
+            />
+          </div>
+
+          <div className="hook-example">
+            <h3>useLiveChannel</h3>
+            <p>
+              Creates an append-only live channel collection. For chat, game
+              events, and feeds &mdash; no update/delete.
+            </p>
+            <CodeBlock
+              code={`import { useLiveChannel } from '@tanstack/react-realtime'
+import { useLiveQuery } from '@tanstack/react-db'
+
+function AuditLog({ resourceId }: { resourceId: string }) {
+  const events = useLiveChannel<AuditEvent>({
+    channel: ['audit', { resourceId }],
+    getKey: (e) => e.id,
+    initialData: () => fetchAuditHistory(resourceId),
+    onEvent: (raw) => {
+      const e = raw as { type: string; event: AuditEvent }
+      return e.type === 'audit' ? e.event : null
+    },
+  })
+
+  const { data } = useLiveQuery((q) =>
+    q.from({ events }).orderBy(({ events }) => events.timestamp)
+  )
+
+  return <div>{data.map((e) => <p key={e.id}>{e.message}</p>)}</div>
+}`}
+            />
+          </div>
+        </div>
+
+        <h2 style={{ marginTop: '3rem' }}>
+          Standalone CRDT hooks
+        </h2>
+        <p className="section-sub">
+          Self-contained hooks for shared counters, values, and sets. No
+          collection required &mdash; define the channel once with{' '}
+          <code>defineSyncedCounter</code> / <code>defineSyncedValue</code> /{' '}
+          <code>defineSyncedSet</code>, then use the corresponding hook.
+        </p>
+
+        <div className="hooks-grid">
+          <div className="hook-example">
+            <h3>useSyncedCounter</h3>
+            <p>
+              PN-Counter CRDT. Concurrent increments from any client always add
+              up.
+            </p>
+            <CodeBlock
+              code={`import { defineSyncedCounter } from '@tanstack/realtime'
+import { useSyncedCounter } from '@tanstack/react-realtime'
+
+const postVotes = defineSyncedCounter({
+  id: 'post-votes',
+  channel: (params: { postId: string }) => ['votes', params],
+})
+
+function VoteButton({ postId, initialVotes }: { postId: string; initialVotes: number }) {
+  const { value, increment, decrement } = useSyncedCounter(postVotes, {
+    params: { postId },
+    initial: initialVotes,
+  })
+
+  return (
+    <div>
+      <button onClick={() => decrement()}>-</button>
+      <span>{value}</span>
+      <button onClick={() => increment()}>+</button>
+    </div>
+  )
+}`}
+            />
+          </div>
+
+          <div className="hook-example">
+            <h3>useSyncedValue</h3>
+            <p>
+              LWW-Register CRDT. Lamport clock + clientId ensures all clients
+              converge.
+            </p>
+            <CodeBlock
+              code={`import { defineSyncedValue } from '@tanstack/realtime'
+import { useSyncedValue } from '@tanstack/react-realtime'
+
+const docTitle = defineSyncedValue({
+  id: 'doc-title',
+  channel: (params: { docId: string }) => ['doc:title', params],
+})
+
+function EditableTitle({ docId }: { docId: string }) {
+  const { value, set } = useSyncedValue(docTitle, {
+    params: { docId },
+    initial: 'Untitled',
+  })
+
+  return (
+    <input
+      value={value}
+      onChange={(e) => set(e.target.value)}
+    />
+  )
+}`}
+            />
+          </div>
+
+          <div className="hook-example">
+            <h3>useSyncedSet</h3>
+            <p>
+              OR-Set CRDT. Concurrent add always wins over concurrent remove.
+            </p>
+            <CodeBlock
+              code={`import { defineSyncedSet } from '@tanstack/realtime'
+import { useSyncedSet } from '@tanstack/react-realtime'
+
+const postTags = defineSyncedSet({
+  id: 'post-tags',
+  channel: (params: { postId: string }) => ['tags', params],
+})
+
+function TagEditor({ postId, initialTags }: { postId: string; initialTags: string[] }) {
+  const { values: tags, add, remove, has } = useSyncedSet(postTags, {
+    params: { postId },
+    initial: initialTags,
+  })
+
+  return (
+    <>
+      {tags.map((tag) => (
+        <span key={tag}>
+          {tag} <button onClick={() => remove(tag)}>x</button>
+        </span>
+      ))}
+      <button onClick={() => add('important')}>+ important</button>
+    </>
+  )
+}`}
+            />
+          </div>
         </div>
       </div>
     </section>
@@ -1616,6 +1904,7 @@ function Footer() {
             <a href="#events">Live Events</a>
             <a href="#streaming">Streaming</a>
             <a href="#resilience">Resilience</a>
+            <a href="#utilities">Utilities</a>
             <a href="#adapters">Message Adapters</a>
             <a href="#quickstart">Quick Start</a>
             <a href="#when-to-use">When to use</a>
@@ -1953,6 +2242,7 @@ export function App() {
       <LiveEvents />
       <Streaming />
       <Resilience />
+      <Utilities />
       <MessageAdapters />
       <Transports />
       <ReactHooks />
