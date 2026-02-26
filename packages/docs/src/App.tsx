@@ -1191,25 +1191,45 @@ const transport = withGapRecovery(
             <h3>Multi-Tab Coordination</h3>
             <p>
               Six browser tabs. Six WebSocket connections. Six times the server
-              cost. <code>createCoordinatedTransport</code> automatically picks
-              the best strategy: SharedWorker &rarr; BroadcastChannel leader
-              election &rarr; direct fallback. Zero config required.
+              cost. <code>createCoordinatedTransport</code> shares a single
+              connection across all tabs automatically.
+            </p>
+            <p>
+              <strong>Default (BroadcastChannel)</strong> &mdash; one tab is elected
+              leader and holds the connection. Others proxy through it. If the leader
+              closes, a new one is elected. Zero config.
             </p>
             <CodeBlock
               code={`import { createCoordinatedTransport, wsTransport } from '@tanstack/realtime'
 
-// Automatic — picks BroadcastChannel in most browsers
+// Zero config — uses BroadcastChannel leader election automatically
 const transport = createCoordinatedTransport({
   transport: () => wsTransport({ url: 'wss://rt.example.com' }),
-})
+})`}
+            />
+            <p>
+              <strong>SharedWorker (opt-in)</strong> &mdash; the browser runs a
+              separate worker process that survives tab close and crashes. Requires
+              a small worker file because SharedWorker loads code from a URL, not
+              inline. Premium robustness for apps that need it.
+            </p>
+            <CodeBlock
+              title="realtime.worker.ts"
+              code={`import { createSharedWorkerCoordinator, wsTransport } from '@tanstack/realtime'
 
-// Best: provide a SharedWorker URL for optimal multi-tab sharing
-const transport = createCoordinatedTransport({
+const coordinator = createSharedWorkerCoordinator(
+  wsTransport({ url: 'wss://rt.example.com' }),
+)
+self.addEventListener('connect', (e) => {
+  coordinator.connect(e.ports[0])
+})`}
+            />
+            <CodeBlock
+              title="app code"
+              code={`const transport = createCoordinatedTransport({
   transport: () => wsTransport({ url: 'wss://rt.example.com' }),
   workerUrl: new URL('./realtime.worker.ts', import.meta.url),
-})
-
-const client = createRealtimeClient({ transport })`}
+})`}
             />
           </div>
         </div>

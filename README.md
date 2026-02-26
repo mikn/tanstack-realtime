@@ -55,6 +55,43 @@ export const client = createRealtimeClient({
 await client.connect()
 ```
 
+### Multi-Tab Coordination
+
+When a user opens your app in multiple browser tabs, each tab would normally open its own WebSocket — multiplying server load, bandwidth, and the potential for state conflicts. `createCoordinatedTransport` solves this by sharing a single connection across all tabs. It picks the best available strategy automatically:
+
+| Strategy | When used | How it works |
+| --- | --- | --- |
+| **SharedWorker** | `workerUrl` is provided and `SharedWorker` API is available | The browser spawns a **separate worker process** from the URL you provide. This worker lives independently of any tab — it survives tab close, sleep, and crashes. All tabs connect to it via `MessagePort`. No election, no heartbeat. |
+| **BroadcastChannel** | No `workerUrl` (or `SharedWorker` unavailable) and `BroadcastChannel` API is available | One tab is elected **leader** and holds the real connection. Other tabs proxy through `BroadcastChannel` messages. Includes heartbeat-based failure detection — if the leader tab closes or crashes, a new leader is elected automatically. **Zero config — this is the default.** |
+| **Direct** | Neither API is available | Each tab opens its own connection. No coordination. |
+
+**Why does SharedWorker need a `workerUrl`?** SharedWorker is a browser API that runs code in a separate thread, shared across tabs. Unlike BroadcastChannel (which is just a messaging API you use inline), the browser needs to **load a separate JavaScript file** to run the worker. That file sets up the coordinator with your transport config:
+
+```ts
+// realtime.worker.ts — a separate file your bundler produces
+import { createSharedWorkerCoordinator } from '@tanstack/realtime'
+import { wsTransport } from '@tanstack/realtime'
+
+const coordinator = createSharedWorkerCoordinator(
+  wsTransport({ url: 'wss://rt.example.com' }),
+)
+
+self.addEventListener('connect', (e) => {
+  coordinator.connect((e as MessageEvent).ports[0]!)
+})
+```
+
+Then in your app code you point to it:
+
+```ts
+const transport = createCoordinatedTransport({
+  transport: () => wsTransport({ url: 'wss://rt.example.com' }),
+  workerUrl: new URL('./realtime.worker.ts', import.meta.url),
+})
+```
+
+**For most apps, you don't need this.** The BroadcastChannel default works great with zero setup. SharedWorker is the premium option for apps that need maximum robustness (no election delay, survives tab crashes instantly, no heartbeat overhead).
+
 ---
 
 ## `@tanstack/react-realtime`
