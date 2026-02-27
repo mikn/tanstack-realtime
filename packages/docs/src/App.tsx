@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import './styles.css'
 import { Highlight, themes } from 'prism-react-renderer'
 
@@ -620,10 +621,523 @@ function StockBadge({ productId }: { productId: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// CRDTs — real conflict example
+// CRDTs — interactive conflict demos
 // ---------------------------------------------------------------------------
 
+interface LogEntry {
+  id: number
+  client: 'a' | 'b' | 'system'
+  text: string
+}
+
+let _logId = 0
+function logEntry(client: LogEntry['client'], text: string): LogEntry {
+  return { id: ++_logId, client, text }
+}
+
+function DemoLog({ entries }: { entries: Array<LogEntry> }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (ref.current) ref.current.scrollTop = ref.current.scrollHeight
+  }, [entries.length])
+  return (
+    <div className="crdt-log" ref={ref}>
+      {entries.map((e) => (
+        <div key={e.id} className={`crdt-log-entry crdt-log-${e.client}`}>
+          {e.client !== 'system' && (
+            <span className={`crdt-log-dot crdt-dot-${e.client}`} />
+          )}
+          {e.text}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ---- LWW Register Demo ----
+function LwwDemo() {
+  const [valA, setValA] = useState('Shopping List')
+  const [valB, setValB] = useState('Shopping List')
+  const [clockA, setClockA] = useState(0)
+  const [clockB, setClockB] = useState(0)
+  const [merged, setMerged] = useState<{
+    value: string
+    winner: 'A' | 'B'
+    reason: string
+  } | null>(null)
+  const [log, setLog] = useState<Array<LogEntry>>([
+    logEntry(
+      'system',
+      'Both clients see "Shopping List". Edit both, then merge.',
+    ),
+  ])
+
+  const editA = (v: string) => {
+    const c = clockA + 1
+    setValA(v)
+    setClockA(c)
+    setMerged(null)
+    setLog((p) => [...p, logEntry('a', `set "${v}" (clock ${c})`)])
+  }
+  const editB = (v: string) => {
+    const c = clockB + 1
+    setValB(v)
+    setClockB(c)
+    setMerged(null)
+    setLog((p) => [...p, logEntry('b', `set "${v}" (clock ${c})`)])
+  }
+  const merge = () => {
+    // lwwWins: higher clock wins, clientId tiebreak
+    // In a real system clientIds are UUIDs; here B wins ties (alphabetically later)
+    const aWins = clockA > clockB
+    const winner: 'A' | 'B' = aWins ? 'A' : 'B'
+    const value = aWins ? valA : valB
+    const reason =
+      clockA === clockB
+        ? `Tie at clock ${clockA} — clientId tiebreak (B > A)`
+        : `clock ${Math.max(clockA, clockB)} > ${Math.min(clockA, clockB)}`
+    setMerged({ value, winner, reason })
+    setLog((p) => [
+      ...p,
+      logEntry('system', `Merge: Client ${winner} wins (${reason})`),
+      logEntry('system', `Both clients converge to "${value}"`),
+    ])
+  }
+  const reset = () => {
+    setValA('Shopping List')
+    setValB('Shopping List')
+    setClockA(0)
+    setClockB(0)
+    setMerged(null)
+    setLog([logEntry('system', 'Reset. Both clients see "Shopping List".')])
+  }
+
+  return (
+    <div className="crdt-demo-inner">
+      <p className="crdt-demo-desc">
+        Two clients rename a document while offline. On reconnect, the higher
+        Lamport clock wins. Edit both fields and click <strong>Merge</strong>.
+      </p>
+      <div className="crdt-demo-clients">
+        <div className="crdt-demo-client crdt-client-a">
+          <div className="crdt-demo-client-hdr">
+            <span className="crdt-dot crdt-dot-a" />
+            Client A<span className="crdt-clock">clock: {clockA}</span>
+          </div>
+          <input
+            className="crdt-demo-input"
+            value={valA}
+            onChange={(e) => editA(e.target.value)}
+          />
+        </div>
+        <div className="crdt-demo-client crdt-client-b">
+          <div className="crdt-demo-client-hdr">
+            <span className="crdt-dot crdt-dot-b" />
+            Client B<span className="crdt-clock">clock: {clockB}</span>
+          </div>
+          <input
+            className="crdt-demo-input"
+            value={valB}
+            onChange={(e) => editB(e.target.value)}
+          />
+        </div>
+      </div>
+      <div className="crdt-demo-actions">
+        <button className="crdt-demo-btn crdt-btn-merge" onClick={merge}>
+          Reconnect &amp; Merge
+        </button>
+        <button className="crdt-demo-btn crdt-btn-reset" onClick={reset}>
+          Reset
+        </button>
+      </div>
+      {merged && (
+        <div
+          className={`crdt-demo-result crdt-win-${merged.winner.toLowerCase()}`}
+        >
+          <span className="crdt-result-label">Merged:</span>
+          <span className="crdt-result-value">"{merged.value}"</span>
+          <span className="crdt-result-winner">
+            Client {merged.winner} wins — {merged.reason}
+          </span>
+        </div>
+      )}
+      <DemoLog entries={log} />
+      <CodeBlock
+        title="fields config"
+        code={`fields: {
+  title:  'lww', // rename races → highest Lamport clock wins
+  status: 'lww', // status changes → deterministic, no surprises
+}`}
+      />
+    </div>
+  )
+}
+
+// ---- PN-Counter Demo ----
+interface PnState {
+  inc: Partial<Record<string, number>>
+  dec: Partial<Record<string, number>>
+}
+function pnVal(s: PnState) {
+  let t = 0
+  for (const v of Object.values(s.inc)) t += v ?? 0
+  for (const v of Object.values(s.dec)) t -= v ?? 0
+  return t
+}
+function pnMerge(a: PnState, b: PnState): PnState {
+  const inc: Partial<Record<string, number>> = { ...a.inc }
+  const dec: Partial<Record<string, number>> = { ...a.dec }
+  for (const [id, v] of Object.entries(b.inc))
+    if ((inc[id] ?? 0) < (v ?? 0)) inc[id] = v
+  for (const [id, v] of Object.entries(b.dec))
+    if ((dec[id] ?? 0) < (v ?? 0)) dec[id] = v
+  return { inc, dec }
+}
+
+function PnCounterDemo() {
+  const [stateA, setStateA] = useState<PnState>({ inc: {}, dec: {} })
+  const [stateB, setStateB] = useState<PnState>({ inc: {}, dec: {} })
+  const [log, setLog] = useState<Array<LogEntry>>([
+    logEntry(
+      'system',
+      'Click +/- on each client. The merged total is always correct.',
+    ),
+  ])
+
+  const incA = () => {
+    setStateA((s) => ({
+      inc: { ...s.inc, a: (s.inc.a ?? 0) + 1 },
+      dec: s.dec,
+    }))
+    setLog((p) => [...p, logEntry('a', '+1')])
+  }
+  const decA = () => {
+    setStateA((s) => ({
+      inc: s.inc,
+      dec: { ...s.dec, a: (s.dec.a ?? 0) + 1 },
+    }))
+    setLog((p) => [...p, logEntry('a', '-1')])
+  }
+  const incB = () => {
+    setStateB((s) => ({
+      inc: { ...s.inc, b: (s.inc.b ?? 0) + 1 },
+      dec: s.dec,
+    }))
+    setLog((p) => [...p, logEntry('b', '+1')])
+  }
+  const decB = () => {
+    setStateB((s) => ({
+      inc: s.inc,
+      dec: { ...s.dec, b: (s.dec.b ?? 0) + 1 },
+    }))
+    setLog((p) => [...p, logEntry('b', '-1')])
+  }
+  const reset = () => {
+    setStateA({ inc: {}, dec: {} })
+    setStateB({ inc: {}, dec: {} })
+    setLog([logEntry('system', 'Reset. Counter back to 0.')])
+  }
+
+  const merged = pnMerge(stateA, stateB)
+  const total = pnVal(merged)
+
+  return (
+    <div className="crdt-demo-inner">
+      <p className="crdt-demo-desc">
+        Each client tracks its own increments and decrements. Merging takes the
+        max per client — <strong>concurrent votes never get lost</strong>.
+      </p>
+      <div className="crdt-pn-total">
+        <span className="crdt-pn-number">{total}</span>
+        <span className="crdt-pn-label">merged total</span>
+      </div>
+      <div className="crdt-demo-clients">
+        <div className="crdt-demo-client crdt-client-a">
+          <div className="crdt-demo-client-hdr">
+            <span className="crdt-dot crdt-dot-a" />
+            Client A
+            <span className="crdt-clock">
+              +{stateA.inc.a ?? 0} / -{stateA.dec.a ?? 0}
+            </span>
+          </div>
+          <div className="crdt-pn-btns">
+            <button className="crdt-demo-btn crdt-btn-inc" onClick={incA}>
+              +1
+            </button>
+            <button className="crdt-demo-btn crdt-btn-dec" onClick={decA}>
+              -1
+            </button>
+          </div>
+        </div>
+        <div className="crdt-demo-client crdt-client-b">
+          <div className="crdt-demo-client-hdr">
+            <span className="crdt-dot crdt-dot-b" />
+            Client B
+            <span className="crdt-clock">
+              +{stateB.inc.b ?? 0} / -{stateB.dec.b ?? 0}
+            </span>
+          </div>
+          <div className="crdt-pn-btns">
+            <button className="crdt-demo-btn crdt-btn-inc" onClick={incB}>
+              +1
+            </button>
+            <button className="crdt-demo-btn crdt-btn-dec" onClick={decB}>
+              -1
+            </button>
+          </div>
+        </div>
+      </div>
+      <div className="crdt-pn-vectors">
+        <span>
+          Vectors: inc = {'{'} a: {merged.inc.a ?? 0}, b: {merged.inc.b ?? 0}{' '}
+          {'}'} dec = {'{'} a: {merged.dec.a ?? 0}, b: {merged.dec.b ?? 0} {'}'}
+        </span>
+      </div>
+      <div className="crdt-demo-actions">
+        <button className="crdt-demo-btn crdt-btn-reset" onClick={reset}>
+          Reset
+        </button>
+      </div>
+      <DemoLog entries={log} />
+      <CodeBlock
+        title="fields config"
+        code={`fields: {
+  votes: 'pn-counter', // 3 users upvote simultaneously → count = 3
+  stock: 'pn-counter', // 2 reservations at once → stock -= 2
+}`}
+      />
+    </div>
+  )
+}
+
+// ---- OR-Set Demo ----
+interface OrEntry {
+  key: string
+  value: string
+  tag: string
+}
+interface OrSetState {
+  entries: Array<OrEntry>
+}
+function orVals(s: OrSetState): Array<string> {
+  const seen = new Map<string, string>()
+  for (const e of s.entries) seen.set(e.key, e.value)
+  return Array.from(seen.values())
+}
+function orMerge(a: OrSetState, b: OrSetState): OrSetState {
+  const seen = new Map<string, OrEntry>()
+  for (const e of a.entries) seen.set(e.tag, e)
+  for (const e of b.entries) seen.set(e.tag, e)
+  return { entries: Array.from(seen.values()) }
+}
+function orAdd(s: OrSetState, value: string): OrSetState {
+  const key = JSON.stringify(value)
+  const tag = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+  return { entries: [...s.entries, { key, value, tag }] }
+}
+function orRemove(s: OrSetState, value: string): OrSetState {
+  const key = JSON.stringify(value)
+  return { entries: s.entries.filter((e) => e.key !== key) }
+}
+
+const INITIAL_TAGS = ['bug', 'feature', 'docs']
+function makeInitialOr(): OrSetState {
+  let s: OrSetState = { entries: [] }
+  for (const t of INITIAL_TAGS) s = orAdd(s, t)
+  return s
+}
+
+function OrSetDemo() {
+  const [stateA, setStateA] = useState<OrSetState>(makeInitialOr)
+  const [stateB, setStateB] = useState<OrSetState>(makeInitialOr)
+  const [inputA, setInputA] = useState('')
+  const [inputB, setInputB] = useState('')
+  const [log, setLog] = useState<Array<LogEntry>>([
+    logEntry(
+      'system',
+      'Both clients see tags: bug, feature, docs. Add or remove tags, then merge.',
+    ),
+  ])
+  const [showMerged, setShowMerged] = useState(false)
+
+  const addA = () => {
+    if (!inputA.trim()) return
+    setStateA((s) => orAdd(s, inputA.trim()))
+    setLog((p) => [...p, logEntry('a', `add "${inputA.trim()}"`)])
+    setInputA('')
+    setShowMerged(false)
+  }
+  const removeA = (v: string) => {
+    setStateA((s) => orRemove(s, v))
+    setLog((p) => [...p, logEntry('a', `remove "${v}"`)])
+    setShowMerged(false)
+  }
+  const addB = () => {
+    if (!inputB.trim()) return
+    setStateB((s) => orAdd(s, inputB.trim()))
+    setLog((p) => [...p, logEntry('b', `add "${inputB.trim()}"`)])
+    setInputB('')
+    setShowMerged(false)
+  }
+  const removeB = (v: string) => {
+    setStateB((s) => orRemove(s, v))
+    setLog((p) => [...p, logEntry('b', `remove "${v}"`)])
+    setShowMerged(false)
+  }
+  const merge = () => {
+    const m = orMerge(stateA, stateB)
+    const vals = orVals(m)
+    setShowMerged(true)
+    setLog((p) => [
+      ...p,
+      logEntry('system', `Merge (union by tag): [${vals.join(', ')}]`),
+    ])
+  }
+  const reset = () => {
+    const init = makeInitialOr()
+    setStateA(init)
+    setStateB(init)
+    setInputA('')
+    setInputB('')
+    setShowMerged(false)
+    setLog([logEntry('system', 'Reset. Both clients see: bug, feature, docs.')])
+  }
+
+  // Scenario: demonstrate add-wins
+  const runAddWins = () => {
+    const fresh = makeInitialOr()
+    // Client A adds "urgent"
+    const a = orAdd(fresh, 'urgent')
+    // Client B removes "urgent" (from their copy which doesn't have it —
+    // simulating concurrent add+remove by having B start from a state that
+    // includes "urgent" so the remove is meaningful)
+    const bWithUrgent = orAdd(fresh, 'urgent')
+    const b = orRemove(bWithUrgent, 'urgent')
+    setStateA(a)
+    setStateB(b)
+    setShowMerged(false)
+    setLog((p) => [
+      ...p,
+      logEntry('system', '— Scenario: add-wins —'),
+      logEntry('a', 'add "urgent" (fresh tag)'),
+      logEntry('b', 'add then remove "urgent" (removes their own tag)'),
+      logEntry(
+        'system',
+        "Click Merge to see that A's add survives B's remove.",
+      ),
+    ])
+  }
+
+  const merged = orMerge(stateA, stateB)
+  const mergedVals = orVals(merged)
+
+  return (
+    <div className="crdt-demo-inner">
+      <p className="crdt-demo-desc">
+        Each add gets a unique tag. Removes only affect tags the remover has
+        seen — so a <strong>concurrent add always wins</strong> over a
+        concurrent remove.
+      </p>
+      <div className="crdt-demo-clients">
+        <div className="crdt-demo-client crdt-client-a">
+          <div className="crdt-demo-client-hdr">
+            <span className="crdt-dot crdt-dot-a" />
+            Client A
+          </div>
+          <div className="crdt-or-tags">
+            {orVals(stateA).map((v) => (
+              <span key={v} className="crdt-or-tag">
+                {v}
+                <button className="crdt-or-tag-x" onClick={() => removeA(v)}>
+                  x
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="crdt-or-add">
+            <input
+              className="crdt-demo-input"
+              value={inputA}
+              placeholder="new tag…"
+              onChange={(e) => setInputA(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addA()}
+            />
+            <button className="crdt-demo-btn crdt-btn-add" onClick={addA}>
+              Add
+            </button>
+          </div>
+        </div>
+        <div className="crdt-demo-client crdt-client-b">
+          <div className="crdt-demo-client-hdr">
+            <span className="crdt-dot crdt-dot-b" />
+            Client B
+          </div>
+          <div className="crdt-or-tags">
+            {orVals(stateB).map((v) => (
+              <span key={v} className="crdt-or-tag">
+                {v}
+                <button className="crdt-or-tag-x" onClick={() => removeB(v)}>
+                  x
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="crdt-or-add">
+            <input
+              className="crdt-demo-input"
+              value={inputB}
+              placeholder="new tag…"
+              onChange={(e) => setInputB(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addB()}
+            />
+            <button className="crdt-demo-btn crdt-btn-add" onClick={addB}>
+              Add
+            </button>
+          </div>
+        </div>
+      </div>
+      <div className="crdt-demo-actions">
+        <button className="crdt-demo-btn crdt-btn-merge" onClick={merge}>
+          Reconnect &amp; Merge
+        </button>
+        <button
+          className="crdt-demo-btn crdt-btn-scenario"
+          onClick={runAddWins}
+        >
+          Run "Add Wins" Scenario
+        </button>
+        <button className="crdt-demo-btn crdt-btn-reset" onClick={reset}>
+          Reset
+        </button>
+      </div>
+      {showMerged && (
+        <div className="crdt-demo-result crdt-win-system">
+          <span className="crdt-result-label">Merged tags:</span>
+          <span className="crdt-result-tags">
+            {mergedVals.map((v) => (
+              <span key={v} className="crdt-or-tag crdt-or-tag-merged">
+                {v}
+              </span>
+            ))}
+          </span>
+        </div>
+      )}
+      <DemoLog entries={log} />
+      <CodeBlock
+        title="fields config"
+        code={`fields: {
+  tags:      'or-set', // A adds "urgent", B removes "bug" → both survive
+  assignees: 'or-set', // A assigns Alice, B assigns Bob → both assigned
+}`}
+      />
+    </div>
+  )
+}
+
+// ---- CRDTs section ----
 function CRDTs() {
+  const [activeTab, setActiveTab] = useState<'lww' | 'pn' | 'or-set'>('lww')
+
   return (
     <section id="crdts" className="section">
       <div className="container">
@@ -636,125 +1150,76 @@ function CRDTs() {
         <p className="section-sub">
           Without CRDTs, concurrent edits race to the server and one change is
           silently overwritten. Declare <code>fields</code> and every conflict
-          is resolved automatically — the right data always wins.
+          is resolved automatically — the right data always wins. Try it below.
         </p>
 
-        <div className="before-after" style={{ marginBottom: '3rem' }}>
-          <div className="ba-col">
-            <div className="ba-label ba-before">Without CRDTs — data loss</div>
-            <CodeBlock
-              code={`// User A renames task to "Implement auth" at t=100
-// User B (offline) renames it to "Implement OAuth" at t=99
-// Both come online — t=100 wins, "Implement auth" survives
-// User B's more specific name is silently dropped
-
-// result: { title: "Implement auth" }  ← B's work gone`}
-            />
+        <div className="crdt-demo">
+          <div className="crdt-demo-tabs">
+            <button
+              className={`crdt-demo-tab${activeTab === 'lww' ? ' active' : ''}`}
+              onClick={() => setActiveTab('lww')}
+            >
+              LWW Register
+              <span className="crdt-demo-tab-sub">Last Writer Wins</span>
+            </button>
+            <button
+              className={`crdt-demo-tab${activeTab === 'pn' ? ' active' : ''}`}
+              onClick={() => setActiveTab('pn')}
+            >
+              PN-Counter
+              <span className="crdt-demo-tab-sub">Distributed Counter</span>
+            </button>
+            <button
+              className={`crdt-demo-tab${activeTab === 'or-set' ? ' active' : ''}`}
+              onClick={() => setActiveTab('or-set')}
+            >
+              OR-Set
+              <span className="crdt-demo-tab-sub">Observed-Remove Set</span>
+            </button>
           </div>
-          <div className="ba-col">
-            <div className="ba-label ba-after">
-              With LWW — deterministic winner
-            </div>
-            <CodeBlock
-              code={`// Same scenario — but now using fields: { title: 'lww' }
-// LWW uses a Lamport clock + clientId tiebreak
-// t=100 still wins, but it's now a deliberate, documented rule
-// Both clients converge to the same value automatically
-
-fields: {
-  title: 'lww', // last write wins — deterministic, no surprises
-}`}
-            />
+          <div className="crdt-demo-content">
+            {activeTab === 'lww' && <LwwDemo />}
+            {activeTab === 'pn' && <PnCounterDemo />}
+            {activeTab === 'or-set' && <OrSetDemo />}
           </div>
         </div>
 
-        <div className="crdt-grid">
-          <div className="crdt-card">
+        <div className="crdt-grid" style={{ marginTop: '2.5rem' }}>
+          <div className="crdt-card crdt-card-compact">
             <h3>
-              LWW-Register <span className="crdt-tag">Last Writer Wins</span>
+              LWW-Register <span className="crdt-tag">lww</span>
             </h3>
             <p>
-              A Lamport clock + clientId tiebreak. The most recent write always
-              wins, with deterministic resolution for simultaneous edits. Use
-              for text fields, status enums, and any scalar value.
+              Lamport clock + clientId tiebreak. Most recent write wins
+              deterministically. Use for text, enums, timestamps.
             </p>
-            <CodeBlock
-              title="real example — document editor"
-              code={`fields: {
-  title:  'lww', // rename races → latest clock wins
-  status: 'lww', // status change races → latest wins
-}
-
-// When User A sets title="Spec" at clock=5
-// and User B sets title="Spec v2" at clock=6
-// every client converges to "Spec v2" — no server round-trip needed`}
-            />
           </div>
-
-          <div className="crdt-card">
+          <div className="crdt-card crdt-card-compact">
             <h3>
-              PN-Counter{' '}
-              <span className="crdt-tag">Positive-Negative Counter</span>
+              PN-Counter <span className="crdt-tag">pn-counter</span>
             </h3>
             <p>
-              Distributed increment and decrement that never loses updates.
-              Every client maintains its own vector — merging takes the max per
-              client. Use for votes, scores, view counts, and stock.
+              Per-client increment/decrement vectors. Merging takes the max —
+              concurrent votes always add up. Use for scores, stock, counts.
             </p>
-            <CodeBlock
-              title="real example — voting"
-              code={`fields: {
-  votes: 'pn-counter', // 3 users upvote simultaneously → count = 3
-  stock: 'pn-counter', // 2 reservations simultaneously → stock -= 2
-}
-
-// Without pn-counter: last-write clobbers → 2 upvotes reported as 1
-// With pn-counter:    each client's delta is tracked → never lost`}
-            />
           </div>
-
-          <div className="crdt-card">
+          <div className="crdt-card crdt-card-compact">
             <h3>
-              OR-Set <span className="crdt-tag">Observed-Remove Set</span>
+              OR-Set <span className="crdt-tag">or-set</span>
             </h3>
             <p>
-              Add and remove elements concurrently without conflicts. Each add
-              gets a unique tag — removes only affect tags the remover has seen.
-              Add always wins over a concurrent remove.
+              Each add gets a unique tag. Add always wins over concurrent
+              remove. Use for tags, reactions, assignee lists.
             </p>
-            <CodeBlock
-              title="real example — tag system"
-              code={`fields: {
-  tags:      'or-set', // A adds "urgent", B removes "bug" → both survive
-  assignees: 'or-set', // A assigns Alice, B assigns Bob → both are assigned
-}
-
-// Without or-set: both sets race → one overwrites the other
-// With or-set:    each operation is tracked by tag → no lost adds`}
-            />
           </div>
-
-          <div className="crdt-card">
+          <div className="crdt-card crdt-card-compact">
             <h3>
-              Local field <span className="crdt-tag">Client-Only</span>
+              Local <span className="crdt-tag">local</span>
             </h3>
             <p>
-              Declare a field as <code>'local'</code> to keep it entirely
-              client-side. It is never sent to peers and never overwritten by
-              incoming messages. Use for UI state that lives alongside server
-              data.
+              Client-only field, never synced. Incoming messages leave it
+              untouched. Use for UI state like drafts or expand toggles.
             </p>
-            <CodeBlock
-              title="real example — draft / expand state"
-              code={`fields: {
-  title:    'lww',   // synced — peers see your renames
-  draft:    'local', // not synced — your in-progress edit stays private
-  expanded: 'local', // not synced — your accordion state is yours
-}
-
-// Incoming peer updates leave 'draft' and 'expanded' untouched
-// onInsert / onUpdate strip local fields before publishing`}
-            />
           </div>
         </div>
       </div>
