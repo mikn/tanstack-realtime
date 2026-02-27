@@ -242,7 +242,7 @@ describe('createRealtimeClient — lifecycle', () => {
     transport.setStatus('connected')
 
     // After the subscription is restored, status should mirror the transport.
-    expect(client.store.state.status).toBe('connected')
+    expect(client.store.get().status).toBe('connected')
   })
 
   it('status store updates when transport status changes (normal path)', () => {
@@ -250,13 +250,13 @@ describe('createRealtimeClient — lifecycle', () => {
     const client = createRealtimeClient({ transport })
 
     transport.setStatus('connected')
-    expect(client.store.state.status).toBe('connected')
+    expect(client.store.get().status).toBe('connected')
 
     transport.setStatus('reconnecting')
-    expect(client.store.state.status).toBe('reconnecting')
+    expect(client.store.get().status).toBe('reconnecting')
 
     transport.setStatus('disconnected')
-    expect(client.store.state.status).toBe('disconnected')
+    expect(client.store.get().status).toBe('disconnected')
   })
 
   it('presence guards still work after destroy + reconnect', async () => {

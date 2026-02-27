@@ -190,18 +190,18 @@ describe('centrifugoTransport', () => {
       url: 'ws://localhost:9999',
       WebSocket: NodeWebSocket,
     })
-    expect(transport.store.state).toBe('disconnected')
+    expect(transport.store.get()).toBe('disconnected')
   })
 
   // ── Connection ──────────────────────────────────────────────────────────
 
   it('reaches connected status after connect()', () => {
-    expect(client.store.state.status).toBe('connected')
+    expect(client.store.get().status).toBe('connected')
   })
 
   it('returns to disconnected after disconnect()', () => {
     client.disconnect()
-    expect(client.store.state.status).toBe('disconnected')
+    expect(client.store.get().status).toBe('disconnected')
   })
 
   // ── Subscribe / receive ─────────────────────────────────────────────────
@@ -311,7 +311,7 @@ describe('centrifugoTransport', () => {
       }),
     })
     await tokenClient.connect()
-    expect(tokenClient.store.state.status).toBe('connected')
+    expect(tokenClient.store.get().status).toBe('connected')
     tokenClient.disconnect()
     tokenClient.destroy()
   })
@@ -330,7 +330,7 @@ describe('centrifugoTransport', () => {
     })
     await tokenClient.connect()
     expect(called).toBe(true)
-    expect(tokenClient.store.state.status).toBe('connected')
+    expect(tokenClient.store.get().status).toBe('connected')
     tokenClient.disconnect()
     tokenClient.destroy()
   })

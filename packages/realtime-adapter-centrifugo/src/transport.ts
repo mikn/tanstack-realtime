@@ -589,7 +589,7 @@ export function centrifugoTransport(
     store,
 
     async connect() {
-      const current = store.state
+      const current = store.get()
 
       if (current === 'connected') return
       if (current !== 'disconnected') return awaitConnection()
@@ -622,7 +622,7 @@ export function centrifugoTransport(
       listeners.add(onMessage)
 
       // Send subscribe when the first listener registers and we're connected.
-      if (listeners.size === 1 && store.state === 'connected') {
+      if (listeners.size === 1 && store.get() === 'connected') {
         const id = nextId()
         cmdChannels.set(id, channel)
         send({ id, subscribe: { channel } })
@@ -638,7 +638,7 @@ export function centrifugoTransport(
           // Clean up any presence state for this channel to avoid leaking
           // memory when channels are dynamically created (e.g. per-room).
           presenceState.delete(channel)
-          if (store.state === 'connected') {
+          if (store.get() === 'connected') {
             const id = nextId()
             send({ id, unsubscribe: { channel } })
           }
@@ -660,7 +660,7 @@ export function centrifugoTransport(
       }
       // We don't add a listener here — publications to the sidecar are handled
       // inside handlePush which dispatches to presenceListeners, not subscriptions.
-      if (store.state === 'connected') {
+      if (store.get() === 'connected') {
         const id = nextId()
         send({ id, subscribe: { channel: prs } })
       }
@@ -704,7 +704,7 @@ export function centrifugoTransport(
       // Clean up sidecar subscription
       if (subscriptions.has(prs)) {
         subscriptions.delete(prs)
-        if (store.state === 'connected') {
+        if (store.get() === 'connected') {
           const id = nextId()
           send({ id, unsubscribe: { channel: prs } })
         }

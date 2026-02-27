@@ -51,13 +51,13 @@ describe('wsTransport - workerd runtime compatibility', () => {
 
   it('starts in disconnected state', () => {
     const transport = wsTransport({ url: 'ws://localhost:3000' })
-    expect(transport.store.state).toBe('disconnected')
+    expect(transport.store.get()).toBe('disconnected')
   })
 
   it('transitions to connecting synchronously when connect() is called', () => {
     const transport = wsTransport({ url: 'ws://localhost:3000' })
     void transport.connect()
-    expect(transport.store.state).toBe('connecting')
+    expect(transport.store.get()).toBe('connecting')
     transport.disconnect()
   })
 
@@ -65,7 +65,7 @@ describe('wsTransport - workerd runtime compatibility', () => {
     const transport = wsTransport({ url: 'ws://localhost:3000' })
     void transport.connect()
     transport.disconnect()
-    expect(transport.store.state).toBe('disconnected')
+    expect(transport.store.get()).toBe('disconnected')
   })
 
   // ── Subscribe / onPresenceChange — synchronous parts ─────────────────────

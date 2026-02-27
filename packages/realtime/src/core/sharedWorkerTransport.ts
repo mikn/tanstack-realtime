@@ -391,14 +391,14 @@ export function createSharedWorkerCoordinator(
       activePorts.add(port)
 
       // Send the current connection status so the tab starts in sync.
-      postToPort(port, { type: 'status', status: inner.store.state })
+      postToPort(port, { type: 'status', status: inner.store.get() })
 
       // Auto-connect the inner transport if it is currently idle.  From the
       // tab's perspective the worker is already "live", so requiring an
       // explicit tab.connect() call is surprising.  We connect eagerly on
       // first port arrival and re-connect whenever a new tab arrives and finds
       // the inner transport disconnected (e.g. after all previous tabs left).
-      if (inner.store.state === 'disconnected') {
+      if (inner.store.get() === 'disconnected') {
         inner.connect().catch(onConnectError)
       }
 

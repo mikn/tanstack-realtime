@@ -215,7 +215,7 @@ describe('createSharedWorkerCoordinator', () => {
 
     const tab = connectTab()
     // Status was sent synchronously on connect.
-    expect(tab.store.state).toBe('connected')
+    expect(tab.store.get()).toBe('connected')
   })
 
   it('broadcasts inner status changes to all connected tabs', () => {
@@ -225,20 +225,20 @@ describe('createSharedWorkerCoordinator', () => {
 
     transport.setStatus('reconnecting')
 
-    expect(tab1.store.state).toBe('reconnecting')
-    expect(tab2.store.state).toBe('reconnecting')
+    expect(tab1.store.get()).toBe('reconnecting')
+    expect(tab2.store.get()).toBe('reconnecting')
   })
 
   it('new tab connecting after a status change receives the current status', () => {
     const { transport } = setupWorker()
     transport.setStatus('connected')
     const tab1 = connectTab()
-    expect(tab1.store.state).toBe('connected')
+    expect(tab1.store.get()).toBe('connected')
 
     transport.setStatus('reconnecting')
     const tab2 = connectTab()
     // tab2 was created after the status changed to reconnecting.
-    expect(tab2.store.state).toBe('reconnecting')
+    expect(tab2.store.get()).toBe('reconnecting')
   })
 
   it('subscribing on a tab causes a real subscription on the inner transport', () => {
@@ -731,7 +731,7 @@ describe('createSharedWorkerTransport', () => {
     setupWorker(inner)
 
     const tab = connectTab()
-    expect(tab.store.state).toBe('connected')
+    expect(tab.store.get()).toBe('connected')
   })
 
   it('relays reconnecting status without triggering auto-connect', () => {
@@ -743,7 +743,7 @@ describe('createSharedWorkerTransport', () => {
     setupWorker(inner)
 
     const tab = connectTab()
-    expect(tab.store.state).toBe('reconnecting')
+    expect(tab.store.get()).toBe('reconnecting')
     expect(connectSpy).not.toHaveBeenCalled()
   })
 
@@ -752,7 +752,7 @@ describe('createSharedWorkerTransport', () => {
     transport.setStatus('connected')
 
     const tab = connectTab()
-    expect(tab.store.state).toBe('connected')
+    expect(tab.store.get()).toBe('connected')
   })
 
   it('store updates reactively as status changes arrive', () => {

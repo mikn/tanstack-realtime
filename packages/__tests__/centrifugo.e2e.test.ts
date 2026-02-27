@@ -84,12 +84,12 @@ describe('centrifugoTransport — real Centrifugo binary', () => {
   // ── Connection ──────────────────────────────────────────────────────────
 
   it('connects and reaches "connected" status', () => {
-    expect(client.store.state.status).toBe('connected')
+    expect(client.store.get().status).toBe('connected')
   })
 
   it('disconnects cleanly', () => {
     client.disconnect()
-    expect(client.store.state.status).toBe('disconnected')
+    expect(client.store.get().status).toBe('disconnected')
   })
 
   // ── Subscribe / publish ─────────────────────────────────────────────────
@@ -245,7 +245,7 @@ describe('centrifugoTransport — real Centrifugo binary', () => {
   it('connects with a static token string (server accepts or ignores it)', async () => {
     const tokenClient = makeClient(port) // anonymous, no token
     await tokenClient.connect()
-    expect(tokenClient.store.state.status).toBe('connected')
+    expect(tokenClient.store.get().status).toBe('connected')
     tokenClient.disconnect()
     tokenClient.destroy()
   })

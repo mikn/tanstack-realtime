@@ -198,7 +198,7 @@ describe('BroadcastChannel transport', () => {
 
     // connect() should work on the leader
     await transport.connect()
-    expect(mockInner.store.state).toBe('connected')
+    expect(mockInner.store.get()).toBe('connected')
   })
 
   // ── Status broadcasting ─────────────────────────────────────────────────
@@ -227,7 +227,7 @@ describe('BroadcastChannel transport', () => {
     await vi.advanceTimersByTimeAsync(10)
 
     // Follower should see 'connected' status
-    expect(tab2.store.state).toBe('connected')
+    expect(tab2.store.get()).toBe('connected')
   })
 
   // ── Subscription fan-out ────────────────────────────────────────────────
@@ -354,10 +354,10 @@ describe('BroadcastChannel transport', () => {
     })
     await vi.advanceTimersByTimeAsync(350)
     await tab1.connect()
-    expect(mockInner.store.state).toBe('connected')
+    expect(mockInner.store.get()).toBe('connected')
 
     tab1.disconnect()
-    expect(mockInner.store.state).toBe('disconnected')
+    expect(mockInner.store.get()).toBe('disconnected')
   })
 
   // ── Leader re-election ──────────────────────────────────────────────────

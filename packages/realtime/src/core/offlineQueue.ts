@@ -152,7 +152,7 @@ export function createOfflineQueue(
   }
 
   // Flush the queue when the connection becomes 'connected'.
-  let previousStatus: ConnectionStatus = inner.store.state
+  let previousStatus: ConnectionStatus = inner.store.get()
   inner.store.subscribe((status) => {
     if (previousStatus !== 'connected' && status === 'connected') {
       void flush()
@@ -170,7 +170,7 @@ export function createOfflineQueue(
     let flushedCount = 0
 
     for (const msg of pending) {
-      if (inner.store.state !== 'connected') {
+      if (inner.store.get() !== 'connected') {
         // Connection dropped mid-flush — keep remaining messages.
         retry.push(msg)
         continue
@@ -228,7 +228,7 @@ export function createOfflineQueue(
     },
 
     async publish(channel, data) {
-      if (inner.store.state === 'connected') {
+      if (inner.store.get() === 'connected') {
         return inner.publish(channel, data)
       }
       enqueue(channel, data)

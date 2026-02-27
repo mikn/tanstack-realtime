@@ -319,7 +319,7 @@ export function createBroadcastChannelTransport(
     startHeartbeat()
 
     // Announce leadership and ask followers to re-register
-    post({ type: 'leader', tabId, status: inner.store.state })
+    post({ type: 'leader', tabId, status: inner.store.get() })
     post({ type: 'reregister' })
   }
 
@@ -401,7 +401,7 @@ export function createBroadcastChannelTransport(
           post({
             type: 'leader',
             tabId,
-            status: inner?.store.state ?? 'disconnected',
+            status: inner?.store.get() ?? 'disconnected',
           })
         }
         break
@@ -446,7 +446,7 @@ export function createBroadcastChannelTransport(
           post({
             type: 'leader',
             tabId,
-            status: inner?.store.state ?? 'disconnected',
+            status: inner?.store.get() ?? 'disconnected',
           })
         }
         break
