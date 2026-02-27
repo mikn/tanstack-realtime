@@ -467,22 +467,59 @@ export const viewersCollection = createCollection(
 )
 ```
 
-### `streamChannelOptions` — reduce-based streams
+### `streamChannelOptions` / `createStreamChannel` — reduce-based streams
 
 Use this for long-running server operations (AI generation, progress tracking) where the client reduces a stream of events into a single accumulated state.
 
+The recommended pattern: define the channel shape once with `createStreamChannel`, then consume with the `useStream` React hook or `streamChannelOptions` for direct TanStack DB use.
+
+```ts
+// features/ai/stream.ts — define once, share everywhere
+import { createStreamChannel, serverStreamCallbacks } from '@tanstack/realtime'
+
+export const aiStream = createStreamChannel({
+  id: 'ai-response',
+  channel: (params: { requestId: string }) => ['ai', params],
+  initial: { content: '' },
+  reduce: (state, event: { type: string; token?: string }) =>
+    event.type === 'token'
+      ? { content: state.content + (event.token ?? '') }
+      : state,
+  ...serverStreamCallbacks,
+  staleAfter: 15_000,
+})
+```
+
+```tsx
+// features/ai/AIResponse.tsx — consume in React
+import { useStream } from '@tanstack/react-realtime'
+import { aiStream } from './stream'
+
+function AIResponse({ requestId }: { requestId: string }) {
+  const { state, status, error } = useStream(aiStream, {
+    params: { requestId },
+  })
+  if (status === 'pending') return <p>Thinking…</p>
+  if (status === 'error') return <p>Error: {error}</p>
+  return <p>{state.content}</p>
+}
+```
+
+For direct TanStack DB collection use (without the React hook):
+
 ```ts
 import { createCollection } from '@tanstack/db'
-import { streamChannelOptions } from '@tanstack/realtime'
+import { streamChannelOptions, serverStreamCallbacks } from '@tanstack/realtime'
 import { client } from './client'
 
 export const generationCollection = createCollection(
-  streamChannelOptions<string, { token: string }>({
+  streamChannelOptions({
     client,
     channel: ['generation', { id: 'run-1' }],
     initial: '',
-    reduce: (state, event) => state + event.token,
-    isDone: (_state, event) => (event as any).done === true,
+    reduce: (state, event: { type: string; token?: string }) =>
+      event.type === 'token' ? state + (event.token ?? '') : state,
+    ...serverStreamCallbacks,
   }),
 )
 ```

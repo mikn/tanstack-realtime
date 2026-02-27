@@ -1,12 +1,26 @@
 import { use, useEffect, useRef, useState } from 'react'
+import {
+  createStreamProcessor,
+  withEnvelopeStripping,
+  withHeartbeatFilter,
+} from '@tanstack/realtime'
 import { RealtimeContext } from './context.js'
 import type { StreamChannelDef, StreamStatus } from '@tanstack/realtime'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 export interface UseStreamOptions<
   TParams extends Record<string, unknown> = Record<string, unknown>,
 > {
   /** Params forwarded to `channelDef.resolveChannel` to derive the channel string. */
   params: TParams
+  /**
+   * Override the channel definition's `staleAfter` for this hook instance.
+   * See `StreamChannelConfig.staleAfter` for details.
+   */
+  staleAfter?: number
 }
 
 export interface UseStreamResult<TState> {
@@ -27,6 +41,10 @@ export interface UseStreamResult<TState> {
  * `status` becomes `'done'`. If `isError` returns a string the subscription
  * is closed and `status` becomes `'error'`.
  *
+ * Framework metadata (`_seq`, `_ts`, `_signature`) is stripped before events
+ * reach `reduce`, `isDone`, or `isError`. Heartbeat events are consumed
+ * internally (they reset the stale timer) and never reach user callbacks.
+ *
  * When the channel changes (because `params` changes) the previous subscription
  * is torn down and a fresh one is started with the initial state.
  *
@@ -43,11 +61,13 @@ export interface UseStreamResult<TState> {
  *       : state,
  *   isDone:  (_, e) => e.type === 'done',
  *   isError: (_, e) => e.type === 'error' ? e.message : false,
+ *   staleAfter: 15_000,
  * })
  *
  * function AiResponse({ messageId }: { messageId: string }) {
  *   const { state, status } = useStream(aiStream, { params: { messageId } })
  *   if (status === 'pending') return <p>Waiting…</p>
+ *   if (status === 'stale') return <p>Stream may have disconnected…</p>
  *   return <p>{state.content}</p>
  * }
  */
@@ -66,7 +86,7 @@ export function useStream<
     )
   }
 
-  const { params } = options
+  const { params, staleAfter: staleAfterOverride } = options
   const channel = channelDef.resolveChannel(params)
 
   const [result, setResult] = useState<UseStreamResult<TState>>({
@@ -79,45 +99,85 @@ export function useStream<
   const defRef = useRef(channelDef)
   defRef.current = channelDef
 
-  useEffect(() => {
-    let stopped = false
-    let currentState = defRef.current.initial
+  // Resolve staleAfter: option override > channel def > undefined.
+  const staleAfterRef = useRef(staleAfterOverride)
+  staleAfterRef.current = staleAfterOverride
 
-    setResult({ state: currentState, status: 'pending' })
+  useEffect(() => {
+    setResult({ state: defRef.current.initial, status: 'pending' })
 
     // Initialise to a no-op so the handler can safely call unsub() even if an
     // event fires synchronously before client.subscribe() has returned.
     let unsub: () => void = () => {}
 
-    const handler = (rawEvent: unknown): void => {
-      if (stopped) return
-      const def = defRef.current
-      const event = rawEvent as TEvent
+    // ----- Stale detection timer -----
+    let staleTimer: ReturnType<typeof setTimeout> | null = null
+    let staleStopped = false
 
-      const errorMsg = def.isError?.(currentState, event)
-      if (errorMsg) {
-        stopped = true
-        setResult({ state: currentState, status: 'error', error: errorMsg })
-        unsub()
-        return
-      }
-
-      const nextState = def.reduce(currentState, event)
-      const done = def.isDone?.(nextState, event) ?? false
-      currentState = nextState
-
-      setResult({ state: currentState, status: done ? 'done' : 'streaming' })
-
-      if (done) {
-        stopped = true
-        unsub()
+    function clearStaleTimer(): void {
+      if (staleTimer != null) {
+        clearTimeout(staleTimer)
+        staleTimer = null
       }
     }
+
+    function resetStaleTimer(): void {
+      clearStaleTimer()
+      const threshold = staleAfterRef.current ?? defRef.current.staleAfter
+      if (!threshold || staleStopped) return
+      staleTimer = setTimeout(() => {
+        if (staleStopped) return
+        setResult((prev) => ({ ...prev, status: 'stale' }))
+      }, threshold)
+    }
+
+    // ----- Stream processor (shared immutable state machine) -----
+    // Wrap callbacks to always read from the ref so a new channelDef object
+    // with different reduce/isDone/isError is picked up between events,
+    // even when the channel key (and therefore this effect) hasn't changed.
+    const processor = createStreamProcessor<TState, TEvent>(
+      {
+        reduce: (state: TState, event: TEvent) =>
+          defRef.current.reduce(state, event),
+        isDone: (state: TState, event: TEvent) =>
+          defRef.current.isDone?.(state, event) ?? false,
+        isError: (state: TState, event: TEvent) =>
+          defRef.current.isError?.(state, event) ?? null,
+      },
+      defRef.current.initial,
+      (snapshot, stopped) => {
+        setResult({
+          state: snapshot.state,
+          status: snapshot.status,
+          ...(snapshot.error != null ? { error: snapshot.error } : {}),
+        })
+
+        if (stopped) {
+          staleStopped = true
+          clearStaleTimer()
+          unsub()
+        }
+      },
+    )
+
+    // ----- Compose handler pipeline -----
+    const handler = withEnvelopeStripping(
+      withHeartbeatFilter(
+        (userEvent) => {
+          resetStaleTimer()
+          processor.process(userEvent)
+        },
+        {
+          onHeartbeat: resetStaleTimer,
+        },
+      ),
+    )
 
     unsub = client.subscribe(channel, handler)
 
     return () => {
-      stopped = true
+      staleStopped = true
+      clearStaleTimer()
       unsub()
     }
   }, [client, channel])

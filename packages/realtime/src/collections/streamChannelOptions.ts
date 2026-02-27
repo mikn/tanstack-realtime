@@ -1,4 +1,9 @@
 import { serializeKey } from '../core/serializeKey.js'
+import {
+  withEnvelopeStripping,
+  withHeartbeatFilter,
+} from '../core/streamEnvelope.js'
+import { createStreamProcessor } from '../core/streamProcessor.js'
 import { STREAM_DONE, STREAM_ERROR } from '../server/serverStream.js'
 import type { CollectionConfig, SyncConfig } from '@tanstack/db'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
@@ -8,7 +13,7 @@ import type { QueryKey, RealtimeClient } from '../core/types.js'
 // Types
 // ---------------------------------------------------------------------------
 
-export type StreamStatus = 'pending' | 'streaming' | 'done' | 'error'
+export type StreamStatus = 'pending' | 'streaming' | 'done' | 'error' | 'stale'
 
 /**
  * The single item stored in a stream collection.
@@ -81,6 +86,30 @@ export interface StreamChannelConfig<
    * ```
    */
   isError?: (state: TState, event: TEvent) => string | false | undefined | null
+
+  /**
+   * Milliseconds of silence (no events at all, including heartbeats) before
+   * the stream status transitions to `'stale'`.
+   *
+   * When a new event arrives while stale, status reverts to `'streaming'`.
+   * This is a soft failure — the stream is not stopped, just flagged.
+   *
+   * **Choosing a value**: should be longer than the producer's heartbeat
+   * interval (if configured). A good default is 2–3× the heartbeat interval.
+   * For example, with `heartbeat: { interval: 5_000 }` on the producer, use
+   * `staleAfter: 15_000` on the consumer.
+   *
+   * @example
+   * streamChannelOptions({
+   *   client,
+   *   channel: 'ai-stream',
+   *   initial: '',
+   *   reduce: (s, e) => s + e.token,
+   *   ...serverStreamCallbacks,
+   *   staleAfter: 15_000,
+   * })
+   */
+  staleAfter?: number
 }
 
 // ---------------------------------------------------------------------------
@@ -110,6 +139,8 @@ export interface StreamChannelDef<
     state: TState,
     event: TEvent,
   ) => string | false | undefined | null
+  /** Stale detection threshold. See `StreamChannelConfig.staleAfter`. */
+  readonly staleAfter?: number
 }
 
 export interface StreamChannelDefConfig<
@@ -133,6 +164,8 @@ export interface StreamChannelDefConfig<
   isDone?: (state: TState, event: TEvent) => boolean
   /** Receives pre-reduce state. See `StreamChannelConfig.isError`. */
   isError?: (state: TState, event: TEvent) => string | false | undefined | null
+  /** Stale detection threshold. See `StreamChannelConfig.staleAfter`. */
+  staleAfter?: number
 }
 
 /**
@@ -173,6 +206,7 @@ export function createStreamChannel<
     reduce: config.reduce,
     isDone: config.isDone,
     isError: config.isError,
+    staleAfter: config.staleAfter,
   }
 }
 
@@ -239,9 +273,6 @@ export function streamChannelOptions<
     rowUpdateMode: 'full',
 
     sync({ begin, write, commit, markReady }) {
-      let stopped = false
-      let currentState = config.initial
-
       // Write the initial (pending) item before markReady so the collection
       // is never empty from the consumer's perspective.
       begin()
@@ -249,7 +280,7 @@ export function streamChannelOptions<
         type: 'insert',
         value: {
           id: serializedChannel,
-          state: currentState,
+          state: config.initial,
           status: 'pending',
         },
       })
@@ -261,54 +292,85 @@ export function streamChannelOptions<
       // avoid a temporal dead zone if an event fires synchronously.
       let unsub: () => void = () => {}
 
-      const handler = (rawEvent: unknown): void => {
-        if (stopped) return
-        const event = rawEvent as TEvent
+      // ----- Stale detection timer -----
+      let staleTimer: ReturnType<typeof setTimeout> | null = null
+      let staleStopped = false
 
-        // Error check runs before reduce so a malformed event can be caught.
-        const errorMsg = config.isError?.(currentState, event)
-        if (errorMsg) {
-          stopped = true
+      function clearStaleTimer(): void {
+        if (staleTimer != null) {
+          clearTimeout(staleTimer)
+          staleTimer = null
+        }
+      }
+
+      function resetStaleTimer(): void {
+        clearStaleTimer()
+        if (!config.staleAfter || staleStopped) return
+        staleTimer = setTimeout(() => {
+          if (staleStopped) return
           begin({ immediate: true })
           write({
             type: 'update',
             value: {
               id: serializedChannel,
-              state: currentState,
-              status: 'error',
-              error: errorMsg,
+              state: processor.currentSnapshot.state,
+              status: 'stale',
             },
           })
           commit()
-          unsub()
-          return
-        }
-
-        const nextState = config.reduce(currentState, event)
-        const done = config.isDone?.(nextState, event) ?? false
-        currentState = nextState
-
-        begin({ immediate: true })
-        write({
-          type: 'update',
-          value: {
-            id: serializedChannel,
-            state: currentState,
-            status: done ? 'done' : 'streaming',
-          },
-        })
-        commit()
-
-        if (done) {
-          stopped = true
-          unsub()
-        }
+        }, config.staleAfter)
       }
+
+      // ----- Stream processor (shared immutable state machine) -----
+      const processor = createStreamProcessor<TState, TEvent>(
+        {
+          reduce: config.reduce,
+          isDone: config.isDone,
+          isError: config.isError,
+        },
+        config.initial,
+        (snapshot, stopped) => {
+          begin({ immediate: true })
+          write({
+            type: 'update',
+            value: {
+              id: serializedChannel,
+              state: snapshot.state,
+              status: snapshot.status,
+              ...(snapshot.error != null ? { error: snapshot.error } : {}),
+            },
+          })
+          commit()
+
+          if (stopped) {
+            staleStopped = true
+            clearStaleTimer()
+            unsub()
+          }
+        },
+      )
+
+      // ----- Compose handler pipeline -----
+      // Inner: stream processor receives stripped, non-heartbeat events.
+      // Middle: heartbeat filter drops heartbeats, resets stale timer.
+      // Outer: envelope stripping + sequence dedup.
+      const handler = withEnvelopeStripping(
+        withHeartbeatFilter(
+          (userEvent) => {
+            resetStaleTimer()
+            processor.process(userEvent)
+          },
+          {
+            onHeartbeat: resetStaleTimer,
+          },
+        ),
+      )
 
       unsub = config.client.subscribe(serializedChannel, handler)
 
       return () => {
-        stopped = true
+        staleStopped = true
+        clearStaleTimer()
         unsub()
       }
     },

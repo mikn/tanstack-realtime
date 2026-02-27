@@ -12,6 +12,28 @@
 export { serializeKey, parseChannel } from './core/serializeKey.js'
 export { createRealtimeClient } from './core/client.js'
 export { hasPresence } from './core/types.js'
+
+// Stream processing primitives — shared between collection and hook consumers.
+// The envelope middleware composes at the handler level; the processor provides
+// the pure event fold.
+export {
+  stripEnvelope,
+  withEnvelopeStripping,
+  withHeartbeatFilter,
+} from './core/streamEnvelope.js'
+export type {
+  EnvelopeResult,
+  HeartbeatFilterOptions,
+} from './core/streamEnvelope.js'
+
+export { processEvent, createStreamProcessor } from './core/streamProcessor.js'
+export type {
+  StreamSnapshot,
+  StreamProcessorConfig,
+  ProcessEventResult,
+  StreamTransitionCallback,
+  StreamProcessor,
+} from './core/streamProcessor.js'
 export type {
   ConnectionStatus,
   PresenceUser,
@@ -199,6 +221,7 @@ export {
   verifyEventSignature,
   STREAM_DONE,
   STREAM_ERROR,
+  STREAM_HEARTBEAT,
 } from './server/index.js'
 export type {
   ChannelPermissions,
@@ -210,4 +233,8 @@ export type {
   ValidatedPublishOptions,
   ServerStream,
   CreateServerStreamOptions,
+  StreamCheckpoint,
+  CheckpointConfig,
+  ExplicitCheckpointConfig,
+  ChannelDefCheckpointConfig,
 } from './server/index.js'

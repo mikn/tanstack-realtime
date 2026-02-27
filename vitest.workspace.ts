@@ -67,6 +67,7 @@ export default defineWorkspace([
         'packages/__tests__/validation.test.ts',
         'packages/__tests__/optimisticMode.test.ts',
         'packages/__tests__/serverStream.test.ts',
+        'packages/__tests__/streamResilience.test.ts',
         'packages/__tests__/tickTransport.test.ts',
         'packages/__tests__/coreInvariants.test.ts',
       ],
