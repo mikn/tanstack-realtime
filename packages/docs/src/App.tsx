@@ -130,15 +130,14 @@ function Nav() {
           <span className="logo-realtime">Realtime</span>
         </a>
         <div className="nav-links">
-          <a href="#example">Example</a>
+          <a href="#quickstart">Quick Start</a>
           <a href="#features">Features</a>
           <a href="#database">Database</a>
+          <a href="#example">Example</a>
           <a href="#crdts">CRDTs</a>
           <a href="#presence">Presence</a>
           <a href="#resilience">Resilience</a>
-          <a href="#utilities">Utilities</a>
           <a href="#when-to-use">When to use</a>
-          <a href="#quickstart">Quick Start</a>
           <a
             href="https://github.com/mikn/tanstack-realtime"
             className="nav-github"
@@ -168,8 +167,8 @@ function Hero() {
           <span className="gradient-text">Keep everything else.</span>
         </h1>
         <p className="hero-sub">
-          Most realtime frameworks want you to adopt their database, their
-          server, their cloud. This is a transport layer that plugs into
+          Many realtime frameworks come with opinions about your database,
+          server, and hosting. This is a transport layer that plugs into
           whatever you already have. Add a <code>channel</code> to one
           collection today. Add CRDTs tomorrow. Your Express routes, your
           Postgres, your deploy target &mdash; all stay exactly where they are.
@@ -177,23 +176,20 @@ function Hero() {
 
         <div className="before-after">
           <div className="ba-col">
-            <div className="ba-label ba-before">Platform lock-in</div>
+            <div className="ba-label ba-before">Without realtime</div>
             <CodeBlock
-              code={`// Convex: replace your backend entirely
-const tasks = useQuery(api.tasks.list, { projectId })
+              code={`// A standard REST endpoint — works, but not live
+const tasks = await fetch('/api/tasks?projectId=' + projectId)
+  .then(r => r.json())
 
-// ElectricSQL: Postgres CDC only, no pub/sub or presence
-const { results } = useShape({
-  url: 'http://localhost:3000/v1/shape',
-  table: 'tasks',
-  where: \`project_id = '\${projectId}'\`,
-})`}
+// To see other users' changes, you poll or
+// the user refreshes the page manually.`}
             />
           </div>
           <div className="ba-col">
-            <div className="ba-label ba-after">Your server, live</div>
+            <div className="ba-label ba-after">With TanStack Realtime</div>
             <CodeBlock
-              code={`// TanStack Realtime: keep your REST API, add a channel
+              code={`// Same REST endpoint, now live
 const tasksOptions = (projectId: string) =>
   realtimeCollectionOptions({
     ...withRest({
@@ -234,48 +230,18 @@ function Features() {
   return (
     <section id="features" className="section">
       <div className="container">
-        <Badge>Why TanStack Realtime</Badge>
+        <Badge>Features</Badge>
         <h2>
-          What&rsquo;s awkward
+          What you get
           <br />
-          everywhere else.
+          out of the box.
         </h2>
         <div className="features-grid">
           <FeatureCard
-            icon=">"
-            title="Keep Your Backend"
-            problem="Convex replaces your server. ElectricSQL requires Postgres CDC. You just want live updates on your existing API."
-            solution="TanStack Realtime is a transport layer. Your Express routes, your database, your deploy target — none of it changes. Add a channel to one collection and your existing endpoints go live."
-          />
-          <FeatureCard
-            icon="~"
-            title="One Feature at a Time"
-            problem="Most realtime frameworks are all-or-nothing. Adopt their model for your whole app, or don't use them at all."
-            solution="Start with queryFn for one collection. Add channel when ready. Add CRDTs when you need conflict resolution. Each step is one config key — stop at any point."
-          />
-          <FeatureCard
             icon="&"
             title="Pub/Sub + Presence"
-            problem="Database sync tools don't do messaging. Chat, typing indicators, and live cursors aren't rows in a table — they need pub/sub and presence."
+            problem="Chat, typing indicators, and live cursors aren't rows in a table — they need pub/sub and presence."
             solution="Channels, presence, and pub/sub are first-class. usePresence tracks who's online. useSubscribe handles ephemeral events. These work alongside collections, not as an afterthought."
-          />
-          <FeatureCard
-            icon="#"
-            title="Client-Side CRDTs"
-            problem="Server-side conflict resolution means changing server code for every field type. Convex requires server mutations. ElectricSQL uses Postgres rules."
-            solution="Declare fields: { votes: 'pn-counter', tags: 'or-set' }. Merging happens on the client — your server just stores and relays. No CRDT logic server-side."
-          />
-          <FeatureCard
-            icon="{"
-            title="Swap Transports, Not Code"
-            problem="You start with a local WebSocket server. In production you need Centrifugo. Behind a corporate proxy you need SSE. Each switch rewrites your app."
-            solution="One import swap. wsTransport → centrifugoTransport → sseTransport. Your collections, hooks, and components don't change. Infrastructure decisions stay separate from app logic."
-          />
-          <FeatureCard
-            icon="@"
-            title="Offline + Multi-Tab"
-            problem="Six tabs open, each with its own WebSocket. User goes through a tunnel. Messages are lost, connections multiply, state diverges."
-            solution="createOfflineQueue buffers and replays on reconnect. createCoordinatedTransport shares one connection across all tabs automatically. Stack them on any transport."
           />
           <FeatureCard
             icon="+"
@@ -305,7 +271,13 @@ function Features() {
             icon="^"
             title="Optimistic Updates"
             problem="Mutation succeeds but the server echo creates a duplicate flash. Or the mutation fails and the UI is stuck."
-            solution="optimistic: true adds a nonce to each mutation. The echo from the server is suppressed. On failure, onOptimisticError fires and the nonce is cleaned up. Zero duplicates."
+            solution="optimistic: true adds a nonce to each mutation. The echo from the server is suppressed. On failure, onOptimisticError fires and the nonce is cleaned up — no duplicate flashes."
+          />
+          <FeatureCard
+            icon="@"
+            title="Offline + Multi-Tab"
+            problem="Six tabs open, each with its own WebSocket. User goes through a tunnel. Messages are lost, connections multiply, state diverges."
+            solution="createOfflineQueue buffers and replays on reconnect. createCoordinatedTransport shares one connection across all tabs automatically. Stack them on any transport."
           />
           <FeatureCard
             icon="="
@@ -334,8 +306,8 @@ function Spectrum() {
           Grow without rewriting.
         </h2>
         <p className="section-sub">
-          Every TanStack Realtime app lives on a spectrum. Each step adds one
-          config key &mdash; and you can stop at any point.
+          You can adopt features incrementally. Each step adds one config key
+          &mdash; and you can stop at any point.
         </p>
 
         <div className="spectrum-steps">
@@ -411,13 +383,12 @@ function DatabaseIntegration() {
       <div className="container">
         <Badge>Database Integration</Badge>
         <h2>
-          Postgres in.
+          From database
           <br />
-          Live UI out.
+          to live UI.
         </h2>
         <p className="section-sub">
-          Wire TanStack Realtime to Postgres in minutes. Your API routes just
-          write to the database and return the saved row &mdash;{' '}
+          Your API routes write to the database and return the saved row &mdash;{' '}
           <code>realtimeCollectionOptions</code> broadcasts it to every
           subscriber automatically.
         </p>
@@ -1145,12 +1116,13 @@ function CRDTs() {
         <h2>
           Two users. One row.
           <br />
-          Zero conflicts.
+          Automatic resolution.
         </h2>
         <p className="section-sub">
           Without CRDTs, concurrent edits race to the server and one change is
           silently overwritten. Declare <code>fields</code> and every conflict
-          is resolved automatically — the right data always wins. Try it below.
+          is resolved automatically with deterministic merge rules. Try it
+          below.
         </p>
 
         <div className="crdt-demo">
@@ -1580,7 +1552,7 @@ function TickBased() {
         <h2>
           60 fps multiplayer.
           <br />
-          Zero boilerplate.
+          Minimal setup.
         </h2>
         <p className="section-sub">
           High-frequency use cases &mdash; multiplayer games, collaborative
@@ -1640,8 +1612,9 @@ const config = tickCollectionOptions<Player, string>({
           <p>
             With <code>deltaCompression: true</code>, only fields that changed
             since the last tick are sent on the wire. The receiver reconstructs
-            full state via <code>applyDelta</code>. For 100 entities where only
-            position changes each frame, this can reduce bandwidth by 80%+.
+            full state via <code>applyDelta</code>. The savings depend on your
+            payload shape &mdash; the fewer fields that change per frame, the
+            larger the reduction.
           </p>
         </div>
       </div>
@@ -1775,7 +1748,8 @@ const transport = createCoordinatedTransport({
               <strong>SharedWorker (opt-in)</strong> &mdash; the browser runs a
               separate worker process that survives tab close and crashes.
               Requires a small worker file because SharedWorker loads code from
-              a URL, not inline. Premium robustness for apps that need it.
+              a URL, not inline. More robust than BroadcastChannel since the
+              worker process survives individual tab crashes.
             </p>
             <CodeBlock
               title="realtime.worker.ts"
@@ -2044,9 +2018,9 @@ function ReactHooks() {
       <div className="container">
         <Badge>React Integration</Badge>
         <h2>
-          Hooks that feel like
+          React hooks for
           <br />
-          <code>useState</code>.
+          every primitive.
         </h2>
 
         <div className="hooks-grid">
@@ -2465,15 +2439,16 @@ function Footer() {
         <div className="footer-brand">
           <span className="logo-tan">TanStack</span>{' '}
           <span className="logo-realtime">Realtime</span>
-          <p>Real-time for the rest of us.</p>
+          <p>A transport layer for live apps.</p>
         </div>
         <div className="footer-links">
           <div>
             <h4>Library</h4>
-            <a href="#example">End-to-End Example</a>
+            <a href="#quickstart">Quick Start</a>
             <a href="#features">Features</a>
             <a href="#spectrum">Progressive Spectrum</a>
             <a href="#database">Database Integration</a>
+            <a href="#example">End-to-End Example</a>
             <a href="#crdts">CRDTs</a>
             <a href="#presence">Presence</a>
             <a href="#events">Live Events</a>
@@ -2482,7 +2457,6 @@ function Footer() {
             <a href="#resilience">Resilience</a>
             <a href="#utilities">Utilities</a>
             <a href="#adapters">Message Adapters</a>
-            <a href="#quickstart">Quick Start</a>
             <a href="#when-to-use">When to use</a>
           </div>
           <div>
@@ -2706,7 +2680,7 @@ function Positioning() {
   return (
     <section id="when-to-use" className="section">
       <div className="container">
-        <Badge>Honest assessment</Badge>
+        <Badge>Scope &amp; Tradeoffs</Badge>
         <h2>
           When it fits.
           <br />
@@ -2810,8 +2784,10 @@ export function App() {
       <Hero />
       <Features />
       <Spectrum />
-      <EndToEndExample />
+      <QuickStart />
       <DatabaseIntegration />
+      <EndToEndExample />
+      <Transports />
       <CRDTs />
       <PresenceSection />
       <LiveEvents />
@@ -2820,9 +2796,7 @@ export function App() {
       <Resilience />
       <Utilities />
       <MessageAdapters />
-      <Transports />
       <ReactHooks />
-      <QuickStart />
       <Ecosystem />
       <Positioning />
       <Footer />
