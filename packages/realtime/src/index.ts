@@ -199,6 +199,7 @@ export {
   verifyEventSignature,
   STREAM_DONE,
   STREAM_ERROR,
+  STREAM_HEARTBEAT,
 } from './server/index.js'
 export type {
   ChannelPermissions,
@@ -210,4 +211,6 @@ export type {
   ValidatedPublishOptions,
   ServerStream,
   CreateServerStreamOptions,
+  StreamCheckpoint,
+  CheckpointConfig,
 } from './server/index.js'

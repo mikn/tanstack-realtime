@@ -1,14 +1,49 @@
 import { serializeKey } from '../core/serializeKey.js'
-import { STREAM_DONE, STREAM_ERROR } from '../server/serverStream.js'
+import {
+  STREAM_DONE,
+  STREAM_ERROR,
+  STREAM_HEARTBEAT,
+} from '../server/serverStream.js'
 import type { CollectionConfig, SyncConfig } from '@tanstack/db'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { QueryKey, RealtimeClient } from '../core/types.js'
 
 // ---------------------------------------------------------------------------
+// Framework metadata keys — stripped from events before user callbacks.
+// ---------------------------------------------------------------------------
+
+/** @internal Keys added by the producer's envelope. Stripped before reduce. */
+const FRAMEWORK_KEYS = new Set(['_seq', '_ts', '_signature'])
+
+/**
+ * Strip framework metadata (`_seq`, `_ts`, `_signature`) from a raw event
+ * envelope, returning only the user-defined event fields.
+ * @internal
+ */
+function stripEnvelope(raw: unknown): {
+  userEvent: unknown
+  seq: number | undefined
+} {
+  if (raw == null || typeof raw !== 'object')
+    return { userEvent: raw, seq: undefined }
+  const envelope = raw as Record<string, unknown>
+  const seq = typeof envelope._seq === 'number' ? envelope._seq : undefined
+  // Fast path: if no framework keys are present, return as-is.
+  if (!FRAMEWORK_KEYS.has('_seq') || !('_seq' in envelope)) {
+    return { userEvent: raw, seq }
+  }
+  const stripped: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(envelope)) {
+    if (!FRAMEWORK_KEYS.has(k)) stripped[k] = v
+  }
+  return { userEvent: stripped, seq }
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type StreamStatus = 'pending' | 'streaming' | 'done' | 'error'
+export type StreamStatus = 'pending' | 'streaming' | 'done' | 'error' | 'stale'
 
 /**
  * The single item stored in a stream collection.
@@ -81,6 +116,30 @@ export interface StreamChannelConfig<
    * ```
    */
   isError?: (state: TState, event: TEvent) => string | false | undefined | null
+
+  /**
+   * Milliseconds of silence (no events at all, including heartbeats) before
+   * the stream status transitions to `'stale'`.
+   *
+   * When a new event arrives while stale, status reverts to `'streaming'`.
+   * This is a soft failure — the stream is not stopped, just flagged.
+   *
+   * **Choosing a value**: should be longer than the producer's heartbeat
+   * interval (if configured). A good default is 2–3× the heartbeat interval.
+   * For example, with `heartbeat: { interval: 5_000 }` on the producer, use
+   * `staleAfter: 15_000` on the consumer.
+   *
+   * @example
+   * streamChannelOptions({
+   *   client,
+   *   channel: 'ai-stream',
+   *   initial: '',
+   *   reduce: (s, e) => s + e.token,
+   *   ...serverStreamCallbacks,
+   *   staleAfter: 15_000,
+   * })
+   */
+  staleAfter?: number
 }
 
 // ---------------------------------------------------------------------------
@@ -110,6 +169,8 @@ export interface StreamChannelDef<
     state: TState,
     event: TEvent,
   ) => string | false | undefined | null
+  /** Stale detection threshold. See `StreamChannelConfig.staleAfter`. */
+  readonly staleAfter?: number
 }
 
 export interface StreamChannelDefConfig<
@@ -133,6 +194,8 @@ export interface StreamChannelDefConfig<
   isDone?: (state: TState, event: TEvent) => boolean
   /** Receives pre-reduce state. See `StreamChannelConfig.isError`. */
   isError?: (state: TState, event: TEvent) => string | false | undefined | null
+  /** Stale detection threshold. See `StreamChannelConfig.staleAfter`. */
+  staleAfter?: number
 }
 
 /**
@@ -173,6 +236,7 @@ export function createStreamChannel<
     reduce: config.reduce,
     isDone: config.isDone,
     isError: config.isError,
+    staleAfter: config.staleAfter,
   }
 }
 
@@ -241,6 +305,7 @@ export function streamChannelOptions<
     sync({ begin, write, commit, markReady }) {
       let stopped = false
       let currentState = config.initial
+      let currentStatus: StreamStatus = 'pending'
 
       // Write the initial (pending) item before markReady so the collection
       // is never empty from the consumer's perspective.
@@ -261,14 +326,65 @@ export function streamChannelOptions<
       // avoid a temporal dead zone if an event fires synchronously.
       let unsub: () => void = () => {}
 
-      const handler = (rawEvent: unknown): void => {
+      // ----- Stale detection timer -----
+      let staleTimer: ReturnType<typeof setTimeout> | null = null
+
+      function clearStaleTimer(): void {
+        if (staleTimer != null) {
+          clearTimeout(staleTimer)
+          staleTimer = null
+        }
+      }
+
+      function resetStaleTimer(): void {
+        clearStaleTimer()
+        if (!config.staleAfter || stopped) return
+        staleTimer = setTimeout(() => {
+          if (stopped) return
+          currentStatus = 'stale'
+          begin({ immediate: true })
+          write({
+            type: 'update',
+            value: {
+              id: serializedChannel,
+              state: currentState,
+              status: 'stale',
+            },
+          })
+          commit()
+        }, config.staleAfter)
+      }
+
+      // ----- Sequence dedup -----
+      let lastSeenSeq = 0
+
+      const handler = (rawEnvelope: unknown): void => {
         if (stopped) return
-        const event = rawEvent as TEvent
+
+        // Strip framework metadata — user callbacks never see _seq/_ts/_signature.
+        const { userEvent, seq } = stripEnvelope(rawEnvelope)
+
+        // Dedup: skip events we've already processed.
+        if (seq != null) {
+          if (seq <= lastSeenSeq) return
+          lastSeenSeq = seq
+        }
+
+        // Every event (including heartbeats) resets the stale timer.
+        resetStaleTimer()
+
+        // Heartbeats are lifecycle-only — never reach reduce/isDone/isError.
+        const eventObj = userEvent as Record<string, unknown> | null
+        if (eventObj && eventObj.type === STREAM_HEARTBEAT) return
+
+        const event = userEvent as TEvent
 
         // Error check runs before reduce so a malformed event can be caught.
         const errorMsg = config.isError?.(currentState, event)
         if (errorMsg) {
           stopped = true
+          clearStaleTimer()
+          currentStatus = 'error'
           begin({ immediate: true })
           write({
             type: 'update',
@@ -287,6 +403,7 @@ export function streamChannelOptions<
         const nextState = config.reduce(currentState, event)
         const done = config.isDone?.(nextState, event) ?? false
         currentState = nextState
+        currentStatus = done ? 'done' : 'streaming'
 
         begin({ immediate: true })
         write({
@@ -294,13 +411,14 @@ export function streamChannelOptions<
           value: {
             id: serializedChannel,
             state: currentState,
-            status: done ? 'done' : 'streaming',
+            status: currentStatus,
           },
         })
         commit()
 
         if (done) {
           stopped = true
+          clearStaleTimer()
           unsub()
         }
       }
@@ -309,6 +427,7 @@ export function streamChannelOptions<
 
       return () => {
         stopped = true
+        clearStaleTimer()
         unsub()
       }
     },

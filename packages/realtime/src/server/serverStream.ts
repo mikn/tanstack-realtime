@@ -5,6 +5,11 @@
  * within a server function, pushes events via a `PublishFn`, and cleans up
  * when the function returns. No persistent server process is assumed.
  *
+ * Resilience features:
+ * - **Sequence numbers** (`_seq`): monotonic counter on every event for dedup
+ * - **Heartbeats**: periodic sentinel events to prevent false stale detection
+ * - **Checkpointing**: periodic snapshots of accumulated state for recovery
+ *
  * @example
  * // In a TanStack Start server function
  * import { createServerStream } from '@tanstack/realtime'
@@ -19,6 +24,22 @@
  *     stream.push({ type: 'token', content: chunk })
  *   }
  *   stream.done()
+ * })
+ *
+ * @example
+ * // With resilience features (heartbeat + checkpoint)
+ * const stream = createServerStream({
+ *   publish: realtimePublish,
+ *   channel: ['ai', { messageId }],
+ *   heartbeat: { interval: 5_000 },
+ *   checkpoint: {
+ *     initial: { content: '' },
+ *     reduce: (s, e) => ({ content: s.content + (e.delta ?? '') }),
+ *     interval: { time: 10_000 },
+ *     handler: async (cp) => {
+ *       await db.messages.upsert({ id: messageId, content: cp.state.content })
+ *     },
+ *   },
  * })
  */
 
@@ -55,9 +76,62 @@ export const STREAM_DONE = '__stream:done' as const
  */
 export const STREAM_ERROR = '__stream:error' as const
 
+/**
+ * Sentinel `type` value pushed periodically by the heartbeat timer.
+ * Consumers use this to reset their stale detection timer without calling
+ * the user-supplied `reduce` function.
+ */
+export const STREAM_HEARTBEAT = '__stream:heartbeat' as const
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+/**
+ * Snapshot of stream progress, passed to the checkpoint handler.
+ */
+export interface StreamCheckpoint<TState> {
+  /** The serialized channel string. */
+  channel: string
+  /** Sequence number of the last event that was checkpointed. */
+  seq: number
+  /** Accumulated state at the time of the checkpoint. */
+  state: TState
+  /** Milliseconds elapsed since the stream was created. */
+  elapsed: number
+}
+
+/**
+ * Configuration for periodic checkpointing of stream state.
+ *
+ * The producer mirrors the consumer's reducer to track accumulated state
+ * and periodically calls `handler` so the application can persist a
+ * recovery snapshot (e.g. to KV, D1, or a CRDT-enabled collection).
+ */
+export interface CheckpointConfig<TState, TEvent = unknown> {
+  /** Initial state — should match the consumer's `initial`. */
+  initial: TState
+  /** Reducer — should match the consumer's `reduce`. */
+  reduce: (state: TState, event: TEvent) => TState
+  /**
+   * How often to checkpoint. At least one of `time` or `events` is required.
+   * When both are set, whichever fires first triggers a checkpoint.
+   */
+  interval: {
+    /** Checkpoint every N milliseconds. */
+    time?: number
+    /** Checkpoint every N user events (excludes heartbeats and sentinels). */
+    events?: number
+  }
+  /**
+   * Called with the accumulated state snapshot. Persist this for recovery.
+   *
+   * Also called once on `done()` with the final state, and on `error()`
+   * with the last good state — so the application always has a chance to
+   * persist the final result.
+   */
+  handler: (checkpoint: StreamCheckpoint<TState>) => Promise<void>
+}
 
 /**
  * A server-side stream handle for pushing events to a channel.
@@ -71,9 +145,11 @@ export interface ServerStream<TEvent = unknown> {
   error: (message: string) => Promise<void>
   /** The serialized channel string this stream publishes to. */
   readonly channel: string
+  /** Current sequence number (number of events published so far). */
+  readonly seq: number
 }
 
-export interface CreateServerStreamOptions {
+export interface CreateServerStreamOptions<TState = unknown, TEvent = unknown> {
   /**
    * The publish function from your transport/preset.
    * In a TanStack Start context, this typically wraps `nodeServer.publish()`
@@ -100,6 +176,29 @@ export interface CreateServerStreamOptions {
    * Uses the Web Crypto API (`crypto.subtle`).
    */
   hmacKey?: string
+
+  /**
+   * Emit periodic heartbeat events so consumers can distinguish "no data
+   * yet" from "producer died". The heartbeat resets the consumer's stale
+   * timer without triggering the user-supplied `reduce`.
+   *
+   * Recommended interval: 5000ms. Should be shorter than the consumer's
+   * `staleAfter` threshold.
+   */
+  heartbeat?: {
+    /** Milliseconds between heartbeat events. */
+    interval: number
+  }
+
+  /**
+   * Periodic checkpointing of accumulated state for recovery.
+   *
+   * When provided, the producer mirrors the consumer's reducer and
+   * periodically calls `handler` with a state snapshot. The application
+   * can persist this to KV, D1, or a CRDT-enabled collection for
+   * recovery if the producer dies.
+   */
+  checkpoint?: CheckpointConfig<TState, TEvent>
 }
 
 // ---------------------------------------------------------------------------
@@ -177,6 +276,10 @@ export async function verifyEventSignature(
  * require a persistent server process. The stream pushes events via the
  * provided `publish` function and signals completion via sentinel events.
  *
+ * Every event is wrapped with framework metadata (`_seq`, `_ts`) that
+ * consumers use for deduplication and stale detection. This metadata is
+ * stripped before the consumer's `reduce` function sees the event.
+ *
  * Clients consume these streams using `streamChannelOptions` with `isDone`
  * and `isError` configured to detect the sentinel constants:
  *
@@ -190,6 +293,7 @@ export async function verifyEventSignature(
  *   reduce: (s, e) => s + e.token,
  *   isDone:  (_, e) => e.type === STREAM_DONE,
  *   isError: (_, e) => e.type === STREAM_ERROR ? e.message : false,
+ *   staleAfter: 15_000,
  * })
  * ```
  *
@@ -204,10 +308,10 @@ export async function verifyEventSignature(
  * }
  * await stream.done()
  */
-export function createServerStream<TEvent = unknown>(
-  options: CreateServerStreamOptions,
+export function createServerStream<TEvent = unknown, TState = unknown>(
+  options: CreateServerStreamOptions<TState, TEvent>,
 ): ServerStream<TEvent> {
-  const { publish, hmacKey } = options
+  const { publish, hmacKey, heartbeat, checkpoint } = options
   const channel =
     typeof options.channel === 'string'
       ? options.channel
@@ -223,31 +327,129 @@ export function createServerStream<TEvent = unknown>(
     return cachedKey
   }
 
+  // ---------------------------------------------------------------------------
+  // Sequence counter — monotonically increasing, attached to every event.
+  // ---------------------------------------------------------------------------
+  let seq = 0
+  const startedAt = Date.now()
+
+  // ---------------------------------------------------------------------------
+  // Checkpoint state — mirrors the consumer's reducer on the producer side.
+  // ---------------------------------------------------------------------------
+  let checkpointState: TState | undefined = checkpoint?.initial
+  let eventsSinceCheckpoint = 0
+
+  function buildCheckpoint(): StreamCheckpoint<TState> {
+    return {
+      channel,
+      seq,
+      state: checkpointState as TState,
+      elapsed: Date.now() - startedAt,
+    }
+  }
+
+  async function maybeCheckpoint(): Promise<void> {
+    if (!checkpoint) return
+    const { interval, handler } = checkpoint
+    let shouldCheckpoint = false
+    if (interval.events && eventsSinceCheckpoint >= interval.events) {
+      shouldCheckpoint = true
+    }
+    // Time-based checkpointing is handled by the timer, not here.
+    if (shouldCheckpoint) {
+      eventsSinceCheckpoint = 0
+      await handler(buildCheckpoint())
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Publish with envelope — adds _seq and _ts to every event.
+  // ---------------------------------------------------------------------------
+
   async function publishEvent(event: unknown): Promise<void> {
+    const envelope: Record<string, unknown> = {
+      ...(event as Record<string, unknown>),
+      _seq: ++seq,
+      _ts: Date.now(),
+    }
+
     if (hmacKey) {
-      const payload = event as Record<string, unknown>
       // Strip _signature from the event before signing to avoid circular deps
-      const { _signature: _, ...eventWithoutSig } = payload
+      const { _signature: _, ...eventWithoutSig } = envelope
       const cryptoKey = await getKey()
       const signature = await signEvent(eventWithoutSig, cryptoKey)
       await publish(channel, { ...eventWithoutSig, _signature: signature })
     } else {
-      await publish(channel, event)
+      await publish(channel, envelope)
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Timers — heartbeat and time-based checkpoint. Cleared on done/error.
+  // ---------------------------------------------------------------------------
+
+  const timers: Array<ReturnType<typeof setInterval>> = []
+
+  if (heartbeat) {
+    timers.push(
+      setInterval(() => {
+        // Fire-and-forget: heartbeats are best-effort, not awaited.
+        publishEvent({ type: STREAM_HEARTBEAT }).catch(() => {})
+      }, heartbeat.interval),
+    )
+  }
+
+  if (checkpoint?.interval.time) {
+    timers.push(
+      setInterval(() => {
+        eventsSinceCheckpoint = 0
+        checkpoint.handler(buildCheckpoint()).catch(() => {})
+      }, checkpoint.interval.time),
+    )
+  }
+
+  function clearTimers(): void {
+    for (const t of timers) clearInterval(t)
+    timers.length = 0
+  }
+
+  // ---------------------------------------------------------------------------
+  // Public API
+  // ---------------------------------------------------------------------------
 
   return {
     channel,
 
+    get seq() {
+      return seq
+    },
+
     async push(event: TEvent): Promise<void> {
       await publishEvent(event)
+
+      // Mirror-reduce for checkpoint tracking.
+      if (checkpoint) {
+        checkpointState = checkpoint.reduce(checkpointState as TState, event)
+        eventsSinceCheckpoint++
+        await maybeCheckpoint()
+      }
     },
 
     async done(): Promise<void> {
+      clearTimers()
+      // Final checkpoint before the done sentinel.
+      if (checkpoint) {
+        await checkpoint.handler(buildCheckpoint())
+      }
       await publishEvent({ type: STREAM_DONE })
     },
 
     async error(message: string): Promise<void> {
+      clearTimers()
+      // Checkpoint the last good state before the error sentinel.
+      if (checkpoint) {
+        await checkpoint.handler(buildCheckpoint())
+      }
       await publishEvent({ type: STREAM_ERROR, message })
     },
   }

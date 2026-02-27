@@ -220,5 +220,11 @@ export {
   verifyEventSignature,
   STREAM_DONE,
   STREAM_ERROR,
+  STREAM_HEARTBEAT,
 } from './serverStream.js'
-export type { ServerStream, CreateServerStreamOptions } from './serverStream.js'
+export type {
+  ServerStream,
+  CreateServerStreamOptions,
+  StreamCheckpoint,
+  CheckpointConfig,
+} from './serverStream.js'

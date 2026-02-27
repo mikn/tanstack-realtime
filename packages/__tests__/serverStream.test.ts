@@ -50,8 +50,12 @@ describe('createServerStream', () => {
     await stream.push({ type: 'token', content: ' World' })
 
     expect(calls).toHaveLength(2)
-    expect(calls[0].data).toEqual({ type: 'token', content: 'Hello' })
-    expect(calls[1].data).toEqual({ type: 'token', content: ' World' })
+    expect(calls[0].data).toMatchObject({ type: 'token', content: 'Hello' })
+    expect(calls[1].data).toMatchObject({ type: 'token', content: ' World' })
+    // Every event should carry framework metadata
+    expect((calls[0].data as any)._seq).toBe(1)
+    expect((calls[1].data as any)._seq).toBe(2)
+    expect(typeof (calls[0].data as any)._ts).toBe('number')
   })
 
   it('done() sends STREAM_DONE sentinel', async () => {
@@ -64,7 +68,7 @@ describe('createServerStream', () => {
     await stream.done()
 
     expect(calls).toHaveLength(1)
-    expect(calls[0].data).toEqual({ type: STREAM_DONE })
+    expect(calls[0].data).toMatchObject({ type: STREAM_DONE })
   })
 
   it('error() sends STREAM_ERROR sentinel with message', async () => {
@@ -77,7 +81,7 @@ describe('createServerStream', () => {
     await stream.error('Something went wrong')
 
     expect(calls).toHaveLength(1)
-    expect(calls[0].data).toEqual({
+    expect(calls[0].data).toMatchObject({
       type: STREAM_ERROR,
       message: 'Something went wrong',
     })
@@ -469,9 +473,9 @@ describe('NodeServer.createStream', () => {
       await new Promise((r) => setTimeout(r, 50))
 
       expect(received).toHaveLength(3)
-      expect(received[0]).toEqual({ type: 'token', content: 'Hi' })
-      expect(received[1]).toEqual({ type: 'token', content: '!' })
-      expect(received[2]).toEqual({ type: STREAM_DONE })
+      expect(received[0]).toMatchObject({ type: 'token', content: 'Hi' })
+      expect(received[1]).toMatchObject({ type: 'token', content: '!' })
+      expect(received[2]).toMatchObject({ type: STREAM_DONE })
 
       client.disconnect()
     } finally {
