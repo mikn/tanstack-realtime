@@ -211,6 +211,18 @@ fix: prevent stale closure in useSubscribe
 1. Read existing code before modifying. Understand the pattern a module follows.
 2. Check the spectrum table in `realtimeCollectionOptions` — new features should
    extend the spectrum, not fork it.
-3. Run `pnpm test` before committing. All 486+ tests must pass.
-4. Run `pnpm lint` — zero errors required.
-5. Keep changes additive and backward-compatible unless explicitly breaking.
+3. Keep changes additive and backward-compatible unless explicitly breaking.
+
+## Pre-Commit Checks (Required)
+
+**You MUST run all of the following checks before every commit and fix any errors:**
+
+1. **Lint** — `pnpm lint` — zero errors required (warnings are acceptable).
+2. **Typecheck** — `pnpm typecheck` — must pass with no errors.
+3. **Tests** — `pnpm vitest run --project node` — all tests must pass.
+   - The `workerd` project requires a prior build step and may fail in dev
+     environments; run it with `pnpm test` when a full build is available.
+4. **Docs build** (if docs were changed) — `cd packages/docs && npx vite build`.
+
+Do not commit until all applicable checks pass. If a pre-commit hook rejects
+your commit, fix the issues and create a **new** commit (do not amend).

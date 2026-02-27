@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './styles.css'
 import { Highlight, themes } from 'prism-react-renderer'
 
@@ -631,10 +631,7 @@ interface LogEntry {
 }
 
 let _logId = 0
-function logEntry(
-  client: LogEntry['client'],
-  text: string,
-): LogEntry {
+function logEntry(client: LogEntry['client'], text: string): LogEntry {
   return { id: ++_logId, client, text }
 }
 
@@ -669,7 +666,10 @@ function LwwDemo() {
     reason: string
   } | null>(null)
   const [log, setLog] = useState<Array<LogEntry>>([
-    logEntry('system', 'Both clients see "Shopping List". Edit both, then merge.'),
+    logEntry(
+      'system',
+      'Both clients see "Shopping List". Edit both, then merge.',
+    ),
   ])
 
   const editA = (v: string) => {
@@ -688,13 +688,13 @@ function LwwDemo() {
   }
   const merge = () => {
     // lwwWins: higher clock wins, clientId tiebreak
-    const aWins =
-      clockA > clockB || (clockA === clockB && 'client-a' > 'client-b')
+    // In a real system clientIds are UUIDs; here B wins ties (alphabetically later)
+    const aWins = clockA > clockB
     const winner: 'A' | 'B' = aWins ? 'A' : 'B'
     const value = aWins ? valA : valB
     const reason =
       clockA === clockB
-        ? `Tie at clock ${clockA} — clientId tiebreak`
+        ? `Tie at clock ${clockA} — clientId tiebreak (B > A)`
         : `clock ${Math.max(clockA, clockB)} > ${Math.min(clockA, clockB)}`
     setMerged({ value, winner, reason })
     setLog((p) => [
@@ -722,8 +722,7 @@ function LwwDemo() {
         <div className="crdt-demo-client crdt-client-a">
           <div className="crdt-demo-client-hdr">
             <span className="crdt-dot crdt-dot-a" />
-            Client A
-            <span className="crdt-clock">clock: {clockA}</span>
+            Client A<span className="crdt-clock">clock: {clockA}</span>
           </div>
           <input
             className="crdt-demo-input"
@@ -734,8 +733,7 @@ function LwwDemo() {
         <div className="crdt-demo-client crdt-client-b">
           <div className="crdt-demo-client-hdr">
             <span className="crdt-dot crdt-dot-b" />
-            Client B
-            <span className="crdt-clock">clock: {clockB}</span>
+            Client B<span className="crdt-clock">clock: {clockB}</span>
           </div>
           <input
             className="crdt-demo-input"
@@ -753,7 +751,9 @@ function LwwDemo() {
         </button>
       </div>
       {merged && (
-        <div className={`crdt-demo-result crdt-win-${merged.winner.toLowerCase()}`}>
+        <div
+          className={`crdt-demo-result crdt-win-${merged.winner.toLowerCase()}`}
+        >
           <span className="crdt-result-label">Merged:</span>
           <span className="crdt-result-value">"{merged.value}"</span>
           <span className="crdt-result-winner">
@@ -775,22 +775,22 @@ function LwwDemo() {
 
 // ---- PN-Counter Demo ----
 interface PnState {
-  inc: Record<string, number>
-  dec: Record<string, number>
+  inc: Partial<Record<string, number>>
+  dec: Partial<Record<string, number>>
 }
 function pnVal(s: PnState) {
   let t = 0
-  for (const v of Object.values(s.inc)) t += v
-  for (const v of Object.values(s.dec)) t -= v
+  for (const v of Object.values(s.inc)) t += v ?? 0
+  for (const v of Object.values(s.dec)) t -= v ?? 0
   return t
 }
 function pnMerge(a: PnState, b: PnState): PnState {
-  const inc = { ...a.inc }
-  const dec = { ...a.dec }
+  const inc: Partial<Record<string, number>> = { ...a.inc }
+  const dec: Partial<Record<string, number>> = { ...a.dec }
   for (const [id, v] of Object.entries(b.inc))
-    if ((inc[id] ?? 0) < v) inc[id] = v
+    if ((inc[id] ?? 0) < (v ?? 0)) inc[id] = v
   for (const [id, v] of Object.entries(b.dec))
-    if ((dec[id] ?? 0) < v) dec[id] = v
+    if ((dec[id] ?? 0) < (v ?? 0)) dec[id] = v
   return { inc, dec }
 }
 
@@ -798,7 +798,10 @@ function PnCounterDemo() {
   const [stateA, setStateA] = useState<PnState>({ inc: {}, dec: {} })
   const [stateB, setStateB] = useState<PnState>({ inc: {}, dec: {} })
   const [log, setLog] = useState<Array<LogEntry>>([
-    logEntry('system', 'Click +/- on each client. The merged total is always correct.'),
+    logEntry(
+      'system',
+      'Click +/- on each client. The merged total is always correct.',
+    ),
   ])
 
   const incA = () => {
@@ -950,7 +953,10 @@ function OrSetDemo() {
   const [inputA, setInputA] = useState('')
   const [inputB, setInputB] = useState('')
   const [log, setLog] = useState<Array<LogEntry>>([
-    logEntry('system', 'Both clients see tags: bug, feature, docs. Add or remove tags, then merge.'),
+    logEntry(
+      'system',
+      'Both clients see tags: bug, feature, docs. Add or remove tags, then merge.',
+    ),
   ])
   const [showMerged, setShowMerged] = useState(false)
 
@@ -1015,7 +1021,10 @@ function OrSetDemo() {
       logEntry('system', '— Scenario: add-wins —'),
       logEntry('a', 'add "urgent" (fresh tag)'),
       logEntry('b', 'add then remove "urgent" (removes their own tag)'),
-      logEntry('system', 'Click Merge to see that A\'s add survives B\'s remove.'),
+      logEntry(
+        'system',
+        "Click Merge to see that A's add survives B's remove.",
+      ),
     ])
   }
 
@@ -1026,8 +1035,8 @@ function OrSetDemo() {
     <div className="crdt-demo-inner">
       <p className="crdt-demo-desc">
         Each add gets a unique tag. Removes only affect tags the remover has
-        seen — so a <strong>concurrent add always wins</strong> over a concurrent
-        remove.
+        seen — so a <strong>concurrent add always wins</strong> over a
+        concurrent remove.
       </p>
       <div className="crdt-demo-clients">
         <div className="crdt-demo-client crdt-client-a">
@@ -1039,10 +1048,7 @@ function OrSetDemo() {
             {orVals(stateA).map((v) => (
               <span key={v} className="crdt-or-tag">
                 {v}
-                <button
-                  className="crdt-or-tag-x"
-                  onClick={() => removeA(v)}
-                >
+                <button className="crdt-or-tag-x" onClick={() => removeA(v)}>
                   x
                 </button>
               </span>
@@ -1070,10 +1076,7 @@ function OrSetDemo() {
             {orVals(stateB).map((v) => (
               <span key={v} className="crdt-or-tag">
                 {v}
-                <button
-                  className="crdt-or-tag-x"
-                  onClick={() => removeB(v)}
-                >
+                <button className="crdt-or-tag-x" onClick={() => removeB(v)}>
                   x
                 </button>
               </span>
@@ -1097,7 +1100,10 @@ function OrSetDemo() {
         <button className="crdt-demo-btn crdt-btn-merge" onClick={merge}>
           Reconnect &amp; Merge
         </button>
-        <button className="crdt-demo-btn crdt-btn-scenario" onClick={runAddWins}>
+        <button
+          className="crdt-demo-btn crdt-btn-scenario"
+          onClick={runAddWins}
+        >
           Run "Add Wins" Scenario
         </button>
         <button className="crdt-demo-btn crdt-btn-reset" onClick={reset}>
