@@ -14,11 +14,13 @@
  *   heartbeat events, optionally calling a side-effect callback (e.g. to reset
  *   a stale timer).
  *
- * These compose naturally:
+ * These compose naturally — envelope stripping is the outermost layer (runs
+ * first on raw transport data), then heartbeat filtering, then your logic:
  * ```ts
- * const handler = withHeartbeatFilter(
- *   withEnvelopeStripping(myBusinessLogic),
- *   { onHeartbeat: resetStaleTimer },
+ * const handler = withEnvelopeStripping(
+ *   withHeartbeatFilter(myBusinessLogic, {
+ *     onHeartbeat: resetStaleTimer,
+ *   }),
  * )
  * client.subscribe(channel, handler)
  * ```

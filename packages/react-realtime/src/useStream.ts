@@ -132,11 +132,17 @@ export function useStream<
     }
 
     // ----- Stream processor (shared immutable state machine) -----
+    // Wrap callbacks to always read from the ref so a new channelDef object
+    // with different reduce/isDone/isError is picked up between events,
+    // even when the channel key (and therefore this effect) hasn't changed.
     const processor = createStreamProcessor<TState, TEvent>(
       {
-        reduce: defRef.current.reduce,
-        isDone: defRef.current.isDone,
-        isError: defRef.current.isError,
+        reduce: (state: TState, event: TEvent) =>
+          defRef.current.reduce(state, event),
+        isDone: (state: TState, event: TEvent) =>
+          defRef.current.isDone?.(state, event) ?? false,
+        isError: (state: TState, event: TEvent) =>
+          defRef.current.isError?.(state, event) ?? null,
       },
       defRef.current.initial,
       (snapshot, stopped) => {

@@ -1460,7 +1460,9 @@ import { aiResponseStream } from './stream'
 
 function AIResponse({ requestId }: { requestId: string }) {
   // useStream returns { state, status, error? } for the active channel
-  const { state, status, error } = useStream(aiResponseStream, { requestId })
+  const { state, status, error } = useStream(aiResponseStream, {
+    params: { requestId },
+  })
 
   if (status === 'pending')  return <span className="thinking">Thinking…</span>
   if (status === 'error')    return <span className="error">Error: {error}</span>
@@ -1495,6 +1497,7 @@ function ChatInput() {
           <CodeBlock
             title="server/routes/chat.ts — stream tokens from your AI"
             code={`import { nodeServer } from '../realtime'
+import { aiResponseStream } from '../../features/ai/stream'
 
 app.post('/api/chat', async (req) => {
   const { requestId, prompt } = req.body
@@ -1503,6 +1506,15 @@ app.post('/api/chat', async (req) => {
   const stream = nodeServer.createStream({
     channel: ['ai', { requestId }],
     hmacKey: process.env.STREAM_HMAC_KEY,  // optional HMAC signing
+    // Checkpoint mirrors the client's reduce — pass the channel definition
+    // so the same reduce logic is reused (no drift risk).
+    checkpoint: {
+      channelDef: aiResponseStream,
+      interval: { time: 10_000 },
+      handler: async (cp) => {
+        await db.aiResponses.upsert({ id: requestId, content: cp.state.content })
+      },
+    },
   })
 
   try {

@@ -338,10 +338,117 @@ const aiStream = createCollection(
 This is equivalent to writing `isDone` and `isError` manually but keeps your
 code DRY and ensures it stays in sync with the sentinel constants.
 
+### `createStreamChannel` — typed channel definitions
+
+Define the stream shape once and share it between consumers and producers:
+
+```ts
+import { createStreamChannel, serverStreamCallbacks } from '@tanstack/realtime'
+
+export const aiStream = createStreamChannel({
+  id: 'ai-response',
+  channel: (params: { requestId: string }) => ['ai', params],
+  initial: { content: '' },
+  reduce: (state, event: { type: string; token?: string }) =>
+    event.type === 'token'
+      ? { content: state.content + (event.token ?? '') }
+      : state,
+  ...serverStreamCallbacks,
+  staleAfter: 15_000,
+})
+```
+
+Consume with the `useStream` React hook:
+
+```tsx
+import { useStream } from '@tanstack/react-realtime'
+import { aiStream } from './stream'
+
+function AIResponse({ requestId }: { requestId: string }) {
+  const { state, status, error } = useStream(aiStream, {
+    params: { requestId },
+  })
+  if (status === 'pending') return <p>Thinking…</p>
+  if (status === 'error') return <p>Error: {error}</p>
+  return <p>{state.content}</p>
+}
+```
+
+### Checkpoint unification with `channelDef`
+
+When checkpointing on the server, pass the same channel definition to
+guarantee the producer's reduce logic matches the consumer's — zero drift risk:
+
+```ts
+const stream = createServerStream({
+  publish: realtimePublish,
+  channel: ['ai', { requestId }],
+  checkpoint: {
+    channelDef: aiStream, // reuses initial + reduce from the def
+    interval: { time: 10_000 },
+    handler: async (cp) => {
+      await db.aiResponses.upsert({ id: requestId, content: cp.state.content })
+    },
+  },
+})
+```
+
+The original explicit `initial` + `reduce` on the checkpoint config still works
+for cases where the producer and consumer don't share code.
+
+### Composable envelope middleware
+
+Framework metadata (`_seq`, `_ts`, `_signature`) added by the producer is
+stripped by composable handler wrappers before events reach `reduce`:
+
+```ts
+import { withEnvelopeStripping, withHeartbeatFilter } from '@tanstack/realtime'
+
+// Compose: outermost runs first on raw transport data
+const handler = withEnvelopeStripping(
+  withHeartbeatFilter(myBusinessLogic, {
+    onHeartbeat: () => resetStaleTimer(),
+  }),
+)
+
+client.subscribe(channel, handler)
+```
+
+- `withEnvelopeStripping` — strips `_seq`/`_ts`/`_signature` and deduplicates
+  by sequence number.
+- `withHeartbeatFilter` — drops heartbeat events, optionally calling a callback.
+
+Both `streamChannelOptions` and `useStream` use these internally. They are also
+exported for custom stream consumers that don't use the built-in collection or
+hook APIs.
+
+### Architecture: shared stream processor
+
+The event state machine (`isError` → `reduce` → `isDone`) is extracted into a
+shared `streamProcessor` module used by both `streamChannelOptions` (TanStack DB
+collection) and `useStream` (React hook). The processor works with immutable
+`StreamSnapshot` values — each event produces a new snapshot that the caller
+forwards to its output mechanism.
+
+```
+useStream (React)              streamChannelOptions (TanStack DB)
+     ↘                              ↙
+      createStreamProcessor          ← pure event fold + lifecycle
+           ↓
+     withEnvelopeStripping           ← strip _seq/_ts/_signature, dedup
+           ↓
+     client.subscribe()              ← raw transport messages
+```
+
+This eliminates duplication and makes the event processing path independently
+testable. The pure `processEvent` function has no timers or subscriptions —
+callers manage those concerns.
+
 ### Breaking changes
 
 None. `createServerStream` is a new API. `createStream` is a new method on
-existing server objects.
+existing server objects. The new envelope middleware and stream processor are
+additive exports.
 
 ---
 
