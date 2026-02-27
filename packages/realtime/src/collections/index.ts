@@ -22,6 +22,7 @@ export type { EphemeralLiveConfig } from './ephemeralLiveOptions.js'
 export {
   streamChannelOptions,
   createStreamChannel,
+  serverStreamCallbacks,
 } from './streamChannelOptions.js'
 export type {
   StreamChannelConfig,
@@ -30,6 +31,9 @@ export type {
   StreamItem,
   StreamStatus,
 } from './streamChannelOptions.js'
+
+export { tickCollectionOptions } from './tickCollectionOptions.js'
+export type { TickCollectionConfig } from './tickCollectionOptions.js'
 
 // CRDT standalone channel definitions
 export { defineSyncedCounter } from './syncedCounter.js'

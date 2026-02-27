@@ -135,6 +135,7 @@ function Nav() {
           <a href="#crdts">CRDTs</a>
           <a href="#presence">Presence</a>
           <a href="#resilience">Resilience</a>
+          <a href="#utilities">Utilities</a>
           <a href="#when-to-use">When to use</a>
           <a href="#quickstart">Quick Start</a>
           <a
@@ -162,40 +163,36 @@ function Hero() {
       <div className="container">
         <Badge>v0.1 &middot; Alpha</Badge>
         <h1>
-          Realtime, <span className="gradient-text">without the ceremony.</span>
+          Add realtime.{' '}
+          <span className="gradient-text">Keep everything else.</span>
         </h1>
         <p className="hero-sub">
-          Add a <code>channel</code> to your existing <code>queryFn</code>.
-          Connected clients update when data changes — no polling, no
-          subscriptions managed by hand. Built on TanStack DB.
+          Most realtime frameworks want you to adopt their database, their
+          server, their cloud. This is a transport layer that plugs into
+          whatever you already have. Add a <code>channel</code> to one
+          collection today. Add CRDTs tomorrow. Your Express routes, your
+          Postgres, your deploy target &mdash; all stay exactly where they are.
         </p>
 
         <div className="before-after">
           <div className="ba-col">
-            <div className="ba-label ba-before">Before &mdash; polling</div>
+            <div className="ba-label ba-before">Platform lock-in</div>
             <CodeBlock
-              code={`// Every tab polls every 30 s. Data drifts.
-function TaskList({ projectId }) {
-  const { data: tasks = [] } = useQuery({
-    queryKey: ['tasks', projectId],
-    queryFn: () =>
-      fetch(\`/api/tasks?projectId=\${projectId}\`)
-        .then(r => r.json()),
-    staleTime: 30_000,
-    refetchInterval: 30_000,
-  })
-  return (
-    <ul>
-      {tasks.map(t => <li key={t.id}>{t.title}</li>)}
-    </ul>
-  )
-}`}
+              code={`// Convex: replace your backend entirely
+const tasks = useQuery(api.tasks.list, { projectId })
+
+// ElectricSQL: Postgres CDC only, no pub/sub or presence
+const { results } = useShape({
+  url: 'http://localhost:3000/v1/shape',
+  table: 'tasks',
+  where: \`project_id = '\${projectId}'\`,
+})`}
             />
           </div>
           <div className="ba-col">
-            <div className="ba-label ba-after">After &mdash; live</div>
+            <div className="ba-label ba-after">Your server, live</div>
             <CodeBlock
-              code={`// Every client updates instantly. Zero polling.
+              code={`// TanStack Realtime: keep your REST API, add a channel
 const tasksOptions = (projectId: string) =>
   realtimeCollectionOptions({
     ...withRest({
@@ -206,14 +203,8 @@ const tasksOptions = (projectId: string) =>
     channel: ['tasks', { projectId }],
   })
 
-function TaskList({ projectId }) {
-  const tasks = useCollection(tasksOptions(projectId))
-  return (
-    <ul>
-      {tasks.map(t => <li key={t.id}>{t.title}</li>)}
-    </ul>
-  )
-}`}
+// Your existing /api/tasks endpoint doesn't change.
+// The channel broadcasts mutations automatically.`}
             />
           </div>
         </div>
@@ -244,63 +235,82 @@ function Features() {
       <div className="container">
         <Badge>Why TanStack Realtime</Badge>
         <h2>
-          Every feature solves
-          <br />a real problem.
+          What&rsquo;s awkward
+          <br />
+          everywhere else.
         </h2>
         <div className="features-grid">
           <FeatureCard
-            icon="~"
-            title="Progressive Adoption"
-            problem="You can't rewrite your whole app on day one."
-            solution="Start with queryFn. Add channel when ready. Add CRDTs when you need conflict resolution. Each step is exactly one config key — stop at any point."
-          />
-          <FeatureCard
-            icon="{"
-            title="Type-Safe End to End"
-            problem="Runtime errors in channel keys and message shapes cost you at 2am."
-            solution="Full TypeScript from channel keys to CRDT field definitions. Autocomplete everywhere. Catch mistakes at build time."
-          />
-          <FeatureCard
             icon=">"
-            title="Transport Agnostic"
-            problem="You'll outgrow your local WebSocket server, but your app code shouldn't care."
-            solution="Start with the Node.js preset. Scale to Centrifugo or SSE. One import swap — zero application code changes."
+            title="Keep Your Backend"
+            problem="Convex replaces your server. ElectricSQL requires Postgres CDC. You just want live updates on your existing API."
+            solution="TanStack Realtime is a transport layer. Your Express routes, your database, your deploy target — none of it changes. Add a channel to one collection and your existing endpoints go live."
+          />
+          <FeatureCard
+            icon="~"
+            title="One Feature at a Time"
+            problem="Most realtime frameworks are all-or-nothing. Adopt their model for your whole app, or don't use them at all."
+            solution="Start with queryFn for one collection. Add channel when ready. Add CRDTs when you need conflict resolution. Each step is one config key — stop at any point."
+          />
+          <FeatureCard
+            icon="&"
+            title="Pub/Sub + Presence"
+            problem="Database sync tools don't do messaging. Chat, typing indicators, and live cursors aren't rows in a table — they need pub/sub and presence."
+            solution="Channels, presence, and pub/sub are first-class. usePresence tracks who's online. useSubscribe handles ephemeral events. These work alongside collections, not as an afterthought."
           />
           <FeatureCard
             icon="#"
-            title="Built-in CRDTs"
-            problem="Two users edit the same field at the same time. One change is silently lost."
-            solution="Declare fields: { title: 'lww', votes: 'pn-counter', tags: 'or-set' }. Concurrent edits merge automatically. No manual conflict resolution."
+            title="Client-Side CRDTs"
+            problem="Server-side conflict resolution means changing server code for every field type. Convex requires server mutations. ElectricSQL uses Postgres rules."
+            solution="Declare fields: { votes: 'pn-counter', tags: 'or-set' }. Merging happens on the client — your server just stores and relays. No CRDT logic server-side."
+          />
+          <FeatureCard
+            icon="{"
+            title="Swap Transports, Not Code"
+            problem="You start with a local WebSocket server. In production you need Centrifugo. Behind a corporate proxy you need SSE. Each switch rewrites your app."
+            solution="One import swap. wsTransport → centrifugoTransport → sseTransport. Your collections, hooks, and components don't change. Infrastructure decisions stay separate from app logic."
           />
           <FeatureCard
             icon="@"
-            title="Offline-First"
-            problem="The user submits a form on a train. The network call fails. The change is gone."
-            solution="Wrap any transport with createOfflineQueue. Mutations buffer and replay in FIFO order on reconnect. Show pending count in your UI."
+            title="Offline + Multi-Tab"
+            problem="Six tabs open, each with its own WebSocket. User goes through a tunnel. Messages are lost, connections multiply, state diverges."
+            solution="createOfflineQueue buffers and replays on reconnect. createCoordinatedTransport shares one connection across all tabs automatically. Stack them on any transport."
+          />
+          <FeatureCard
+            icon="+"
+            title="Streaming Reductions"
+            problem="AI token streams, live metrics, progress bars — these aren't collections of rows. They're a sequence of events folded into one piece of state."
+            solution="streamChannelOptions with a reduce function. Status tracks pending → streaming → done. isDone and isError close the stream. Works for any accumulated state."
           />
           <FeatureCard
             icon="*"
             title="TanStack Ecosystem"
             problem="Yet another state layer fighting with your existing cache."
-            solution="Collections plug into TanStack DB via SyncConfig. TanStack Query runs alongside for non-realtime data. They are parallel systems — no conflict."
-          />
-          <FeatureCard
-            icon="&"
-            title="Presence & Cursors"
-            problem="Users have no idea who else is looking at the same document."
-            solution="createPresenceChannel + usePresence. Join with any data — name, cursor, status. Others update reactively. The current user is always excluded from the list."
-          />
-          <FeatureCard
-            icon="+"
-            title="Gap Recovery"
-            problem="The user reconnects after 30 seconds offline and sees stale data."
-            solution="Add refetchOnReconnect: true to re-run queryFn and diff on reconnect. Or use withGapRecovery for custom replay — server-assisted offset recovery, raw subscriptions, or collections without a queryFn."
+            solution="Collections plug into TanStack DB. TanStack Query runs alongside for non-realtime data. They are parallel systems, not competing ones. useStore works everywhere."
           />
           <FeatureCard
             icon="%"
-            title="Multi-Tab via SharedWorker"
-            problem="Six browser tabs. Six WebSocket connections. Six times the server cost."
-            solution="createSharedWorkerTransport shares one connection across all tabs. Falls back to BroadcastChannel automatically. Zero application code changes."
+            title="Type-Safe Channels"
+            problem="Runtime errors in channel keys and message shapes cost you at 2am."
+            solution="Full TypeScript from channel keys to CRDT field definitions to presence data shapes. Autocomplete everywhere. Catch mistakes at build time, not in production."
+          />
+          <FeatureCard
+            icon="!"
+            title="Server Validation"
+            problem="Clients publish directly to channels. Nothing stops a malicious payload from reaching everyone."
+            solution="createValidatedPublish wraps your publish function with a validate hook. The onPublish callback in createNodeServer runs before fan-out — reject, transform, or sanitize any message server-side."
+          />
+          <FeatureCard
+            icon="^"
+            title="Optimistic Updates"
+            problem="Mutation succeeds but the server echo creates a duplicate flash. Or the mutation fails and the UI is stuck."
+            solution="optimistic: true adds a nonce to each mutation. The echo from the server is suppressed. On failure, onOptimisticError fires and the nonce is cleaned up. Zero duplicates."
+          />
+          <FeatureCard
+            icon="="
+            title="60 fps Tick Transport"
+            problem="Publishing one event per entity per frame floods the wire. Multiplayer games need batched, fixed-rate updates."
+            solution="tickTransport batches all setState calls into one frame per tick interval. Delta compression sends only changed fields. onTick delivers the full frame. Stacks on any transport."
           />
         </div>
       </div>
@@ -985,9 +995,11 @@ function Streaming() {
         <div className="use-case-codes" style={{ marginBottom: '1.5rem' }}>
           <CodeBlock
             title="features/ai/stream.ts — define the channel shape"
-            code={`import { createStreamChannel } from '@tanstack/realtime'
+            code={`import { createStreamChannel, serverStreamCallbacks } from '@tanstack/realtime'
 
-// Define once — reuse in any component
+// Define once — reuse in any component.
+// serverStreamCallbacks provides isDone/isError that match
+// the STREAM_DONE / STREAM_ERROR sentinels from createServerStream.
 export const aiResponseStream = createStreamChannel({
   id: 'ai-response',
   channel: (params: { requestId: string }) => ['ai', params],
@@ -1000,14 +1012,8 @@ export const aiResponseStream = createStreamChannel({
       ? { content: state.content + (event.token ?? '') }
       : state,
 
-  // Stream closes and status → 'done'
-  isDone: (_, e) => (e as { type: string }).type === 'done',
-
-  // Stream closes and status → 'error'  (checked before reduce)
-  isError: (_, e) =>
-    (e as { type: string }).type === 'error'
-      ? ((e as { message?: string }).message ?? 'Unknown error')
-      : false,
+  // Wire up sentinel detection from createServerStream
+  ...serverStreamCallbacks,
 })`}
           />
           <CodeBlock
@@ -1051,20 +1057,24 @@ function ChatInput() {
         <div className="use-case-codes">
           <CodeBlock
             title="server/routes/chat.ts — stream tokens from your AI"
-            code={`import { serializeKey } from '@tanstack/realtime'
-import { nodeServer } from '../realtime'
+            code={`import { nodeServer } from '../realtime'
 
 app.post('/api/chat', async (req) => {
   const { requestId, prompt } = req.body
-  const channel = serializeKey(['ai', { requestId }])
+
+  // createStream returns push/done/error helpers with HMAC signing
+  const stream = nodeServer.createStream({
+    channel: ['ai', { requestId }],
+    hmacKey: process.env.STREAM_HMAC_KEY,  // optional HMAC signing
+  })
 
   try {
     for await (const chunk of openai.stream(prompt)) {
-      nodeServer.publish(channel, { type: 'token', token: chunk.text })
+      await stream.push({ type: 'token', token: chunk.text })
     }
-    nodeServer.publish(channel, { type: 'done' })
+    await stream.done()  // sends STREAM_DONE sentinel
   } catch (err) {
-    nodeServer.publish(channel, { type: 'error', message: String(err) })
+    await stream.error(String(err))  // sends STREAM_ERROR sentinel
   }
 })`}
           />
@@ -1087,6 +1097,87 @@ const cpuStream = createStreamChannel({
   // Open-ended — no isDone, stream runs until the component unmounts
 })`}
           />
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Tick-Based Transport — high-frequency game state
+// ---------------------------------------------------------------------------
+
+function TickBased() {
+  return (
+    <section id="tick" className="section">
+      <div className="container">
+        <Badge>Tick-Based</Badge>
+        <h2>
+          60 fps multiplayer.
+          <br />
+          Zero boilerplate.
+        </h2>
+        <p className="section-sub">
+          High-frequency use cases &mdash; multiplayer games, collaborative
+          drawing, live simulations &mdash; need batched, fixed-rate updates,
+          not individual events. <code>tickTransport</code> wraps any transport
+          and sends one frame per tick interval.
+        </p>
+
+        <div className="use-case-codes">
+          <CodeBlock
+            title="game/transport.ts — wrap any transport"
+            code={`import { tickTransport, wsTransport } from '@tanstack/realtime'
+
+const tick = tickTransport(
+  wsTransport({ url: 'wss://rt.example.com' }),
+  { tickMs: 16, deltaCompression: true },  // ~60 Hz, only changed fields
+)
+
+// Set state each render frame — batched into one publish per tick
+tick.setState('game:room-1', myPlayerId, {
+  x: player.x,
+  y: player.y,
+  health: player.health,
+  animation: 'run',
+})
+
+// Remove an entity (e.g. player disconnected)
+tick.removeEntity('game:room-1', 'player-42')
+
+// Receive batched frames from all players
+tick.onTick('game:room-1', (frame) => {
+  for (const [entityId, state] of Object.entries(frame.entities)) {
+    updateEntity(entityId, state)
+  }
+  for (const entityId of frame.removed) {
+    removeEntity(entityId)
+  }
+})`}
+          />
+          <CodeBlock
+            title="game/collection.ts — tick collection with TanStack DB"
+            code={`import { tickCollectionOptions } from '@tanstack/realtime'
+
+// Drive a TanStack DB collection from tick frames.
+// Each frame is one begin/commit cycle — no per-entity overhead.
+const config = tickCollectionOptions<Player, string>({
+  transport: tick,
+  channel: 'game:room-1',
+  getKey: (p) => p.id,
+  getEntityId: (p) => p.id,
+})`}
+          />
+        </div>
+
+        <div className="callout">
+          <span className="callout-label">Delta Compression</span>
+          <p>
+            With <code>deltaCompression: true</code>, only fields that changed
+            since the last tick are sent on the wire. The receiver reconstructs
+            full state via <code>applyDelta</code>. For 100 entities where only
+            position changes each frame, this can reduce bandwidth by 80%+.
+          </p>
         </div>
       </div>
     </section>
@@ -1120,17 +1211,25 @@ function Resilience() {
             <p>
               The user submits a form on a train. Wrap any transport with{' '}
               <code>createOfflineQueue</code> &mdash; publishes buffer and
-              replay in FIFO order when the connection comes back. Show pending
-              count reactively via the exposed store.
+              replay in FIFO order when the connection comes back. Plug in{' '}
+              <code>localStorage</code> or any storage adapter so messages
+              survive page refresh. Show pending count reactively via the
+              exposed store.
             </p>
             <CodeBlock
-              code={`import { createOfflineQueue } from '@tanstack/realtime'
-import { nodeTransport } from '@tanstack/realtime-preset-node'
+              code={`import {
+  createLocalStorageAdapter,
+  createOfflineQueue,
+  wsTransport,
+} from '@tanstack/realtime'
 import { useStore } from '@tanstack/react-store'
 
 const transport = createOfflineQueue(
-  nodeTransport({ url: 'wss://rt.example.com' }),
-  { maxSize: 500 },
+  wsTransport({ url: 'wss://rt.example.com' }),
+  {
+    maxSize: 500,
+    storage: createLocalStorageAdapter(), // survives page refresh
+  },
 )
 
 const client = createRealtimeClient({ transport })
@@ -1168,10 +1267,10 @@ const tasksOptions = realtimeCollectionOptions({
 })
 
 // Option B — transport level (any subscription)
-import { withGapRecovery } from '@tanstack/realtime'
+import { withGapRecovery, wsTransport } from '@tanstack/realtime'
 
 const transport = withGapRecovery(
-  nodeTransport({ url: 'wss://rt.example.com' }),
+  wsTransport({ url: 'wss://rt.example.com' }),
   {
     onGap: async (channel) => {
       // Called for every active channel after reconnect
@@ -1185,37 +1284,147 @@ const transport = withGapRecovery(
             />
           </div>
 
-          {/* Multi-tab SharedWorker */}
+          {/* Multi-tab coordination */}
           <div className="resilience-card">
             <div className="resilience-card-icon">%</div>
-            <h3>Multi-Tab SharedWorker</h3>
+            <h3>Multi-Tab Coordination</h3>
             <p>
               Six browser tabs. Six WebSocket connections. Six times the server
-              cost. <code>createSharedWorkerTransport</code> shares one
-              connection across all tabs. Falls back to{' '}
-              <code>BroadcastChannel</code> automatically in environments
-              without SharedWorker support.
+              cost. <code>createCoordinatedTransport</code> shares a single
+              connection across all tabs automatically.
+            </p>
+            <p>
+              <strong>Default (BroadcastChannel)</strong> &mdash; one tab is
+              elected leader and holds the connection. Others proxy through it.
+              If the leader closes, a new one is elected. Zero config.
             </p>
             <CodeBlock
-              code={`// worker.ts — the SharedWorker script (one per origin)
-import { createSharedWorkerServer } from '@tanstack/realtime'
-import { nodeTransport } from '@tanstack/realtime-preset-node'
+              code={`import { createCoordinatedTransport, wsTransport } from '@tanstack/realtime'
 
-createSharedWorkerServer(
-  nodeTransport({ url: 'wss://rt.example.com' }),
+// Zero config — uses BroadcastChannel leader election automatically
+const transport = createCoordinatedTransport({
+  transport: () => wsTransport({ url: 'wss://rt.example.com' }),
+})`}
+            />
+            <p>
+              <strong>SharedWorker (opt-in)</strong> &mdash; the browser runs a
+              separate worker process that survives tab close and crashes.
+              Requires a small worker file because SharedWorker loads code from
+              a URL, not inline. Premium robustness for apps that need it.
+            </p>
+            <CodeBlock
+              title="realtime.worker.ts"
+              code={`import { createSharedWorkerCoordinator, wsTransport } from '@tanstack/realtime'
+
+const coordinator = createSharedWorkerCoordinator(
+  wsTransport({ url: 'wss://rt.example.com' }),
+)
+self.addEventListener('connect', (e) => {
+  coordinator.connect(e.ports[0])
+})`}
+            />
+            <CodeBlock
+              title="app code"
+              code={`const transport = createCoordinatedTransport({
+  transport: () => wsTransport({ url: 'wss://rt.example.com' }),
+  workerUrl: new URL('./realtime.worker.ts', import.meta.url),
+})`}
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Core Utilities — dedup, throttle, ephemeral
+// ---------------------------------------------------------------------------
+
+function Utilities() {
+  return (
+    <section id="utilities" className="section section-dark">
+      <div className="container">
+        <Badge>Core Utilities</Badge>
+        <h2>
+          Small tools that
+          <br />
+          solve real problems.
+        </h2>
+        <p className="section-sub">
+          Deduplication, throttling, and ephemeral maps &mdash; standalone
+          utilities you can use with any transport or collection.
+        </p>
+
+        <div className="resilience-grid">
+          <div className="resilience-card">
+            <div className="resilience-card-icon">#</div>
+            <h3>createDedup</h3>
+            <p>
+              Bounded deduplication filter. Tracks recently-seen message IDs per
+              channel using FIFO eviction. Call <code>seen(channel, id)</code>{' '}
+              &mdash; returns <code>true</code> for duplicates.
+            </p>
+            <CodeBlock
+              code={`import { createDedup } from '@tanstack/realtime'
+
+const dedup = createDedup({ maxSize: 500 })
+
+transport.subscribe('chat', (msg) => {
+  if (dedup.seen('chat', msg.id)) return // skip duplicate
+  handleMessage(msg)
+})`}
+            />
+          </div>
+
+          <div className="resilience-card">
+            <div className="resilience-card-icon">~</div>
+            <h3>throttle</h3>
+            <p>
+              Trailing-edge throttle for high-frequency publishes. First call
+              fires immediately; subsequent calls within the interval are
+              coalesced. The last value is always sent.
+            </p>
+            <CodeBlock
+              code={`import { throttle } from '@tanstack/realtime'
+
+const throttledPublish = throttle(
+  (pos: { x: number; y: number }) =>
+    client.publish('cursors', pos),
+  { interval: 50 }, // max 20 publishes/sec
 )
 
-// app.ts — every tab uses this client, sharing one WebSocket
-import {
-  createSharedWorkerTransport,
-  isSharedWorkerSupported,
-} from '@tanstack/realtime'
+// Called on every mouse move
+onMouseMove = (e) =>
+  throttledPublish({ x: e.clientX, y: e.clientY })`}
+            />
+          </div>
 
-const transport = isSharedWorkerSupported()
-  ? createSharedWorkerTransport(new URL('./worker.ts', import.meta.url))
-  : nodeTransport({ url: 'wss://rt.example.com' }) // automatic fallback
+          <div className="resilience-card">
+            <div className="resilience-card-icon">*</div>
+            <h3>createEphemeralMap</h3>
+            <p>
+              Key-value store where entries auto-expire after a TTL. Perfect for
+              typing indicators, &ldquo;user is viewing&rdquo; badges, and
+              cursor positions that should disappear when the user goes silent.
+            </p>
+            <CodeBlock
+              code={`import { createEphemeralMap } from '@tanstack/realtime'
 
-const client = createRealtimeClient({ transport })`}
+const typingUsers = createEphemeralMap<{ name: string }>({
+  ttl: 3000, // entries expire after 3 seconds
+})
+
+// Update on every keystroke — resets the timer
+typingUsers.set(userId, { name: 'Alice' })
+
+// Subscribe to changes (entries auto-removed on timeout)
+typingUsers.subscribe((entries) => {
+  setTyping(entries.map((e) => e.value.name))
+})
+
+// Cleanup on teardown
+typingUsers.destroy()`}
             />
           </div>
         </div>
@@ -1307,16 +1516,17 @@ function Transports() {
 
         <div className="transport-grid">
           <div className="transport-card">
-            <h3>Node.js Preset</h3>
+            <h3>Built-in WebSocket</h3>
             <p>
-              Built-in WebSocket server and client. Minimal setup. Suitable for
-              local development and single-server deployments.
+              <code>wsTransport</code> lives in the base package &mdash; no
+              extra dependencies. Connects to a <code>createNodeServer</code>{' '}
+              instance. Works in browsers, SharedWorkers, and Node.js.
             </p>
             <CodeBlock
-              code={`import { nodeTransport } from '@tanstack/realtime-preset-node'
+              code={`import { wsTransport } from '@tanstack/realtime'
 
 const client = createRealtimeClient({
-  transport: nodeTransport({ url: 'ws://localhost:3001' }),
+  transport: wsTransport({ url: 'ws://localhost:3001' }),
 })`}
             />
           </div>
@@ -1423,6 +1633,195 @@ function ReactHooks() {
 }`}
             />
           </div>
+
+          <div className="hook-example">
+            <h3>useChannel</h3>
+            <p>
+              Combines subscribe + publish for one channel. Omit the callback
+              for publish-only.
+            </p>
+            <CodeBlock
+              code={`function ChatRoom({ roomId }) {
+  const [messages, setMessages] = useState<Message[]>([])
+  const { publish } = useChannel(
+    ['chat', { roomId }],
+    (raw) => setMessages((prev) => [...prev, raw as Message]),
+  )
+
+  return (
+    <>
+      {messages.map((m) => <p key={m.id}>{m.text}</p>)}
+      <button onClick={() => publish({ id: crypto.randomUUID(), text: 'Hi!' })}>
+        Send
+      </button>
+    </>
+  )
+}`}
+            />
+          </div>
+
+          <div className="hook-example">
+            <h3>useRealtimeCollection</h3>
+            <p>
+              Creates a CRDT-backed TanStack DB collection. Client is sourced
+              from context &mdash; no need to pass it manually.
+            </p>
+            <CodeBlock
+              code={`import { useRealtimeCollection } from '@tanstack/react-realtime'
+import { useLiveQuery } from '@tanstack/react-db'
+
+function TodoList({ projectId }: { projectId: string }) {
+  const todos = useRealtimeCollection<Todo>({
+    channel: ['todos', { projectId }],
+    getKey: (t) => t.id,
+    queryFn: () => fetchTodos(projectId),
+  })
+
+  const { data } = useLiveQuery((q) =>
+    q.from({ todos }).select()
+  )
+
+  return <ul>{data.map((t) => <li key={t.id}>{t.text}</li>)}</ul>
+}`}
+            />
+          </div>
+
+          <div className="hook-example">
+            <h3>useLiveChannel</h3>
+            <p>
+              Creates an append-only live channel collection. For chat, game
+              events, and feeds &mdash; no update/delete.
+            </p>
+            <CodeBlock
+              code={`import { useLiveChannel } from '@tanstack/react-realtime'
+import { useLiveQuery } from '@tanstack/react-db'
+
+function AuditLog({ resourceId }: { resourceId: string }) {
+  const events = useLiveChannel<AuditEvent>({
+    channel: ['audit', { resourceId }],
+    getKey: (e) => e.id,
+    initialData: () => fetchAuditHistory(resourceId),
+    onEvent: (raw) => {
+      const e = raw as { type: string; event: AuditEvent }
+      return e.type === 'audit' ? e.event : null
+    },
+  })
+
+  const { data } = useLiveQuery((q) =>
+    q.from({ events }).orderBy(({ events }) => events.timestamp)
+  )
+
+  return <div>{data.map((e) => <p key={e.id}>{e.message}</p>)}</div>
+}`}
+            />
+          </div>
+        </div>
+
+        <h2 style={{ marginTop: '3rem' }}>Standalone CRDT hooks</h2>
+        <p className="section-sub">
+          Self-contained hooks for shared counters, values, and sets. No
+          collection required &mdash; define the channel once with{' '}
+          <code>defineSyncedCounter</code> / <code>defineSyncedValue</code> /{' '}
+          <code>defineSyncedSet</code>, then use the corresponding hook.
+        </p>
+
+        <div className="hooks-grid">
+          <div className="hook-example">
+            <h3>useSyncedCounter</h3>
+            <p>
+              PN-Counter CRDT. Concurrent increments from any client always add
+              up.
+            </p>
+            <CodeBlock
+              code={`import { defineSyncedCounter } from '@tanstack/realtime'
+import { useSyncedCounter } from '@tanstack/react-realtime'
+
+const postVotes = defineSyncedCounter({
+  id: 'post-votes',
+  channel: (params: { postId: string }) => ['votes', params],
+})
+
+function VoteButton({ postId, initialVotes }: { postId: string; initialVotes: number }) {
+  const { value, increment, decrement } = useSyncedCounter(postVotes, {
+    params: { postId },
+    initial: initialVotes,
+  })
+
+  return (
+    <div>
+      <button onClick={() => decrement()}>-</button>
+      <span>{value}</span>
+      <button onClick={() => increment()}>+</button>
+    </div>
+  )
+}`}
+            />
+          </div>
+
+          <div className="hook-example">
+            <h3>useSyncedValue</h3>
+            <p>
+              LWW-Register CRDT. Lamport clock + clientId ensures all clients
+              converge.
+            </p>
+            <CodeBlock
+              code={`import { defineSyncedValue } from '@tanstack/realtime'
+import { useSyncedValue } from '@tanstack/react-realtime'
+
+const docTitle = defineSyncedValue({
+  id: 'doc-title',
+  channel: (params: { docId: string }) => ['doc:title', params],
+})
+
+function EditableTitle({ docId }: { docId: string }) {
+  const { value, set } = useSyncedValue(docTitle, {
+    params: { docId },
+    initial: 'Untitled',
+  })
+
+  return (
+    <input
+      value={value}
+      onChange={(e) => set(e.target.value)}
+    />
+  )
+}`}
+            />
+          </div>
+
+          <div className="hook-example">
+            <h3>useSyncedSet</h3>
+            <p>
+              OR-Set CRDT. Concurrent add always wins over concurrent remove.
+            </p>
+            <CodeBlock
+              code={`import { defineSyncedSet } from '@tanstack/realtime'
+import { useSyncedSet } from '@tanstack/react-realtime'
+
+const postTags = defineSyncedSet({
+  id: 'post-tags',
+  channel: (params: { postId: string }) => ['tags', params],
+})
+
+function TagEditor({ postId, initialTags }: { postId: string; initialTags: string[] }) {
+  const { values: tags, add, remove, has } = useSyncedSet(postTags, {
+    params: { postId },
+    initial: initialTags,
+  })
+
+  return (
+    <>
+      {tags.map((tag) => (
+        <span key={tag}>
+          {tag} <button onClick={() => remove(tag)}>x</button>
+        </span>
+      ))}
+      <button onClick={() => add('important')}>+ important</button>
+    </>
+  )
+}`}
+            />
+          </div>
         </div>
       </div>
     </section>
@@ -1479,11 +1878,10 @@ httpServer.listen(3001)`}
             <h3>Create the client and wrap your app</h3>
             <CodeBlock
               code={`// app/client.ts
-import { createRealtimeClient } from '@tanstack/realtime'
-import { nodeTransport } from '@tanstack/realtime-preset-node'
+import { createRealtimeClient, wsTransport } from '@tanstack/realtime'
 
 export const realtimeClient = createRealtimeClient({
-  transport: nodeTransport({ url: 'ws://localhost:3001' }),
+  transport: wsTransport({ url: 'ws://localhost:3001' }),
 })
 
 // app/main.tsx
@@ -1615,7 +2013,9 @@ function Footer() {
             <a href="#presence">Presence</a>
             <a href="#events">Live Events</a>
             <a href="#streaming">Streaming</a>
+            <a href="#tick">Tick-Based</a>
             <a href="#resilience">Resilience</a>
+            <a href="#utilities">Utilities</a>
             <a href="#adapters">Message Adapters</a>
             <a href="#quickstart">Quick Start</a>
             <a href="#when-to-use">When to use</a>
@@ -1723,11 +2123,10 @@ http.listen(3001)`}
             <div className="e2e-step-label">2 — client</div>
             <CodeBlock
               title="app/client.ts"
-              code={`import { createRealtimeClient } from '@tanstack/realtime'
-import { nodeTransport } from '@tanstack/realtime-preset-node'
+              code={`import { createRealtimeClient, wsTransport } from '@tanstack/realtime'
 
 export const realtimeClient = createRealtimeClient({
-  transport: nodeTransport({ url: 'ws://localhost:3001' }),
+  transport: wsTransport({ url: 'ws://localhost:3001' }),
 })`}
             />
           </div>
@@ -1952,7 +2351,9 @@ export function App() {
       <PresenceSection />
       <LiveEvents />
       <Streaming />
+      <TickBased />
       <Resilience />
+      <Utilities />
       <MessageAdapters />
       <Transports />
       <ReactHooks />

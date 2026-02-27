@@ -92,11 +92,16 @@ export function sseTransport(options: SseTransportOptions): RealtimeTransport {
 
   async function postAction(action: ClientAction): Promise<void> {
     const headers = await authHeaders()
-    await fetch(resolveUrl(), {
+    const response = await fetch(resolveUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify(action),
     })
+    if (!response.ok) {
+      console.warn(
+        `[realtime:sse] POST action "${action.action}" failed with status ${response.status}`,
+      )
+    }
   }
 
   async function resubscribeAll(): Promise<void> {

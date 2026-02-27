@@ -1,5 +1,5 @@
 /**
- * Unit tests for nodeTransport reconnect edge cases.
+ * Unit tests for wsTransport reconnect edge cases.
  *
  * Uses a mock WebSocket class and fake timers to exercise reconnect logic
  * without a real network.
@@ -27,8 +27,8 @@ import {
   vi,
 } from 'vitest'
 
-// Import AFTER vi.hoisted so transport.ts picks up MockWebSocket as `WS`.
-import { nodeTransport } from '@tanstack/realtime-preset-node'
+// Import AFTER vi.hoisted so wsTransport picks up MockWebSocket via globalThis.WebSocket.
+import { wsTransport } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // vi.hoisted() runs before module imports, giving us a chance to replace
@@ -113,7 +113,7 @@ const { MockWebSocket, restoreGlobalWs } = vi.hoisted(() => {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('nodeTransport — reconnect edge cases', () => {
+describe('wsTransport — reconnect edge cases', () => {
   beforeEach(() => {
     MockWebSocket.instances = []
     vi.useFakeTimers()
@@ -135,7 +135,7 @@ describe('nodeTransport — reconnect edge cases', () => {
   // time and that attempts beyond the cap all use exactly maxDelay.
 
   it('backoff delay is capped at maxDelay after many connection failures', async () => {
-    const transport = nodeTransport({
+    const transport = wsTransport({
       url: 'ws://localhost:9999',
       initialDelay: 50,
       maxDelay: 200,
@@ -192,7 +192,7 @@ describe('nodeTransport — reconnect edge cases', () => {
   // ── 2. No duplicate timers ───────────────────────────────────────────────
 
   it('scheduleReconnect does not create duplicate timers on rapid close events', async () => {
-    const transport = nodeTransport({
+    const transport = wsTransport({
       url: 'ws://localhost:9999',
       initialDelay: 1000,
       maxDelay: 30_000,
@@ -223,7 +223,7 @@ describe('nodeTransport — reconnect edge cases', () => {
   // ── 3. Disconnect during reconnect wait ──────────────────────────────────
 
   it('disconnect() during reconnect wait cancels the pending timer', async () => {
-    const transport = nodeTransport({
+    const transport = wsTransport({
       url: 'ws://localhost:9999',
       initialDelay: 1000,
       maxDelay: 30_000,
@@ -253,7 +253,7 @@ describe('nodeTransport — reconnect edge cases', () => {
 
   it('getToken() rejection schedules a retry instead of crashing', async () => {
     let callCount = 0
-    const transport = nodeTransport({
+    const transport = wsTransport({
       url: 'ws://localhost:9999',
       initialDelay: 100,
       maxDelay: 30_000,
@@ -289,7 +289,7 @@ describe('nodeTransport — reconnect edge cases', () => {
   // ── 5. reconnectAttempt resets on successful connection ──────────────────
 
   it('reconnectAttempt resets to 0 after a successful connection', async () => {
-    const transport = nodeTransport({
+    const transport = wsTransport({
       url: 'ws://localhost:9999',
       initialDelay: 100,
       maxDelay: 10_000,

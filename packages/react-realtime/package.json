@@ -9,19 +9,29 @@
       "import": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
       }
     }
   },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsup"
   },
   "dependencies": {
-    "@tanstack/realtime": "*",
-    "@tanstack/db": "*"
+    "@tanstack/db": "*",
+    "@tanstack/realtime": "workspace:*"
   },
   "peerDependencies": {
-    "react": ">=18.0.0",
-    "@tanstack/react-store": ">=0.0.0"
+    "@tanstack/react-store": ">=0.0.0",
+    "react": ">=18.0.0"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "devDependencies": {
+    "@standard-schema/spec": "^1.1.0"
+  }
 }

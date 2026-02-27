@@ -16,6 +16,7 @@ import {
   realtimeCollectionOptions,
 } from '@tanstack/realtime'
 import type { ConnectionStatus, RealtimeTransport } from '@tanstack/realtime'
+import type { CollectionConfig } from '@tanstack/db'
 
 // ---------------------------------------------------------------------------
 // Mock transport
@@ -73,18 +74,20 @@ interface Order {
 
 type WriteOp = { type: string; value?: unknown; key?: unknown }
 
-function driveSync(config: ReturnType<typeof realtimeCollectionOptions>): {
+function driveSync(config: CollectionConfig<any, any, any, any>): {
   ops: Array<WriteOp>
   stop: () => void
 } {
   const ops: Array<WriteOp> = []
   const stop = config.sync.sync({
+    collection: null as any,
     begin: () => {},
     write: (op: WriteOp) => ops.push(op),
     commit: () => {},
     markReady: () => {},
+    truncate: () => {},
   })
-  return { ops, stop }
+  return { ops, stop: stop as unknown as () => void }
 }
 
 // ---------------------------------------------------------------------------

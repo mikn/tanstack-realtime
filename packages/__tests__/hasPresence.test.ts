@@ -89,19 +89,19 @@ describe('hasPresence', () => {
   it('returns false when joinPresence is not a function', () => {
     const t = createBaseTransport() as unknown as Record<string, unknown>
     t['joinPresence'] = 'not-a-function'
-    expect(hasPresence(t as RealtimeTransport)).toBe(false)
+    expect(hasPresence(t as unknown as RealtimeTransport)).toBe(false)
   })
 
   it('returns false when joinPresence is null', () => {
     const t = createBaseTransport() as unknown as Record<string, unknown>
     t['joinPresence'] = null
-    expect(hasPresence(t as RealtimeTransport)).toBe(false)
+    expect(hasPresence(t as unknown as RealtimeTransport)).toBe(false)
   })
 
   it('returns false when joinPresence is undefined', () => {
     const t = createBaseTransport() as unknown as Record<string, unknown>
     t['joinPresence'] = undefined
-    expect(hasPresence(t as RealtimeTransport)).toBe(false)
+    expect(hasPresence(t as unknown as RealtimeTransport)).toBe(false)
   })
 
   it('returns true with only joinPresence defined (single-method check)', () => {
@@ -242,7 +242,7 @@ describe('createRealtimeClient — lifecycle', () => {
     transport.setStatus('connected')
 
     // After the subscription is restored, status should mirror the transport.
-    expect(client.store.state.status).toBe('connected')
+    expect(client.store.get().status).toBe('connected')
   })
 
   it('status store updates when transport status changes (normal path)', () => {
@@ -250,13 +250,13 @@ describe('createRealtimeClient — lifecycle', () => {
     const client = createRealtimeClient({ transport })
 
     transport.setStatus('connected')
-    expect(client.store.state.status).toBe('connected')
+    expect(client.store.get().status).toBe('connected')
 
     transport.setStatus('reconnecting')
-    expect(client.store.state.status).toBe('reconnecting')
+    expect(client.store.get().status).toBe('reconnecting')
 
     transport.setStatus('disconnected')
-    expect(client.store.state.status).toBe('disconnected')
+    expect(client.store.get().status).toBe('disconnected')
   })
 
   it('presence guards still work after destroy + reconnect', async () => {
@@ -274,25 +274,25 @@ describe('createRealtimeClient — lifecycle', () => {
 describe('withGapRecovery — presence guards', () => {
   it('throws joinPresence when inner transport is base-only', () => {
     const inner = createBaseTransport()
-    const transport = withGapRecovery(inner, { onGap: vi.fn() })
+    const transport = withGapRecovery(inner, { onGap: vi.fn() }) as any
     expect(() => transport.joinPresence('ch', {})).toThrow('withGapRecovery')
   })
 
   it('throws updatePresence when inner transport is base-only', () => {
     const inner = createBaseTransport()
-    const transport = withGapRecovery(inner, { onGap: vi.fn() })
+    const transport = withGapRecovery(inner, { onGap: vi.fn() }) as any
     expect(() => transport.updatePresence('ch', {})).toThrow('withGapRecovery')
   })
 
   it('throws leavePresence when inner transport is base-only', () => {
     const inner = createBaseTransport()
-    const transport = withGapRecovery(inner, { onGap: vi.fn() })
+    const transport = withGapRecovery(inner, { onGap: vi.fn() }) as any
     expect(() => transport.leavePresence('ch')).toThrow('withGapRecovery')
   })
 
   it('throws onPresenceChange when inner transport is base-only', () => {
     const inner = createBaseTransport()
-    const transport = withGapRecovery(inner, { onGap: vi.fn() })
+    const transport = withGapRecovery(inner, { onGap: vi.fn() }) as any
     expect(() => transport.onPresenceChange('ch', vi.fn())).toThrow(
       'withGapRecovery',
     )
@@ -300,7 +300,7 @@ describe('withGapRecovery — presence guards', () => {
 
   it('delegates presence methods when inner is presence-capable', () => {
     const inner = createPresenceTransport()
-    const transport = withGapRecovery(inner, { onGap: vi.fn() })
+    const transport = withGapRecovery(inner, { onGap: vi.fn() }) as any
     transport.joinPresence('ch', { id: 1 })
     expect(inner.joinPresence).toHaveBeenCalledWith('ch', { id: 1 })
   })
@@ -309,25 +309,25 @@ describe('withGapRecovery — presence guards', () => {
 describe('createOfflineQueue — presence guards', () => {
   it('throws joinPresence when inner transport is base-only', () => {
     const inner = createBaseTransport()
-    const queue = createOfflineQueue(inner)
+    const queue = createOfflineQueue(inner) as any
     expect(() => queue.joinPresence('ch', {})).toThrow('createOfflineQueue')
   })
 
   it('throws updatePresence when inner transport is base-only', () => {
     const inner = createBaseTransport()
-    const queue = createOfflineQueue(inner)
+    const queue = createOfflineQueue(inner) as any
     expect(() => queue.updatePresence('ch', {})).toThrow('createOfflineQueue')
   })
 
   it('throws leavePresence when inner transport is base-only', () => {
     const inner = createBaseTransport()
-    const queue = createOfflineQueue(inner)
+    const queue = createOfflineQueue(inner) as any
     expect(() => queue.leavePresence('ch')).toThrow('createOfflineQueue')
   })
 
   it('throws onPresenceChange when inner transport is base-only', () => {
     const inner = createBaseTransport()
-    const queue = createOfflineQueue(inner)
+    const queue = createOfflineQueue(inner) as any
     expect(() => queue.onPresenceChange('ch', vi.fn())).toThrow(
       'createOfflineQueue',
     )
@@ -335,7 +335,7 @@ describe('createOfflineQueue — presence guards', () => {
 
   it('delegates presence methods when inner is presence-capable', () => {
     const inner = createPresenceTransport()
-    const queue = createOfflineQueue(inner)
+    const queue = createOfflineQueue(inner) as any
     queue.joinPresence('ch', { user: 'bob' })
     expect(inner.joinPresence).toHaveBeenCalledWith('ch', { user: 'bob' })
   })

@@ -1,0 +1,8 @@
+#!/bin/sh
+# Pre-commit hook — fast checks to catch problems early.
+
+set -e
+
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm format:check

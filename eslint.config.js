@@ -12,7 +12,7 @@ export default [
   ...tanstackConfig,
   {
     // Use projectService so TypeScript ESLint handles the monorepo tsconfigs
-    // and files excluded from package-level tsconfigs (src/react, *.config.ts).
+    // and files excluded from package-level tsconfigs (*.config.ts).
     name: 'tanstack/realtime/project-service',
     languageOptions: {
       parserOptions: {

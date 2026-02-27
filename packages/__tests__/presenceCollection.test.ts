@@ -19,6 +19,7 @@ import {
   createRealtimeClient,
   presenceChannelOptions,
 } from '@tanstack/realtime'
+import type { CollectionConfig } from '@tanstack/db'
 import type {
   ConnectionStatus,
   PresenceCapable,
@@ -77,18 +78,20 @@ type UserData = { name: string; avatar: string }
 
 type WriteOp = { type: string; value?: unknown; key?: unknown }
 
-function driveSync(config: ReturnType<typeof presenceChannelOptions>): {
+function driveSync(config: CollectionConfig<any, any, any, any>): {
   ops: Array<WriteOp>
   stop: () => void
 } {
   const ops: Array<WriteOp> = []
   const stop = config.sync.sync({
-    begin: (_opts?: unknown) => {},
+    collection: null as any,
+    begin: () => {},
     write: (op: WriteOp) => ops.push(op),
     commit: () => {},
     markReady: () => {},
+    truncate: () => {},
   })
-  return { ops, stop }
+  return { ops, stop: stop as unknown as () => void }
 }
 
 // ---------------------------------------------------------------------------
@@ -359,14 +362,16 @@ describe('presenceChannelOptions — markReady called', () => {
     const config = presenceChannelOptions<UserData>({ client, channel: 'ch' })
 
     const markReady = vi.fn()
-    const stop = config.sync.sync({
+    const stopFn = config.sync.sync({
+      collection: null as any,
       begin: () => {},
       write: () => {},
       commit: () => {},
       markReady,
+      truncate: () => {},
     })
 
     expect(markReady).toHaveBeenCalledTimes(1)
-    stop()
+    ;(stopFn as unknown as () => void)()
   })
 })

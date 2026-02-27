@@ -280,7 +280,7 @@ describe('isSharedWorkerSupported — manual feature-detection pattern', () => {
     const saved = removeSharedWorker()
     try {
       const fallback = vi.fn(() => createFallbackTransport())
-      const fallback2 = vi.fn(() => createFallbackTransport())
+      const fallback2 = vi.fn((_url: string) => createFallbackTransport())
 
       // Pattern A: use fallback param
       createSharedWorkerTransport('wss://example.com/worker.js', fallback)

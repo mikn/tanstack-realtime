@@ -1,11 +1,18 @@
 import { randomBytes } from 'node:crypto'
 import { WebSocket, WebSocketServer } from 'ws'
-import { parseChannel } from '@tanstack/realtime'
+import {
+  createServerStream,
+  parseChannel,
+  serializeKey,
+} from '@tanstack/realtime'
 import type { IncomingMessage, Server } from 'node:http'
 import type {
   ChannelPermissions,
   ParsedChannel,
   PresenceUser,
+  QueryKey,
+  ServerStream,
+  ValidatePublishFn,
 } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
@@ -15,16 +22,52 @@ import type {
 type ClientMsg =
   | { type: 'subscribe'; channel: string }
   | { type: 'unsubscribe'; channel: string }
-  | { type: 'publish'; channel: string; data: unknown }
+  | { type: 'publish'; channel: string; data: unknown; requestId?: string }
   | { type: 'presence:join'; channel: string; data: unknown }
   | { type: 'presence:update'; channel: string; data: unknown }
   | { type: 'presence:leave'; channel: string }
+
+const VALID_CLIENT_MSG_TYPES = new Set([
+  'subscribe',
+  'unsubscribe',
+  'publish',
+  'presence:join',
+  'presence:update',
+  'presence:leave',
+])
+
+/**
+ * Validate that a parsed JSON value has the expected shape of a ClientMsg.
+ * Returns the validated message, or null if the shape is invalid.
+ */
+function validateClientMsg(raw: unknown): ClientMsg | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const msg = raw as Record<string, unknown>
+  if (typeof msg.type !== 'string') return null
+  if (!VALID_CLIENT_MSG_TYPES.has(msg.type)) return null
+
+  switch (msg.type) {
+    case 'subscribe':
+    case 'unsubscribe':
+    case 'presence:leave':
+      return typeof msg.channel === 'string' ? (msg as ClientMsg) : null
+    case 'publish':
+      return typeof msg.channel === 'string' ? (msg as ClientMsg) : null
+    case 'presence:join':
+    case 'presence:update':
+      return typeof msg.channel === 'string' ? (msg as ClientMsg) : null
+    default:
+      return null
+  }
+}
 
 type ServerMsg =
   | { type: 'connected'; connectionId: string }
   | { type: 'subscribe:ok'; channel: string }
   | { type: 'subscribe:error'; channel: string; code: number; reason: string }
   | { type: 'message'; channel: string; data: unknown }
+  | { type: 'publish:ack'; requestId: string }
+  | { type: 'publish:error'; requestId: string; reason: string }
   | {
       type: 'presence:update'
       channel: string
@@ -52,6 +95,27 @@ export interface NodeServerOptions {
   ) => Promise<ChannelPermissions>
   /** WebSocket path. Defaults to `/_realtime`. */
   path?: string
+
+  /**
+   * Server-side publish validation. Called before fan-out when a client
+   * publishes a message. When omitted, all authorized publishes are
+   * accepted as-is.
+   *
+   * When the client includes a `requestId` in the publish message,
+   * the server sends back `publish:ack` or `publish:error` so the
+   * client can await confirmation.
+   *
+   * @example
+   * onPublish: async ({ channel, data, userId }) => {
+   *   if (channel.namespace === 'todos') {
+   *     const result = todoSchema.safeParse(data)
+   *     if (!result.success) return { accepted: false, reason: result.error.message }
+   *     return { accepted: true, data: result.data }
+   *   }
+   *   return { accepted: true }
+   * }
+   */
+  onPublish?: ValidatePublishFn
 }
 
 export interface NodeServer {
@@ -64,6 +128,24 @@ export interface NodeServer {
   publish: (channel: string, data: unknown) => void
   /** Close all connections and shut down. */
   close: () => Promise<void>
+
+  /**
+   * Create a server-side stream for pushing events to a channel.
+   *
+   * The stream handle wraps `publish()` and adds sentinel events for
+   * `done()` and `error()`. Clients consume via `streamChannelOptions`.
+   *
+   * @example
+   * const stream = nodeServer.createStream({ channel: ['ai', { sessionId }] })
+   * for await (const chunk of llmResponse) {
+   *   await stream.push({ type: 'token', content: chunk })
+   * }
+   * await stream.done()
+   */
+  createStream: <TEvent = unknown>(options: {
+    channel: QueryKey | string
+    hmacKey?: string
+  }) => ServerStream<TEvent>
 }
 
 // ---------------------------------------------------------------------------
@@ -112,7 +194,7 @@ type PresenceChannels = Map<string, Map<string, unknown>>
  * nodeServer.attach(httpServer)
  */
 export function createNodeServer(options: NodeServerOptions): NodeServer {
-  const { getUser, authorize, path = '/_realtime' } = options
+  const { getUser, authorize, path = '/_realtime', onPublish } = options
 
   let wss: WebSocketServer | null = null
   const connections = new Map<string, ConnectionState>()
@@ -168,12 +250,14 @@ export function createNodeServer(options: NodeServerOptions): NodeServer {
   }
 
   async function handleMessage(conn: ConnectionState, raw: string) {
-    let msg: ClientMsg
+    let parsed: unknown
     try {
-      msg = JSON.parse(raw) as ClientMsg
+      parsed = JSON.parse(raw)
     } catch {
       return
     }
+    const msg = validateClientMsg(parsed)
+    if (!msg) return
 
     switch (msg.type) {
       case 'subscribe': {
@@ -200,8 +284,60 @@ export function createNodeServer(options: NodeServerOptions): NodeServer {
 
       case 'publish': {
         const perms = conn.authorizedChannels.get(msg.channel)
-        if (!perms?.publish) return
-        fanOut(msg.channel, msg.data, conn.connectionId)
+        if (!perms?.publish) {
+          if (msg.requestId) {
+            sendTo(conn.ws, {
+              type: 'publish:error',
+              requestId: msg.requestId,
+              reason: 'unauthorized',
+            })
+          }
+          return
+        }
+
+        if (onPublish) {
+          const parsed = parseChannel(msg.channel)
+          try {
+            const result = await onPublish({
+              channel: parsed,
+              rawChannel: msg.channel,
+              data: msg.data,
+              userId: conn.userId,
+            })
+            if (!result.accepted) {
+              if (msg.requestId) {
+                sendTo(conn.ws, {
+                  type: 'publish:error',
+                  requestId: msg.requestId,
+                  reason: result.reason ?? 'Validation failed',
+                })
+              }
+              return
+            }
+            const publishData =
+              result.data !== undefined ? result.data : msg.data
+            fanOut(msg.channel, publishData, conn.connectionId)
+          } catch (err) {
+            if (msg.requestId) {
+              sendTo(conn.ws, {
+                type: 'publish:error',
+                requestId: msg.requestId,
+                reason:
+                  err instanceof Error ? err.message : 'Internal server error',
+              })
+            }
+            return
+          }
+        } else {
+          fanOut(msg.channel, msg.data, conn.connectionId)
+        }
+
+        if (msg.requestId) {
+          sendTo(conn.ws, {
+            type: 'publish:ack',
+            requestId: msg.requestId,
+          })
+        }
         break
       }
 
@@ -301,6 +437,20 @@ export function createNodeServer(options: NodeServerOptions): NodeServer {
 
     publish(channel: string, data: unknown) {
       fanOut(channel, data)
+    },
+
+    createStream<TEvent = unknown>(opts: {
+      channel: QueryKey | string
+      hmacKey?: string
+    }): ServerStream<TEvent> {
+      return createServerStream<TEvent>({
+        publish: async (ch, data) => {
+          const serialized = typeof ch === 'string' ? ch : serializeKey(ch)
+          fanOut(serialized, data)
+        },
+        channel: opts.channel,
+        hmacKey: opts.hmacKey,
+      })
     },
 
     async close(): Promise<void> {

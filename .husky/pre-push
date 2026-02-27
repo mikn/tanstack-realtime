@@ -1,0 +1,28 @@
+#!/bin/sh
+# Pre-push hook — mirrors the CI pipeline so failures are caught locally.
+# Runs: lockfile check, lint, format, knip, build, test, size.
+
+set -e
+
+echo "🔒 Checking lockfile is up to date..."
+pnpm install --frozen-lockfile
+
+echo "🔍 Linting..."
+pnpm lint
+
+echo "🎨 Checking formatting..."
+pnpm format:check
+
+echo "🧹 Checking for unused exports..."
+pnpm knip
+
+echo "🔨 Building packages..."
+pnpm build
+
+echo "🧪 Running tests..."
+pnpm test
+
+echo "📦 Checking bundle size..."
+pnpm size
+
+echo "✅ All CI checks passed — pushing."

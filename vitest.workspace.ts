@@ -39,6 +39,7 @@ export default defineWorkspace([
       name: 'node',
       environment: 'node',
       globals: true,
+      setupFiles: ['packages/__tests__/setup.ts'],
       include: [
         'packages/__tests__/integration.test.ts',
         'packages/__tests__/stream.test.ts',
@@ -58,9 +59,16 @@ export default defineWorkspace([
         'packages/__tests__/ephemeralLive.test.ts',
         'packages/__tests__/sharedWorkerFallback.test.ts',
         'packages/__tests__/sse.test.ts',
-        'packages/__tests__/reconnect-edge-cases.test.ts',
+        'packages/__tests__/reconnectEdgeCases.test.ts',
         'packages/__tests__/spectrum.test.ts',
-        'packages/__tests__/docs-examples.test.ts',
+        'packages/__tests__/docsExamples.test.ts',
+        'packages/__tests__/broadcastChannelTransport.test.ts',
+        'packages/__tests__/offlineQueueStorage.test.ts',
+        'packages/__tests__/validation.test.ts',
+        'packages/__tests__/optimisticMode.test.ts',
+        'packages/__tests__/serverStream.test.ts',
+        'packages/__tests__/tickTransport.test.ts',
+        'packages/__tests__/coreInvariants.test.ts',
       ],
       pool: 'forks',
       poolOptions: { forks: { singleFork: true } },
@@ -92,11 +100,9 @@ export default defineWorkspace([
 
   // ── Workerd runtime compatibility tests ──────────────────────────────────
   // Runs inside the real workerd runtime via @cloudflare/vitest-pool-workers.
-  // Verifies that nodeTransport from @tanstack/realtime-preset-node is
-  // workerd-compatible: the "browser": { "ws": false } field in that
-  // package's package.json tells wrangler's esbuild to exclude the `ws`
-  // package, leaving the transport to use globalThis.WebSocket (which
-  // exists in workerd) instead.
+  // Verifies that wsTransport from @tanstack/realtime is workerd-compatible:
+  // it uses globalThis.WebSocket (which exists in workerd) with no
+  // Node.js-specific dependencies.
   //
   // NOTE: wrangler bundles via esbuild and resolves @tanstack/realtime-preset-node
   // from the built dist/ via the workspace symlink. Run `npm run build` before

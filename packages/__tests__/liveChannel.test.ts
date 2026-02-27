@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Store } from '@tanstack/store'
 import { createRealtimeClient, liveChannelOptions } from '@tanstack/realtime'
 import type { RealtimeTransport } from '@tanstack/realtime'
+import type { CollectionConfig } from '@tanstack/db'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -43,18 +44,20 @@ function createMockTransport(): RealtimeTransport & {
 
 type WriteOp = { type: string; value?: unknown; key?: unknown }
 
-function driveSync(config: ReturnType<typeof liveChannelOptions>): {
+function driveSync(config: CollectionConfig<any, any, any, any>): {
   ops: Array<WriteOp>
   stop: () => void
 } {
   const ops: Array<WriteOp> = []
   const stop = config.sync.sync({
+    collection: null as any,
     begin: () => {},
     write: (op: WriteOp) => ops.push(op),
     commit: () => {},
     markReady: () => {},
+    truncate: () => {},
   })
-  return { ops, stop }
+  return { ops, stop: stop as unknown as () => void }
 }
 
 /** A manually-resolved promise — lets tests control exactly when async work completes. */

@@ -9,14 +9,37 @@
       "import": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./server": {
+      "import": {
+        "types": "./dist/server/index.d.ts",
+        "default": "./dist/server/index.js"
+      },
+      "require": {
+        "types": "./dist/server/index.d.cts",
+        "default": "./dist/server/index.cjs"
       }
     }
   },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "sideEffects": false,
   "scripts": {
     "build": "tsup"
   },
-  "dependencies": {
+  "dependencies": {},
+  "peerDependencies": {
+    "@tanstack/db": ">=0.0.1",
+    "@tanstack/store": ">=0.0.1"
+  },
+  "devDependencies": {
+    "@standard-schema/spec": "^1.1.0",
     "@tanstack/db": "*",
     "@tanstack/store": "*"
   }

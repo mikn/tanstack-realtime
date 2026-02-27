@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "fixed": [],
+  "linked": [
+    [
+      "@tanstack/realtime",
+      "@tanstack/react-realtime",
+      "@tanstack/realtime-preset-node",
+      "@tanstack/realtime-adapter-centrifugo",
+      "@tanstack/realtime-adapter-sse"
+    ]
+  ],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": []
+}

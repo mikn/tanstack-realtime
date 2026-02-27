@@ -27,8 +27,11 @@ export function generateClientId(): string {
 
 // ---------------------------------------------------------------------------
 // Lamport clock — monotonically increasing counter for causal ordering.
-// Shared across all CRDT operations in this JS session so every publish
-// from this client is totally ordered relative to any other.
+//
+// In browser environments a single module-level clock is fine because each
+// tab gets its own module instance. In persistent server processes (e.g.
+// Node.js servers handling requests for many users), a module-global clock
+// leaks state across clients. Use `createClock()` for per-instance isolation.
 // ---------------------------------------------------------------------------
 
 let _clock = 0
@@ -41,6 +44,50 @@ export function tickClock(): number {
 /** Advance the local clock past an incoming value. Call on every receive. */
 export function advanceClock(incoming: number): void {
   if (incoming >= _clock) _clock = incoming + 1
+}
+
+/**
+ * Reset the module-global clock to zero. Intended for testing only.
+ * @internal
+ */
+export function resetClock(): void {
+  _clock = 0
+}
+
+// ---------------------------------------------------------------------------
+// Scoped Lamport clock — per-instance isolation for server environments.
+// ---------------------------------------------------------------------------
+
+export interface LamportClock {
+  /** Increment and return the new clock value. */
+  tick: () => number
+  /** Advance past an incoming value. */
+  advance: (incoming: number) => void
+  /** Current clock value (readonly). */
+  readonly value: number
+}
+
+/**
+ * Create an isolated Lamport clock instance.
+ *
+ * Use this on the server side where multiple clients share the same process.
+ * Each `createRealtimeClient` or request handler gets its own clock so
+ * clock values don't leak between unrelated clients.
+ *
+ * In browser environments the module-level `tickClock` / `advanceClock`
+ * are fine because each tab has its own module instance.
+ */
+export function createClock(): LamportClock {
+  let clock = 0
+  return {
+    tick: () => ++clock,
+    advance: (incoming: number) => {
+      if (incoming >= clock) clock = incoming + 1
+    },
+    get value() {
+      return clock
+    },
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -211,6 +258,23 @@ export function mergeOr(a: OrState, b: OrState): OrState {
   for (const e of a.entries) seen.set(e.tag, e)
   for (const e of b.entries) seen.set(e.tag, e)
   return { entries: Array.from(seen.values()) }
+}
+
+/**
+ * Compact an OR-Set by keeping only one tag per unique value (key).
+ *
+ * Over time, repeated add/remove cycles accumulate tombstone-style entries.
+ * `compactOr` deduplicates: for each unique `key`, only the *last* tag is
+ * retained. This is semantics-preserving because `orValues` already dedupes
+ * by key, and `orRemove` drops *all* entries for a key.
+ *
+ * Call periodically (e.g. after merge) to bound memory growth.
+ */
+export function compactOr(state: OrState): OrState {
+  // Keep the last entry per key (iterating forward, later entries overwrite).
+  const byKey = new Map<string, OrEntry>()
+  for (const e of state.entries) byKey.set(e.key, e)
+  return { entries: Array.from(byKey.values()) }
 }
 
 /** Return a new OrState with `value` added (fresh unique tag). */

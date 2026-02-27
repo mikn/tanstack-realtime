@@ -1,6 +1,7 @@
 import { serializeKey } from '../core/serializeKey.js'
 import {
   advanceClock,
+  compactOr,
   initOrFromArray,
   lwwWins,
   mergeOr,
@@ -48,12 +49,23 @@ export interface RealtimeChannelMessage<T = unknown> {
    * convergence. Non-CRDT receivers can safely ignore it and read `data`.
    */
   _crdt?: CrdtMessageHeader
+  /**
+   * Client-generated nonce for echo suppression. Present only when the
+   * sender uses `optimistic: true`. The receiving client checks this +
+   * `_clientId` to skip processing messages it originated itself.
+   */
+  _nonce?: string
+  /**
+   * Client ID of the originator. Used together with `_nonce` for echo
+   * suppression in optimistic mode.
+   */
+  _clientId?: string
 }
 
 export interface RealtimeCollectionConfig<
   T extends object = Record<string, unknown>,
   TKey extends string | number = string,
-  TSchema extends StandardSchemaV1 = StandardSchemaV1,
+  TSchema extends StandardSchemaV1 = never,
 > {
   /**
    * The realtime client that manages the underlying transport.
@@ -164,6 +176,34 @@ export interface RealtimeCollectionConfig<
    * }
    */
   onMessage?: (raw: unknown) => RealtimeChannelMessage<T> | null | undefined
+
+  /**
+   * When `true`, published messages from this client include `_nonce` and
+   * `_clientId` fields. When such messages are echoed back from the channel,
+   * they are suppressed (not applied twice).
+   *
+   * This works with TanStack DB's built-in optimistic transaction system:
+   * - The mutation callback runs asynchronously
+   * - If the callback rejects, TanStack DB rolls back the optimistic state
+   * - The publish-back happens after the callback succeeds
+   * - Echo suppression prevents double-application
+   *
+   * @default false
+   */
+  optimistic?: boolean
+
+  /**
+   * Called when an optimistic mutation fails (the `onInsert`/`onUpdate`/
+   * `onDelete` callback throws). Useful for showing toast notifications.
+   *
+   * Only relevant when `optimistic: true`. TanStack DB handles the actual
+   * rollback automatically — this callback is for UI feedback only.
+   */
+  onOptimisticError?: (params: {
+    action: 'insert' | 'update' | 'delete'
+    key: TKey
+    error: unknown
+  }) => void
 
   /** Called after a local insert. Should persist to the server. */
   onInsert?: InsertMutationFn<T, TKey>
@@ -293,7 +333,7 @@ function mergeCrdtRow<T extends object>(
       }
       const wire = crdtHeader?.fields[field] as OrWire | undefined
       if (wire) {
-        const merged = mergeOr(prevState, wire)
+        const merged = compactOr(mergeOr(prevState, wire))
         newCrdt[field] = merged
         result[field] = orValues(merged)
       } else {
@@ -449,7 +489,7 @@ function buildCrdtFields<T extends object>(
 export function realtimeCollectionOptions<
   T extends object = Record<string, unknown>,
   TKey extends string | number = string,
-  TSchema extends StandardSchemaV1 = StandardSchemaV1,
+  TSchema extends StandardSchemaV1 = never,
 >(
   config: RealtimeCollectionConfig<T, TKey, TSchema>,
 ): CollectionConfig<T, TKey, TSchema> {
@@ -460,6 +500,8 @@ export function realtimeCollectionOptions<
     fields,
     queryFn,
     refetchOnReconnect = false,
+    optimistic = false,
+    onOptimisticError,
     onInsert,
     onUpdate,
     onDelete,
@@ -496,6 +538,15 @@ export function realtimeCollectionOptions<
   // Per-row: derived plain row + per-field CRDT internal state.
   const syncedEntries = new Map<TKey, RowEntry<T>>()
 
+  // Echo suppression: track nonces of in-flight optimistic operations.
+  // When we receive a message with a matching _clientId + _nonce, we skip it.
+  let nonceCounter = 0
+  const pendingNonces = new Set<string>()
+
+  function generateNonce(): string {
+    return `${client?.clientId ?? 'unknown'}-${++nonceCounter}`
+  }
+
   // ---------------------------------------------------------------------------
   // Message processing
   // ---------------------------------------------------------------------------
@@ -509,6 +560,16 @@ export function realtimeCollectionOptions<
       : (raw as RealtimeChannelMessage<T>)
 
     if (!msg || typeof msg.action !== 'string') return
+
+    // Echo suppression: if this message originated from us (optimistic mode),
+    // skip it to prevent double-application. The optimistic state was already
+    // applied by TanStack DB's transaction system.
+    if (optimistic && msg._nonce && msg._clientId === client?.clientId) {
+      if (pendingNonces.has(msg._nonce)) {
+        pendingNonces.delete(msg._nonce)
+        return
+      }
+    }
 
     if (msg.action === 'delete') {
       const key = getKey(msg.data)
@@ -660,9 +721,43 @@ export function realtimeCollectionOptions<
   // Mutation wrappers
   // ---------------------------------------------------------------------------
 
+  function buildPublishMessage(
+    action: 'insert' | 'update' | 'delete',
+    data: T,
+    entry: RowEntry<T> | undefined,
+    nonce: string | undefined,
+  ): RealtimeChannelMessage {
+    const crdtFields =
+      entry && fields
+        ? buildCrdtFields(entry, data, fields, client!.clientId)
+        : {}
+    return {
+      action,
+      data: stripLocalFields(data, fields),
+      ...(Object.keys(crdtFields).length > 0 && {
+        _crdt: { fields: crdtFields },
+      }),
+      ...(nonce && { _nonce: nonce, _clientId: client!.clientId }),
+    }
+  }
+
   const wrappedOnInsert: InsertMutationFn<T, TKey> | undefined = onInsert
     ? async (params) => {
-        const result = await onInsert(params)
+        const nonce = optimistic ? generateNonce() : undefined
+        if (nonce) pendingNonces.add(nonce)
+
+        let result: T | null | undefined
+        try {
+          result = await onInsert(params)
+        } catch (err) {
+          if (nonce) pendingNonces.delete(nonce)
+          if (onOptimisticError) {
+            const key = params.transaction.mutations[0].key as TKey
+            onOptimisticError({ action: 'insert', key, error: err })
+          }
+          throw err
+        }
+
         if (result != null) {
           const key = getKey(result)
           const entry: RowEntry<T> = {
@@ -672,17 +767,19 @@ export function realtimeCollectionOptions<
           syncedEntries.set(key, entry)
 
           if (primaryChannel && client) {
-            const crdtFields = fields
-              ? buildCrdtFields(entry, result, fields, client.clientId)
-              : {}
-            await client.publish(primaryChannel, {
-              action: 'insert',
-              data: stripLocalFields(result, fields),
-              ...(Object.keys(crdtFields).length > 0 && {
-                _crdt: { fields: crdtFields },
-              }),
-            } satisfies RealtimeChannelMessage)
+            try {
+              await client.publish(
+                primaryChannel,
+                buildPublishMessage('insert', result, entry, nonce),
+              )
+            } catch {
+              // Publish failed after mutation succeeded. Clean up the nonce
+              // to prevent it from leaking in pendingNonces forever.
+              if (nonce) pendingNonces.delete(nonce)
+            }
           }
+        } else if (nonce) {
+          pendingNonces.delete(nonce)
         }
         return result
       }
@@ -690,7 +787,21 @@ export function realtimeCollectionOptions<
 
   const wrappedOnUpdate: UpdateMutationFn<T, TKey> | undefined = onUpdate
     ? async (params) => {
-        const result = await onUpdate(params)
+        const nonce = optimistic ? generateNonce() : undefined
+        if (nonce) pendingNonces.add(nonce)
+
+        let result: T | null | undefined
+        try {
+          result = await onUpdate(params)
+        } catch (err) {
+          if (nonce) pendingNonces.delete(nonce)
+          if (onOptimisticError) {
+            const key = params.transaction.mutations[0].key as TKey
+            onOptimisticError({ action: 'update', key, error: err })
+          }
+          throw err
+        }
+
         if (result != null) {
           const key = getKey(result)
           const entry: RowEntry<T> = syncedEntries.get(key) ?? {
@@ -700,18 +811,19 @@ export function realtimeCollectionOptions<
           syncedEntries.set(key, entry)
 
           if (primaryChannel && client) {
-            const crdtFields = fields
-              ? buildCrdtFields(entry, result, fields, client.clientId)
-              : {}
+            // buildPublishMessage calls buildCrdtFields which reads entry.row
+            // as the previous state for delta computation. We must NOT update
+            // entry.row until after the message is built.
+            const msg = buildPublishMessage('update', result, entry, nonce)
             entry.row = result
-            await client.publish(primaryChannel, {
-              action: 'update',
-              data: stripLocalFields(result, fields),
-              ...(Object.keys(crdtFields).length > 0 && {
-                _crdt: { fields: crdtFields },
-              }),
-            } satisfies RealtimeChannelMessage)
+            try {
+              await client.publish(primaryChannel, msg)
+            } catch {
+              if (nonce) pendingNonces.delete(nonce)
+            }
           }
+        } else if (nonce) {
+          pendingNonces.delete(nonce)
         }
         return result
       }
@@ -719,16 +831,36 @@ export function realtimeCollectionOptions<
 
   const wrappedOnDelete: DeleteMutationFn<T, TKey> | undefined = onDelete
     ? async (params) => {
-        const result = await onDelete(params)
+        const nonce = optimistic ? generateNonce() : undefined
+        if (nonce) pendingNonces.add(nonce)
+
+        let result: T | null | undefined
+        try {
+          result = await onDelete(params)
+        } catch (err) {
+          if (nonce) pendingNonces.delete(nonce)
+          if (onOptimisticError) {
+            const key = params.transaction.mutations[0].key as TKey
+            onOptimisticError({ action: 'delete', key, error: err })
+          }
+          throw err
+        }
+
         if (result != null) {
           syncedEntries.delete(getKey(result))
 
           if (primaryChannel && client) {
-            await client.publish(primaryChannel, {
-              action: 'delete',
-              data: result,
-            } satisfies RealtimeChannelMessage)
+            try {
+              await client.publish(
+                primaryChannel,
+                buildPublishMessage('delete', result, undefined, nonce),
+              )
+            } catch {
+              if (nonce) pendingNonces.delete(nonce)
+            }
           }
+        } else if (nonce) {
+          pendingNonces.delete(nonce)
         }
         return result
       }

@@ -85,12 +85,20 @@ export interface RealtimeTransport {
    * Calling the returned function removes the listener. When the last
    * listener for a channel is removed the transport sends `unsubscribe` to
    * the server.
+   *
+   * Transport implementations receive `unknown` data. For typed
+   * subscriptions, use {@link RealtimeClient.subscribe} which narrows the
+   * type via a generic parameter.
    */
   subscribe: (channel: string, onMessage: (data: unknown) => void) => () => void
 
   /**
    * Publish `data` to `channel`.
    * Silently dropped if the transport is not currently connected.
+   *
+   * Transport implementations accept `unknown` data. For typed
+   * publishes, use {@link RealtimeClient.publish} which constrains the
+   * type via a generic parameter.
    */
   publish: (channel: string, data: unknown) => Promise<void>
 
@@ -150,6 +158,23 @@ export interface PresenceCapable {
     callback: (users: ReadonlyArray<PresenceUser>) => void,
   ) => () => void
 }
+
+/**
+ * Utility type for transport middleware that preserves the presence capability
+ * of the inner transport. Use in place of `RealtimeTransport` when writing
+ * middleware that conditionally forwards presence methods.
+ *
+ * @example
+ * function myMiddleware<T extends RealtimeTransport>(
+ *   inner: T,
+ * ): PresenceAwareTransport<T> & { myCustomMethod: () => void } {
+ *   // ...
+ * }
+ */
+export type PresenceAwareTransport<T extends RealtimeTransport> =
+  T extends PresenceCapable
+    ? RealtimeTransport & PresenceCapable
+    : RealtimeTransport
 
 /**
  * Type guard — returns `true` when `transport` implements {@link PresenceCapable}.
@@ -242,17 +267,27 @@ export interface RealtimeClient {
 
   /**
    * Subscribe to a serialized channel string. Returns an unsubscribe function.
+   *
+   * The type parameter `T` narrows the message data type. Defaults to
+   * `unknown` — use it when you know the shape of messages on a channel.
+   *
    * Prefer `realtimeCollectionOptions` or `liveChannelOptions` for
    * collection-backed subscriptions.
    */
-  subscribe: (channel: string, onMessage: (data: unknown) => void) => () => void
+  subscribe: <T = unknown>(
+    channel: string,
+    onMessage: (data: T) => void,
+  ) => () => void
 
   /**
    * Publish `data` to a channel.
+   *
+   * The type parameter `T` constrains the data type. Defaults to `unknown`.
+   *
    * Accepts either a pre-serialized channel string or a `QueryKey` array
    * (which is serialized via `serializeKey` before sending).
    */
-  publish: (key: QueryKey | string, data: unknown) => Promise<void>
+  publish: <T = unknown>(key: QueryKey | string, data: T) => Promise<void>
 
   /**
    * Join the presence set for `channel` with the given `data`.

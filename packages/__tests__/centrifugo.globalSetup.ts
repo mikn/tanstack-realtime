@@ -28,6 +28,12 @@ import { fileURLToPath } from 'node:url'
 import type { ChildProcess } from 'node:child_process'
 import type { GlobalSetupContext } from 'vitest/node'
 
+declare module 'vitest' {
+  export interface ProvidedContext {
+    centrifugoPort: number
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Paths
 // ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 # TanStack Realtime
 
-> Framework-agnostic realtime primitives — live collections, pub/sub messaging, presence, and CRDT state — built for [TanStack DB](https://github.com/TanStack/db).
+> Add realtime to your existing app — keep your server, your database, your deploy target. Live collections, pub/sub, presence, and CRDTs as a transport layer, not a platform. Built for [TanStack DB](https://github.com/TanStack/db).
 
 [![npm version](https://img.shields.io/npm/v/@tanstack/realtime)](https://www.npmjs.com/package/@tanstack/realtime)
 [![License](https://img.shields.io/github/license/mikn/tanstack-realtime)](LICENSE)
@@ -12,21 +12,22 @@
 > TanStack Realtime library could look like. Use it to experiment, get inspired,
 > or contribute ideas — but do not rely on it in production.
 
-- **Transport-agnostic** — works with WebSockets (Node.js), Server-Sent Events, or Centrifugo out of the box; bring your own transport for anything else
-- **Live collections** — wire TanStack DB collections to realtime channels with a single config object
-- **Presence** — track who is connected to a channel; current user always excluded from the list
-- **CRDT primitives** — conflict-free last-write-wins, PN-counters, and OR-sets for collaborative state
-- **Resilient by default** — exponential back-off reconnection, offline queue, deduplication, gap recovery, and SharedWorker transport for multi-tab apps
+- **Keep your backend** — not a platform. Your Express routes, your Postgres, your deploy target stay exactly where they are. Add a `channel` to one collection and it goes live.
+- **One feature at a time** — start with `queryFn`. Add `channel` when ready. Add `fields` for CRDTs when you need conflict resolution. Each step is one config key — stop at any point.
+- **Pub/sub + presence** — chat, typing indicators, live cursors, and activity feeds are first-class. These aren't database rows — they need channels and presence, not table sync.
+- **Client-side CRDTs** — `{ votes: 'pn-counter', tags: 'or-set' }`. Merging happens on the client. Your server just stores and relays — no CRDT logic server-side.
+- **Swap transports, not code** — `wsTransport` → `centrifugoTransport` → `sseTransport`. One import swap. Your collections and hooks don't change.
+- **Resilient by default** — offline queue, gap recovery, deduplication, and automatic multi-tab coordination (SharedWorker → BroadcastChannel → direct)
 
 ## Packages
 
-| Package                                                                         | Description                                                                    |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| [`@tanstack/realtime`](#tanstackrealtime)                                       | Core client, collection helpers, CRDT primitives, and type definitions         |
-| [`@tanstack/react-realtime`](#tanstackreact-realtime)                           | React hooks and provider                                                       |
-| [`@tanstack/realtime-preset-node`](#tanstackrealtime-preset-node)               | WebSocket transport + Node.js server for local dev and self-hosted deployments |
-| [`@tanstack/realtime-adapter-centrifugo`](#tanstackrealtime-adapter-centrifugo) | Transport adapter for [Centrifugo](https://centrifugal.dev)                    |
-| [`@tanstack/realtime-adapter-sse`](#tanstackrealtime-adapter-sse)               | Server-Sent Events transport adapter                                           |
+| Package                                                                         | Description                                                            |
+| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| [`@tanstack/realtime`](#tanstackrealtime)                                       | Core client, collection helpers, CRDT primitives, and type definitions |
+| [`@tanstack/react-realtime`](#tanstackreact-realtime)                           | React hooks and provider                                               |
+| [`@tanstack/realtime-preset-node`](#tanstackrealtime-preset-node)               | Node.js server for local dev and self-hosted deployments               |
+| [`@tanstack/realtime-adapter-centrifugo`](#tanstackrealtime-adapter-centrifugo) | Transport adapter for [Centrifugo](https://centrifugal.dev)            |
+| [`@tanstack/realtime-adapter-sse`](#tanstackrealtime-adapter-sse)               | Server-Sent Events transport adapter                                   |
 
 ---
 
@@ -43,15 +44,58 @@ npm install @tanstack/realtime
 ### Creating a client
 
 ```ts
-import { createRealtimeClient } from '@tanstack/realtime'
-import { nodeTransport } from '@tanstack/realtime-preset-node'
+import {
+  createCoordinatedTransport,
+  createRealtimeClient,
+  wsTransport,
+} from '@tanstack/realtime'
 
+// Recommended: automatic multi-tab coordination
 export const client = createRealtimeClient({
-  transport: nodeTransport({ url: 'ws://localhost:3000' }),
+  transport: createCoordinatedTransport({
+    transport: () => wsTransport({ url: 'ws://localhost:3000' }),
+  }),
 })
 
 await client.connect()
 ```
+
+### Multi-Tab Coordination
+
+When a user opens your app in multiple browser tabs, each tab would normally open its own WebSocket — multiplying server load, bandwidth, and the potential for state conflicts. `createCoordinatedTransport` solves this by sharing a single connection across all tabs. It picks the best available strategy automatically:
+
+| Strategy             | When used                                                                              | How it works                                                                                                                                                                                                                                                                       |
+| -------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SharedWorker**     | `workerUrl` is provided and `SharedWorker` API is available                            | The browser spawns a **separate worker process** from the URL you provide. This worker lives independently of any tab — it survives tab close, sleep, and crashes. All tabs connect to it via `MessagePort`. No election, no heartbeat.                                            |
+| **BroadcastChannel** | No `workerUrl` (or `SharedWorker` unavailable) and `BroadcastChannel` API is available | One tab is elected **leader** and holds the real connection. Other tabs proxy through `BroadcastChannel` messages. Includes heartbeat-based failure detection — if the leader tab closes or crashes, a new leader is elected automatically. **Zero config — this is the default.** |
+| **Direct**           | Neither API is available                                                               | Each tab opens its own connection. No coordination.                                                                                                                                                                                                                                |
+
+**Why does SharedWorker need a `workerUrl`?** SharedWorker is a browser API that runs code in a separate thread, shared across tabs. Unlike BroadcastChannel (which is just a messaging API you use inline), the browser needs to **load a separate JavaScript file** to run the worker. That file sets up the coordinator with your transport config:
+
+```ts
+// realtime.worker.ts — a separate file your bundler produces
+import { createSharedWorkerCoordinator } from '@tanstack/realtime'
+import { wsTransport } from '@tanstack/realtime'
+
+const coordinator = createSharedWorkerCoordinator(
+  wsTransport({ url: 'wss://rt.example.com' }),
+)
+
+self.addEventListener('connect', (e) => {
+  coordinator.connect((e as MessageEvent).ports[0]!)
+})
+```
+
+Then in your app code you point to it:
+
+```ts
+const transport = createCoordinatedTransport({
+  transport: () => wsTransport({ url: 'wss://rt.example.com' }),
+  workerUrl: new URL('./realtime.worker.ts', import.meta.url),
+})
+```
+
+**For most apps, you don't need this.** The BroadcastChannel default works great with zero setup. SharedWorker is the premium option for apps that need maximum robustness (no election delay, survives tab crashes instantly, no heartbeat overhead).
 
 ---
 
@@ -177,7 +221,7 @@ function StatusBar() {
 
 ## `@tanstack/realtime-preset-node`
 
-Self-contained WebSocket server and matching client transport. Suitable for local development, self-hosted deployments, and server-side tests.
+Node.js WebSocket server for local development, self-hosted deployments, and server-side tests. The client transport (`wsTransport`) lives in the base `@tanstack/realtime` package.
 
 ### Installation
 
@@ -218,11 +262,10 @@ realtime.publish('todos:teamId=123', { type: 'created', todo })
 ### Client transport
 
 ```ts
-import { createRealtimeClient } from '@tanstack/realtime'
-import { nodeTransport } from '@tanstack/realtime-preset-node'
+import { createRealtimeClient, wsTransport } from '@tanstack/realtime'
 
 export const client = createRealtimeClient({
-  transport: nodeTransport({
+  transport: wsTransport({
     url: 'ws://localhost:3000', // omit in the browser — derived from window.location
     path: '/_realtime', // default
   }),

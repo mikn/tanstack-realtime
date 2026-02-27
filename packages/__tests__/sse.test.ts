@@ -515,8 +515,8 @@ describe('sseTransport', () => {
     const postCalls = fetchMock.mock.calls
       .slice(callsBefore)
       .filter(
-        ([, init]: [unknown, RequestInit | undefined]) =>
-          init?.method === 'POST',
+        (args: Array<any>) =>
+          (args[1] as RequestInit | undefined)?.method === 'POST',
       )
 
     expect(postCalls.length).toBeGreaterThanOrEqual(1)

@@ -6,10 +6,9 @@ import {
   orHas,
   orRemove,
   orValues,
-} from '../core/crdt.js'
+} from '@tanstack/realtime'
 import { RealtimeContext } from './context.js'
-import type { SyncedSetDef } from '../collections/syncedSet.js'
-import type { OrState } from '../core/crdt.js'
+import type { OrState, SyncedSetDef } from '@tanstack/realtime'
 
 export interface UseSyncedSetOptions<
   T,

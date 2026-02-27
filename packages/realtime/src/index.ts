@@ -21,6 +21,8 @@ export type {
   RealtimeTransport,
   // Optional presence extension — implement alongside RealtimeTransport
   PresenceCapable,
+  // Utility type for middleware that preserves presence capability
+  PresenceAwareTransport,
   RealtimeClient,
   RealtimeClientOptions,
 } from './core/types.js'
@@ -41,11 +43,14 @@ export type {
   OrEntry,
   OrState,
   OrWire,
+  LamportClock,
 } from './core/crdt.js'
 export {
   generateClientId,
   tickClock,
   advanceClock,
+  resetClock,
+  createClock,
   lwwWins,
   pnValue,
   mergePn,
@@ -53,6 +58,7 @@ export {
   pnDecrement,
   orValues,
   mergeOr,
+  compactOr,
   orAdd,
   orRemove,
   orHas,
@@ -68,6 +74,8 @@ export {
   ephemeralLiveOptions,
   streamChannelOptions,
   createStreamChannel,
+  serverStreamCallbacks,
+  tickCollectionOptions,
   defineSyncedCounter,
   defineSyncedValue,
   defineSyncedSet,
@@ -85,6 +93,7 @@ export type {
   StreamChannelDefConfig,
   StreamItem,
   StreamStatus,
+  TickCollectionConfig,
   SyncedCounterConfig,
   SyncedCounterDef,
   SyncedValueConfig,
@@ -92,6 +101,23 @@ export type {
   SyncedSetConfig,
   SyncedSetDef,
 } from './collections/index.js'
+
+// Built-in WebSocket transport — browser-safe, no Node.js dependencies.
+// Connects to a createNodeServer instance using the built-in wire protocol.
+export { wsTransport } from './core/wsTransport.js'
+export type { WsTransportOptions } from './core/wsTransport.js'
+
+// Tick-based transport — batches updates per tick interval for game state.
+export {
+  tickTransport,
+  computeDelta,
+  applyDelta,
+} from './core/tickTransport.js'
+export type {
+  TickTransportOptions,
+  TickFrame,
+  TickTransport,
+} from './core/tickTransport.js'
 
 // REST/DB composition helpers
 export { withRest } from './core/withRest.js'
@@ -109,6 +135,16 @@ export type {
   OfflineQueueTransport,
 } from './core/offlineQueue.js'
 
+export {
+  createIndexedDBStorage,
+  createLocalStorageAdapter,
+} from './core/offlineQueueStorage.js'
+export type {
+  OfflineQueueStorage,
+  IndexedDBStorageOptions,
+  LocalStorageOptions,
+} from './core/offlineQueueStorage.js'
+
 export { throttle } from './core/throttle.js'
 export type { ThrottleOptions, ThrottledFn } from './core/throttle.js'
 
@@ -125,26 +161,53 @@ export type {
   GapRecoveryTransport,
 } from './core/gapRecovery.js'
 
-// SharedWorker-based multi-tab transport.
+// Multi-tab transport coordination.
+// createCoordinatedTransport() is the recommended entry point — it
+// automatically selects SharedWorker > BroadcastChannel > direct.
+export { createCoordinatedTransport } from './core/coordinatedTransport.js'
+export type { CoordinatedTransportOptions } from './core/coordinatedTransport.js'
+
+// BroadcastChannel-based multi-tab transport — leader election, no worker file.
+export {
+  createBroadcastChannelTransport,
+  isBroadcastChannelSupported,
+} from './core/broadcastChannelTransport.js'
+export type { BroadcastChannelTransportOptions } from './core/broadcastChannelTransport.js'
+
+// SharedWorker-based multi-tab transport — best performance, requires worker file.
 // Tab side: createSharedWorkerTransport(workerUrl)
-// Worker side: createSharedWorkerServer(innerTransport) — call in the SharedWorker file.
+// Worker side: createSharedWorkerCoordinator(innerTransport) — call in the SharedWorker file.
 export {
   createSharedWorkerTransport,
-  createSharedWorkerServer,
+  createSharedWorkerCoordinator,
   isSharedWorkerSupported,
 } from './core/sharedWorkerTransport.js'
 export type {
   SharedWorkerTransportOptions,
-  SharedWorkerServerOptions,
-  SharedWorkerServer,
+  SharedWorkerCoordinatorOptions,
+  SharedWorkerCoordinator,
   TabToWorkerMsg,
   WorkerToTabMsg,
 } from './core/sharedWorkerTransport.js'
 
 // Server-side types — transport-agnostic, exported from core so any preset
 // can implement the same contract without an additional import path.
+export {
+  createValidatedPublish,
+  PublishValidationError,
+  createServerStream,
+  verifyEventSignature,
+  STREAM_DONE,
+  STREAM_ERROR,
+} from './server/index.js'
 export type {
   ChannelPermissions,
   AuthorizeFn,
   PublishFn,
+  PublishValidation,
+  PublishValidationResult,
+  ValidatePublishFn,
+  ValidatedPublishOptions,
+  ServerStream,
+  CreateServerStreamOptions,
 } from './server/index.js'

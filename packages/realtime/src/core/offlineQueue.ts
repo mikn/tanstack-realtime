@@ -14,6 +14,7 @@ import type {
   PresenceUser,
   RealtimeTransport,
 } from './types.js'
+import type { OfflineQueueStorage } from './offlineQueueStorage.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,6 +52,19 @@ export interface OfflineQueueOptions {
    * @default () => false (discard on failure)
    */
   onFlushError?: (message: QueuedMessage, error: unknown) => boolean
+
+  /**
+   * Pluggable storage adapter for persisting queued messages across
+   * page refreshes. When omitted, the queue is memory-only (existing behavior).
+   *
+   * @example
+   * import { createIndexedDBStorage, createOfflineQueue } from '@tanstack/realtime'
+   *
+   * const transport = createOfflineQueue(inner, {
+   *   storage: createIndexedDBStorage(),
+   * })
+   */
+  storage?: OfflineQueueStorage
 }
 
 export interface OfflineQueueTransport extends RealtimeTransport {
@@ -93,7 +107,7 @@ export function createOfflineQueue(
   inner: RealtimeTransport,
   options: OfflineQueueOptions = {},
 ): OfflineQueueTransport {
-  const { maxSize = 1000, onFlushError = () => false } = options
+  const { maxSize = 1000, onFlushError = () => false, storage } = options
   let nextId = 1
 
   const queueStore = new Store<OfflineQueueState>({
@@ -102,8 +116,43 @@ export function createOfflineQueue(
     isFlushing: false,
   })
 
+  // Storage initialization: load persisted messages and merge with any
+  // messages that were enqueued before loading completed.
+  if (storage) {
+    storage
+      .load()
+      .then((persisted) => {
+        if (persisted.length > 0) {
+          queueStore.setState((s) => {
+            // Bump nextId inside setState to avoid a race where enqueue()
+            // runs between load() resolving and the ID bump.
+            const maxPersistedId = Math.max(...persisted.map((m) => m.id))
+            if (maxPersistedId >= nextId) nextId = maxPersistedId + 1
+            // Re-assign IDs to any messages enqueued during init so they
+            // don't collide with persisted IDs.
+            const reIdPending = s.pending.map((m) => ({
+              ...m,
+              id: nextId++,
+            }))
+            const merged = [...persisted, ...reIdPending]
+            return { ...s, pending: merged.slice(-maxSize) }
+          })
+        }
+      })
+      .catch(() => {
+        // Storage unavailable — continue with in-memory queue.
+      })
+  }
+
+  function persistToStorage(): void {
+    if (!storage) return
+    storage.save(queueStore.state.pending).catch(() => {
+      // Silently ignore persistence failures — in-memory queue is canonical.
+    })
+  }
+
   // Flush the queue when the connection becomes 'connected'.
-  let previousStatus: ConnectionStatus = inner.store.state
+  let previousStatus: ConnectionStatus = inner.store.get()
   inner.store.subscribe((status) => {
     if (previousStatus !== 'connected' && status === 'connected') {
       void flush()
@@ -121,7 +170,7 @@ export function createOfflineQueue(
     let flushedCount = 0
 
     for (const msg of pending) {
-      if (inner.store.state !== 'connected') {
+      if (inner.store.get() !== 'connected') {
         // Connection dropped mid-flush — keep remaining messages.
         retry.push(msg)
         continue
@@ -142,6 +191,7 @@ export function createOfflineQueue(
       flushed: s.flushed + flushedCount,
       isFlushing: false,
     }))
+    persistToStorage()
   }
 
   function enqueue(channel: string, data: unknown): void {
@@ -158,6 +208,7 @@ export function createOfflineQueue(
       if (updated.length > maxSize) updated.shift()
       return { ...s, pending: updated }
     })
+    persistToStorage()
   }
 
   const transport: OfflineQueueTransport = {
@@ -177,7 +228,7 @@ export function createOfflineQueue(
     },
 
     async publish(channel, data) {
-      if (inner.store.state === 'connected') {
+      if (inner.store.get() === 'connected') {
         return inner.publish(channel, data)
       }
       enqueue(channel, data)
@@ -185,6 +236,9 @@ export function createOfflineQueue(
 
     clearQueue() {
       queueStore.setState((s) => ({ ...s, pending: [] }))
+      if (storage) {
+        storage.clear().catch(() => {})
+      }
     },
   }
 

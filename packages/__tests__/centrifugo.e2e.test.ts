@@ -19,6 +19,12 @@ import { afterEach, beforeEach, describe, expect, inject, it } from 'vitest'
 import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
 import { createRealtimeClient } from '@tanstack/realtime'
 
+declare module 'vitest' {
+  export interface ProvidedContext {
+    centrifugoPort: number
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -78,12 +84,12 @@ describe('centrifugoTransport — real Centrifugo binary', () => {
   // ── Connection ──────────────────────────────────────────────────────────
 
   it('connects and reaches "connected" status', () => {
-    expect(client.store.state.status).toBe('connected')
+    expect(client.store.get().status).toBe('connected')
   })
 
   it('disconnects cleanly', () => {
     client.disconnect()
-    expect(client.store.state.status).toBe('disconnected')
+    expect(client.store.get().status).toBe('disconnected')
   })
 
   // ── Subscribe / publish ─────────────────────────────────────────────────
@@ -207,7 +213,9 @@ describe('centrifugoTransport — real Centrifugo binary', () => {
     const updates: Array<Array<{ data: { name: string; status?: string } }>> =
       []
     client.onPresenceChange('e2e-prs-update', (users) =>
-      updates.push(users as Array<{ data: { name: string; status?: string } }>),
+      updates.push(
+        users as unknown as Array<{ data: { name: string; status?: string } }>,
+      ),
     )
     client.joinPresence('e2e-prs-update', { name: 'alice' })
     await wait(60)
@@ -237,7 +245,7 @@ describe('centrifugoTransport — real Centrifugo binary', () => {
   it('connects with a static token string (server accepts or ignores it)', async () => {
     const tokenClient = makeClient(port) // anonymous, no token
     await tokenClient.connect()
-    expect(tokenClient.store.state.status).toBe('connected')
+    expect(tokenClient.store.get().status).toBe('connected')
     tokenClient.disconnect()
     tokenClient.destroy()
   })

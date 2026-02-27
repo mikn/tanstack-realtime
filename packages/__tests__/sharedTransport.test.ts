@@ -1,5 +1,5 @@
 /**
- * Tests for createSharedWorkerTransport + createSharedWorkerServer.
+ * Tests for createSharedWorkerTransport + createSharedWorkerCoordinator.
  *
  * SharedWorker and MessagePort are unavailable in Node.js, so we use a
  * synchronous bidirectional port mock. Both exports are tested end-to-end:
@@ -10,7 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Store } from '@tanstack/store'
 import {
-  createSharedWorkerServer,
+  createSharedWorkerCoordinator,
   createSharedWorkerTransport,
 } from '@tanstack/realtime'
 import type {
@@ -18,7 +18,7 @@ import type {
   PresenceCapable,
   PresenceUser,
   RealtimeTransport,
-  SharedWorkerServerOptions,
+  SharedWorkerCoordinatorOptions,
 } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ class MockMessagePort {
 
 const workerServers = new Map<
   string,
-  ReturnType<typeof createSharedWorkerServer>
+  ReturnType<typeof createSharedWorkerCoordinator>
 >()
 
 class MockSharedWorker {
@@ -173,10 +173,10 @@ const TEST_URL = 'https://worker.example.com/realtime.js'
 
 function setupWorker(
   inner?: ReturnType<typeof createMockInnerTransport>,
-  options?: SharedWorkerServerOptions,
+  options?: SharedWorkerCoordinatorOptions,
 ) {
   const transport = inner ?? createMockInnerTransport()
-  const server = createSharedWorkerServer(transport, options)
+  const server = createSharedWorkerCoordinator(transport, options)
   workerServers.set(TEST_URL, server)
   return {
     transport,
@@ -205,17 +205,17 @@ afterEach(() => {
 })
 
 // ---------------------------------------------------------------------------
-// createSharedWorkerServer — invariant tests
+// createSharedWorkerCoordinator — invariant tests
 // ---------------------------------------------------------------------------
 
-describe('createSharedWorkerServer', () => {
+describe('createSharedWorkerCoordinator', () => {
   it('sends the current inner transport status to a newly connected port', () => {
     const { transport } = setupWorker()
     transport.setStatus('connected')
 
     const tab = connectTab()
     // Status was sent synchronously on connect.
-    expect(tab.store.state).toBe('connected')
+    expect(tab.store.get()).toBe('connected')
   })
 
   it('broadcasts inner status changes to all connected tabs', () => {
@@ -225,20 +225,20 @@ describe('createSharedWorkerServer', () => {
 
     transport.setStatus('reconnecting')
 
-    expect(tab1.store.state).toBe('reconnecting')
-    expect(tab2.store.state).toBe('reconnecting')
+    expect(tab1.store.get()).toBe('reconnecting')
+    expect(tab2.store.get()).toBe('reconnecting')
   })
 
   it('new tab connecting after a status change receives the current status', () => {
     const { transport } = setupWorker()
     transport.setStatus('connected')
     const tab1 = connectTab()
-    expect(tab1.store.state).toBe('connected')
+    expect(tab1.store.get()).toBe('connected')
 
     transport.setStatus('reconnecting')
     const tab2 = connectTab()
     // tab2 was created after the status changed to reconnecting.
-    expect(tab2.store.state).toBe('reconnecting')
+    expect(tab2.store.get()).toBe('reconnecting')
   })
 
   it('subscribing on a tab causes a real subscription on the inner transport', () => {
@@ -661,10 +661,10 @@ describe('createSharedWorkerServer', () => {
 })
 
 // ---------------------------------------------------------------------------
-// createSharedWorkerServer — onConnectError option
+// createSharedWorkerCoordinator — onConnectError option
 // ---------------------------------------------------------------------------
 
-describe('createSharedWorkerServer — onConnectError', () => {
+describe('createSharedWorkerCoordinator — onConnectError', () => {
   it('connect error is passed to the onConnectError callback', async () => {
     const connectError = new Error('auth failed')
     const inner = createMockInnerTransport()
@@ -694,7 +694,7 @@ describe('createSharedWorkerServer — onConnectError', () => {
     await new Promise((r) => setTimeout(r, 0))
 
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[SharedWorkerServer]'),
+      expect.stringContaining('[SharedWorkerCoordinator]'),
       connectError,
     )
     consoleSpy.mockRestore()
@@ -731,7 +731,7 @@ describe('createSharedWorkerTransport', () => {
     setupWorker(inner)
 
     const tab = connectTab()
-    expect(tab.store.state).toBe('connected')
+    expect(tab.store.get()).toBe('connected')
   })
 
   it('relays reconnecting status without triggering auto-connect', () => {
@@ -743,7 +743,7 @@ describe('createSharedWorkerTransport', () => {
     setupWorker(inner)
 
     const tab = connectTab()
-    expect(tab.store.state).toBe('reconnecting')
+    expect(tab.store.get()).toBe('reconnecting')
     expect(connectSpy).not.toHaveBeenCalled()
   })
 
@@ -752,7 +752,7 @@ describe('createSharedWorkerTransport', () => {
     transport.setStatus('connected')
 
     const tab = connectTab()
-    expect(tab.store.state).toBe('connected')
+    expect(tab.store.get()).toBe('connected')
   })
 
   it('store updates reactively as status changes arrive', () => {
