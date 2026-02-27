@@ -350,4 +350,120 @@ describe('createOfflineQueue with storage', () => {
     expect(queue.queueStore.state.pending).toHaveLength(0)
     expect(queue.queueStore.state.flushed).toBe(1)
   })
+
+  it('re-IDs messages enqueued during init to avoid ID collisions', async () => {
+    let resolveLoad!: (msgs: Array<QueuedMessage>) => void
+    const slowStorage: OfflineQueueStorage = {
+      load: () =>
+        new Promise((resolve) => {
+          resolveLoad = resolve
+        }),
+      save: async () => {},
+      clear: async () => {},
+    }
+
+    const inner = createMockTransport()
+    const queue = createOfflineQueue(inner, { storage: slowStorage })
+
+    // Enqueue 3 messages while storage.load() is pending (IDs will be 1, 2, 3)
+    await queue.publish('ch', 'fast-1')
+    await queue.publish('ch', 'fast-2')
+    await queue.publish('ch', 'fast-3')
+
+    // Storage resolves with messages that have IDs 100-102
+    resolveLoad([
+      { id: 100, channel: 'ch', data: 'persisted-1', enqueuedAt: '2024-01-01T00:00:00Z' },
+      { id: 101, channel: 'ch', data: 'persisted-2', enqueuedAt: '2024-01-01T00:00:01Z' },
+      { id: 102, channel: 'ch', data: 'persisted-3', enqueuedAt: '2024-01-01T00:00:02Z' },
+    ])
+    await vi.advanceTimersByTimeAsync(0)
+
+    const pending = queue.queueStore.state.pending
+    // Should have all 6 messages: 3 persisted + 3 re-IDed
+    expect(pending).toHaveLength(6)
+
+    // Persisted messages keep their IDs
+    expect(pending[0].id).toBe(100)
+    expect(pending[1].id).toBe(101)
+    expect(pending[2].id).toBe(102)
+
+    // Re-IDed messages get IDs > 102 (no collisions)
+    expect(pending[3].id).toBeGreaterThan(102)
+    expect(pending[4].id).toBeGreaterThan(pending[3].id)
+    expect(pending[5].id).toBeGreaterThan(pending[4].id)
+
+    // Data is preserved
+    expect(pending[3].data).toBe('fast-1')
+    expect(pending[4].data).toBe('fast-2')
+    expect(pending[5].data).toBe('fast-3')
+
+    // All IDs are unique
+    const ids = pending.map((m) => m.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('maxSize eviction during merge keeps newest messages', async () => {
+    const storage = createMemoryStorage()
+
+    // Pre-fill storage with 8 messages
+    storage.data = Array.from({ length: 8 }, (_, i) => ({
+      id: i + 1,
+      channel: 'ch',
+      data: `persisted-${i}`,
+      enqueuedAt: '2024-01-01T00:00:00Z',
+    }))
+
+    const inner = createMockTransport()
+    // maxSize = 5: only 5 total messages should survive
+    const queue = createOfflineQueue(inner, { storage, maxSize: 5 })
+
+    await vi.advanceTimersByTimeAsync(0)
+
+    const pending = queue.queueStore.state.pending
+    // Should keep last 5 from the merged 8
+    expect(pending).toHaveLength(5)
+    // Slice keeps the tail, so IDs 4-8
+    expect(pending[0].id).toBe(4)
+    expect(pending[4].id).toBe(8)
+  })
+
+  it('storage.load() failure falls back to memory-only', async () => {
+    const failStorage: OfflineQueueStorage = {
+      load: async () => {
+        throw new Error('IndexedDB unavailable')
+      },
+      save: async () => {},
+      clear: async () => {},
+    }
+
+    const inner = createMockTransport()
+    const queue = createOfflineQueue(inner, { storage: failStorage })
+
+    await vi.advanceTimersByTimeAsync(0)
+
+    // Queue should still work (memory-only)
+    await queue.publish('ch', 'data')
+    expect(queue.queueStore.state.pending).toHaveLength(1)
+  })
+
+  it('new enqueues after init get IDs that continue from merged state', async () => {
+    const storage = createMemoryStorage()
+    storage.data = [
+      { id: 50, channel: 'ch', data: 'old', enqueuedAt: '2024-01-01T00:00:00Z' },
+    ]
+
+    const inner = createMockTransport()
+    const queue = createOfflineQueue(inner, { storage })
+
+    await vi.advanceTimersByTimeAsync(0)
+
+    // Enqueue after init — ID should be > 50
+    await queue.publish('ch', 'new-1')
+    await queue.publish('ch', 'new-2')
+
+    const ids = queue.queueStore.state.pending.map((m) => m.id)
+    expect(ids[0]).toBe(50)
+    expect(ids[1]).toBeGreaterThan(50)
+    expect(ids[2]).toBeGreaterThan(ids[1])
+  })
 })

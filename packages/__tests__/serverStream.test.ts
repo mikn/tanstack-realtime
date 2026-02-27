@@ -17,6 +17,7 @@ import {
   createServerStream,
   serverStreamCallbacks,
   streamChannelOptions,
+  verifyEventSignature,
   wsTransport,
 } from '@tanstack/realtime'
 import { createNodeServer } from '@tanstack/realtime-preset-node'
@@ -95,6 +96,221 @@ describe('createServerStream', () => {
 
     await stream.push({ token: 'hi' })
     expect(calls[0].channel).toBe(stream.channel)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Tests: Sentinel constants
+// ---------------------------------------------------------------------------
+
+describe('STREAM_DONE / STREAM_ERROR constants', () => {
+  it('STREAM_DONE is the exact sentinel string', () => {
+    expect(STREAM_DONE).toBe('__stream:done')
+  })
+
+  it('STREAM_ERROR is the exact sentinel string', () => {
+    expect(STREAM_ERROR).toBe('__stream:error')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Tests: serverStreamCallbacks helper
+// ---------------------------------------------------------------------------
+
+describe('serverStreamCallbacks', () => {
+  it('isDone returns true for STREAM_DONE events', () => {
+    expect(serverStreamCallbacks.isDone(null, { type: STREAM_DONE })).toBe(true)
+    expect(serverStreamCallbacks.isDone(null, { type: 'token' })).toBe(false)
+    expect(serverStreamCallbacks.isDone(null, {})).toBe(false)
+  })
+
+  it('isError returns error message for STREAM_ERROR events', () => {
+    expect(
+      serverStreamCallbacks.isError(null, { type: STREAM_ERROR, message: 'Oops' }),
+    ).toBe('Oops')
+    expect(
+      serverStreamCallbacks.isError(null, { type: STREAM_ERROR }),
+    ).toBe('Stream error') // fallback message
+    expect(
+      serverStreamCallbacks.isError(null, { type: 'token' }),
+    ).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Tests: HMAC signing & verification
+// ---------------------------------------------------------------------------
+
+describe('createServerStream — HMAC signing', () => {
+  it('adds _signature field when hmacKey is provided', async () => {
+    const calls: Array<{ data: unknown }> = []
+    const publish: PublishFn = async (_ch, data) => {
+      calls.push({ data })
+    }
+
+    const stream = createServerStream({
+      publish,
+      channel: 'signed-ch',
+      hmacKey: 'test-secret-key',
+    })
+
+    await stream.push({ type: 'token', content: 'Hello' })
+
+    expect(calls).toHaveLength(1)
+    const payload = calls[0].data as Record<string, unknown>
+    expect(payload._signature).toBeDefined()
+    expect(typeof payload._signature).toBe('string')
+    expect(payload.type).toBe('token')
+    expect(payload.content).toBe('Hello')
+  })
+
+  it('strips existing _signature before signing to prevent pollution', async () => {
+    const calls: Array<{ data: unknown }> = []
+    const publish: PublishFn = async (_ch, data) => {
+      calls.push({ data })
+    }
+
+    const stream = createServerStream({
+      publish,
+      channel: 'ch',
+      hmacKey: 'secret',
+    })
+
+    // Push an event that already has a _signature (attacker-injected)
+    await stream.push({ type: 'token', _signature: 'fake-sig' } as any)
+
+    const payload = calls[0].data as Record<string, unknown>
+    // The _signature should be the real one, not 'fake-sig'
+    expect(payload._signature).not.toBe('fake-sig')
+    expect(typeof payload._signature).toBe('string')
+  })
+
+  it('sentinel events are also signed when hmacKey is provided', async () => {
+    const calls: Array<{ data: unknown }> = []
+    const publish: PublishFn = async (_ch, data) => {
+      calls.push({ data })
+    }
+
+    const stream = createServerStream({
+      publish,
+      channel: 'ch',
+      hmacKey: 'secret',
+    })
+
+    await stream.done()
+    await stream.error('fail')
+
+    const donePayload = calls[0].data as Record<string, unknown>
+    const errorPayload = calls[1].data as Record<string, unknown>
+    expect(donePayload._signature).toBeDefined()
+    expect(errorPayload._signature).toBeDefined()
+  })
+
+  it('does NOT add _signature when hmacKey is omitted', async () => {
+    const calls: Array<{ data: unknown }> = []
+    const publish: PublishFn = async (_ch, data) => {
+      calls.push({ data })
+    }
+
+    const stream = createServerStream({ publish, channel: 'ch' })
+    await stream.push({ type: 'token' })
+
+    const payload = calls[0].data as Record<string, unknown>
+    expect(payload._signature).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Tests: verifyEventSignature
+// ---------------------------------------------------------------------------
+
+describe('verifyEventSignature', () => {
+  it('returns true for a valid signature', async () => {
+    const calls: Array<{ data: unknown }> = []
+    const hmacKey = 'my-verification-key'
+    const publish: PublishFn = async (_ch, data) => {
+      calls.push({ data })
+    }
+
+    const stream = createServerStream({
+      publish,
+      channel: 'ch',
+      hmacKey,
+    })
+
+    await stream.push({ type: 'token', value: 42 })
+
+    const payload = calls[0].data as Record<string, unknown>
+    const { _signature, ...eventWithoutSig } = payload
+
+    const isValid = await verifyEventSignature(
+      eventWithoutSig,
+      _signature as string,
+      hmacKey,
+    )
+    expect(isValid).toBe(true)
+  })
+
+  it('returns false for a tampered event', async () => {
+    const calls: Array<{ data: unknown }> = []
+    const hmacKey = 'my-verification-key'
+    const publish: PublishFn = async (_ch, data) => {
+      calls.push({ data })
+    }
+
+    const stream = createServerStream({
+      publish,
+      channel: 'ch',
+      hmacKey,
+    })
+
+    await stream.push({ type: 'token', value: 42 })
+
+    const payload = calls[0].data as Record<string, unknown>
+    const { _signature } = payload
+
+    // Tamper with the event
+    const tampered = { type: 'token', value: 999 }
+    const isValid = await verifyEventSignature(
+      tampered,
+      _signature as string,
+      hmacKey,
+    )
+    expect(isValid).toBe(false)
+  })
+
+  it('returns false for missing signature', async () => {
+    const isValid = await verifyEventSignature(
+      { type: 'token' },
+      undefined,
+      'key',
+    )
+    expect(isValid).toBe(false)
+  })
+
+  it('returns false for wrong key', async () => {
+    const calls: Array<{ data: unknown }> = []
+    const publish: PublishFn = async (_ch, data) => {
+      calls.push({ data })
+    }
+
+    const stream = createServerStream({
+      publish,
+      channel: 'ch',
+      hmacKey: 'correct-key',
+    })
+
+    await stream.push({ type: 'token' })
+
+    const payload = calls[0].data as Record<string, unknown>
+    const { _signature, ...eventWithoutSig } = payload
+
+    const isValid = await verifyEventSignature(
+      eventWithoutSig,
+      _signature as string,
+      'wrong-key',
+    )
+    expect(isValid).toBe(false)
   })
 })
 

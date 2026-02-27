@@ -287,6 +287,196 @@ describe('tickTransport', () => {
 
     tick.stop()
   })
+
+  it('publishes removal-only frames (no setState, only removeEntity)', () => {
+    const inner = createMockTransport()
+    const tick = tickTransport(inner, { tickMs: 10 })
+
+    // Only remove, no setState
+    tick.removeEntity('game', 'player-x')
+    vi.advanceTimersByTime(10)
+
+    expect(inner.publishCalls).toHaveLength(1)
+    const frame = inner.publishCalls[0].data as TickFrame
+    expect(frame.removed).toEqual(['player-x'])
+    expect(Object.keys(frame.entities)).toHaveLength(0)
+
+    tick.stop()
+  })
+
+  it('subscribe() filters out __tick wire frames', () => {
+    const inner = createMockTransport()
+    const tick = tickTransport(inner, { tickMs: 10 })
+
+    const received: Array<unknown> = []
+    tick.subscribe('game', (data) => received.push(data))
+
+    // Normal message — should pass through
+    inner.emit('game', { type: 'chat', text: 'hello' })
+
+    // Tick wire frame — should be filtered out
+    inner.emit('game', {
+      __tick: true,
+      tick: 1,
+      timestamp: Date.now(),
+      entities: { p1: { x: 10 } },
+      removed: [],
+    })
+
+    // Another normal message
+    inner.emit('game', { type: 'chat', text: 'world' })
+
+    expect(received).toHaveLength(2)
+    expect(received[0]).toEqual({ type: 'chat', text: 'hello' })
+    expect(received[1]).toEqual({ type: 'chat', text: 'world' })
+
+    tick.stop()
+  })
+
+  it('does not publish when disconnected', () => {
+    const inner = createMockTransport()
+    inner.store.setState(() => 'disconnected')
+    const tick = tickTransport(inner, { tickMs: 10 })
+
+    tick.setState('game', 'p1', { x: 1 })
+    vi.advanceTimersByTime(10)
+
+    // Should NOT publish while disconnected
+    expect(inner.publishCalls).toHaveLength(0)
+
+    // Reconnect — dirty state persists and is sent on next tick
+    inner.store.setState(() => 'connected')
+    vi.advanceTimersByTime(10)
+
+    // Dirty state accumulated during disconnect is now flushed
+    expect(inner.publishCalls).toHaveLength(1)
+    expect((inner.publishCalls[0].data as TickFrame).entities['p1']).toEqual({ x: 1 })
+
+    tick.stop()
+  })
+
+  it('publishes on next tick after reconnection with new dirty state', () => {
+    const inner = createMockTransport()
+    inner.store.setState(() => 'disconnected')
+    const tick = tickTransport(inner, { tickMs: 10 })
+
+    tick.setState('game', 'p1', { x: 1 })
+    vi.advanceTimersByTime(10)
+    expect(inner.publishCalls).toHaveLength(0)
+
+    // Reconnect and set new state
+    inner.store.setState(() => 'connected')
+    tick.setState('game', 'p1', { x: 2 })
+    vi.advanceTimersByTime(10)
+
+    expect(inner.publishCalls).toHaveLength(1)
+    expect((inner.publishCalls[0].data as TickFrame).entities['p1']).toEqual({ x: 2 })
+
+    tick.stop()
+  })
+
+  it('both subscribe() and onTick() work simultaneously', () => {
+    const inner = createMockTransport()
+    const tick = tickTransport(inner, { tickMs: 10 })
+
+    const subscribeReceived: Array<unknown> = []
+    const tickReceived: Array<TickFrame> = []
+
+    tick.subscribe('game', (data) => subscribeReceived.push(data))
+    tick.onTick('game', (frame) => tickReceived.push(frame))
+
+    // Normal message — goes to subscribe only
+    inner.emit('game', { type: 'chat', text: 'hi' })
+
+    // Tick frame — goes to onTick only
+    inner.emit('game', {
+      __tick: true,
+      tick: 1,
+      timestamp: Date.now(),
+      entities: { p1: { x: 1 } },
+      removed: [],
+    })
+
+    expect(subscribeReceived).toHaveLength(1)
+    expect(subscribeReceived[0]).toEqual({ type: 'chat', text: 'hi' })
+    expect(tickReceived).toHaveLength(1)
+    expect(tickReceived[0].tick).toBe(1)
+
+    tick.stop()
+  })
+
+  it('update and removal in same tick for different entities', () => {
+    const inner = createMockTransport()
+    const tick = tickTransport(inner, { tickMs: 10 })
+
+    tick.setState('game', 'p1', { x: 10 })
+    tick.removeEntity('game', 'p2')
+    vi.advanceTimersByTime(10)
+
+    const frame = inner.publishCalls[0].data as TickFrame
+    expect(frame.entities['p1']).toEqual({ x: 10 })
+    expect(frame.removed).toEqual(['p2'])
+
+    tick.stop()
+  })
+
+  it('removeEntity clears entity from dirty state', () => {
+    const inner = createMockTransport()
+    const tick = tickTransport(inner, { tickMs: 10 })
+
+    // Set then remove same entity in same tick
+    tick.setState('game', 'p1', { x: 10 })
+    tick.removeEntity('game', 'p1')
+    vi.advanceTimersByTime(10)
+
+    const frame = inner.publishCalls[0].data as TickFrame
+    // Entity should be in removed, not in entities
+    expect(frame.entities['p1']).toBeUndefined()
+    expect(frame.removed).toContain('p1')
+
+    tick.stop()
+  })
+
+  it('delta compression with key removal (prev has key, next does not)', () => {
+    const inner = createMockTransport()
+    const tick = tickTransport(inner, {
+      tickMs: 10,
+      deltaCompression: true,
+    })
+
+    tick.setState('game', 'p1', { x: 10, y: 20, z: 30 })
+    vi.advanceTimersByTime(10)
+
+    // Remove z
+    tick.setState('game', 'p1', { x: 10, y: 20 })
+    vi.advanceTimersByTime(10)
+
+    const frame2 = inner.publishCalls[1].data as TickFrame
+    expect(frame2.entities['p1']).toEqual({ z: undefined })
+
+    tick.stop()
+  })
+
+  it('delta compression: no frame when state is identical', () => {
+    const inner = createMockTransport()
+    const tick = tickTransport(inner, {
+      tickMs: 10,
+      deltaCompression: true,
+    })
+
+    tick.setState('game', 'p1', { x: 10, y: 20 })
+    vi.advanceTimersByTime(10)
+
+    // Set identical state
+    tick.setState('game', 'p1', { x: 10, y: 20 })
+    vi.advanceTimersByTime(10)
+
+    // Second tick: delta is null, no entities in frame.
+    // Frame should not be published since both entities and removed are empty.
+    expect(inner.publishCalls).toHaveLength(1)
+
+    tick.stop()
+  })
 })
 
 // ---------------------------------------------------------------------------

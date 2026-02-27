@@ -294,6 +294,24 @@ function Features() {
             problem="Runtime errors in channel keys and message shapes cost you at 2am."
             solution="Full TypeScript from channel keys to CRDT field definitions to presence data shapes. Autocomplete everywhere. Catch mistakes at build time, not in production."
           />
+          <FeatureCard
+            icon="!"
+            title="Server Validation"
+            problem="Clients publish directly to channels. Nothing stops a malicious payload from reaching everyone."
+            solution="createValidatedPublish wraps your publish function with a validate hook. The onPublish callback in createNodeServer runs before fan-out — reject, transform, or sanitize any message server-side."
+          />
+          <FeatureCard
+            icon="^"
+            title="Optimistic Updates"
+            problem="Mutation succeeds but the server echo creates a duplicate flash. Or the mutation fails and the UI is stuck."
+            solution="optimistic: true adds a nonce to each mutation. The echo from the server is suppressed. On failure, onOptimisticError fires and the nonce is cleaned up. Zero duplicates."
+          />
+          <FeatureCard
+            icon="="
+            title="60 fps Tick Transport"
+            problem="Publishing one event per entity per frame floods the wire. Multiplayer games need batched, fixed-rate updates."
+            solution="tickTransport batches all setState calls into one frame per tick interval. Delta compression sends only changed fields. onTick delivers the full frame. Stacks on any transport."
+          />
         </div>
       </div>
     </section>
@@ -977,9 +995,11 @@ function Streaming() {
         <div className="use-case-codes" style={{ marginBottom: '1.5rem' }}>
           <CodeBlock
             title="features/ai/stream.ts — define the channel shape"
-            code={`import { createStreamChannel } from '@tanstack/realtime'
+            code={`import { createStreamChannel, serverStreamCallbacks } from '@tanstack/realtime'
 
-// Define once — reuse in any component
+// Define once — reuse in any component.
+// serverStreamCallbacks provides isDone/isError that match
+// the STREAM_DONE / STREAM_ERROR sentinels from createServerStream.
 export const aiResponseStream = createStreamChannel({
   id: 'ai-response',
   channel: (params: { requestId: string }) => ['ai', params],
@@ -992,14 +1012,8 @@ export const aiResponseStream = createStreamChannel({
       ? { content: state.content + (event.token ?? '') }
       : state,
 
-  // Stream closes and status → 'done'
-  isDone: (_, e) => (e as { type: string }).type === 'done',
-
-  // Stream closes and status → 'error'  (checked before reduce)
-  isError: (_, e) =>
-    (e as { type: string }).type === 'error'
-      ? ((e as { message?: string }).message ?? 'Unknown error')
-      : false,
+  // Wire up sentinel detection from createServerStream
+  ...serverStreamCallbacks,
 })`}
           />
           <CodeBlock
@@ -1043,20 +1057,24 @@ function ChatInput() {
         <div className="use-case-codes">
           <CodeBlock
             title="server/routes/chat.ts — stream tokens from your AI"
-            code={`import { serializeKey } from '@tanstack/realtime'
-import { nodeServer } from '../realtime'
+            code={`import { nodeServer } from '../realtime'
 
 app.post('/api/chat', async (req) => {
   const { requestId, prompt } = req.body
-  const channel = serializeKey(['ai', { requestId }])
+
+  // createStream returns push/done/error helpers with HMAC signing
+  const stream = nodeServer.createStream({
+    channel: ['ai', { requestId }],
+    hmacKey: process.env.STREAM_HMAC_KEY,  // optional HMAC signing
+  })
 
   try {
     for await (const chunk of openai.stream(prompt)) {
-      nodeServer.publish(channel, { type: 'token', token: chunk.text })
+      await stream.push({ type: 'token', token: chunk.text })
     }
-    nodeServer.publish(channel, { type: 'done' })
+    await stream.done()  // sends STREAM_DONE sentinel
   } catch (err) {
-    nodeServer.publish(channel, { type: 'error', message: String(err) })
+    await stream.error(String(err))  // sends STREAM_ERROR sentinel
   }
 })`}
           />
@@ -1079,6 +1097,89 @@ const cpuStream = createStreamChannel({
   // Open-ended — no isDone, stream runs until the component unmounts
 })`}
           />
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Tick-Based Transport — high-frequency game state
+// ---------------------------------------------------------------------------
+
+function TickBased() {
+  return (
+    <section id="tick" className="section">
+      <div className="container">
+        <Badge>Tick-Based</Badge>
+        <h2>
+          60 fps multiplayer.
+          <br />
+          Zero boilerplate.
+        </h2>
+        <p className="section-sub">
+          High-frequency use cases &mdash; multiplayer games, collaborative
+          drawing, live simulations &mdash; need batched, fixed-rate updates,
+          not individual events. <code>tickTransport</code> wraps any transport
+          and sends one frame per tick interval.
+        </p>
+
+        <div className="use-case-codes">
+          <CodeBlock
+            title="game/transport.ts — wrap any transport"
+            code={`import { tickTransport, wsTransport } from '@tanstack/realtime'
+
+const tick = tickTransport(
+  wsTransport({ url: 'wss://rt.example.com' }),
+  { tickMs: 16, deltaCompression: true },  // ~60 Hz, only changed fields
+)
+
+// Set state each render frame — batched into one publish per tick
+tick.setState('game:room-1', myPlayerId, {
+  x: player.x,
+  y: player.y,
+  health: player.health,
+  animation: 'run',
+})
+
+// Remove an entity (e.g. player disconnected)
+tick.removeEntity('game:room-1', 'player-42')
+
+// Receive batched frames from all players
+tick.onTick('game:room-1', (frame) => {
+  for (const [entityId, state] of Object.entries(frame.entities)) {
+    updateEntity(entityId, state)
+  }
+  for (const entityId of frame.removed) {
+    removeEntity(entityId)
+  }
+})`}
+          />
+          <CodeBlock
+            title="game/collection.ts — tick collection with TanStack DB"
+            code={`import { tickCollectionOptions } from '@tanstack/realtime'
+
+// Drive a TanStack DB collection from tick frames.
+// Each frame is one begin/commit cycle — no per-entity overhead.
+const config = tickCollectionOptions<Player, string>({
+  transport: tick,
+  channel: 'game:room-1',
+  getKey: (p) => p.id,
+  getEntityId: (p) => p.id,
+})`}
+          />
+        </div>
+
+        <div className="callout">
+          <span className="callout-label">
+            Delta Compression
+          </span>
+          <p>
+            With <code>deltaCompression: true</code>, only fields that changed
+            since the last tick are sent on the wire. The receiver reconstructs
+            full state via <code>applyDelta</code>. For 100 entities where only
+            position changes each frame, this can reduce bandwidth by 80%+.
+          </p>
         </div>
       </div>
     </section>
@@ -1112,16 +1213,25 @@ function Resilience() {
             <p>
               The user submits a form on a train. Wrap any transport with{' '}
               <code>createOfflineQueue</code> &mdash; publishes buffer and
-              replay in FIFO order when the connection comes back. Show pending
-              count reactively via the exposed store.
+              replay in FIFO order when the connection comes back. Plug in{' '}
+              <code>localStorage</code> or any storage adapter so messages
+              survive page refresh. Show pending count reactively via the
+              exposed store.
             </p>
             <CodeBlock
-              code={`import { createOfflineQueue, wsTransport } from '@tanstack/realtime'
+              code={`import {
+  createLocalStorageAdapter,
+  createOfflineQueue,
+  wsTransport,
+} from '@tanstack/realtime'
 import { useStore } from '@tanstack/react-store'
 
 const transport = createOfflineQueue(
   wsTransport({ url: 'wss://rt.example.com' }),
-  { maxSize: 500 },
+  {
+    maxSize: 500,
+    storage: createLocalStorageAdapter(), // survives page refresh
+  },
 )
 
 const client = createRealtimeClient({ transport })
@@ -1905,6 +2015,7 @@ function Footer() {
             <a href="#presence">Presence</a>
             <a href="#events">Live Events</a>
             <a href="#streaming">Streaming</a>
+            <a href="#tick">Tick-Based</a>
             <a href="#resilience">Resilience</a>
             <a href="#utilities">Utilities</a>
             <a href="#adapters">Message Adapters</a>
@@ -2242,6 +2353,7 @@ export function App() {
       <PresenceSection />
       <LiveEvents />
       <Streaming />
+      <TickBased />
       <Resilience />
       <Utilities />
       <MessageAdapters />

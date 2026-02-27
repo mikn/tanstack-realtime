@@ -332,4 +332,173 @@ describe('realtimeCollectionOptions — optimistic mode', () => {
     expect(published._clientId).toBe(client.clientId)
     expect(published.action).toBe('delete')
   })
+
+  it('cleans up nonce when publish fails after successful mutation (insert)', async () => {
+    const transport = createMockTransport()
+    // Override publish to fail after mutation succeeds
+    const originalPublish = transport.publish.bind(transport)
+    let publishCallCount = 0
+    transport.publish = async (_channel, _data) => {
+      publishCallCount++
+      throw new Error('Network error on publish')
+    }
+
+    const client = createRealtimeClient({ transport })
+
+    const config = realtimeCollectionOptions<Doc, string>({
+      client,
+      channel: 'docs',
+      getKey: (d) => d.id,
+      optimistic: true,
+      onInsert: () => Promise.resolve({ id: '1', title: 'new' }),
+    })
+    const { ops } = driveSync(config)
+
+    // Mutation succeeds, publish fails — nonce should be cleaned up
+    await config.onInsert!({
+      transaction: {
+        mutations: [{ modified: { id: '1', title: 'new' }, key: '1', original: {} }],
+      },
+    } as any)
+
+    expect(publishCallCount).toBe(1) // publish was attempted
+
+    // The nonce should be cleaned up — a subsequent message with the same
+    // clientId should NOT be suppressed
+    transport.publish = originalPublish
+    transport.emit('docs', {
+      action: 'insert',
+      data: { id: '1', title: 'from-server' },
+      _nonce: 'different-nonce',
+      _clientId: client.clientId,
+    })
+
+    // Should be applied (nonce was cleaned up, 'different-nonce' won't match)
+    expect(ops).toHaveLength(1)
+  })
+
+  it('cleans up nonce when publish fails after successful mutation (update)', async () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+
+    const config = realtimeCollectionOptions<Doc, string>({
+      client,
+      channel: 'docs',
+      getKey: (d) => d.id,
+      optimistic: true,
+      onUpdate: () => Promise.resolve({ id: '1', title: 'updated' }),
+    })
+    const { ops } = driveSync(config)
+
+    // Seed the entry
+    transport.emit('docs', {
+      action: 'insert',
+      data: { id: '1', title: 'existing' },
+    })
+
+    // Make publish fail
+    transport.publish = async () => {
+      throw new Error('Publish failed')
+    }
+
+    await config.onUpdate!({
+      transaction: {
+        mutations: [{ modified: { id: '1', title: 'updated' }, key: '1', original: {} }],
+      },
+    } as any)
+
+    // Nonce should be cleaned up — server echo should not be suppressed
+    transport.publish = async () => {} // restore
+    transport.emit('docs', {
+      action: 'update',
+      data: { id: '1', title: 'server-update' },
+      _nonce: 'server-nonce',
+      _clientId: client.clientId,
+    })
+
+    // 1 insert from seed + 1 update from server echo
+    expect(ops.filter((o) => o.type === 'update')).toHaveLength(1)
+  })
+
+  it('concurrent mutations on same key have independent nonces', async () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+    let insertCall = 0
+
+    const config = realtimeCollectionOptions<Doc, string>({
+      client,
+      channel: 'docs',
+      getKey: (d) => d.id,
+      optimistic: true,
+      onInsert: async () => {
+        insertCall++
+        if (insertCall === 1) {
+          return { id: '1', title: 'first' }
+        }
+        return { id: '2', title: 'second' }
+      },
+    })
+    const { ops } = driveSync(config)
+
+    // Two concurrent mutations
+    await config.onInsert!({
+      transaction: {
+        mutations: [{ modified: { id: '1', title: 'first' }, key: '1', original: {} }],
+      },
+    } as any)
+
+    await config.onInsert!({
+      transaction: {
+        mutations: [{ modified: { id: '2', title: 'second' }, key: '2', original: {} }],
+      },
+    } as any)
+
+    // Both should have different nonces
+    const nonce1 = (transport.publishCalls[0].data as RealtimeChannelMessage)._nonce
+    const nonce2 = (transport.publishCalls[1].data as RealtimeChannelMessage)._nonce
+    expect(nonce1).toBeDefined()
+    expect(nonce2).toBeDefined()
+    expect(nonce1).not.toBe(nonce2)
+
+    // Echo from first mutation: should be suppressed
+    transport.emit('docs', transport.publishCalls[0].data)
+    // Echo from second mutation: should be suppressed
+    transport.emit('docs', transport.publishCalls[1].data)
+
+    // No ops from echoes
+    expect(ops).toHaveLength(0)
+  })
+
+  it('onInsert returning null cleans up nonce', async () => {
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
+
+    const config = realtimeCollectionOptions<Doc, string>({
+      client,
+      channel: 'docs',
+      getKey: (d) => d.id,
+      optimistic: true,
+      onInsert: () => Promise.resolve(null),
+    })
+    const { ops } = driveSync(config)
+
+    await config.onInsert!({
+      transaction: {
+        mutations: [{ modified: { id: '1', title: 'new' }, key: '1', original: {} }],
+      },
+    } as any)
+
+    // No publish since result was null
+    expect(transport.publishCalls).toHaveLength(0)
+
+    // A subsequent message from the same clientId should be applied
+    transport.emit('docs', {
+      action: 'insert',
+      data: { id: '1', title: 'from-server' },
+      _nonce: 'whatever',
+      _clientId: client.clientId,
+    })
+
+    expect(ops).toHaveLength(1)
+  })
 })

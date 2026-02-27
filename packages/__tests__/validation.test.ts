@@ -138,6 +138,69 @@ describe('createValidatedPublish', () => {
       data: { title: 'A'.repeat(101) },
     })).rejects.toThrow('Title too long')
   })
+
+  it('publishes falsy data (null) when validation returns { data: null }', async () => {
+    const publishCalls: Array<{ data: unknown }> = []
+    const publish: PublishFn = async (_ch, data) => {
+      publishCalls.push({ data })
+    }
+
+    const validate: ValidatePublishFn = () => ({
+      accepted: true,
+      data: null,
+    })
+
+    const validated = createValidatedPublish({ publish, validate })
+    await validated('ch', { original: true })
+
+    // Should publish null, not the original data
+    expect(publishCalls[0].data).toBeNull()
+  })
+
+  it('publishes falsy data (0) when validation returns { data: 0 }', async () => {
+    const publishCalls: Array<{ data: unknown }> = []
+    const publish: PublishFn = async (_ch, data) => {
+      publishCalls.push({ data })
+    }
+
+    const validate: ValidatePublishFn = () => ({
+      accepted: true,
+      data: 0,
+    })
+
+    const validated = createValidatedPublish({ publish, validate })
+    await validated('ch', { original: true })
+
+    // Should publish 0, not the original data
+    expect(publishCalls[0].data).toBe(0)
+  })
+
+  it('propagates exceptions thrown by validate (not just rejections)', async () => {
+    const publish: PublishFn = vi.fn()
+    const validate: ValidatePublishFn = () => {
+      throw new Error('Unexpected crash')
+    }
+
+    const validated = createValidatedPublish({ publish, validate })
+
+    await expect(validated('ch', {})).rejects.toThrow('Unexpected crash')
+    expect(publish).not.toHaveBeenCalled()
+  })
+
+  it('PublishValidationError has reason property', async () => {
+    const publish: PublishFn = vi.fn()
+    const validate: ValidatePublishFn = () => ({
+      accepted: false,
+      reason: 'Custom reason',
+    })
+
+    const validated = createValidatedPublish({ publish, validate })
+
+    const err = await validated('ch', {}).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(PublishValidationError)
+    expect((err as PublishValidationError).reason).toBe('Custom reason')
+    expect((err as PublishValidationError).name).toBe('PublishValidationError')
+  })
 })
 
 // ---------------------------------------------------------------------------

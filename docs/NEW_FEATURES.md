@@ -197,11 +197,9 @@ interface PublishValidation {
   userId?: string
 }
 
-interface PublishValidationResult {
-  accepted: boolean
-  reason?: string
-  data?: unknown  // transformed data
-}
+type PublishValidationResult =
+  | { accepted: true; data?: unknown }
+  | { accepted: false; reason?: string }
 
 type ValidatePublishFn = (
   params: PublishValidation,
@@ -223,7 +221,7 @@ TanStack Start server functions — no persistent server process assumed.
 ### `createServerStream`
 
 ```ts
-import { createServerStream } from '@tanstack/realtime'
+import { createServerStream, STREAM_DONE, STREAM_ERROR } from '@tanstack/realtime'
 
 // In a TanStack Start server function
 export const generateAI = createServerFn()(async ({ sessionId }) => {
@@ -235,29 +233,31 @@ export const generateAI = createServerFn()(async ({ sessionId }) => {
   for await (const chunk of llmResponse) {
     await stream.push({ type: 'token', content: chunk })
   }
-  await stream.done()  // sends { type: '__stream:done' }
+  await stream.done()  // sends { type: STREAM_DONE }
 })
 ```
 
 ### Sentinel events
 
-- `stream.done()` → publishes `{ type: '__stream:done' }`
-- `stream.error(message)` → publishes `{ type: '__stream:error', message }`
+- `stream.done()` → publishes `{ type: STREAM_DONE }`
+- `stream.error(message)` → publishes `{ type: STREAM_ERROR, message }`
 
 ### Client consumption
 
 Use `streamChannelOptions` with `isDone` and `isError`:
 
 ```ts
+import { streamChannelOptions, STREAM_DONE, STREAM_ERROR } from '@tanstack/realtime'
+
 streamChannelOptions({
   client,
   channel: ['ai', { sessionId }],
   initial: '',
   reduce: (state, event) =>
     event.type === 'token' ? state + event.content : state,
-  isDone: (_s, e) => e.type === '__stream:done',
+  isDone: (_s, e) => e.type === STREAM_DONE,
   isError: (_s, e) =>
-    e.type === '__stream:error' ? e.message : false,
+    e.type === STREAM_ERROR ? e.message : false,
 })
 ```
 
@@ -282,6 +282,44 @@ const stream = createServerStream({
 
 Each event includes a `_signature` field. Clients can verify with
 `verifyEventSignature()`.
+
+### `verifyEventSignature()`
+
+Verifies an HMAC-SHA256 signature on a received event using constant-time
+comparison (via `crypto.subtle.verify`) to prevent timing side-channel attacks.
+
+> **Important:** HMAC is symmetric — the same `hmacKey` is used to both sign
+> and verify events. Never expose this key to untrusted clients. Only call
+> `verifyEventSignature` in trusted server-side code or in environments where
+> the key cannot be leaked to end users.
+
+```ts
+import { verifyEventSignature } from '@tanstack/realtime'
+
+const isValid = await verifyEventSignature(event, event._signature, process.env.STREAM_HMAC_KEY)
+if (!isValid) return currentState // skip untrusted event
+```
+
+### `serverStreamCallbacks` helper
+
+Pre-built `isDone` / `isError` callbacks that match the sentinel events pushed
+by `createServerStream`. Spread these into your `streamChannelOptions` config
+to avoid manually checking for `STREAM_DONE` / `STREAM_ERROR`:
+
+```ts
+import { streamChannelOptions, serverStreamCallbacks } from '@tanstack/realtime'
+
+const aiStream = createCollection(streamChannelOptions({
+  client,
+  channel: ['ai', { sessionId }],
+  initial: '',
+  reduce: (s, e) => e.type === 'token' ? s + e.content : s,
+  ...serverStreamCallbacks,
+}))
+```
+
+This is equivalent to writing `isDone` and `isError` manually but keeps your
+code DRY and ensures it stays in sync with the sentinel constants.
 
 ### Breaking changes
 
