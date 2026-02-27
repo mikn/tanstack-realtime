@@ -59,11 +59,14 @@ export function parseChannel(channel: string): ParsedChannel {
   const namespace = channel.slice(0, colonIdx)
   const paramStr = channel.slice(colonIdx + 1)
 
-  const params: Record<string, string> = {}
+  const params: Record<string, string> = Object.create(null)
   for (const part of paramStr.split(',')) {
     const eqIdx = part.indexOf('=')
     if (eqIdx === -1) continue
     const k = part.slice(0, eqIdx)
+    // Guard against prototype pollution: reject keys that could modify the
+    // prototype chain when assigned to a plain object.
+    if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue
     const v = decodeURIComponent(part.slice(eqIdx + 1))
     params[k] = v
   }

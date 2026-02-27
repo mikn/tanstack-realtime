@@ -36,7 +36,7 @@ export function createRealtimeClient(
   // Mirror the transport's status into a typed store so React / Vue / Solid
   // adapters can observe it via their respective `useStore` implementations.
   const store = new Store<{ status: ConnectionStatus }>({
-    status: transport.store.state,
+    status: transport.store.get(),
   })
 
   // The status subscription is lazily managed so that destroy() + connect()
@@ -72,8 +72,15 @@ export function createRealtimeClient(
     },
 
     destroy() {
+      // Unsubscribe from the transport status store first, so that the
+      // subsequent disconnect does not propagate a 'disconnected' status
+      // through the client store (callers should no longer observe it).
       statusSub?.unsubscribe()
       statusSub = null
+      // Disconnect the transport so the WebSocket is closed and no further
+      // events are processed. This prevents leaking connections when the
+      // client is torn down (e.g. React provider unmount).
+      transport.disconnect()
     },
 
     subscribe<T = unknown>(channel: string, onMessage: (data: T) => void) {

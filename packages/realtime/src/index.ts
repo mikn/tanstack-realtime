@@ -21,6 +21,8 @@ export type {
   RealtimeTransport,
   // Optional presence extension — implement alongside RealtimeTransport
   PresenceCapable,
+  // Utility type for middleware that preserves presence capability
+  PresenceAwareTransport,
   RealtimeClient,
   RealtimeClientOptions,
 } from './core/types.js'
@@ -41,11 +43,14 @@ export type {
   OrEntry,
   OrState,
   OrWire,
+  LamportClock,
 } from './core/crdt.js'
 export {
   generateClientId,
   tickClock,
   advanceClock,
+  resetClock,
+  createClock,
   lwwWins,
   pnValue,
   mergePn,
@@ -53,6 +58,7 @@ export {
   pnDecrement,
   orValues,
   mergeOr,
+  compactOr,
   orAdd,
   orRemove,
   orHas,

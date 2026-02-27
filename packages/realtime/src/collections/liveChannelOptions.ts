@@ -78,6 +78,12 @@ export function liveChannelOptions<
       // that history always precedes live events in the collection.  Without
       // this, a message arriving 1 ms before the history fetch completes would
       // appear *before* older messages loaded from the server.
+      //
+      // The buffer is capped at 10 000 events to prevent unbounded memory
+      // growth when initialData is slow and the channel is very active.
+      // When the cap is reached, the oldest events are dropped (newer events
+      // are more important for catch-up).
+      const MAX_PENDING = 10_000
       const pending: Array<unknown> = []
       let initialized = !initialData // true immediately when there is no history
 
@@ -85,6 +91,7 @@ export function liveChannelOptions<
       const unsub = client.subscribe(serializedChannel, (raw) => {
         if (stopped) return
         if (!initialized) {
+          if (pending.length >= MAX_PENDING) pending.shift()
           pending.push(raw)
           return
         }

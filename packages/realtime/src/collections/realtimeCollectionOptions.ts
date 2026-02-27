@@ -1,6 +1,7 @@
 import { serializeKey } from '../core/serializeKey.js'
 import {
   advanceClock,
+  compactOr,
   initOrFromArray,
   lwwWins,
   mergeOr,
@@ -332,7 +333,7 @@ function mergeCrdtRow<T extends object>(
       }
       const wire = crdtHeader?.fields[field] as OrWire | undefined
       if (wire) {
-        const merged = mergeOr(prevState, wire)
+        const merged = compactOr(mergeOr(prevState, wire))
         newCrdt[field] = merged
         result[field] = orValues(merged)
       } else {

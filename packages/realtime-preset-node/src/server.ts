@@ -23,6 +23,40 @@ type ClientMsg =
   | { type: 'presence:update'; channel: string; data: unknown }
   | { type: 'presence:leave'; channel: string }
 
+const VALID_CLIENT_MSG_TYPES = new Set([
+  'subscribe',
+  'unsubscribe',
+  'publish',
+  'presence:join',
+  'presence:update',
+  'presence:leave',
+])
+
+/**
+ * Validate that a parsed JSON value has the expected shape of a ClientMsg.
+ * Returns the validated message, or null if the shape is invalid.
+ */
+function validateClientMsg(raw: unknown): ClientMsg | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const msg = raw as Record<string, unknown>
+  if (typeof msg.type !== 'string') return null
+  if (!VALID_CLIENT_MSG_TYPES.has(msg.type)) return null
+
+  switch (msg.type) {
+    case 'subscribe':
+    case 'unsubscribe':
+    case 'presence:leave':
+      return typeof msg.channel === 'string' ? (msg as ClientMsg) : null
+    case 'publish':
+      return typeof msg.channel === 'string' ? (msg as ClientMsg) : null
+    case 'presence:join':
+    case 'presence:update':
+      return typeof msg.channel === 'string' ? (msg as ClientMsg) : null
+    default:
+      return null
+  }
+}
+
 type ServerMsg =
   | { type: 'connected'; connectionId: string }
   | { type: 'subscribe:ok'; channel: string }
@@ -212,12 +246,14 @@ export function createNodeServer(options: NodeServerOptions): NodeServer {
   }
 
   async function handleMessage(conn: ConnectionState, raw: string) {
-    let msg: ClientMsg
+    let parsed: unknown
     try {
-      msg = JSON.parse(raw) as ClientMsg
+      parsed = JSON.parse(raw)
     } catch {
       return
     }
+    const msg = validateClientMsg(parsed)
+    if (!msg) return
 
     switch (msg.type) {
       case 'subscribe': {

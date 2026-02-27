@@ -201,7 +201,7 @@ export function tickTransport(
   let localTick = 0
 
   // Track connection state so we don't tick when disconnected.
-  let isConnected = inner.store.state === 'connected'
+  let isConnected = inner.store.get() === 'connected'
   inner.store.subscribe((status) => {
     isConnected = status === 'connected'
   })
@@ -332,8 +332,9 @@ export function tickTransport(
     removeEntity(channel, entityId) {
       if (!removedEntities.has(channel)) removedEntities.set(channel, new Set())
       removedEntities.get(channel)!.add(entityId)
-      // Also clean from dirtyState
+      // Also clean from dirtyState and previousState to prevent memory leaks.
       dirtyState.get(channel)?.delete(entityId)
+      previousState.get(channel)?.delete(entityId)
       ensureTickLoop()
     },
 
@@ -361,10 +362,13 @@ export function tickTransport(
       innerSubs.clear()
       dirtyState.clear()
       removedEntities.clear()
+      previousState.clear()
     },
   }
 
   // Forward presence methods when the inner transport supports them.
+  // When the inner transport lacks presence, attach throwing stubs so callers
+  // get a clear error (consistent with withGapRecovery).
   if (hasPresence(inner)) {
     const presenceInner = inner
     Object.assign(transport, {
@@ -384,6 +388,18 @@ export function tickTransport(
         return presenceInner.onPresenceChange(channel, callback)
       },
     } satisfies PresenceCapable)
+  } else {
+    const notSupported = (method: string) => () => {
+      throw new Error(
+        `[realtime] tickTransport: the wrapped transport does not implement PresenceCapable. Called ${method}().`,
+      )
+    }
+    Object.assign(transport, {
+      joinPresence: notSupported('joinPresence'),
+      updatePresence: notSupported('updatePresence'),
+      leavePresence: notSupported('leavePresence'),
+      onPresenceChange: notSupported('onPresenceChange'),
+    })
   }
 
   return transport

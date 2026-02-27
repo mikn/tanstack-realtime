@@ -45,6 +45,12 @@ export interface WsTransportOptions {
    * as `?token=<value>`. Called once per connection attempt so short-lived
    * tokens (e.g. JWTs) are refreshed on every reconnect.
    *
+   * **Security note**: The token is sent as a URL query parameter because the
+   * browser `WebSocket` API does not support custom headers. This is the
+   * standard approach for WebSocket authentication. Use short-lived tokens
+   * (e.g. single-use JWTs with a 30-60s expiry) to minimize exposure in
+   * server access logs. Never pass long-lived session tokens here.
+   *
    * @example
    * getToken: () => fetch('/api/realtime-token').then((r) => r.text())
    */
@@ -81,6 +87,49 @@ type ServerMsg =
       channel: string
       users: ReadonlyArray<PresenceUser>
     }
+
+const VALID_SERVER_MSG_TYPES = new Set([
+  'connected',
+  'subscribe:ok',
+  'subscribe:error',
+  'message',
+  'presence:update',
+  'publish:ack',
+  'publish:error',
+])
+
+/**
+ * Validate that a parsed JSON value has the expected shape of a ServerMsg.
+ * Returns the validated message, or null if the shape is invalid.
+ */
+function validateServerMsg(raw: unknown): ServerMsg | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const msg = raw as Record<string, unknown>
+  if (typeof msg.type !== 'string') return null
+  if (!VALID_SERVER_MSG_TYPES.has(msg.type)) return null
+
+  switch (msg.type) {
+    case 'connected':
+      return typeof msg.connectionId === 'string' ? (msg as ServerMsg) : null
+    case 'subscribe:ok':
+      return typeof msg.channel === 'string' ? (msg as ServerMsg) : null
+    case 'subscribe:error':
+      return typeof msg.channel === 'string' &&
+        typeof msg.code === 'number' &&
+        typeof msg.reason === 'string'
+        ? (msg as ServerMsg)
+        : null
+    case 'message':
+      return typeof msg.channel === 'string' ? (msg as ServerMsg) : null
+    case 'presence:update':
+      return typeof msg.channel === 'string' && Array.isArray(msg.users)
+        ? (msg as ServerMsg)
+        : null
+    default:
+      // publish:ack / publish:error — not handled by wsTransport
+      return null
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Transport factory
@@ -261,15 +310,16 @@ export function wsTransport(
     })
 
     ws.addEventListener('message', (event) => {
-      let msg: ServerMsg
+      let parsed: unknown
       try {
         const raw =
           typeof event.data === 'string' ? event.data : String(event.data)
-        msg = JSON.parse(raw) as ServerMsg
+        parsed = JSON.parse(raw)
       } catch {
         return
       }
-      handleMessage(msg)
+      const msg = validateServerMsg(parsed)
+      if (msg) handleMessage(msg)
     })
   }
 

@@ -160,6 +160,23 @@ export interface PresenceCapable {
 }
 
 /**
+ * Utility type for transport middleware that preserves the presence capability
+ * of the inner transport. Use in place of `RealtimeTransport` when writing
+ * middleware that conditionally forwards presence methods.
+ *
+ * @example
+ * function myMiddleware<T extends RealtimeTransport>(
+ *   inner: T,
+ * ): PresenceAwareTransport<T> & { myCustomMethod: () => void } {
+ *   // ...
+ * }
+ */
+export type PresenceAwareTransport<T extends RealtimeTransport> =
+  T extends PresenceCapable
+    ? RealtimeTransport & PresenceCapable
+    : RealtimeTransport
+
+/**
  * Type guard — returns `true` when `transport` implements {@link PresenceCapable}.
  *
  * Use this in generic middleware or utility code that accepts any

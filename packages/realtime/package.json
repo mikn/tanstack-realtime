@@ -14,6 +14,16 @@
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
       }
+    },
+    "./server": {
+      "import": {
+        "types": "./dist/server/index.d.ts",
+        "default": "./dist/server/index.js"
+      },
+      "require": {
+        "types": "./dist/server/index.d.cts",
+        "default": "./dist/server/index.cjs"
+      }
     }
   },
   "main": "./dist/index.cjs",
@@ -23,11 +33,14 @@
   "scripts": {
     "build": "tsup"
   },
-  "dependencies": {
-    "@tanstack/db": "*",
-    "@tanstack/store": "*"
+  "dependencies": {},
+  "peerDependencies": {
+    "@tanstack/db": ">=0.0.1",
+    "@tanstack/store": ">=0.0.1"
   },
   "devDependencies": {
-    "@standard-schema/spec": "^1.1.0"
+    "@standard-schema/spec": "^1.1.0",
+    "@tanstack/db": "*",
+    "@tanstack/store": "*"
   }
 }

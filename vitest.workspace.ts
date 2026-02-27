@@ -67,6 +67,7 @@ export default defineWorkspace([
         'packages/__tests__/optimisticMode.test.ts',
         'packages/__tests__/serverStream.test.ts',
         'packages/__tests__/tickTransport.test.ts',
+        'packages/__tests__/architecturalFixes.test.ts',
       ],
       pool: 'forks',
       poolOptions: { forks: { singleFork: true } },
