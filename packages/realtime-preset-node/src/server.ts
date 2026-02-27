@@ -1,6 +1,10 @@
 import { randomBytes } from 'node:crypto'
 import { WebSocket, WebSocketServer } from 'ws'
-import { createServerStream, parseChannel, serializeKey } from '@tanstack/realtime'
+import {
+  createServerStream,
+  parseChannel,
+  serializeKey,
+} from '@tanstack/realtime'
 import type { IncomingMessage, Server } from 'node:http'
 import type {
   ChannelPermissions,
@@ -441,8 +445,7 @@ export function createNodeServer(options: NodeServerOptions): NodeServer {
     }): ServerStream<TEvent> {
       return createServerStream<TEvent>({
         publish: async (ch, data) => {
-          const serialized =
-            typeof ch === 'string' ? ch : serializeKey(ch)
+          const serialized = typeof ch === 'string' ? ch : serializeKey(ch)
           fanOut(serialized, data)
         },
         channel: opts.channel,

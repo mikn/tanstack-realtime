@@ -752,8 +752,7 @@ export function realtimeCollectionOptions<
         } catch (err) {
           if (nonce) pendingNonces.delete(nonce)
           if (onOptimisticError) {
-            const key =
-              params.transaction.mutations[0].key as TKey
+            const key = params.transaction.mutations[0].key as TKey
             onOptimisticError({ action: 'insert', key, error: err })
           }
           throw err
@@ -797,8 +796,7 @@ export function realtimeCollectionOptions<
         } catch (err) {
           if (nonce) pendingNonces.delete(nonce)
           if (onOptimisticError) {
-            const key =
-              params.transaction.mutations[0].key as TKey
+            const key = params.transaction.mutations[0].key as TKey
             onOptimisticError({ action: 'update', key, error: err })
           }
           throw err
@@ -842,8 +840,7 @@ export function realtimeCollectionOptions<
         } catch (err) {
           if (nonce) pendingNonces.delete(nonce)
           if (onOptimisticError) {
-            const key =
-              params.transaction.mutations[0].key as TKey
+            const key = params.transaction.mutations[0].key as TKey
             onOptimisticError({ action: 'delete', key, error: err })
           }
           throw err

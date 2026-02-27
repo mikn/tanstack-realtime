@@ -221,7 +221,4 @@ export {
   STREAM_DONE,
   STREAM_ERROR,
 } from './serverStream.js'
-export type {
-  ServerStream,
-  CreateServerStreamOptions,
-} from './serverStream.js'
+export type { ServerStream, CreateServerStreamOptions } from './serverStream.js'

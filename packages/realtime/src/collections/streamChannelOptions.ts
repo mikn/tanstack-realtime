@@ -351,7 +351,7 @@ export const serverStreamCallbacks = {
   isError: (_state: unknown, event: unknown): string | false => {
     const e = event as Record<string, unknown>
     if (e.type === STREAM_ERROR) {
-      return (typeof e.message === 'string' ? e.message : 'Stream error')
+      return typeof e.message === 'string' ? e.message : 'Stream error'
     }
     return false
   },

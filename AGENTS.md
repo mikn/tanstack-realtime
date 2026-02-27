@@ -86,15 +86,15 @@ export function wsTransport(options: WsTransportOptions): RealtimeTransport
 
 ### Naming Conventions
 
-| Kind                    | Pattern                        | Example                      |
-|-------------------------|--------------------------------|------------------------------|
-| Transport factory       | `*Transport`                   | `wsTransport`, `tickTransport` |
-| Middleware factory      | `create*` or `with*`           | `createOfflineQueue`, `withGapRecovery` |
-| Collection factory      | `*CollectionOptions` or `*ChannelOptions` | `realtimeCollectionOptions`, `streamChannelOptions` |
-| Server factory          | `create*`                      | `createNodeServer`, `createSseHandler` |
-| Options type            | `*Options`                     | `WsTransportOptions`         |
-| Config type             | `*Config`                      | `RealtimeCollectionConfig`   |
-| Type guard              | `has*` / `is*`                 | `hasPresence`                |
+| Kind               | Pattern                                   | Example                                             |
+| ------------------ | ----------------------------------------- | --------------------------------------------------- |
+| Transport factory  | `*Transport`                              | `wsTransport`, `tickTransport`                      |
+| Middleware factory | `create*` or `with*`                      | `createOfflineQueue`, `withGapRecovery`             |
+| Collection factory | `*CollectionOptions` or `*ChannelOptions` | `realtimeCollectionOptions`, `streamChannelOptions` |
+| Server factory     | `create*`                                 | `createNodeServer`, `createSseHandler`              |
+| Options type       | `*Options`                                | `WsTransportOptions`                                |
+| Config type        | `*Config`                                 | `RealtimeCollectionConfig`                          |
+| Type guard         | `has*` / `is*`                            | `hasPresence`                                       |
 
 ### Subscription Pattern
 
@@ -143,7 +143,7 @@ When adding new message types, extend the union — do not add boolean flags.
 ### Error Handling
 
 | Context               | Pattern                                  |
-|-----------------------|------------------------------------------|
+| --------------------- | ---------------------------------------- |
 | Invalid config        | `throw new Error('[module] message')`    |
 | Business logic result | Discriminated union result type          |
 | Callback errors       | `onFlushError`, `onOptimisticError`      |

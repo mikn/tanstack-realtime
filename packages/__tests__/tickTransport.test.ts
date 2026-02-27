@@ -350,7 +350,9 @@ describe('tickTransport', () => {
 
     // Dirty state accumulated during disconnect is now flushed
     expect(inner.publishCalls).toHaveLength(1)
-    expect((inner.publishCalls[0].data as TickFrame).entities['p1']).toEqual({ x: 1 })
+    expect((inner.publishCalls[0].data as TickFrame).entities['p1']).toEqual({
+      x: 1,
+    })
 
     tick.stop()
   })
@@ -370,7 +372,9 @@ describe('tickTransport', () => {
     vi.advanceTimersByTime(10)
 
     expect(inner.publishCalls).toHaveLength(1)
-    expect((inner.publishCalls[0].data as TickFrame).entities['p1']).toEqual({ x: 2 })
+    expect((inner.publishCalls[0].data as TickFrame).entities['p1']).toEqual({
+      x: 2,
+    })
 
     tick.stop()
   })
@@ -521,7 +525,9 @@ describe('tickCollectionOptions', () => {
       begin: () => {},
       write: (op: any) => ops.push(op),
       commit: () => {},
-      markReady: () => { ready = true },
+      markReady: () => {
+        ready = true
+      },
       collection: null as any,
       truncate: () => {},
     } as any)
@@ -571,7 +577,6 @@ describe('tickCollectionOptions', () => {
     expect(ops).toHaveLength(4)
     expect(ops[3].type).toBe('delete')
     expect(ops[3].key).toBe('player-2')
-
     ;(cleanup as unknown as () => void)()
     tick.stop()
   })

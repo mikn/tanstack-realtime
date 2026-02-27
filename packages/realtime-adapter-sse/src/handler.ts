@@ -401,8 +401,7 @@ export function createSseHandler(options: SseHandlerOptions = {}): SseHandler {
       const handler = this
       return createServerStream<TEvent>({
         publish: async (ch, data) => {
-          const serialized =
-            typeof ch === 'string' ? ch : serializeKey(ch)
+          const serialized = typeof ch === 'string' ? ch : serializeKey(ch)
           handler.broadcast(serialized, data)
         },
         channel: opts.channel,

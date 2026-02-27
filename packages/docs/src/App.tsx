@@ -1171,9 +1171,7 @@ const config = tickCollectionOptions<Player, string>({
         </div>
 
         <div className="callout">
-          <span className="callout-label">
-            Delta Compression
-          </span>
+          <span className="callout-label">Delta Compression</span>
           <p>
             With <code>deltaCompression: true</code>, only fields that changed
             since the last tick are sent on the wire. The receiver reconstructs

@@ -31,7 +31,10 @@ import type { NodeServer } from '@tanstack/realtime-preset-node'
 
 describe('createServerStream', () => {
   it('push() calls publish with the event data', async () => {
-    const calls: Array<{ channel: string | ReadonlyArray<unknown>; data: unknown }> = []
+    const calls: Array<{
+      channel: string | ReadonlyArray<unknown>
+      data: unknown
+    }> = []
     const publish: PublishFn = async (channel, data) => {
       calls.push({ channel: channel as string, data })
     }
@@ -126,14 +129,15 @@ describe('serverStreamCallbacks', () => {
 
   it('isError returns error message for STREAM_ERROR events', () => {
     expect(
-      serverStreamCallbacks.isError(null, { type: STREAM_ERROR, message: 'Oops' }),
+      serverStreamCallbacks.isError(null, {
+        type: STREAM_ERROR,
+        message: 'Oops',
+      }),
     ).toBe('Oops')
-    expect(
-      serverStreamCallbacks.isError(null, { type: STREAM_ERROR }),
-    ).toBe('Stream error') // fallback message
-    expect(
-      serverStreamCallbacks.isError(null, { type: 'token' }),
-    ).toBe(false)
+    expect(serverStreamCallbacks.isError(null, { type: STREAM_ERROR })).toBe(
+      'Stream error',
+    ) // fallback message
+    expect(serverStreamCallbacks.isError(null, { type: 'token' })).toBe(false)
   })
 })
 
@@ -335,7 +339,9 @@ describe('createServerStream + streamChannelOptions integration', () => {
 
     // 2. Create a mock client that routes to our subscribers map
     const { Store } = await import('@tanstack/store')
-    const _store = new Store<'connected' | 'disconnected' | 'connecting' | 'reconnecting'>('connected')
+    const _store = new Store<
+      'connected' | 'disconnected' | 'connecting' | 'reconnecting'
+    >('connected')
 
     const mockClient = {
       clientId: 'test',
@@ -371,7 +377,10 @@ describe('createServerStream + streamChannelOptions integration', () => {
     config.sync.sync({
       begin: () => {},
       write: (op: any) => {
-        const o = op as { type: string; value: { status: string; state: string } }
+        const o = op as {
+          type: string
+          value: { status: string; state: string }
+        }
         if (o.type === 'update') {
           updates.push({ status: o.value.status, state: o.value.state })
         }

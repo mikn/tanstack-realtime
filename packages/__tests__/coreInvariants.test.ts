@@ -291,7 +291,9 @@ describe('B2: OR-Set compaction', () => {
     expect(compacted.entries.length).toBe(2)
 
     // Values should be preserved
-    expect(orValues(compacted)).toEqual(expect.arrayContaining(['alpha', 'beta']))
+    expect(orValues(compacted)).toEqual(
+      expect.arrayContaining(['alpha', 'beta']),
+    )
   })
 
   it('compactOr is a no-op when already compact', () => {
@@ -397,9 +399,8 @@ describe('B3: Per-instance Lamport clock', () => {
   })
 
   it('multiple createClock instances are completely independent', () => {
-    const clocks: Array<LamportClock> = Array.from(
-      { length: 10 },
-      () => createClock(),
+    const clocks: Array<LamportClock> = Array.from({ length: 10 }, () =>
+      createClock(),
     )
 
     // Tick each a different number of times
@@ -546,9 +547,8 @@ describe('A4: PresenceAwareTransport type utility', () => {
 
   it('PresenceAwareTransport preserves presence from presence-capable transport', () => {
     const transport = createMockTransportWithPresence()
-    const _typed: PresenceAwareTransport<
-      RealtimeTransport & PresenceCapable
-    > = transport
+    const _typed: PresenceAwareTransport<RealtimeTransport & PresenceCapable> =
+      transport
     expect(typeof _typed.joinPresence).toBe('function')
   })
 })
@@ -646,10 +646,8 @@ describe('C1: /server subpath export', () => {
     const fs = await import('node:fs')
     const pkg = JSON.parse(
       fs.readFileSync(
-        new URL(
-          '../../packages/realtime/package.json',
-          import.meta.url,
-        ).pathname,
+        new URL('../../packages/realtime/package.json', import.meta.url)
+          .pathname,
         'utf-8',
       ),
     )
@@ -668,10 +666,8 @@ describe('C2+C3: Package dependency configuration', () => {
     const fs = await import('node:fs')
     const pkg = JSON.parse(
       fs.readFileSync(
-        new URL(
-          '../../packages/realtime/package.json',
-          import.meta.url,
-        ).pathname,
+        new URL('../../packages/realtime/package.json', import.meta.url)
+          .pathname,
         'utf-8',
       ),
     )
@@ -689,10 +685,8 @@ describe('C2+C3: Package dependency configuration', () => {
     const fs = await import('node:fs')
     const pkg = JSON.parse(
       fs.readFileSync(
-        new URL(
-          '../../packages/realtime/package.json',
-          import.meta.url,
-        ).pathname,
+        new URL('../../packages/realtime/package.json', import.meta.url)
+          .pathname,
         'utf-8',
       ),
     )

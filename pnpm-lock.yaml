@@ -155,17 +155,16 @@ importers:
         version: 1.1.0
 
   packages/realtime:
-    dependencies:
+    devDependencies:
+      '@standard-schema/spec':
+        specifier: ^1.1.0
+        version: 1.1.0
       '@tanstack/db':
         specifier: '*'
         version: 0.5.29(typescript@5.9.3)
       '@tanstack/store':
         specifier: '*'
         version: 0.9.1
-    devDependencies:
-      '@standard-schema/spec':
-        specifier: ^1.1.0
-        version: 1.1.0
 
   packages/realtime-adapter-centrifugo:
     dependencies:
@@ -190,9 +189,6 @@ importers:
       '@tanstack/realtime':
         specifier: workspace:*
         version: link:../realtime
-      '@tanstack/store':
-        specifier: '*'
-        version: 0.9.1
       ws:
         specifier: '*'
         version: 8.19.0

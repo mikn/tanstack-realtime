@@ -31,7 +31,10 @@ import type { NodeServer } from '@tanstack/realtime-preset-node'
 
 describe('createValidatedPublish', () => {
   it('publishes data when validation accepts', async () => {
-    const publishCalls: Array<{ channel: string | ReadonlyArray<unknown>; data: unknown }> = []
+    const publishCalls: Array<{
+      channel: string | ReadonlyArray<unknown>
+      data: unknown
+    }> = []
     const publish: PublishFn = async (channel, data) => {
       publishCalls.push({ channel: channel as string, data })
     }
@@ -43,7 +46,10 @@ describe('createValidatedPublish', () => {
 
     expect(publishCalls).toHaveLength(1)
     expect(publishCalls[0].channel).toBe('my-channel')
-    expect(publishCalls[0].data).toEqual({ action: 'insert', data: { id: '1' } })
+    expect(publishCalls[0].data).toEqual({
+      action: 'insert',
+      data: { id: '1' },
+    })
   })
 
   it('throws PublishValidationError when validation rejects', async () => {
@@ -55,13 +61,13 @@ describe('createValidatedPublish', () => {
 
     const validated = createValidatedPublish({ publish, validate })
 
-    await expect(
-      validated('my-channel', { bad: 'data' }),
-    ).rejects.toThrow(PublishValidationError)
+    await expect(validated('my-channel', { bad: 'data' })).rejects.toThrow(
+      PublishValidationError,
+    )
 
-    await expect(
-      validated('my-channel', { bad: 'data' }),
-    ).rejects.toThrow('Invalid data shape')
+    await expect(validated('my-channel', { bad: 'data' })).rejects.toThrow(
+      'Invalid data shape',
+    )
 
     expect(publish).not.toHaveBeenCalled()
   })
@@ -72,9 +78,7 @@ describe('createValidatedPublish', () => {
 
     const validated = createValidatedPublish({ publish, validate })
 
-    await expect(
-      validated('ch', {}),
-    ).rejects.toThrow('Validation failed')
+    await expect(validated('ch', {})).rejects.toThrow('Validation failed')
   })
 
   it('publishes transformed data when validation returns data', async () => {
@@ -96,7 +100,10 @@ describe('createValidatedPublish', () => {
 
   it('passes parsed channel to the validate function', async () => {
     const publish: PublishFn = async () => {}
-    const validateCalls: Array<{ namespace: string; params: Record<string, string> }> = []
+    const validateCalls: Array<{
+      namespace: string
+      params: Record<string, string>
+    }> = []
 
     const validate: ValidatePublishFn = ({ channel }) => {
       validateCalls.push({
@@ -128,15 +135,19 @@ describe('createValidatedPublish', () => {
 
     const validated = createValidatedPublish({ publish, validate })
 
-    await expect(validated('ch', {
-      action: 'insert',
-      data: { title: 'Short' },
-    })).resolves.toBeUndefined()
+    await expect(
+      validated('ch', {
+        action: 'insert',
+        data: { title: 'Short' },
+      }),
+    ).resolves.toBeUndefined()
 
-    await expect(validated('ch', {
-      action: 'insert',
-      data: { title: 'A'.repeat(101) },
-    })).rejects.toThrow('Title too long')
+    await expect(
+      validated('ch', {
+        action: 'insert',
+        data: { title: 'A'.repeat(101) },
+      }),
+    ).rejects.toThrow('Title too long')
   })
 
   it('publishes falsy data (null) when validation returns { data: null }', async () => {
@@ -212,9 +223,7 @@ describe('createNodeServer — onPublish validation', () => {
   let nodeServer: NodeServer
   let port: number
 
-  async function startServer(
-    onPublish?: ValidatePublishFn,
-  ): Promise<void> {
+  async function startServer(onPublish?: ValidatePublishFn): Promise<void> {
     httpServer = createServer()
     nodeServer = createNodeServer({
       getUser: () => Promise.resolve({ userId: 'test-user' }),

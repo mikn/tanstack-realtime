@@ -117,9 +117,10 @@ export function tickCollectionOptions<
           // Process entity updates
           for (const [entityId, state] of Object.entries(frame.entities)) {
             const existingKey = entityIdToKey.get(entityId)
-            const existing = existingKey !== undefined
-              ? currentState.get(existingKey)
-              : undefined
+            const existing =
+              existingKey !== undefined
+                ? currentState.get(existingKey)
+                : undefined
             const row = config.fromEntity(entityId, state, existing)
             const key = config.getKey(row)
 

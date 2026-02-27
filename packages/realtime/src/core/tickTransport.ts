@@ -189,10 +189,7 @@ export function tickTransport(
   const removedEntities = new Map<string, Set<string>>()
 
   // channel → Set of tick frame listeners
-  const tickListeners = new Map<
-    string,
-    Set<(frame: TickFrame) => void>
-  >()
+  const tickListeners = new Map<string, Set<(frame: TickFrame) => void>>()
 
   // Inner subscription unsubs (one per channel with tick listeners)
   const innerSubs = new Map<string, () => void>()
@@ -247,10 +244,7 @@ export function tickTransport(
               previousState.set(channel, new Map())
             }
             const prev = previousState.get(channel)!.get(entityId)
-            const delta = computeDelta(
-              prev,
-              state as Record<string, unknown>,
-            )
+            const delta = computeDelta(prev, state as Record<string, unknown>)
             if (delta) {
               frame.entities[entityId] = delta
               previousState
@@ -263,10 +257,7 @@ export function tickTransport(
         }
       }
 
-      if (
-        Object.keys(frame.entities).length > 0 ||
-        frame.removed.length > 0
-      ) {
+      if (Object.keys(frame.entities).length > 0 || frame.removed.length > 0) {
         inner
           .publish(channel, { __tick: true, ...frame } satisfies TickWireFrame)
           .catch(() => {

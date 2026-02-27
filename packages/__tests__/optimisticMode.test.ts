@@ -102,7 +102,9 @@ describe('realtimeCollectionOptions — optimistic mode', () => {
 
     await config.onInsert!({
       transaction: {
-        mutations: [{ modified: { id: '1', title: 'new' }, key: '1', original: {} }],
+        mutations: [
+          { modified: { id: '1', title: 'new' }, key: '1', original: {} },
+        ],
       },
     } as any)
 
@@ -126,7 +128,9 @@ describe('realtimeCollectionOptions — optimistic mode', () => {
 
     await config.onInsert!({
       transaction: {
-        mutations: [{ modified: { id: '1', title: 'new' }, key: '1', original: {} }],
+        mutations: [
+          { modified: { id: '1', title: 'new' }, key: '1', original: {} },
+        ],
       },
     } as any)
 
@@ -151,7 +155,9 @@ describe('realtimeCollectionOptions — optimistic mode', () => {
     // Perform the mutation
     await config.onInsert!({
       transaction: {
-        mutations: [{ modified: { id: '1', title: 'new' }, key: '1', original: {} }],
+        mutations: [
+          { modified: { id: '1', title: 'new' }, key: '1', original: {} },
+        ],
       },
     } as any)
 
@@ -228,7 +234,9 @@ describe('realtimeCollectionOptions — optimistic mode', () => {
     await expect(
       config.onInsert!({
         transaction: {
-          mutations: [{ modified: { id: '1', title: 'new' }, key: '1', original: {} }],
+          mutations: [
+            { modified: { id: '1', title: 'new' }, key: '1', original: {} },
+          ],
         },
       } as any),
     ).rejects.toThrow('Server error')
@@ -257,7 +265,9 @@ describe('realtimeCollectionOptions — optimistic mode', () => {
 
     await config.onInsert!({
       transaction: {
-        mutations: [{ modified: { id: '1', title: 'new' }, key: '1', original: {} }],
+        mutations: [
+          { modified: { id: '1', title: 'new' }, key: '1', original: {} },
+        ],
       },
     } as any).catch(() => {})
 
@@ -292,7 +302,9 @@ describe('realtimeCollectionOptions — optimistic mode', () => {
 
     await config.onUpdate!({
       transaction: {
-        mutations: [{ modified: { id: '1', title: 'updated' }, key: '1', original: {} }],
+        mutations: [
+          { modified: { id: '1', title: 'updated' }, key: '1', original: {} },
+        ],
       },
     } as any)
 
@@ -357,7 +369,9 @@ describe('realtimeCollectionOptions — optimistic mode', () => {
     // Mutation succeeds, publish fails — nonce should be cleaned up
     await config.onInsert!({
       transaction: {
-        mutations: [{ modified: { id: '1', title: 'new' }, key: '1', original: {} }],
+        mutations: [
+          { modified: { id: '1', title: 'new' }, key: '1', original: {} },
+        ],
       },
     } as any)
 
@@ -403,7 +417,9 @@ describe('realtimeCollectionOptions — optimistic mode', () => {
 
     await config.onUpdate!({
       transaction: {
-        mutations: [{ modified: { id: '1', title: 'updated' }, key: '1', original: {} }],
+        mutations: [
+          { modified: { id: '1', title: 'updated' }, key: '1', original: {} },
+        ],
       },
     } as any)
 
@@ -443,19 +459,25 @@ describe('realtimeCollectionOptions — optimistic mode', () => {
     // Two concurrent mutations
     await config.onInsert!({
       transaction: {
-        mutations: [{ modified: { id: '1', title: 'first' }, key: '1', original: {} }],
+        mutations: [
+          { modified: { id: '1', title: 'first' }, key: '1', original: {} },
+        ],
       },
     } as any)
 
     await config.onInsert!({
       transaction: {
-        mutations: [{ modified: { id: '2', title: 'second' }, key: '2', original: {} }],
+        mutations: [
+          { modified: { id: '2', title: 'second' }, key: '2', original: {} },
+        ],
       },
     } as any)
 
     // Both should have different nonces
-    const nonce1 = (transport.publishCalls[0].data as RealtimeChannelMessage)._nonce
-    const nonce2 = (transport.publishCalls[1].data as RealtimeChannelMessage)._nonce
+    const nonce1 = (transport.publishCalls[0].data as RealtimeChannelMessage)
+      ._nonce
+    const nonce2 = (transport.publishCalls[1].data as RealtimeChannelMessage)
+      ._nonce
     expect(nonce1).toBeDefined()
     expect(nonce2).toBeDefined()
     expect(nonce1).not.toBe(nonce2)
@@ -484,7 +506,9 @@ describe('realtimeCollectionOptions — optimistic mode', () => {
 
     await config.onInsert!({
       transaction: {
-        mutations: [{ modified: { id: '1', title: 'new' }, key: '1', original: {} }],
+        mutations: [
+          { modified: { id: '1', title: 'new' }, key: '1', original: {} },
+        ],
       },
     } as any)
 

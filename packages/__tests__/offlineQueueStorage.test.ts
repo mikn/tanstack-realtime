@@ -175,8 +175,18 @@ describe('createLocalStorageAdapter', () => {
   it('save + load round-trip', async () => {
     const storage = createLocalStorageAdapter({ key: 'test-queue' })
     const messages: Array<QueuedMessage> = [
-      { id: 3, channel: 'ch', data: { x: 1 }, enqueuedAt: '2024-01-01T00:00:00Z' },
-      { id: 1, channel: 'ch', data: { x: 2 }, enqueuedAt: '2024-01-01T00:00:01Z' },
+      {
+        id: 3,
+        channel: 'ch',
+        data: { x: 1 },
+        enqueuedAt: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 1,
+        channel: 'ch',
+        data: { x: 2 },
+        enqueuedAt: '2024-01-01T00:00:01Z',
+      },
     ]
 
     await storage.save(messages)
@@ -271,8 +281,18 @@ describe('createOfflineQueue with storage', () => {
 
     // Simulate a previous session: messages are in storage
     storage.data = [
-      { id: 5, channel: 'ch', data: 'old-1', enqueuedAt: '2024-01-01T00:00:00Z' },
-      { id: 6, channel: 'ch', data: 'old-2', enqueuedAt: '2024-01-01T00:00:01Z' },
+      {
+        id: 5,
+        channel: 'ch',
+        data: 'old-1',
+        enqueuedAt: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 6,
+        channel: 'ch',
+        data: 'old-2',
+        enqueuedAt: '2024-01-01T00:00:01Z',
+      },
     ]
 
     const inner = createMockTransport()
@@ -292,7 +312,12 @@ describe('createOfflineQueue with storage', () => {
   it('continues IDs from persisted state (no ID collisions)', async () => {
     const storage = createMemoryStorage()
     storage.data = [
-      { id: 10, channel: 'ch', data: 'old', enqueuedAt: '2024-01-01T00:00:00Z' },
+      {
+        id: 10,
+        channel: 'ch',
+        data: 'old',
+        enqueuedAt: '2024-01-01T00:00:00Z',
+      },
     ]
 
     const inner = createMockTransport()
@@ -327,7 +352,12 @@ describe('createOfflineQueue with storage', () => {
 
     // Storage loads with pre-existing messages
     resolveLoad([
-      { id: 5, channel: 'ch', data: 'persisted', enqueuedAt: '2024-01-01T00:00:00Z' },
+      {
+        id: 5,
+        channel: 'ch',
+        data: 'persisted',
+        enqueuedAt: '2024-01-01T00:00:00Z',
+      },
     ])
     await vi.advanceTimersByTimeAsync(0)
 
@@ -372,9 +402,24 @@ describe('createOfflineQueue with storage', () => {
 
     // Storage resolves with messages that have IDs 100-102
     resolveLoad([
-      { id: 100, channel: 'ch', data: 'persisted-1', enqueuedAt: '2024-01-01T00:00:00Z' },
-      { id: 101, channel: 'ch', data: 'persisted-2', enqueuedAt: '2024-01-01T00:00:01Z' },
-      { id: 102, channel: 'ch', data: 'persisted-3', enqueuedAt: '2024-01-01T00:00:02Z' },
+      {
+        id: 100,
+        channel: 'ch',
+        data: 'persisted-1',
+        enqueuedAt: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 101,
+        channel: 'ch',
+        data: 'persisted-2',
+        enqueuedAt: '2024-01-01T00:00:01Z',
+      },
+      {
+        id: 102,
+        channel: 'ch',
+        data: 'persisted-3',
+        enqueuedAt: '2024-01-01T00:00:02Z',
+      },
     ])
     await vi.advanceTimersByTimeAsync(0)
 
@@ -449,7 +494,12 @@ describe('createOfflineQueue with storage', () => {
   it('new enqueues after init get IDs that continue from merged state', async () => {
     const storage = createMemoryStorage()
     storage.data = [
-      { id: 50, channel: 'ch', data: 'old', enqueuedAt: '2024-01-01T00:00:00Z' },
+      {
+        id: 50,
+        channel: 'ch',
+        data: 'old',
+        enqueuedAt: '2024-01-01T00:00:00Z',
+      },
     ]
 
     const inner = createMockTransport()

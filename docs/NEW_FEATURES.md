@@ -29,7 +29,7 @@ realtimeCollectionOptions({
   client,
   channel: ['todos', { projectId }],
   getKey: (t) => t.id,
-  optimistic: true,  // NEW
+  optimistic: true, // NEW
   onOptimisticError: ({ action, key, error }) => {
     toast.error(`Failed to ${action} item ${key}`)
   },
@@ -57,8 +57,8 @@ interface RealtimeChannelMessage<T> {
   action: 'insert' | 'update' | 'delete'
   data: T
   _crdt?: CrdtMessageHeader
-  _nonce?: string     // NEW: echo suppression nonce
-  _clientId?: string  // NEW: originator client ID
+  _nonce?: string // NEW: echo suppression nonce
+  _clientId?: string // NEW: originator client ID
 }
 ```
 
@@ -132,7 +132,10 @@ A stateless wrapper around `PublishFn`. Runs validation within the ephemeral
 server function — no persistent server required.
 
 ```ts
-import { createValidatedPublish, PublishValidationError } from '@tanstack/realtime'
+import {
+  createValidatedPublish,
+  PublishValidationError,
+} from '@tanstack/realtime'
 
 const validatedPublish = createValidatedPublish({
   publish: async (channel, data) => {
@@ -176,7 +179,8 @@ const nodeServer = createNodeServer({
   onPublish: async ({ channel, data, userId }) => {
     if (channel.namespace === 'todos') {
       const result = todoSchema.safeParse(data)
-      if (!result.success) return { accepted: false, reason: result.error.message }
+      if (!result.success)
+        return { accepted: false, reason: result.error.message }
       return { accepted: true, data: result.data }
     }
     return { accepted: true }
@@ -221,19 +225,23 @@ TanStack Start server functions — no persistent server process assumed.
 ### `createServerStream`
 
 ```ts
-import { createServerStream, STREAM_DONE, STREAM_ERROR } from '@tanstack/realtime'
+import {
+  createServerStream,
+  STREAM_DONE,
+  STREAM_ERROR,
+} from '@tanstack/realtime'
 
 // In a TanStack Start server function
 export const generateAI = createServerFn()(async ({ sessionId }) => {
   const stream = createServerStream({
-    publish: realtimePublish,  // your PublishFn
+    publish: realtimePublish, // your PublishFn
     channel: ['ai', { sessionId }],
   })
 
   for await (const chunk of llmResponse) {
     await stream.push({ type: 'token', content: chunk })
   }
-  await stream.done()  // sends { type: STREAM_DONE }
+  await stream.done() // sends { type: STREAM_DONE }
 })
 ```
 
@@ -247,7 +255,11 @@ export const generateAI = createServerFn()(async ({ sessionId }) => {
 Use `streamChannelOptions` with `isDone` and `isError`:
 
 ```ts
-import { streamChannelOptions, STREAM_DONE, STREAM_ERROR } from '@tanstack/realtime'
+import {
+  streamChannelOptions,
+  STREAM_DONE,
+  STREAM_ERROR,
+} from '@tanstack/realtime'
 
 streamChannelOptions({
   client,
@@ -256,8 +268,7 @@ streamChannelOptions({
   reduce: (state, event) =>
     event.type === 'token' ? state + event.content : state,
   isDone: (_s, e) => e.type === STREAM_DONE,
-  isError: (_s, e) =>
-    e.type === STREAM_ERROR ? e.message : false,
+  isError: (_s, e) => (e.type === STREAM_ERROR ? e.message : false),
 })
 ```
 
@@ -296,7 +307,11 @@ comparison (via `crypto.subtle.verify`) to prevent timing side-channel attacks.
 ```ts
 import { verifyEventSignature } from '@tanstack/realtime'
 
-const isValid = await verifyEventSignature(event, event._signature, process.env.STREAM_HMAC_KEY)
+const isValid = await verifyEventSignature(
+  event,
+  event._signature,
+  process.env.STREAM_HMAC_KEY,
+)
 if (!isValid) return currentState // skip untrusted event
 ```
 
@@ -309,13 +324,15 @@ to avoid manually checking for `STREAM_DONE` / `STREAM_ERROR`:
 ```ts
 import { streamChannelOptions, serverStreamCallbacks } from '@tanstack/realtime'
 
-const aiStream = createCollection(streamChannelOptions({
-  client,
-  channel: ['ai', { sessionId }],
-  initial: '',
-  reduce: (s, e) => e.type === 'token' ? s + e.content : s,
-  ...serverStreamCallbacks,
-}))
+const aiStream = createCollection(
+  streamChannelOptions({
+    client,
+    channel: ['ai', { sessionId }],
+    initial: '',
+    reduce: (s, e) => (e.type === 'token' ? s + e.content : s),
+    ...serverStreamCallbacks,
+  }),
+)
 ```
 
 This is equivalent to writing `isDone` and `isError` manually but keeps your
@@ -338,10 +355,10 @@ tick interval and sends them as a single frame.
 ```ts
 import { tickTransport, wsTransport } from '@tanstack/realtime'
 
-const tick = tickTransport(
-  wsTransport({ url: 'ws://localhost:3001' }),
-  { tickMs: 16, deltaCompression: true },
-)
+const tick = tickTransport(wsTransport({ url: 'ws://localhost:3001' }), {
+  tickMs: 16,
+  deltaCompression: true,
+})
 
 // Set entity state each frame
 tick.setState('game:room-1', myPlayerId, { x: 100, y: 200 })
@@ -361,10 +378,10 @@ tick.onTick('game:room-1', (frame) => {
 
 ```ts
 interface TickFrame {
-  tick: number                       // monotonic tick counter
-  timestamp: number                  // ms since epoch
-  entities: Record<string, unknown>  // entityId → state (or delta)
-  removed: Array<string>             // removed entity IDs
+  tick: number // monotonic tick counter
+  timestamp: number // ms since epoch
+  entities: Record<string, unknown> // entityId → state (or delta)
+  removed: Array<string> // removed entity IDs
 }
 ```
 
@@ -376,8 +393,8 @@ frame. Use `computeDelta()` and `applyDelta()` for manual delta handling:
 ```ts
 import { computeDelta, applyDelta } from '@tanstack/realtime'
 
-const delta = computeDelta(prev, next)   // null if identical
-const full = applyDelta(base, delta)     // reconstruct from base + delta
+const delta = computeDelta(prev, next) // null if identical
+const full = applyDelta(base, delta) // reconstruct from base + delta
 ```
 
 ### Collection integration
@@ -385,21 +402,23 @@ const full = applyDelta(base, delta)     // reconstruct from base + delta
 ```ts
 import { tickCollectionOptions } from '@tanstack/realtime'
 
-const playerCollection = createCollection(tickCollectionOptions({
-  transport: tickTransport,
-  channel: 'game:room-1',
-  getKey: (p) => p.id,
-  keyToEntityId: (key) => key,
-  fromEntity: (entityId, state) => ({
-    id: entityId,
-    ...(state as { x: number; y: number }),
+const playerCollection = createCollection(
+  tickCollectionOptions({
+    transport: tickTransport,
+    channel: 'game:room-1',
+    getKey: (p) => p.id,
+    keyToEntityId: (key) => key,
+    fromEntity: (entityId, state) => ({
+      id: entityId,
+      ...(state as { x: number; y: number }),
+    }),
+    interpolate: (prev, next, alpha) => ({
+      ...prev,
+      x: prev.x + (next.x - prev.x) * alpha,
+      y: prev.y + (next.y - prev.y) * alpha,
+    }),
   }),
-  interpolate: (prev, next, alpha) => ({
-    ...prev,
-    x: prev.x + (next.x - prev.x) * alpha,
-    y: prev.y + (next.y - prev.y) * alpha,
-  }),
-}))
+)
 ```
 
 ### Breaking changes
