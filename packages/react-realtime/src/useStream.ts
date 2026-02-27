@@ -1,31 +1,11 @@
 import { use, useEffect, useRef, useState } from 'react'
-import { STREAM_HEARTBEAT } from '@tanstack/realtime'
+import {
+  createStreamProcessor,
+  withEnvelopeStripping,
+  withHeartbeatFilter,
+} from '@tanstack/realtime'
 import { RealtimeContext } from './context.js'
 import type { StreamChannelDef, StreamStatus } from '@tanstack/realtime'
-
-// ---------------------------------------------------------------------------
-// Framework metadata stripping — mirrors streamChannelOptions logic.
-// ---------------------------------------------------------------------------
-
-const FRAMEWORK_KEYS = new Set(['_seq', '_ts', '_signature'])
-
-function stripEnvelope(raw: unknown): {
-  userEvent: unknown
-  seq: number | undefined
-} {
-  if (raw == null || typeof raw !== 'object')
-    return { userEvent: raw, seq: undefined }
-  const envelope = raw as Record<string, unknown>
-  const seq = typeof envelope._seq === 'number' ? envelope._seq : undefined
-  if (!('_seq' in envelope)) {
-    return { userEvent: raw, seq }
-  }
-  const stripped: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(envelope)) {
-    if (!FRAMEWORK_KEYS.has(k)) stripped[k] = v
-  }
-  return { userEvent: stripped, seq }
-}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -124,10 +104,7 @@ export function useStream<
   staleAfterRef.current = staleAfterOverride
 
   useEffect(() => {
-    let stopped = false
-    let currentState = defRef.current.initial
-
-    setResult({ state: currentState, status: 'pending' })
+    setResult({ state: defRef.current.initial, status: 'pending' })
 
     // Initialise to a no-op so the handler can safely call unsub() even if an
     // event fires synchronously before client.subscribe() has returned.
@@ -135,6 +112,7 @@ export function useStream<
 
     // ----- Stale detection timer -----
     let staleTimer: ReturnType<typeof setTimeout> | null = null
+    let staleStopped = false
 
     function clearStaleTimer(): void {
       if (staleTimer != null) {
@@ -146,64 +124,53 @@ export function useStream<
     function resetStaleTimer(): void {
       clearStaleTimer()
       const threshold = staleAfterRef.current ?? defRef.current.staleAfter
-      if (!threshold || stopped) return
+      if (!threshold || staleStopped) return
       staleTimer = setTimeout(() => {
-        if (stopped) return
+        if (staleStopped) return
         setResult((prev) => ({ ...prev, status: 'stale' }))
       }, threshold)
     }
 
-    // ----- Sequence dedup -----
-    let lastSeenSeq = 0
+    // ----- Stream processor (shared immutable state machine) -----
+    const processor = createStreamProcessor<TState, TEvent>(
+      {
+        reduce: defRef.current.reduce,
+        isDone: defRef.current.isDone,
+        isError: defRef.current.isError,
+      },
+      defRef.current.initial,
+      (snapshot, stopped) => {
+        setResult({
+          state: snapshot.state,
+          status: snapshot.status,
+          ...(snapshot.error != null ? { error: snapshot.error } : {}),
+        })
 
-    const handler = (rawEnvelope: unknown): void => {
-      if (stopped) return
-      const def = defRef.current
+        if (stopped) {
+          staleStopped = true
+          clearStaleTimer()
+          unsub()
+        }
+      },
+    )
 
-      // Strip framework metadata.
-      const { userEvent, seq } = stripEnvelope(rawEnvelope)
-
-      // Dedup: skip already-seen sequence numbers.
-      if (seq != null) {
-        if (seq <= lastSeenSeq) return
-        lastSeenSeq = seq
-      }
-
-      // Every event (including heartbeats) resets the stale timer.
-      resetStaleTimer()
-
-      // Heartbeats are lifecycle-only — never reach user callbacks.
-      const eventObj = userEvent as Record<string, unknown> | null
-      if (eventObj && eventObj.type === STREAM_HEARTBEAT) return
-
-      const event = userEvent as TEvent
-
-      const errorMsg = def.isError?.(currentState, event)
-      if (errorMsg) {
-        stopped = true
-        clearStaleTimer()
-        setResult({ state: currentState, status: 'error', error: errorMsg })
-        unsub()
-        return
-      }
-
-      const nextState = def.reduce(currentState, event)
-      const done = def.isDone?.(nextState, event) ?? false
-      currentState = nextState
-
-      setResult({ state: currentState, status: done ? 'done' : 'streaming' })
-
-      if (done) {
-        stopped = true
-        clearStaleTimer()
-        unsub()
-      }
-    }
+    // ----- Compose handler pipeline -----
+    const handler = withEnvelopeStripping(
+      withHeartbeatFilter(
+        (userEvent) => {
+          resetStaleTimer()
+          processor.process(userEvent)
+        },
+        {
+          onHeartbeat: resetStaleTimer,
+        },
+      ),
+    )
 
     unsub = client.subscribe(channel, handler)
 
     return () => {
-      stopped = true
+      staleStopped = true
       clearStaleTimer()
       unsub()
     }

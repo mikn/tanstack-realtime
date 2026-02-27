@@ -1,43 +1,13 @@
 import { serializeKey } from '../core/serializeKey.js'
 import {
-  STREAM_DONE,
-  STREAM_ERROR,
-  STREAM_HEARTBEAT,
-} from '../server/serverStream.js'
+  withEnvelopeStripping,
+  withHeartbeatFilter,
+} from '../core/streamEnvelope.js'
+import { createStreamProcessor } from '../core/streamProcessor.js'
+import { STREAM_DONE, STREAM_ERROR } from '../server/serverStream.js'
 import type { CollectionConfig, SyncConfig } from '@tanstack/db'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { QueryKey, RealtimeClient } from '../core/types.js'
-
-// ---------------------------------------------------------------------------
-// Framework metadata keys — stripped from events before user callbacks.
-// ---------------------------------------------------------------------------
-
-/** @internal Keys added by the producer's envelope. Stripped before reduce. */
-const FRAMEWORK_KEYS = new Set(['_seq', '_ts', '_signature'])
-
-/**
- * Strip framework metadata (`_seq`, `_ts`, `_signature`) from a raw event
- * envelope, returning only the user-defined event fields.
- * @internal
- */
-function stripEnvelope(raw: unknown): {
-  userEvent: unknown
-  seq: number | undefined
-} {
-  if (raw == null || typeof raw !== 'object')
-    return { userEvent: raw, seq: undefined }
-  const envelope = raw as Record<string, unknown>
-  const seq = typeof envelope._seq === 'number' ? envelope._seq : undefined
-  // Fast path: if no framework keys are present, return as-is.
-  if (!FRAMEWORK_KEYS.has('_seq') || !('_seq' in envelope)) {
-    return { userEvent: raw, seq }
-  }
-  const stripped: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(envelope)) {
-    if (!FRAMEWORK_KEYS.has(k)) stripped[k] = v
-  }
-  return { userEvent: stripped, seq }
-}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -303,10 +273,6 @@ export function streamChannelOptions<
     rowUpdateMode: 'full',
 
     sync({ begin, write, commit, markReady }) {
-      let stopped = false
-      let currentState = config.initial
-      let currentStatus: StreamStatus = 'pending'
-
       // Write the initial (pending) item before markReady so the collection
       // is never empty from the consumer's perspective.
       begin()
@@ -314,7 +280,7 @@ export function streamChannelOptions<
         type: 'insert',
         value: {
           id: serializedChannel,
-          state: currentState,
+          state: config.initial,
           status: 'pending',
         },
       })
@@ -328,6 +294,7 @@ export function streamChannelOptions<
 
       // ----- Stale detection timer -----
       let staleTimer: ReturnType<typeof setTimeout> | null = null
+      let staleStopped = false
 
       function clearStaleTimer(): void {
         if (staleTimer != null) {
@@ -338,16 +305,15 @@ export function streamChannelOptions<
 
       function resetStaleTimer(): void {
         clearStaleTimer()
-        if (!config.staleAfter || stopped) return
+        if (!config.staleAfter || staleStopped) return
         staleTimer = setTimeout(() => {
-          if (stopped) return
-          currentStatus = 'stale'
+          if (staleStopped) return
           begin({ immediate: true })
           write({
             type: 'update',
             value: {
               id: serializedChannel,
-              state: currentState,
+              state: processor.currentSnapshot.state,
               status: 'stale',
             },
           })
@@ -355,78 +321,55 @@ export function streamChannelOptions<
         }, config.staleAfter)
       }
 
-      // ----- Sequence dedup -----
-      let lastSeenSeq = 0
-
-      const handler = (rawEnvelope: unknown): void => {
-        if (stopped) return
-
-        // Strip framework metadata — user callbacks never see _seq/_ts/_signature.
-        const { userEvent, seq } = stripEnvelope(rawEnvelope)
-
-        // Dedup: skip events we've already processed.
-        if (seq != null) {
-          if (seq <= lastSeenSeq) return
-          lastSeenSeq = seq
-        }
-
-        // Every event (including heartbeats) resets the stale timer.
-        resetStaleTimer()
-
-        // Heartbeats are lifecycle-only — never reach reduce/isDone/isError.
-        const eventObj = userEvent as Record<string, unknown> | null
-        if (eventObj && eventObj.type === STREAM_HEARTBEAT) return
-
-        const event = userEvent as TEvent
-
-        // Error check runs before reduce so a malformed event can be caught.
-        const errorMsg = config.isError?.(currentState, event)
-        if (errorMsg) {
-          stopped = true
-          clearStaleTimer()
-          currentStatus = 'error'
+      // ----- Stream processor (shared immutable state machine) -----
+      const processor = createStreamProcessor<TState, TEvent>(
+        {
+          reduce: config.reduce,
+          isDone: config.isDone,
+          isError: config.isError,
+        },
+        config.initial,
+        (snapshot, stopped) => {
           begin({ immediate: true })
           write({
             type: 'update',
             value: {
               id: serializedChannel,
-              state: currentState,
-              status: 'error',
-              error: errorMsg,
+              state: snapshot.state,
+              status: snapshot.status,
+              ...(snapshot.error != null ? { error: snapshot.error } : {}),
             },
           })
           commit()
-          unsub()
-          return
-        }
 
-        const nextState = config.reduce(currentState, event)
-        const done = config.isDone?.(nextState, event) ?? false
-        currentState = nextState
-        currentStatus = done ? 'done' : 'streaming'
+          if (stopped) {
+            staleStopped = true
+            clearStaleTimer()
+            unsub()
+          }
+        },
+      )
 
-        begin({ immediate: true })
-        write({
-          type: 'update',
-          value: {
-            id: serializedChannel,
-            state: currentState,
-            status: currentStatus,
+      // ----- Compose handler pipeline -----
+      // Inner: stream processor receives stripped, non-heartbeat events.
+      // Middle: heartbeat filter drops heartbeats, resets stale timer.
+      // Outer: envelope stripping + sequence dedup.
+      const handler = withEnvelopeStripping(
+        withHeartbeatFilter(
+          (userEvent) => {
+            resetStaleTimer()
+            processor.process(userEvent)
           },
-        })
-        commit()
-
-        if (done) {
-          stopped = true
-          clearStaleTimer()
-          unsub()
-        }
-      }
+          {
+            onHeartbeat: resetStaleTimer,
+          },
+        ),
+      )
 
       unsub = config.client.subscribe(serializedChannel, handler)
 
       return () => {
-        stopped = true
+        staleStopped = true
         clearStaleTimer()
         unsub()
       }

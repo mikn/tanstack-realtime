@@ -44,6 +44,7 @@
  */
 
 import { serializeKey } from '../core/serializeKey.js'
+import type { StreamChannelDef } from '../collections/streamChannelOptions.js'
 import type { QueryKey } from '../core/types.js'
 import type { PublishFn } from './index.js'
 
@@ -107,8 +108,36 @@ export interface StreamCheckpoint<TState> {
  * The producer mirrors the consumer's reducer to track accumulated state
  * and periodically calls `handler` so the application can persist a
  * recovery snapshot (e.g. to KV, D1, or a CRDT-enabled collection).
+ *
+ * You can provide `initial` and `reduce` explicitly, **or** pass a
+ * `channelDef` to reuse the consumer's channel definition — ensuring the
+ * producer and consumer always use the same reduce logic.
+ *
+ * @example
+ * // Explicit initial/reduce (original API — still works)
+ * checkpoint: {
+ *   initial: { content: '' },
+ *   reduce: (s, e) => ({ content: s.content + e.delta }),
+ *   interval: { time: 10_000 },
+ *   handler: async (cp) => { ... },
+ * }
+ *
+ * @example
+ * // Unified: reuse the channel definition (no drift risk)
+ * checkpoint: {
+ *   channelDef: aiStream,
+ *   interval: { time: 10_000 },
+ *   handler: async (cp) => { ... },
+ * }
  */
-export interface CheckpointConfig<TState, TEvent = unknown> {
+export type CheckpointConfig<TState, TEvent = unknown> =
+  | ExplicitCheckpointConfig<TState, TEvent>
+  | ChannelDefCheckpointConfig<TState, TEvent>
+
+/**
+ * Checkpoint config with explicit `initial` and `reduce` — the original API.
+ */
+export interface ExplicitCheckpointConfig<TState, TEvent = unknown> {
   /** Initial state — should match the consumer's `initial`. */
   initial: TState
   /** Reducer — should match the consumer's `reduce`. */
@@ -129,6 +158,34 @@ export interface CheckpointConfig<TState, TEvent = unknown> {
    * Also called once on `done()` with the final state, and on `error()`
    * with the last good state — so the application always has a chance to
    * persist the final result.
+   */
+  handler: (checkpoint: StreamCheckpoint<TState>) => Promise<void>
+}
+
+/**
+ * Checkpoint config that derives `initial` and `reduce` from a
+ * `StreamChannelDef`.  Guarantees the producer mirrors the consumer's
+ * exact reduce logic — no drift risk.
+ */
+export interface ChannelDefCheckpointConfig<TState, TEvent = unknown> {
+  /**
+   * The stream channel definition to derive `initial` and `reduce` from.
+   * This is the same object you pass to `useStream` or use with
+   * `streamChannelOptions` — ensuring a single source of truth.
+   */
+  channelDef: StreamChannelDef<TState, TEvent>
+  /**
+   * How often to checkpoint. At least one of `time` or `events` is required.
+   * When both are set, whichever fires first triggers a checkpoint.
+   */
+  interval: {
+    /** Checkpoint every N milliseconds. */
+    time?: number
+    /** Checkpoint every N user events (excludes heartbeats and sentinels). */
+    events?: number
+  }
+  /**
+   * Called with the accumulated state snapshot. Persist this for recovery.
    */
   handler: (checkpoint: StreamCheckpoint<TState>) => Promise<void>
 }
@@ -335,8 +392,20 @@ export function createServerStream<TEvent = unknown, TState = unknown>(
 
   // ---------------------------------------------------------------------------
   // Checkpoint state — mirrors the consumer's reducer on the producer side.
+  // Resolve initial/reduce from channelDef (unified) or explicit config.
   // ---------------------------------------------------------------------------
-  let checkpointState: TState | undefined = checkpoint?.initial
+  const cpInitial: TState | undefined = checkpoint
+    ? 'channelDef' in checkpoint
+      ? checkpoint.channelDef.initial
+      : checkpoint.initial
+    : undefined
+  const cpReduce: ((s: TState, e: TEvent) => TState) | undefined = checkpoint
+    ? 'channelDef' in checkpoint
+      ? checkpoint.channelDef.reduce
+      : checkpoint.reduce
+    : undefined
+
+  let checkpointState: TState | undefined = cpInitial
   let eventsSinceCheckpoint = 0
 
   function buildCheckpoint(): StreamCheckpoint<TState> {
@@ -428,8 +497,8 @@ export function createServerStream<TEvent = unknown, TState = unknown>(
       await publishEvent(event)
 
       // Mirror-reduce for checkpoint tracking.
-      if (checkpoint) {
-        checkpointState = checkpoint.reduce(checkpointState as TState, event)
+      if (checkpoint && cpReduce) {
+        checkpointState = cpReduce(checkpointState as TState, event)
         eventsSinceCheckpoint++
         await maybeCheckpoint()
       }

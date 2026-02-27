@@ -227,4 +227,6 @@ export type {
   CreateServerStreamOptions,
   StreamCheckpoint,
   CheckpointConfig,
+  ExplicitCheckpointConfig,
+  ChannelDefCheckpointConfig,
 } from './serverStream.js'
