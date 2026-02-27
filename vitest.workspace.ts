@@ -39,6 +39,7 @@ export default defineWorkspace([
       name: 'node',
       environment: 'node',
       globals: true,
+      setupFiles: ['packages/__tests__/setup.ts'],
       include: [
         'packages/__tests__/integration.test.ts',
         'packages/__tests__/stream.test.ts',

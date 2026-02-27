@@ -129,8 +129,8 @@ describe('tickTransport', () => {
     vi.advanceTimersByTime(16)
 
     expect(inner.publishCalls).toHaveLength(1)
-    const frame = inner.publishCalls[0].data as TickFrame & { __tick: boolean }
-    expect(frame.__tick).toBe(true)
+    expect(inner.publishCalls[0].data).toHaveProperty('__tick', true)
+    const frame = inner.publishCalls[0].data as TickFrame
     expect(frame.entities['player-1']).toEqual({ x: 10, y: 20 })
     expect(frame.entities['player-2']).toEqual({ x: 30, y: 40 })
     expect(frame.tick).toBe(1)
