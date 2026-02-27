@@ -1,4 +1,5 @@
 import { serializeKey } from '../core/serializeKey.js'
+import { STREAM_DONE, STREAM_ERROR } from '../server/serverStream.js'
 import type { CollectionConfig, SyncConfig } from '@tanstack/db'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { QueryKey, RealtimeClient } from '../core/types.js'
@@ -320,3 +321,38 @@ export function streamChannelOptions<
     sync,
   }
 }
+
+// ---------------------------------------------------------------------------
+// Server stream integration helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Pre-built `isDone` / `isError` callbacks that match the sentinel events
+ * pushed by `createServerStream` (from `@tanstack/realtime`).
+ *
+ * Spread these into your `streamChannelOptions` config to avoid manually
+ * checking for the `__stream:done` / `__stream:error` sentinel types.
+ *
+ * @example
+ * import { streamChannelOptions, serverStreamCallbacks } from '@tanstack/realtime'
+ *
+ * const aiStream = createCollection(streamChannelOptions({
+ *   client,
+ *   channel: ['ai', { sessionId }],
+ *   initial: '',
+ *   reduce: (s, e) => e.type === 'token' ? s + e.content : s,
+ *   ...serverStreamCallbacks,
+ * }))
+ */
+export const serverStreamCallbacks = {
+  isDone: (_state: unknown, event: unknown): boolean => {
+    return (event as Record<string, unknown>).type === STREAM_DONE
+  },
+  isError: (_state: unknown, event: unknown): string | false => {
+    const e = event as Record<string, unknown>
+    if (e.type === STREAM_ERROR) {
+      return (typeof e.message === 'string' ? e.message : 'Stream error')
+    }
+    return false
+  },
+} as const

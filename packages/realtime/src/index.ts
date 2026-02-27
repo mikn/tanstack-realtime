@@ -68,6 +68,7 @@ export {
   ephemeralLiveOptions,
   streamChannelOptions,
   createStreamChannel,
+  serverStreamCallbacks,
   tickCollectionOptions,
   defineSyncedCounter,
   defineSyncedValue,
@@ -102,7 +103,7 @@ export type { WsTransportOptions } from './core/wsTransport.js'
 
 // Tick-based transport — batches updates per tick interval for game state.
 export {
-  createTickTransport,
+  tickTransport,
   computeDelta,
   applyDelta,
 } from './core/tickTransport.js'
@@ -190,6 +191,8 @@ export {
   PublishValidationError,
   createServerStream,
   verifyEventSignature,
+  STREAM_DONE,
+  STREAM_ERROR,
 } from './server/index.js'
 export type {
   ChannelPermissions,

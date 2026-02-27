@@ -15,8 +15,8 @@ import { Store } from '@tanstack/store'
 import {
   applyDelta,
   computeDelta,
-  createTickTransport,
   tickCollectionOptions,
+  tickTransport,
 } from '@tanstack/realtime'
 import type {
   ConnectionStatus,
@@ -103,10 +103,10 @@ describe('computeDelta / applyDelta', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Tests: createTickTransport
+// Tests: tickTransport
 // ---------------------------------------------------------------------------
 
-describe('createTickTransport', () => {
+describe('tickTransport', () => {
   beforeEach(() => {
     vi.useFakeTimers()
   })
@@ -117,7 +117,7 @@ describe('createTickTransport', () => {
 
   it('batches multiple setState calls into one publish per tick', async () => {
     const inner = createMockTransport()
-    const tick = createTickTransport(inner, { tickMs: 16 })
+    const tick = tickTransport(inner, { tickMs: 16 })
 
     tick.setState('game', 'player-1', { x: 10, y: 20 })
     tick.setState('game', 'player-2', { x: 30, y: 40 })
@@ -140,7 +140,7 @@ describe('createTickTransport', () => {
 
   it('advances tick counter monotonically', () => {
     const inner = createMockTransport()
-    const tick = createTickTransport(inner, { tickMs: 10 })
+    const tick = tickTransport(inner, { tickMs: 10 })
 
     tick.setState('game', 'p1', { x: 1 })
     vi.advanceTimersByTime(10)
@@ -162,7 +162,7 @@ describe('createTickTransport', () => {
 
   it('does not publish when nothing is dirty', () => {
     const inner = createMockTransport()
-    const tick = createTickTransport(inner, { tickMs: 10 })
+    const tick = tickTransport(inner, { tickMs: 10 })
 
     tick.setState('game', 'p1', { x: 1 })
     vi.advanceTimersByTime(10)
@@ -178,7 +178,7 @@ describe('createTickTransport', () => {
 
   it('includes removed entities in the frame', () => {
     const inner = createMockTransport()
-    const tick = createTickTransport(inner, { tickMs: 10 })
+    const tick = tickTransport(inner, { tickMs: 10 })
 
     tick.setState('game', 'p1', { x: 1 })
     tick.removeEntity('game', 'p2')
@@ -193,7 +193,7 @@ describe('createTickTransport', () => {
 
   it('onTick delivers frames from inner transport', () => {
     const inner = createMockTransport()
-    const tick = createTickTransport(inner, { tickMs: 10 })
+    const tick = tickTransport(inner, { tickMs: 10 })
 
     const received: Array<TickFrame> = []
     tick.onTick('game', (frame) => received.push(frame))
@@ -217,7 +217,7 @@ describe('createTickTransport', () => {
 
   it('unsubscribing from onTick cleans up inner subscription', () => {
     const inner = createMockTransport()
-    const tick = createTickTransport(inner, { tickMs: 10 })
+    const tick = tickTransport(inner, { tickMs: 10 })
 
     const unsub = tick.onTick('game', () => {})
     unsub()
@@ -238,7 +238,7 @@ describe('createTickTransport', () => {
 
   it('delta compression sends only changed fields', () => {
     const inner = createMockTransport()
-    const tick = createTickTransport(inner, {
+    const tick = tickTransport(inner, {
       tickMs: 10,
       deltaCompression: true,
     })
@@ -262,7 +262,7 @@ describe('createTickTransport', () => {
 
   it('stop() clears the tick interval and listeners', () => {
     const inner = createMockTransport()
-    const tick = createTickTransport(inner, { tickMs: 10 })
+    const tick = tickTransport(inner, { tickMs: 10 })
 
     tick.setState('game', 'p1', { x: 1 })
     tick.stop()
@@ -277,7 +277,7 @@ describe('createTickTransport', () => {
     const inner = createMockTransport()
     const connectSpy = vi.spyOn(inner, 'connect')
     const disconnectSpy = vi.spyOn(inner, 'disconnect')
-    const tick = createTickTransport(inner)
+    const tick = tickTransport(inner)
 
     await tick.connect()
     expect(connectSpy).toHaveBeenCalled()
@@ -310,7 +310,7 @@ describe('tickCollectionOptions', () => {
 
   it('creates a collection that syncs from tick frames', () => {
     const inner = createMockTransport()
-    const tick = createTickTransport(inner, { tickMs: 10 })
+    const tick = tickTransport(inner, { tickMs: 10 })
 
     const config = tickCollectionOptions<Player, string>({
       transport: tick,

@@ -106,7 +106,7 @@ export interface NodeServer {
    */
   createStream: <TEvent = unknown>(options: {
     channel: QueryKey | string
-    signingKey?: string
+    hmacKey?: string
   }) => ServerStream<TEvent>
 }
 
@@ -401,7 +401,7 @@ export function createNodeServer(options: NodeServerOptions): NodeServer {
 
     createStream<TEvent = unknown>(opts: {
       channel: QueryKey | string
-      signingKey?: string
+      hmacKey?: string
     }): ServerStream<TEvent> {
       return createServerStream<TEvent>({
         publish: async (ch, data) => {
@@ -410,7 +410,7 @@ export function createNodeServer(options: NodeServerOptions): NodeServer {
           fanOut(serialized, data)
         },
         channel: opts.channel,
-        signingKey: opts.signingKey,
+        hmacKey: opts.hmacKey,
       })
     },
 

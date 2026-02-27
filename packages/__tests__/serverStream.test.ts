@@ -11,8 +11,11 @@
 import { createServer } from 'node:http'
 import { describe, expect, it } from 'vitest'
 import {
+  STREAM_DONE,
+  STREAM_ERROR,
   createRealtimeClient,
   createServerStream,
+  serverStreamCallbacks,
   streamChannelOptions,
   wsTransport,
 } from '@tanstack/realtime'
@@ -47,7 +50,7 @@ describe('createServerStream', () => {
     expect(calls[1].data).toEqual({ type: 'token', content: ' World' })
   })
 
-  it('done() sends __stream:done sentinel', async () => {
+  it('done() sends STREAM_DONE sentinel', async () => {
     const calls: Array<{ data: unknown }> = []
     const publish: PublishFn = async (_ch, data) => {
       calls.push({ data })
@@ -57,10 +60,10 @@ describe('createServerStream', () => {
     await stream.done()
 
     expect(calls).toHaveLength(1)
-    expect(calls[0].data).toEqual({ type: '__stream:done' })
+    expect(calls[0].data).toEqual({ type: STREAM_DONE })
   })
 
-  it('error() sends __stream:error sentinel with message', async () => {
+  it('error() sends STREAM_ERROR sentinel with message', async () => {
     const calls: Array<{ data: unknown }> = []
     const publish: PublishFn = async (_ch, data) => {
       calls.push({ data })
@@ -71,7 +74,7 @@ describe('createServerStream', () => {
 
     expect(calls).toHaveLength(1)
     expect(calls[0].data).toEqual({
-      type: '__stream:error',
+      type: STREAM_ERROR,
       message: 'Something went wrong',
     })
   })
@@ -144,9 +147,7 @@ describe('createServerStream + streamChannelOptions integration', () => {
       initial: '',
       reduce: (state, event) =>
         event.type === 'token' ? state + (event.content ?? '') : state,
-      isDone: (_s, e) => e.type === '__stream:done',
-      isError: (_s, e) =>
-        e.type === '__stream:error' ? (e.message ?? 'Error') : false,
+      ...serverStreamCallbacks,
     })
 
     // 4. Drive sync
@@ -245,7 +246,7 @@ describe('NodeServer.createStream', () => {
       expect(received).toHaveLength(3)
       expect(received[0]).toEqual({ type: 'token', content: 'Hi' })
       expect(received[1]).toEqual({ type: 'token', content: '!' })
-      expect(received[2]).toEqual({ type: '__stream:done' })
+      expect(received[2]).toEqual({ type: STREAM_DONE })
 
       client.disconnect()
     } finally {

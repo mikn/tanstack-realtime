@@ -96,6 +96,8 @@ export function tickCollectionOptions<
       : serializeKey(config.channel)
 
   const currentState = new Map<TKey, T>()
+  // Reverse index: entityId → key for O(1) lookup per frame entity.
+  const entityIdToKey = new Map<string, TKey>()
 
   const sync: SyncConfig<T, TKey> = {
     rowUpdateMode: 'full',
@@ -114,7 +116,10 @@ export function tickCollectionOptions<
 
           // Process entity updates
           for (const [entityId, state] of Object.entries(frame.entities)) {
-            const existing = findByEntityId(entityId)
+            const existingKey = entityIdToKey.get(entityId)
+            const existing = existingKey !== undefined
+              ? currentState.get(existingKey)
+              : undefined
             const row = config.fromEntity(entityId, state, existing)
             const key = config.getKey(row)
 
@@ -124,15 +129,16 @@ export function tickCollectionOptions<
               write({ type: 'insert', value: row })
             }
             currentState.set(key, row)
+            entityIdToKey.set(entityId, key)
           }
 
           // Process removals
           for (const entityId of frame.removed) {
-            const existing = findByEntityId(entityId)
-            if (existing) {
-              const key = config.getKey(existing)
+            const key = entityIdToKey.get(entityId)
+            if (key !== undefined) {
               write({ type: 'delete', key })
               currentState.delete(key)
+              entityIdToKey.delete(entityId)
             }
           }
 
@@ -140,17 +146,11 @@ export function tickCollectionOptions<
         },
       )
 
-      function findByEntityId(entityId: string): T | undefined {
-        for (const [key, row] of currentState) {
-          if (config.keyToEntityId(key) === entityId) return row
-        }
-        return undefined
-      }
-
       return () => {
         stopped = true
         unsub()
         currentState.clear()
+        entityIdToKey.clear()
       }
     },
   }

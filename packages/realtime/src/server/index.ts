@@ -93,15 +93,13 @@ export interface PublishValidation {
 
 /**
  * Result of a `ValidatePublishFn`.
+ *
+ * Uses a discriminated union on `accepted` so that `reason` is only available
+ * on rejections and `data` is only available on acceptances.
  */
-export interface PublishValidationResult {
-  /** Whether to accept the publish. */
-  accepted: boolean
-  /** If rejected, a reason string. */
-  reason?: string
-  /** If accepted, optionally transform the data before fan-out. */
-  data?: unknown
-}
+export type PublishValidationResult =
+  | { accepted: true; data?: unknown }
+  | { accepted: false; reason?: string }
 
 /**
  * Server-side validation hook called before a publish is fanned out.
@@ -217,7 +215,12 @@ export function createValidatedPublish(
 // Server-side streams — re-export
 // ---------------------------------------------------------------------------
 
-export { createServerStream, verifyEventSignature } from './serverStream.js'
+export {
+  createServerStream,
+  verifyEventSignature,
+  STREAM_DONE,
+  STREAM_ERROR,
+} from './serverStream.js'
 export type {
   ServerStream,
   CreateServerStreamOptions,

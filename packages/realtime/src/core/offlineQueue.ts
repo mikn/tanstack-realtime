@@ -118,24 +118,29 @@ export function createOfflineQueue(
 
   // Storage initialization: load persisted messages and merge with any
   // messages that were enqueued before loading completed.
-  let _storageReady = !storage
   if (storage) {
     storage
       .load()
       .then((persisted) => {
         if (persisted.length > 0) {
-          const maxPersistedId = Math.max(...persisted.map((m) => m.id))
-          if (maxPersistedId >= nextId) nextId = maxPersistedId + 1
           queueStore.setState((s) => {
-            // Merge: persisted messages first, then any enqueued during init.
-            const merged = [...persisted, ...s.pending]
+            // Bump nextId inside setState to avoid a race where enqueue()
+            // runs between load() resolving and the ID bump.
+            const maxPersistedId = Math.max(...persisted.map((m) => m.id))
+            if (maxPersistedId >= nextId) nextId = maxPersistedId + 1
+            // Re-assign IDs to any messages enqueued during init so they
+            // don't collide with persisted IDs.
+            const reIdPending = s.pending.map((m) => ({
+              ...m,
+              id: nextId++,
+            }))
+            const merged = [...persisted, ...reIdPending]
             return { ...s, pending: merged.slice(-maxSize) }
           })
         }
-        _storageReady = true
       })
       .catch(() => {
-        _storageReady = true
+        // Storage unavailable — continue with in-memory queue.
       })
   }
 

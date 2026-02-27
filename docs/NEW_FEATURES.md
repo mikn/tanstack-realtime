@@ -276,7 +276,7 @@ const stream = sseHandler.createStream({ channel: ['ai', { sessionId }] })
 const stream = createServerStream({
   publish,
   channel: 'ai:session=abc',
-  signingKey: process.env.STREAM_SIGNING_KEY,
+  hmacKey: process.env.STREAM_HMAC_KEY,
 })
 ```
 
@@ -298,9 +298,9 @@ tick interval and sends them as a single frame.
 ### Transport wrapper
 
 ```ts
-import { createTickTransport, wsTransport } from '@tanstack/realtime'
+import { tickTransport, wsTransport } from '@tanstack/realtime'
 
-const tick = createTickTransport(
+const tick = tickTransport(
   wsTransport({ url: 'ws://localhost:3001' }),
   { tickMs: 16, deltaCompression: true },
 )

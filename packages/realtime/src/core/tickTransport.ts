@@ -11,7 +11,12 @@
  */
 
 import { Store } from '@tanstack/store'
-import type { RealtimeTransport } from './types.js'
+import { hasPresence } from './types.js'
+import type {
+  PresenceCapable,
+  PresenceUser,
+  RealtimeTransport,
+} from './types.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -44,6 +49,14 @@ export interface TickFrame {
   entities: Record<string, unknown>
   /** Entity IDs removed this tick. */
   removed: Array<string>
+}
+
+/**
+ * Internal wire format for tick frames on the channel.
+ * The `__tick` flag distinguishes tick frames from normal messages.
+ */
+interface TickWireFrame extends TickFrame {
+  __tick: true
 }
 
 export interface TickTransport extends RealtimeTransport {
@@ -132,12 +145,17 @@ export function applyDelta(
  * tick frame per interval. Incoming frames are delivered via `onTick()`.
  *
  * Normal `subscribe`/`publish` still work (delegated to the inner transport)
- * for non-tick channels.
+ * for non-tick channels. Tick frames on the wire include a `__tick: true`
+ * flag — the wrapper filters them out of normal `subscribe()` callbacks so
+ * the transport contract is not violated.
+ *
+ * Presence methods are forwarded transparently when the inner transport
+ * supports them.
  *
  * @example
- * import { createTickTransport, wsTransport } from '@tanstack/realtime'
+ * import { tickTransport, wsTransport } from '@tanstack/realtime'
  *
- * const tick = createTickTransport(
+ * const tick = tickTransport(
  *   wsTransport({ url: 'ws://localhost:3001' }),
  *   { tickMs: 16 },
  * )
@@ -152,7 +170,7 @@ export function applyDelta(
  *   }
  * })
  */
-export function createTickTransport(
+export function tickTransport(
   inner: RealtimeTransport,
   options: TickTransportOptions = {},
 ): TickTransport {
@@ -182,18 +200,31 @@ export function createTickTransport(
   let tickTimer: ReturnType<typeof setInterval> | null = null
   let localTick = 0
 
+  // Track connection state so we don't tick when disconnected.
+  let isConnected = inner.store.state === 'connected'
+  inner.store.subscribe((status) => {
+    isConnected = status === 'connected'
+  })
+
   function ensureTickLoop(): void {
     if (tickTimer) return
     tickTimer = setInterval(sendTick, tickMs)
   }
 
   function sendTick(): void {
-    if (dirtyState.size === 0 && removedEntities.size === 0) return
+    // Collect all channels that have dirty state OR pending removals.
+    const allChannels = new Set<string>([
+      ...dirtyState.keys(),
+      ...removedEntities.keys(),
+    ])
+
+    if (allChannels.size === 0) return
+    if (!isConnected) return
 
     localTick++
     tickStore.setState((s) => ({ ...s, tick: localTick }))
 
-    for (const [channel, entities] of dirtyState) {
+    for (const channel of allChannels) {
       const frame: TickFrame = {
         tick: localTick,
         timestamp: Date.now(),
@@ -208,24 +239,27 @@ export function createTickTransport(
         removedEntities.delete(channel)
       }
 
-      for (const [entityId, state] of entities) {
-        if (deltaCompression) {
-          if (!previousState.has(channel)) {
-            previousState.set(channel, new Map())
+      const entities = dirtyState.get(channel)
+      if (entities) {
+        for (const [entityId, state] of entities) {
+          if (deltaCompression) {
+            if (!previousState.has(channel)) {
+              previousState.set(channel, new Map())
+            }
+            const prev = previousState.get(channel)!.get(entityId)
+            const delta = computeDelta(
+              prev,
+              state as Record<string, unknown>,
+            )
+            if (delta) {
+              frame.entities[entityId] = delta
+              previousState
+                .get(channel)!
+                .set(entityId, { ...(prev ?? {}), ...delta })
+            }
+          } else {
+            frame.entities[entityId] = state
           }
-          const prev = previousState.get(channel)!.get(entityId)
-          const delta = computeDelta(
-            prev,
-            state as Record<string, unknown>,
-          )
-          if (delta) {
-            frame.entities[entityId] = delta
-            previousState
-              .get(channel)!
-              .set(entityId, { ...(prev ?? {}), ...delta })
-          }
-        } else {
-          frame.entities[entityId] = state
         }
       }
 
@@ -234,8 +268,11 @@ export function createTickTransport(
         frame.removed.length > 0
       ) {
         inner
-          .publish(channel, { __tick: true, ...frame })
-          .catch(() => {})
+          .publish(channel, { __tick: true, ...frame } satisfies TickWireFrame)
+          .catch(() => {
+            // Publish failed (e.g. disconnected mid-tick). The data is
+            // ephemeral game state — dropping it is acceptable.
+          })
       }
     }
 
@@ -246,11 +283,8 @@ export function createTickTransport(
     if (innerSubs.has(channel)) return
     const unsub = inner.subscribe(channel, (raw) => {
       const data = raw as Record<string, unknown>
-      if (!data.__tick) {
-        // Not a tick frame — ignore (let normal subscribe handle it)
-        return
-      }
-      const frame = data as unknown as TickFrame & { __tick: boolean }
+      if (!data.__tick) return // Not a tick frame — normal subscribe handles it
+      const frame = data as unknown as TickFrame
       tickStore.setState((s) => ({
         ...s,
         serverTick: Math.max(s.serverTick, frame.tick),
@@ -277,7 +311,12 @@ export function createTickTransport(
     },
 
     subscribe(channel, onMessage) {
-      return inner.subscribe(channel, onMessage)
+      // Filter out tick wire frames so consumers never see __tick messages.
+      return inner.subscribe(channel, (raw) => {
+        const data = raw as Record<string, unknown>
+        if (data.__tick) return // Tick frames go to onTick, not subscribe
+        onMessage(raw)
+      })
     },
 
     async publish(channel, data) {
@@ -323,6 +362,28 @@ export function createTickTransport(
       dirtyState.clear()
       removedEntities.clear()
     },
+  }
+
+  // Forward presence methods when the inner transport supports them.
+  if (hasPresence(inner)) {
+    const presenceInner = inner
+    Object.assign(transport, {
+      joinPresence(channel: string, data: unknown) {
+        presenceInner.joinPresence(channel, data)
+      },
+      updatePresence(channel: string, data: unknown) {
+        presenceInner.updatePresence(channel, data)
+      },
+      leavePresence(channel: string) {
+        presenceInner.leavePresence(channel)
+      },
+      onPresenceChange(
+        channel: string,
+        callback: (users: ReadonlyArray<PresenceUser>) => void,
+      ) {
+        return presenceInner.onPresenceChange(channel, callback)
+      },
+    } satisfies PresenceCapable)
   }
 
   return transport

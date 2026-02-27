@@ -767,10 +767,16 @@ export function realtimeCollectionOptions<
           syncedEntries.set(key, entry)
 
           if (primaryChannel && client) {
-            await client.publish(
-              primaryChannel,
-              buildPublishMessage('insert', result, entry, nonce),
-            )
+            try {
+              await client.publish(
+                primaryChannel,
+                buildPublishMessage('insert', result, entry, nonce),
+              )
+            } catch {
+              // Publish failed after mutation succeeded. Clean up the nonce
+              // to prevent it from leaking in pendingNonces forever.
+              if (nonce) pendingNonces.delete(nonce)
+            }
           }
         } else if (nonce) {
           pendingNonces.delete(nonce)
@@ -806,18 +812,16 @@ export function realtimeCollectionOptions<
           syncedEntries.set(key, entry)
 
           if (primaryChannel && client) {
-            const crdtFields = fields
-              ? buildCrdtFields(entry, result, fields, client.clientId)
-              : {}
+            // buildPublishMessage calls buildCrdtFields which reads entry.row
+            // as the previous state for delta computation. We must NOT update
+            // entry.row until after the message is built.
+            const msg = buildPublishMessage('update', result, entry, nonce)
             entry.row = result
-            await client.publish(primaryChannel, {
-              action: 'update',
-              data: stripLocalFields(result, fields),
-              ...(Object.keys(crdtFields).length > 0 && {
-                _crdt: { fields: crdtFields },
-              }),
-              ...(nonce && { _nonce: nonce, _clientId: client.clientId }),
-            } satisfies RealtimeChannelMessage)
+            try {
+              await client.publish(primaryChannel, msg)
+            } catch {
+              if (nonce) pendingNonces.delete(nonce)
+            }
           }
         } else if (nonce) {
           pendingNonces.delete(nonce)
@@ -848,11 +852,14 @@ export function realtimeCollectionOptions<
           syncedEntries.delete(getKey(result))
 
           if (primaryChannel && client) {
-            await client.publish(primaryChannel, {
-              action: 'delete',
-              data: result,
-              ...(nonce && { _nonce: nonce, _clientId: client.clientId }),
-            } satisfies RealtimeChannelMessage)
+            try {
+              await client.publish(
+                primaryChannel,
+                buildPublishMessage('delete', result, undefined, nonce),
+              )
+            } catch {
+              if (nonce) pendingNonces.delete(nonce)
+            }
           }
         } else if (nonce) {
           pendingNonces.delete(nonce)

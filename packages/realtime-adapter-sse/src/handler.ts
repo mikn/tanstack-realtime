@@ -46,7 +46,7 @@ export interface SseHandler {
    */
   createStream: <TEvent = unknown>(options: {
     channel: QueryKey | string
-    signingKey?: string
+    hmacKey?: string
   }) => ServerStream<TEvent>
 }
 
@@ -396,7 +396,7 @@ export function createSseHandler(options: SseHandlerOptions = {}): SseHandler {
 
     createStream<TEvent = unknown>(opts: {
       channel: QueryKey | string
-      signingKey?: string
+      hmacKey?: string
     }): ServerStream<TEvent> {
       const handler = this
       return createServerStream<TEvent>({
@@ -406,7 +406,7 @@ export function createSseHandler(options: SseHandlerOptions = {}): SseHandler {
           handler.broadcast(serialized, data)
         },
         channel: opts.channel,
-        signingKey: opts.signingKey,
+        hmacKey: opts.hmacKey,
       })
     },
   }

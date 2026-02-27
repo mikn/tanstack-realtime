@@ -22,6 +22,7 @@ export type { EphemeralLiveConfig } from './ephemeralLiveOptions.js'
 export {
   streamChannelOptions,
   createStreamChannel,
+  serverStreamCallbacks,
 } from './streamChannelOptions.js'
 export type {
   StreamChannelConfig,
