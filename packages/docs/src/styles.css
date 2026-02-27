@@ -794,3 +794,837 @@ code {
     font-size: 0.8rem;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Nav active state
+   --------------------------------------------------------------------------- */
+
+.nav-active {
+  color: var(--accent-2) !important;
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------------
+   Docs layout
+   --------------------------------------------------------------------------- */
+
+.docs-layout {
+  display: flex;
+  min-height: 100vh;
+  padding-top: calc(var(--disclaimer-height) + 3.25rem);
+}
+
+.docs-content {
+  flex: 1;
+  min-width: 0;
+  max-width: 52rem;
+  padding: 2.5rem 3rem 4rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Sidebar
+   --------------------------------------------------------------------------- */
+
+.sidebar {
+  position: sticky;
+  top: calc(var(--disclaimer-height) + 3.25rem);
+  height: calc(100vh - var(--disclaimer-height) - 3.25rem);
+  width: 240px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: 1.5rem 1rem 2rem 1.5rem;
+  border-right: 1px solid var(--border);
+  background: var(--bg-primary);
+}
+
+.sidebar-home {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 1.25rem;
+  transition: color 0.15s;
+}
+
+.sidebar-home:hover {
+  color: var(--text-primary);
+}
+
+.sidebar-section {
+  margin-bottom: 1.25rem;
+}
+
+.sidebar-heading {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+}
+
+.sidebar-link {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  padding: 0.25rem 0 0.25rem 0.5rem;
+  border-left: 2px solid transparent;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.sidebar-link:hover {
+  color: var(--text-primary);
+}
+
+.sidebar-link.active {
+  color: var(--accent-2);
+  border-left-color: var(--accent-2);
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------------
+   Doc article
+   --------------------------------------------------------------------------- */
+
+.doc-article h1 {
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  margin-bottom: 0.75rem;
+}
+
+.doc-article h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin-top: 2.5rem;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.015em;
+}
+
+.doc-article h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-top: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.doc-article p {
+  color: var(--text-secondary);
+  font-size: 0.925rem;
+  line-height: 1.7;
+  margin-bottom: 1rem;
+}
+
+.doc-article ul,
+.doc-article ol {
+  color: var(--text-secondary);
+  font-size: 0.925rem;
+  line-height: 1.7;
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
+}
+
+.doc-article li {
+  margin-bottom: 0.35rem;
+}
+
+.doc-article a {
+  color: var(--accent-1);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.doc-article a:hover {
+  color: var(--text-primary);
+}
+
+.doc-article .code-block {
+  margin-bottom: 1.25rem;
+}
+
+.doc-lead {
+  font-size: 1.05rem !important;
+  color: var(--text-secondary) !important;
+  line-height: 1.75 !important;
+  max-width: 42rem;
+  margin-bottom: 1.5rem !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Doc callout
+   --------------------------------------------------------------------------- */
+
+.doc-callout {
+  background: color-mix(in srgb, var(--accent-2) 5%, var(--bg-elevated));
+  border: 1px solid color-mix(in srgb, var(--accent-2) 20%, transparent);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin: 1.25rem 0;
+}
+
+.doc-callout p {
+  margin-bottom: 0 !important;
+  font-size: 0.875rem !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Doc grid (field types, etc.)
+   --------------------------------------------------------------------------- */
+
+.doc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+}
+
+.doc-grid-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.doc-grid-card h3 {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent-1);
+  margin-top: 0;
+  margin-bottom: 0.35rem;
+}
+
+.doc-grid-card p {
+  font-size: 0.825rem !important;
+  margin-bottom: 0 !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Demo shared styles
+   --------------------------------------------------------------------------- */
+
+.demo-box {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin: 1.25rem 0;
+}
+
+.demo-box h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-top: 0;
+  margin-bottom: 0.35rem;
+}
+
+.demo-desc {
+  font-size: 0.85rem !important;
+  color: var(--text-secondary) !important;
+  margin-bottom: 1rem !important;
+}
+
+.demo-clients {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.demo-client {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.demo-client-a {
+  border-color: color-mix(in srgb, #38bdf8 30%, var(--border));
+}
+
+.demo-client-b {
+  border-color: color-mix(in srgb, #c084fc 30%, var(--border));
+}
+
+.demo-client-hdr {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.demo-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.demo-dot-a {
+  background: #38bdf8;
+}
+
+.demo-dot-b {
+  background: #c084fc;
+}
+
+.demo-clock {
+  margin-left: auto;
+  font-weight: 400;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.demo-input {
+  width: 100%;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.demo-input:focus {
+  border-color: var(--accent-2);
+}
+
+.demo-input::placeholder {
+  color: var(--text-muted);
+}
+
+.demo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  border-radius: 6px;
+  border: 1px solid var(--border-bright);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+  white-space: nowrap;
+}
+
+.demo-btn:hover {
+  background: var(--bg-elevated);
+  border-color: var(--text-muted);
+}
+
+.demo-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.demo-btn-primary {
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  color: #000;
+  border-color: transparent;
+}
+
+.demo-btn-primary:hover {
+  filter: brightness(1.1);
+}
+
+.demo-btn-green {
+  background: color-mix(in srgb, #22c55e 15%, var(--bg-card));
+  border-color: color-mix(in srgb, #22c55e 40%, transparent);
+  color: #22c55e;
+}
+
+.demo-btn-green:hover {
+  background: color-mix(in srgb, #22c55e 25%, var(--bg-card));
+}
+
+.demo-btn-red {
+  background: color-mix(in srgb, #ef4444 15%, var(--bg-card));
+  border-color: color-mix(in srgb, #ef4444 40%, transparent);
+  color: #ef4444;
+}
+
+.demo-btn-red:hover {
+  background: color-mix(in srgb, #ef4444 25%, var(--bg-card));
+}
+
+.demo-btn-sm {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+}
+
+.demo-btn-active {
+  background: color-mix(in srgb, var(--accent-2) 15%, var(--bg-card));
+}
+
+.demo-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.demo-btn-row {
+  display: flex;
+  gap: 0.4rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Demo event log
+   --------------------------------------------------------------------------- */
+
+.demo-log {
+  max-height: 140px;
+  overflow-y: auto;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 0.75rem;
+}
+
+.demo-log-entry {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0;
+}
+
+.demo-log-a {
+  color: #38bdf8;
+}
+
+.demo-log-b {
+  color: #c084fc;
+}
+
+.demo-log-system {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ---------------------------------------------------------------------------
+   Demo result
+   --------------------------------------------------------------------------- */
+
+.demo-result {
+  background: color-mix(in srgb, var(--accent-2) 8%, var(--bg-code));
+  border: 1px solid color-mix(in srgb, var(--accent-2) 25%, transparent);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.demo-result-a {
+  border-color: color-mix(in srgb, #38bdf8 30%, transparent);
+  background: color-mix(in srgb, #38bdf8 8%, var(--bg-code));
+}
+
+.demo-result-b {
+  border-color: color-mix(in srgb, #c084fc 30%, transparent);
+  background: color-mix(in srgb, #c084fc 8%, var(--bg-code));
+}
+
+/* ---------------------------------------------------------------------------
+   Demo tabs (CRDTs)
+   --------------------------------------------------------------------------- */
+
+.demo-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  padding: 0.5rem 0.5rem 0;
+  margin-top: 1rem;
+}
+
+.demo-tab {
+  padding: 0.4rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 6px 6px 0 0;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+
+.demo-tab:hover {
+  color: var(--text-secondary);
+}
+
+.demo-tab.active {
+  color: var(--accent-2);
+  background: var(--bg-code);
+}
+
+.demo-tabs + .demo-box {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  margin-top: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   CRDT demos — counter
+   --------------------------------------------------------------------------- */
+
+.demo-counter-total {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.demo-counter-num {
+  font-size: 2.5rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-2);
+  line-height: 1;
+}
+
+.demo-counter-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 0.2rem;
+}
+
+/* ---------------------------------------------------------------------------
+   CRDT demos — OR-Set tags
+   --------------------------------------------------------------------------- */
+
+.demo-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+  min-height: 1.75rem;
+}
+
+.demo-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.2rem 0.5rem;
+  border-radius: 100px;
+  background: color-mix(in srgb, var(--accent-2) 12%, var(--bg-card));
+  border: 1px solid color-mix(in srgb, var(--accent-2) 25%, transparent);
+  color: var(--text-primary);
+}
+
+.demo-tag-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 0.65rem;
+  font-family: var(--font-sans);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 50%;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.demo-tag-x:hover {
+  color: #ef4444;
+}
+
+.demo-tag-merged {
+  background: color-mix(in srgb, #22c55e 12%, var(--bg-card));
+  border-color: color-mix(in srgb, #22c55e 30%, transparent);
+}
+
+.demo-tag-add {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.demo-tag-add .demo-input {
+  flex: 1;
+}
+
+/* ---------------------------------------------------------------------------
+   Presence demo
+   --------------------------------------------------------------------------- */
+
+.demo-presence-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.demo-presence-area {
+  position: relative;
+  height: 220px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: none;
+  margin-bottom: 0.75rem;
+}
+
+.demo-presence-label {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.75rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.demo-cursor {
+  position: absolute;
+  pointer-events: none;
+  transition:
+    left 0.15s ease-out,
+    top 0.15s ease-out;
+}
+
+.demo-cursor-label {
+  position: absolute;
+  top: 18px;
+  left: 10px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  color: #000;
+  white-space: nowrap;
+}
+
+.demo-presence-avatars {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.demo-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #000;
+}
+
+/* ---------------------------------------------------------------------------
+   Chat / Pub-Sub demo
+   --------------------------------------------------------------------------- */
+
+.demo-chat-feed {
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.demo-chat-empty {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  text-align: center;
+  padding: 1.5rem 0;
+}
+
+.demo-chat-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text-muted) 5%, transparent);
+}
+
+.demo-chat-a {
+  border-left: 2px solid #38bdf8;
+}
+
+.demo-chat-b {
+  border-left: 2px solid #c084fc;
+}
+
+.demo-chat-input-row {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.demo-chat-input-row .demo-input {
+  flex: 1;
+}
+
+/* ---------------------------------------------------------------------------
+   Streaming demo
+   --------------------------------------------------------------------------- */
+
+.demo-stream-output {
+  min-height: 100px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  line-height: 1.65;
+  margin-bottom: 0.75rem;
+}
+
+.demo-stream-placeholder {
+  color: var(--text-muted);
+}
+
+.demo-stream-thinking {
+  color: var(--accent-1);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.demo-stream-cursor {
+  display: inline;
+  color: var(--accent-2);
+  animation: blink 0.8s step-end infinite;
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.demo-stream-error {
+  color: #ef4444;
+  font-size: 0.82rem;
+  margin-top: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  background: color-mix(in srgb, #ef4444 8%, transparent);
+  border: 1px solid color-mix(in srgb, #ef4444 20%, transparent);
+  border-radius: 6px;
+}
+
+.demo-stream-status {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.demo-stream-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  padding: 0.15rem 0.5rem;
+  border-radius: 100px;
+  text-transform: uppercase;
+}
+
+.demo-stream-idle {
+  background: color-mix(in srgb, var(--text-muted) 15%, transparent);
+  color: var(--text-muted);
+}
+
+.demo-stream-pending {
+  background: color-mix(in srgb, var(--accent-1) 15%, transparent);
+  color: var(--accent-1);
+}
+
+.demo-stream-streaming {
+  background: color-mix(in srgb, #38bdf8 15%, transparent);
+  color: #38bdf8;
+}
+
+.demo-stream-done {
+  background: color-mix(in srgb, #22c55e 15%, transparent);
+  color: #22c55e;
+}
+
+.demo-stream-error {
+  background: color-mix(in srgb, #ef4444 15%, transparent);
+  color: #ef4444;
+}
+
+/* ---------------------------------------------------------------------------
+   Docs responsive
+   --------------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .sidebar {
+    display: none;
+  }
+
+  .docs-content {
+    padding: 2rem 1.5rem 3rem;
+  }
+
+  .demo-clients {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .docs-content {
+    padding: 1.5rem 1rem 2rem;
+  }
+
+  .demo-box {
+    padding: 1rem;
+  }
+
+  .demo-presence-area {
+    height: 160px;
+  }
+
+  .doc-grid {
+    grid-template-columns: 1fr;
+  }
+}
