@@ -13,10 +13,9 @@ export function Collections() {
       <h2 id="with-rest">withRest &mdash; the 80% case</h2>
       <p>
         Spread <code>withRest</code> into <code>realtimeCollectionOptions</code>{' '}
-        to wire <code>getKey</code>, <code>queryFn</code>,{' '}
-        <code>onInsert</code>, <code>onUpdate</code>, and{' '}
-        <code>onDelete</code> to standard REST/JSON endpoints in one call. Your
-        server routes are plain CRUD.
+        to wire <code>getKey</code>, <code>queryFn</code>, <code>onInsert</code>
+        , <code>onUpdate</code>, and <code>onDelete</code> to standard REST/JSON
+        endpoints in one call. Your server routes are plain CRUD.
       </p>
       <CodeBlock
         title="features/tasks/collection.ts"
@@ -83,8 +82,8 @@ router.delete('/api/tasks/:id', async (req) => {
       <h2 id="server-push">Server-initiated push</h2>
       <p>
         The one case where you call <code>nodeServer.publish()</code> directly:
-        changes that originate outside a client mutation &mdash; background jobs,
-        cron tasks, webhooks.
+        changes that originate outside a client mutation &mdash; background
+        jobs, cron tasks, webhooks.
       </p>
       <CodeBlock
         title="server/jobs/inventorySync.ts"
@@ -117,7 +116,8 @@ export async function syncInventory(productId: string) {
       <h2 id="optimistic-updates">Optimistic updates</h2>
       <p>
         Enable <code>optimistic: true</code> to add a nonce to each mutation.
-        The echo from the server is suppressed so there are no duplicate flashes.
+        The echo from the server is suppressed so there are no duplicate
+        flashes.
       </p>
       <CodeBlock
         code={`realtimeCollectionOptions({

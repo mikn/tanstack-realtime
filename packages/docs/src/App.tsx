@@ -29,7 +29,7 @@ function useHash() {
   return hash
 }
 
-const docRoutes: Record<string, () => React.JSX.Element> = {
+const docRoutes: Partial<Record<string, () => React.JSX.Element>> = {
   '#/docs/getting-started': GettingStarted,
   '#/docs/collections': Collections,
   '#/docs/crdts': CRDTs,
@@ -80,7 +80,10 @@ function DocsNav({ hash }: { hash: string }) {
               <a href="#when-to-use">When to use</a>
             </>
           ) : null}
-          <a href="#/docs/getting-started" className={!isHome ? 'nav-active' : ''}>
+          <a
+            href="#/docs/getting-started"
+            className={!isHome ? 'nav-active' : ''}
+          >
             Docs
           </a>
           <a

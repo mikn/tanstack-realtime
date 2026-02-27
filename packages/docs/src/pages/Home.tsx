@@ -7,8 +7,7 @@ function Hero() {
       <div className="container">
         <span className="badge">v0.1 &middot; Alpha</span>
         <h1>
-          Realtime primitives{' '}
-          <span className="gradient-text">for React</span>
+          Realtime primitives <span className="gradient-text">for React</span>
         </h1>
         <p className="hero-sub">
           Type-safe, transport-agnostic realtime. Plug into your existing server
@@ -231,19 +230,31 @@ function Ecosystem() {
         <div className="ecosystem-grid">
           <div className="eco-card">
             <h3>TanStack DB</h3>
-            <p>Collections with optimistic mutations, derived views, and reactive queries.</p>
+            <p>
+              Collections with optimistic mutations, derived views, and reactive
+              queries.
+            </p>
           </div>
           <div className="eco-card">
             <h3>TanStack Query</h3>
-            <p>Use alongside Realtime for data that doesn&rsquo;t need a live channel.</p>
+            <p>
+              Use alongside Realtime for data that doesn&rsquo;t need a live
+              channel.
+            </p>
           </div>
           <div className="eco-card">
             <h3>TanStack Store</h3>
-            <p>Connection status, queue state, and collection data all expose reactive stores.</p>
+            <p>
+              Connection status, queue state, and collection data all expose
+              reactive stores.
+            </p>
           </div>
           <div className="eco-card">
             <h3>TanStack Start</h3>
-            <p>Server functions provide the queryFn. WebSocket transport handles the rest.</p>
+            <p>
+              Server functions provide the queryFn. WebSocket transport handles
+              the rest.
+            </p>
           </div>
         </div>
       </div>
@@ -266,9 +277,14 @@ function Positioning() {
             <h3>Good fit</h3>
             <ul>
               <li>Live updates without polling</li>
-              <li>Reactive collections that update when any client mutates data</li>
+              <li>
+                Reactive collections that update when any client mutates data
+              </li>
               <li>Presence and lightweight pub/sub messaging</li>
-              <li>Concurrent edits on simple fields &mdash; counters, tag sets, scalar values</li>
+              <li>
+                Concurrent edits on simple fields &mdash; counters, tag sets,
+                scalar values
+              </li>
               <li>Swappable transports without code changes</li>
             </ul>
           </div>
@@ -276,9 +292,18 @@ function Positioning() {
           <div className="positioning-card positioning-bad">
             <h3>Look elsewhere</h3>
             <ul>
-              <li><strong>Already using ElectricSQL</strong> &mdash; it syncs Postgres directly to client collections</li>
-              <li><strong>Rich text editing</strong> &mdash; Yjs and Hocuspocus are purpose-built for this</li>
-              <li><strong>Polling works fine</strong> &mdash; TanStack Query with a refetchInterval is simpler</li>
+              <li>
+                <strong>Already using ElectricSQL</strong> &mdash; it syncs
+                Postgres directly to client collections
+              </li>
+              <li>
+                <strong>Rich text editing</strong> &mdash; Yjs and Hocuspocus
+                are purpose-built for this
+              </li>
+              <li>
+                <strong>Polling works fine</strong> &mdash; TanStack Query with
+                a refetchInterval is simpler
+              </li>
             </ul>
           </div>
         </div>
@@ -306,19 +331,42 @@ function Footer() {
           </div>
           <div>
             <h4>Community</h4>
-            <a href="https://github.com/mikn/tanstack-realtime" target="_blank" rel="noopener">GitHub</a>
-            <a href="https://discord.com/invite/WrRKjPJ" target="_blank" rel="noopener">Discord</a>
+            <a
+              href="https://github.com/mikn/tanstack-realtime"
+              target="_blank"
+              rel="noopener"
+            >
+              GitHub
+            </a>
+            <a
+              href="https://discord.com/invite/WrRKjPJ"
+              target="_blank"
+              rel="noopener"
+            >
+              Discord
+            </a>
           </div>
           <div>
             <h4>Ecosystem</h4>
-            <a href="https://tanstack.com/query" target="_blank" rel="noopener">TanStack Query</a>
-            <a href="https://tanstack.com/db" target="_blank" rel="noopener">TanStack DB</a>
-            <a href="https://tanstack.com/store" target="_blank" rel="noopener">TanStack Store</a>
-            <a href="https://tanstack.com/start" target="_blank" rel="noopener">TanStack Start</a>
+            <a href="https://tanstack.com/query" target="_blank" rel="noopener">
+              TanStack Query
+            </a>
+            <a href="https://tanstack.com/db" target="_blank" rel="noopener">
+              TanStack DB
+            </a>
+            <a href="https://tanstack.com/store" target="_blank" rel="noopener">
+              TanStack Store
+            </a>
+            <a href="https://tanstack.com/start" target="_blank" rel="noopener">
+              TanStack Start
+            </a>
           </div>
         </div>
         <div className="footer-bottom">
-          <p>&copy; {new Date().getFullYear()} mikn. MIT License. Not an official TanStack project.</p>
+          <p>
+            &copy; {new Date().getFullYear()} mikn. MIT License. Not an official
+            TanStack project.
+          </p>
         </div>
       </div>
     </footer>

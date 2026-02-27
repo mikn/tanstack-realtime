@@ -17,11 +17,11 @@ const NAMES = ['Alice', 'Bob', 'Charlie', 'Dana']
 
 function PresenceDemo() {
   const areaRef = useRef<HTMLDivElement>(null)
-  const [users, setUsers] = useState<FakeUser[]>([
+  const [users, setUsers] = useState<Array<FakeUser>>([
     { id: '1', name: 'Alice', color: COLORS[0], cursor: null },
     { id: '2', name: 'Bob', color: COLORS[1], cursor: { x: 120, y: 80 } },
   ])
-  const [joined, setJoined] = useState<string[]>(['1', '2'])
+  const [joined, setJoined] = useState<Array<string>>(['1', '2'])
 
   // Move Bob's cursor randomly
   useEffect(() => {
@@ -156,9 +156,9 @@ export function Presence() {
     <article className="doc-article">
       <h1>Presence</h1>
       <p className="doc-lead">
-        Track who's connected and what they're doing.{' '}
-        <code>usePresence</code> joins on mount, leaves on unmount, and returns
-        a reactive list of every other connected user.
+        Track who's connected and what they're doing. <code>usePresence</code>{' '}
+        joins on mount, leaves on unmount, and returns a reactive list of every
+        other connected user.
       </p>
 
       <h2 id="try-it">Try it</h2>
@@ -220,12 +220,12 @@ function DocumentPage({ docId }: { docId: string }) {
       <div className="doc-callout">
         <p>
           <code>usePresence</code> subscribes to the channel, calls{' '}
-          <code>client.joinPresence(channel, initial)</code> on mount, and
-          calls <code>client.leavePresence(channel)</code> on unmount. The{' '}
-          <code>others</code> array is reactive &mdash; it updates when any
-          peer joins, updates their data, or disconnects. The current user is
-          always excluded. <code>updatePresence(delta)</code> merges partial
-          data, so a cursor update doesn't overwrite the user's name.
+          <code>client.joinPresence(channel, initial)</code> on mount, and calls{' '}
+          <code>client.leavePresence(channel)</code> on unmount. The{' '}
+          <code>others</code> array is reactive &mdash; it updates when any peer
+          joins, updates their data, or disconnects. The current user is always
+          excluded. <code>updatePresence(delta)</code> merges partial data, so a
+          cursor update doesn't overwrite the user's name.
         </p>
       </div>
     </article>

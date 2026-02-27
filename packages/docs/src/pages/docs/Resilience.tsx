@@ -116,9 +116,7 @@ self.addEventListener('connect', (e) => {
       <h2 id="utilities">Utilities</h2>
 
       <h3>createDedup</h3>
-      <p>
-        Bounded deduplication filter using FIFO eviction.
-      </p>
+      <p>Bounded deduplication filter using FIFO eviction.</p>
       <CodeBlock
         code={`import { createDedup } from '@tanstack/realtime'
 
@@ -131,9 +129,7 @@ transport.subscribe('chat', (msg) => {
       />
 
       <h3>throttle</h3>
-      <p>
-        Trailing-edge throttle for high-frequency publishes.
-      </p>
+      <p>Trailing-edge throttle for high-frequency publishes.</p>
       <CodeBlock
         code={`import { throttle } from '@tanstack/realtime'
 

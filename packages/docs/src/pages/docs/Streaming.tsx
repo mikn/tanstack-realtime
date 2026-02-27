@@ -86,7 +86,9 @@ function StreamDemo() {
         {status === 'pending' && (
           <span className="demo-stream-thinking">Thinking...</span>
         )}
-        {(status === 'streaming' || status === 'done' || status === 'error') && (
+        {(status === 'streaming' ||
+          status === 'done' ||
+          status === 'error') && (
           <span>
             {tokens}
             {status === 'streaming' && (
@@ -94,9 +96,7 @@ function StreamDemo() {
             )}
           </span>
         )}
-        {status === 'error' && (
-          <div className="demo-stream-error">{error}</div>
-        )}
+        {status === 'error' && <div className="demo-stream-error">{error}</div>}
       </div>
       <div className="demo-stream-status">
         Status:{' '}

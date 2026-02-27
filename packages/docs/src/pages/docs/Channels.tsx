@@ -13,13 +13,14 @@ interface Msg {
 }
 
 function PubSubDemo() {
-  const [msgs, setMsgs] = useState<Msg[]>([])
+  const [msgs, setMsgs] = useState<Array<Msg>>([])
   const [inputA, setInputA] = useState('')
   const [inputB, setInputB] = useState('')
   const feedRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight
+    if (feedRef.current)
+      feedRef.current.scrollTop = feedRef.current.scrollHeight
   }, [msgs.length])
 
   const send = (from: 'A' | 'B', text: string) => {
@@ -30,20 +31,23 @@ function PubSubDemo() {
     ])
   }
 
-  const sendA = () => { send('A', inputA); setInputA('') }
-  const sendB = () => { send('B', inputB); setInputB('') }
+  const sendA = () => {
+    send('A', inputA)
+    setInputA('')
+  }
+  const sendB = () => {
+    send('B', inputB)
+    setInputB('')
+  }
 
   return (
     <div className="demo-box">
       <h3>Pub/Sub channel</h3>
       <p className="demo-desc">
-        Two clients publish messages to the same channel. Both see every
-        message in real time. Type in either input and press Enter.
+        Two clients publish messages to the same channel. Both see every message
+        in real time. Type in either input and press Enter.
       </p>
-      <div
-        ref={feedRef}
-        className="demo-chat-feed"
-      >
+      <div ref={feedRef} className="demo-chat-feed">
         {msgs.length === 0 && (
           <div className="demo-chat-empty">
             No messages yet. Send one from Client A or B.
@@ -176,8 +180,9 @@ function ChatRoom({ roomId }: { roomId: string }) {
       <h2 id="live-channels">Live event channels</h2>
       <p>
         Use <code>liveChannelOptions</code> for append-only streams like chat,
-        audit logs, or game events. Unlike <code>realtimeCollectionOptions</code>,
-        there is no <code>onUpdate</code> or <code>onDelete</code>.
+        audit logs, or game events. Unlike{' '}
+        <code>realtimeCollectionOptions</code>, there is no{' '}
+        <code>onUpdate</code> or <code>onDelete</code>.
       </p>
       <CodeBlock
         title="features/chat/collection.ts"

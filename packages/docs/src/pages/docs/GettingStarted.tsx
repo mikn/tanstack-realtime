@@ -11,9 +11,7 @@ export function GettingStarted() {
 
       <h2 id="installation">Installation</h2>
       <CodeBlock code={`npm i @tanstack/realtime @tanstack/react-realtime`} />
-      <p>
-        For the built-in WebSocket server, also install the Node.js preset:
-      </p>
+      <p>For the built-in WebSocket server, also install the Node.js preset:</p>
       <CodeBlock code={`npm i @tanstack/realtime-preset-node`} />
 
       <h2 id="server-setup">Server setup</h2>
@@ -121,8 +119,8 @@ function TodoList() {
           messaging, live event streams
         </li>
         <li>
-          <a href="#/docs/transports">Transports</a> &mdash; swap WebSocket
-          for SSE or Centrifugo
+          <a href="#/docs/transports">Transports</a> &mdash; swap WebSocket for
+          SSE or Centrifugo
         </li>
       </ul>
     </article>

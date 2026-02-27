@@ -15,7 +15,7 @@ function log(client: LogEntry['client'], text: string): LogEntry {
   return { id: ++_logId, client, text }
 }
 
-function DemoLog({ entries }: { entries: LogEntry[] }) {
+function DemoLog({ entries }: { entries: Array<LogEntry> }) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (ref.current) ref.current.scrollTop = ref.current.scrollHeight
@@ -48,7 +48,7 @@ function LwwDemo() {
     winner: 'A' | 'B'
     reason: string
   } | null>(null)
-  const [entries, setEntries] = useState<LogEntry[]>([
+  const [entries, setEntries] = useState<Array<LogEntry>>([
     log('system', 'Both clients see "Shopping List". Edit both, then merge.'),
   ])
 
@@ -130,7 +130,9 @@ function LwwDemo() {
         </button>
       </div>
       {merged && (
-        <div className={`demo-result demo-result-${merged.winner.toLowerCase()}`}>
+        <div
+          className={`demo-result demo-result-${merged.winner.toLowerCase()}`}
+        >
           <strong>Merged:</strong> "{merged.value}" &mdash; Client{' '}
           {merged.winner} wins ({merged.reason})
         </div>
@@ -145,30 +147,33 @@ function LwwDemo() {
 // ---------------------------------------------------------------------------
 
 interface PnState {
-  inc: Record<string, number>
-  dec: Record<string, number>
+  inc: { [key: string]: number | undefined }
+  dec: { [key: string]: number | undefined }
 }
 function pnVal(s: PnState) {
   let t = 0
-  for (const v of Object.values(s.inc)) t += v
-  for (const v of Object.values(s.dec)) t -= v
+  for (const v of Object.values(s.inc)) t += v ?? 0
+  for (const v of Object.values(s.dec)) t -= v ?? 0
   return t
 }
 function pnMerge(a: PnState, b: PnState): PnState {
-  const inc: Record<string, number> = { ...a.inc }
-  const dec: Record<string, number> = { ...a.dec }
+  const inc: { [key: string]: number | undefined } = { ...a.inc }
+  const dec: { [key: string]: number | undefined } = { ...a.dec }
   for (const [id, v] of Object.entries(b.inc))
-    if ((inc[id] ?? 0) < v) inc[id] = v
+    if ((inc[id] ?? 0) < (v ?? 0)) inc[id] = v
   for (const [id, v] of Object.entries(b.dec))
-    if ((dec[id] ?? 0) < v) dec[id] = v
+    if ((dec[id] ?? 0) < (v ?? 0)) dec[id] = v
   return { inc, dec }
 }
 
 function PnCounterDemo() {
   const [stA, setStA] = useState<PnState>({ inc: {}, dec: {} })
   const [stB, setStB] = useState<PnState>({ inc: {}, dec: {} })
-  const [entries, setEntries] = useState<LogEntry[]>([
-    log('system', 'Click +/- on each client. The merged total is always correct.'),
+  const [entries, setEntries] = useState<Array<LogEntry>>([
+    log(
+      'system',
+      'Click +/- on each client. The merged total is always correct.',
+    ),
   ])
 
   const incA = () => {
@@ -255,8 +260,14 @@ function PnCounterDemo() {
 // OR-Set Demo
 // ---------------------------------------------------------------------------
 
-interface OrEntry { key: string; value: string; tag: string }
-interface OrSetState { entries: OrEntry[] }
+interface OrEntry {
+  key: string
+  value: string
+  tag: string
+}
+interface OrSetState {
+  entries: Array<OrEntry>
+}
 function orVals(s: OrSetState) {
   const seen = new Map<string, string>()
   for (const e of s.entries) seen.set(e.key, e.value)
@@ -288,20 +299,54 @@ function OrSetDemo() {
   const [inA, setInA] = useState('')
   const [inB, setInB] = useState('')
   const [show, setShow] = useState(false)
-  const [entries, setEntries] = useState<LogEntry[]>([
-    log('system', 'Both clients see: bug, feature, docs. Add/remove, then merge.'),
+  const [entries, setEntries] = useState<Array<LogEntry>>([
+    log(
+      'system',
+      'Both clients see: bug, feature, docs. Add/remove, then merge.',
+    ),
   ])
 
-  const addA = () => { if (!inA.trim()) return; setStA(s => orAdd(s, inA.trim())); setEntries(p => [...p, log('a', `add "${inA.trim()}"`)]); setInA(''); setShow(false) }
-  const addB = () => { if (!inB.trim()) return; setStB(s => orAdd(s, inB.trim())); setEntries(p => [...p, log('b', `add "${inB.trim()}"`)]); setInB(''); setShow(false) }
-  const rmA = (v: string) => { setStA(s => orRemove(s, v)); setEntries(p => [...p, log('a', `remove "${v}"`)]); setShow(false) }
-  const rmB = (v: string) => { setStB(s => orRemove(s, v)); setEntries(p => [...p, log('b', `remove "${v}"`)]); setShow(false) }
+  const addA = () => {
+    if (!inA.trim()) return
+    setStA((s) => orAdd(s, inA.trim()))
+    setEntries((p) => [...p, log('a', `add "${inA.trim()}"`)])
+    setInA('')
+    setShow(false)
+  }
+  const addB = () => {
+    if (!inB.trim()) return
+    setStB((s) => orAdd(s, inB.trim()))
+    setEntries((p) => [...p, log('b', `add "${inB.trim()}"`)])
+    setInB('')
+    setShow(false)
+  }
+  const rmA = (v: string) => {
+    setStA((s) => orRemove(s, v))
+    setEntries((p) => [...p, log('a', `remove "${v}"`)])
+    setShow(false)
+  }
+  const rmB = (v: string) => {
+    setStB((s) => orRemove(s, v))
+    setEntries((p) => [...p, log('b', `remove "${v}"`)])
+    setShow(false)
+  }
   const merge = () => {
     const vals = orVals(orMerge(stA, stB))
     setShow(true)
-    setEntries(p => [...p, log('system', `Merge (union): [${vals.join(', ')}]`)])
+    setEntries((p) => [
+      ...p,
+      log('system', `Merge (union): [${vals.join(', ')}]`),
+    ])
   }
-  const reset = () => { const i = fresh(); setStA(i); setStB(i); setInA(''); setInB(''); setShow(false); setEntries([log('system', 'Reset.')]) }
+  const reset = () => {
+    const i = fresh()
+    setStA(i)
+    setStB(i)
+    setInA('')
+    setInB('')
+    setShow(false)
+    setEntries([log('system', 'Reset.')])
+  }
 
   const merged = orMerge(stA, stB)
 
@@ -319,15 +364,26 @@ function OrSetDemo() {
             <span className="demo-dot demo-dot-a" /> Client A
           </div>
           <div className="demo-tags">
-            {orVals(stA).map(v => (
+            {orVals(stA).map((v) => (
               <span key={v} className="demo-tag">
-                {v} <button className="demo-tag-x" onClick={() => rmA(v)}>x</button>
+                {v}{' '}
+                <button className="demo-tag-x" onClick={() => rmA(v)}>
+                  x
+                </button>
               </span>
             ))}
           </div>
           <div className="demo-tag-add">
-            <input className="demo-input" value={inA} placeholder="new tag..." onChange={e => setInA(e.target.value)} onKeyDown={e => e.key === 'Enter' && addA()} />
-            <button className="demo-btn" onClick={addA}>Add</button>
+            <input
+              className="demo-input"
+              value={inA}
+              placeholder="new tag..."
+              onChange={(e) => setInA(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addA()}
+            />
+            <button className="demo-btn" onClick={addA}>
+              Add
+            </button>
           </div>
         </div>
         <div className="demo-client demo-client-b">
@@ -335,26 +391,45 @@ function OrSetDemo() {
             <span className="demo-dot demo-dot-b" /> Client B
           </div>
           <div className="demo-tags">
-            {orVals(stB).map(v => (
+            {orVals(stB).map((v) => (
               <span key={v} className="demo-tag">
-                {v} <button className="demo-tag-x" onClick={() => rmB(v)}>x</button>
+                {v}{' '}
+                <button className="demo-tag-x" onClick={() => rmB(v)}>
+                  x
+                </button>
               </span>
             ))}
           </div>
           <div className="demo-tag-add">
-            <input className="demo-input" value={inB} placeholder="new tag..." onChange={e => setInB(e.target.value)} onKeyDown={e => e.key === 'Enter' && addB()} />
-            <button className="demo-btn" onClick={addB}>Add</button>
+            <input
+              className="demo-input"
+              value={inB}
+              placeholder="new tag..."
+              onChange={(e) => setInB(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addB()}
+            />
+            <button className="demo-btn" onClick={addB}>
+              Add
+            </button>
           </div>
         </div>
       </div>
       <div className="demo-actions">
-        <button className="demo-btn demo-btn-primary" onClick={merge}>Reconnect &amp; Merge</button>
-        <button className="demo-btn" onClick={reset}>Reset</button>
+        <button className="demo-btn demo-btn-primary" onClick={merge}>
+          Reconnect &amp; Merge
+        </button>
+        <button className="demo-btn" onClick={reset}>
+          Reset
+        </button>
       </div>
       {show && (
         <div className="demo-result">
           <strong>Merged tags:</strong>{' '}
-          {orVals(merged).map(v => <span key={v} className="demo-tag demo-tag-merged">{v}</span>)}
+          {orVals(merged).map((v) => (
+            <span key={v} className="demo-tag demo-tag-merged">
+              {v}
+            </span>
+          ))}
         </div>
       )}
       <DemoLog entries={entries} />
@@ -374,9 +449,8 @@ export function CRDTs() {
       <h1>CRDTs</h1>
       <p className="doc-lead">
         Conflict-free data types let two clients edit the same row
-        simultaneously and merge deterministically. Declare{' '}
-        <code>fields</code> on a collection and every conflict is resolved
-        automatically.
+        simultaneously and merge deterministically. Declare <code>fields</code>{' '}
+        on a collection and every conflict is resolved automatically.
       </p>
 
       <h2 id="try-it">Try it</h2>
@@ -387,9 +461,24 @@ export function CRDTs() {
       </p>
 
       <div className="demo-tabs">
-        <button className={`demo-tab${tab === 'lww' ? ' active' : ''}`} onClick={() => setTab('lww')}>LWW Register</button>
-        <button className={`demo-tab${tab === 'pn' ? ' active' : ''}`} onClick={() => setTab('pn')}>PN-Counter</button>
-        <button className={`demo-tab${tab === 'or' ? ' active' : ''}`} onClick={() => setTab('or')}>OR-Set</button>
+        <button
+          className={`demo-tab${tab === 'lww' ? ' active' : ''}`}
+          onClick={() => setTab('lww')}
+        >
+          LWW Register
+        </button>
+        <button
+          className={`demo-tab${tab === 'pn' ? ' active' : ''}`}
+          onClick={() => setTab('pn')}
+        >
+          PN-Counter
+        </button>
+        <button
+          className={`demo-tab${tab === 'or' ? ' active' : ''}`}
+          onClick={() => setTab('or')}
+        >
+          OR-Set
+        </button>
       </div>
       {tab === 'lww' && <LwwDemo />}
       {tab === 'pn' && <PnCounterDemo />}
