@@ -145,6 +145,9 @@ export type {
 export { withRest } from './core/withRest.js'
 export type { WithRestOptions } from './core/withRest.js'
 
+export { withServerFns } from './core/withServerFns.js'
+export type { WithServerFnsOptions } from './core/withServerFns.js'
+
 // Core utilities
 export { createDedup } from './core/dedup.js'
 export type { DedupOptions, DeduplicationFilter } from './core/dedup.js'
