@@ -4,6 +4,7 @@ const sections = [
     items: [
       { label: 'Getting Started', hash: '#/docs/getting-started' },
       { label: 'Collections', hash: '#/docs/collections' },
+      { label: 'Under the Hood', hash: '#/docs/under-the-hood' },
     ],
   },
   {
@@ -20,6 +21,7 @@ const sections = [
     items: [
       { label: 'Transports', hash: '#/docs/transports' },
       { label: 'Resilience', hash: '#/docs/resilience' },
+      { label: 'Security', hash: '#/docs/security' },
     ],
   },
   {
@@ -28,9 +30,17 @@ const sections = [
   },
 ]
 
-export function Sidebar({ currentHash }: { currentHash: string }) {
+export function Sidebar({
+  currentHash,
+  mobileOpen,
+  onClose,
+}: {
+  currentHash: string
+  mobileOpen: boolean
+  onClose: () => void
+}) {
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${mobileOpen ? ' sidebar-mobile-open' : ''}`}>
       <a href="#/" className="sidebar-home">
         &larr; Home
       </a>
@@ -42,6 +52,7 @@ export function Sidebar({ currentHash }: { currentHash: string }) {
               key={item.hash}
               href={item.hash}
               className={`sidebar-link${currentHash === item.hash ? ' active' : ''}`}
+              onClick={onClose}
             >
               {item.label}
             </a>

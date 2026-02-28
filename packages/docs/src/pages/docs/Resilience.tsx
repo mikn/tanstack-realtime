@@ -5,9 +5,129 @@ export function Resilience() {
     <article className="doc-article">
       <h1>Resilience</h1>
       <p className="doc-lead">
-        Three transport wrappers that stack on top of any adapter. Use one, two,
-        or all three in any combination.
+        Transport wrappers, channel recovery, and FPS sync that stack on top of
+        any adapter. Use one, two, or all in any combination.
       </p>
+
+      <h2 id="channel-recovery">Channel recovery</h2>
+      <p>
+        Serverless and edge functions are short-lived by design — a Lambda
+        invocation typically lasts at most 15 minutes. WebSocket connections
+        can outlive function instances, causing the server-side channel state
+        to be lost. Channel recovery lets a long-lived client session survive
+        across multiple short-lived function invocations.
+      </p>
+      <p>
+        The strategy is <strong>compaction to the database</strong>: before a
+        function instance shuts down, it writes a snapshot of each channel&rsquo;s
+        current sequence number and any buffered messages to the database.
+        When a new instance starts or a client reconnects, it reads the snapshot,
+        fast-forwards to the last known sequence, and resumes from there.
+      </p>
+      <CodeBlock
+        title="server/realtime.ts — channel recovery with compaction"
+        code={`import { createNodeServer } from '@tanstack/realtime-preset-node'
+
+export const nodeServer = createNodeServer({
+  signingSecret: process.env.REALTIME_SIGNING_SECRET,
+  getUser: (req) => verifyJwt(req.headers.authorization),
+  authorize: async (userId, channel) => ({ subscribe: true, publish: true }),
+
+  // Called periodically and on graceful shutdown.
+  // Persist per-channel state so the next function instance can resume.
+  onCompact: async (snapshots) => {
+    await db.channelSnapshots.upsertMany(
+      snapshots.map(({ channel, seq, ts }) => ({
+        channel,
+        seq,
+        ts,
+        updatedAt: new Date(),
+      })),
+    )
+  },
+
+  // Called when a client sends { type: 'recover', channel, lastSeq }.
+  // Return the snapshot so the client can fast-forward.
+  onRecover: async (channel, clientLastSeq) => {
+    const snapshot = await db.channelSnapshots.findOne({ channel })
+    if (!snapshot || snapshot.seq <= clientLastSeq) return null
+    return { seq: snapshot.seq, ts: snapshot.ts }
+  },
+})`}
+      />
+      <p>
+        On the client side, enable recovery by passing{' '}
+        <code>recoverOnReconnect: true</code>. The client automatically sends
+        its last known sequence on reconnect and applies the snapshot diff
+        before resuming normal operation.
+      </p>
+      <CodeBlock
+        code={`const todosOptions = realtimeCollectionOptions({
+  ...withRest({ url: '/api/todos', getKey: (t: Todo) => t.id }),
+  client: realtimeClient,
+  channel: ['todos', { projectId }],
+  // Trigger recovery on reconnect instead of a full refetch
+  recoverOnReconnect: true,
+})`}
+      />
+      <div className="doc-callout">
+        <p>
+          <strong>Default pattern recommendation:</strong> Use{' '}
+          <code>recoverOnReconnect: true</code> together with{' '}
+          <code>onCompact</code> for all collections in serverless environments.
+          This avoids a full <code>queryFn</code> refetch (which can be
+          expensive) while still recovering missed messages. Fall back to{' '}
+          <code>refetchOnReconnect: true</code> only when you cannot persist
+          channel snapshots.
+        </p>
+      </div>
+
+      <h2 id="fps-sync">FPS sync (tick-based updates)</h2>
+      <p>
+        High-frequency use cases like multiplayer games, live dashboards, and
+        collaborative cursors can produce hundreds of updates per second. Sending
+        every event individually saturates the connection and causes jank on the
+        receiving end. FPS sync batches updates into fixed-interval ticks and
+        delivers the <em>latest</em> value for each key in a single frame.
+      </p>
+      <CodeBlock
+        title="Configuring a tick-based collection"
+        code={`import { tickCollectionOptions } from '@tanstack/realtime'
+
+// Snapshots are sent at most 30 times per second.
+// Intermediate updates between ticks are dropped — only the latest wins.
+const cursorOptions = tickCollectionOptions({
+  client: realtimeClient,
+  channel: ['cursors', { roomId }],
+  fps: 30,           // target frame rate
+  getKey: (c) => c.userId,
+})`}
+      />
+      <p>
+        For data where you want <em>all</em> intermediate values (e.g. chat
+        messages, audit events), use <code>liveChannelOptions</code> instead
+        — it has no tick batching and delivers every event in order.
+      </p>
+      <CodeBlock
+        title="Adaptive FPS — throttle on the client"
+        code={`import { throttle } from '@tanstack/realtime'
+
+// Publish at most every 33 ms (~30 fps), regardless of mouse move frequency.
+const publishCursor = throttle(
+  (pos: { x: number; y: number }) => client.publish(['cursors', { roomId }], pos),
+  { interval: 33 },
+)`}
+      />
+      <div className="doc-callout">
+        <p>
+          <strong>Client throttle vs server tick:</strong> <code>throttle</code>{' '}
+          reduces how often the client <em>sends</em>; the tick collection
+          controls how often the server <em>broadcasts</em>. For the best
+          results, combine both: throttle on the client to reduce network load,
+          and use <code>fps</code> on the collection to smooth delivery to
+          subscribers.
+        </p>
+      </div>
 
       <h2 id="offline-queue">Offline queue</h2>
       <p>

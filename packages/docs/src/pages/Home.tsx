@@ -96,7 +96,8 @@ function Spectrum() {
       <div className="container">
         <h2>Grow without rewriting</h2>
         <p className="section-sub">
-          Each step adds one config key. You can stop at any point.
+          Start with a plain TanStack DB collection. Each step adds one config
+          key. You can stop at any point.
         </p>
 
         <div className="spectrum-steps">
@@ -104,29 +105,51 @@ function Spectrum() {
             <div className="spectrum-step-header">
               <span className="step-number">1</span>
               <div>
-                <h4>Server-only</h4>
-                <p>Just a queryFn. No WebSocket, no client.</p>
+                <h4>Plain TanStack DB collection</h4>
+                <p>
+                  A normal local collection &mdash; no WebSocket, no server
+                  push.
+                </p>
               </div>
             </div>
             <CodeBlock
-              code={`realtimeCollectionOptions({
-  queryFn: () => fetch('/api/todos').then(r => r.json()),
-  getKey: (t) => t.id,
+              code={`import { createCollection } from '@tanstack/db'
+
+const todosCollection = createCollection({
+  getKey: (t: Todo) => t.id,
+  // data loaded however you like — fetch, TanStack Query, etc.
+})`}
+            />
+          </div>
+
+          <div className="spectrum-step">
+            <div className="spectrum-step-header">
+              <span className="step-number">2</span>
+              <div>
+                <h4>+ queryFn &mdash; seed from server</h4>
+                <p>Fetch initial data and keep it in sync with REST.</p>
+              </div>
+            </div>
+            <CodeBlock
+              code={`import { realtimeCollectionOptions, withRest } from '@tanstack/realtime'
+
+realtimeCollectionOptions({
+  ...withRest({ url: '/api/todos', getKey: (t: Todo) => t.id }),
 })`}
             />
           </div>
 
           <div className="spectrum-step active">
             <div className="spectrum-step-header">
-              <span className="step-number">2</span>
+              <span className="step-number">3</span>
               <div>
                 <h4>+ Channel &mdash; go live</h4>
-                <p>Every mutation is broadcast to all subscribers.</p>
+                <p>Every mutation is broadcast to all subscribers instantly.</p>
               </div>
             </div>
             <CodeBlock
               code={`realtimeCollectionOptions({
-  // ...queryFn, getKey
+  ...withRest({ url: '/api/todos', getKey: (t: Todo) => t.id }),
   client: realtimeClient,
   channel: ['todos', { projectId }],
 })`}
@@ -135,7 +158,7 @@ function Spectrum() {
 
           <div className="spectrum-step">
             <div className="spectrum-step-header">
-              <span className="step-number">3</span>
+              <span className="step-number">4</span>
               <div>
                 <h4>+ Fields &mdash; conflict-free</h4>
                 <p>Concurrent edits merge automatically with CRDTs.</p>

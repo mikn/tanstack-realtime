@@ -177,6 +177,87 @@ function ChatRoom({ roomId }: { roomId: string }) {
 }`}
       />
 
+      <h2 id="server-authority">Server authority for broadcasts</h2>
+      <p>
+        By default <code>usePublish</code> sends data directly from the client
+        to the channel. This is fine for ephemeral signals (typing indicators,
+        cursor positions) where clients already have write access. For data that
+        gets persisted or needs validation, route writes through a server
+        function so the server controls what is accepted and broadcast.
+      </p>
+      <p>
+        The recommended pattern with TanStack Start is a server function that
+        validates the payload, writes to the database, and then publishes to the
+        channel &mdash; all in one place.
+      </p>
+      <CodeBlock
+        title="app/functions/chat.ts (TanStack Start server function)"
+        code={`import { createServerFn } from '@tanstack/start'
+import { nodeServer } from '../server/realtime'
+import { serializeKey } from '@tanstack/realtime'
+
+export const sendMessage = createServerFn({ method: 'POST' })
+  .validator((body: unknown) => {
+    // validate & sanitize here — only trusted data reaches the channel
+    const { roomId, text } = body as { roomId: string; text: string }
+    if (!text?.trim()) throw new Error('Empty message')
+    return { roomId, text: text.trim() }
+  })
+  .handler(async ({ data: { roomId, text } }) => {
+    const message = await db.messages.create({
+      data: { roomId, text, authorId: ctx.userId },
+    })
+    // publish is called server-side — the client never touches the channel directly
+    nodeServer.publish(
+      serializeKey(['chat', { roomId }]),
+      { type: 'message', message },
+    )
+    return message
+  })`}
+      />
+      <CodeBlock
+        title="app/components/ChatRoom.tsx"
+        code={`import { useSubscribe } from '@tanstack/react-realtime'
+import { sendMessage } from '../functions/chat'
+
+function ChatRoom({ roomId }: { roomId: string }) {
+  const [messages, setMessages] = useState<Message[]>([])
+
+  // Subscribe to receive — server publishes, clients never publish directly
+  useSubscribe(['chat', { roomId }], (raw) => {
+    const e = raw as { type: string; message: Message }
+    if (e.type === 'message') setMessages((p) => [...p, e.message])
+  })
+
+  const [text, setText] = useState('')
+
+  return (
+    <>
+      {messages.map((m) => <p key={m.id}>{m.text}</p>)}
+      <input value={text} onChange={(e) => setText(e.target.value)} />
+      <button onClick={async () => {
+        await sendMessage({ data: { roomId, text } })
+        setText('')
+      }}>
+        Send
+      </button>
+    </>
+  )
+}`}
+      />
+      <div className="doc-callout">
+        <p>
+          <strong>When to use direct client publish vs server function:</strong>{' '}
+          Use client-side <code>usePublish</code> for ephemeral, non-persisted
+          signals (typing indicators, cursor moves, reactions) where the cost of
+          a server round-trip isn&rsquo;t worth it. Route through a server
+          function whenever data is persisted, needs authorization beyond channel
+          access, or must be validated before other clients see it. See the{' '}
+          <a href="#/docs/security">Security</a> page for a full discussion of
+          the trade-offs.
+        </p>
+      </div>
+
       <h2 id="live-channels">Live event channels</h2>
       <p>
         Use <code>liveChannelOptions</code> for append-only streams like chat,

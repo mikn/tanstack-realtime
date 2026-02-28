@@ -805,6 +805,57 @@ code {
 }
 
 /* ---------------------------------------------------------------------------
+   Hamburger button (mobile docs nav)
+   --------------------------------------------------------------------------- */
+
+.nav-hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 32px;
+  height: 32px;
+  padding: 4px;
+  background: none;
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.nav-hamburger span {
+  display: block;
+  height: 2px;
+  background: var(--text-secondary);
+  border-radius: 2px;
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.nav-hamburger.open span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.nav-hamburger.open span:nth-child(2) {
+  opacity: 0;
+}
+
+.nav-hamburger.open span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* Overlay behind mobile sidebar */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 98;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+}
+
+/* ---------------------------------------------------------------------------
    Docs layout
    --------------------------------------------------------------------------- */
 
@@ -1599,7 +1650,28 @@ code {
 
 @media (max-width: 900px) {
   .sidebar {
-    display: none;
+    position: fixed;
+    top: 0;
+    left: -280px;
+    width: 280px;
+    height: 100%;
+    z-index: 99;
+    padding-top: calc(var(--disclaimer-height) + 3.25rem + 1rem);
+    transition: left 0.25s ease;
+    box-shadow: none;
+  }
+
+  .sidebar.sidebar-mobile-open {
+    left: 0;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+  }
+
+  .sidebar-overlay {
+    display: block;
+  }
+
+  .nav-hamburger {
+    display: flex;
   }
 
   .docs-content {

@@ -11,6 +11,8 @@ import { Streaming } from './pages/docs/Streaming'
 import { Transports } from './pages/docs/Transports'
 import { Resilience } from './pages/docs/Resilience'
 import { Hooks } from './pages/docs/Hooks'
+import { UnderTheHood } from './pages/docs/UnderTheHood'
+import { Security } from './pages/docs/Security'
 
 // ---------------------------------------------------------------------------
 // Simple hash router
@@ -32,12 +34,14 @@ function useHash() {
 const docRoutes: Partial<Record<string, () => React.JSX.Element>> = {
   '#/docs/getting-started': GettingStarted,
   '#/docs/collections': Collections,
+  '#/docs/under-the-hood': UnderTheHood,
   '#/docs/crdts': CRDTs,
   '#/docs/presence': Presence,
   '#/docs/channels': Channels,
   '#/docs/streaming': Streaming,
   '#/docs/transports': Transports,
   '#/docs/resilience': Resilience,
+  '#/docs/security': Security,
   '#/docs/hooks': Hooks,
 }
 
@@ -63,7 +67,15 @@ function DisclaimerBar() {
   )
 }
 
-function DocsNav({ hash }: { hash: string }) {
+function DocsNav({
+  hash,
+  onMenuToggle,
+  menuOpen,
+}: {
+  hash: string
+  onMenuToggle: () => void
+  menuOpen: boolean
+}) {
   const isHome = !hash.startsWith('#/docs')
   return (
     <nav className="nav">
@@ -95,6 +107,17 @@ function DocsNav({ hash }: { hash: string }) {
             GitHub
           </a>
         </div>
+        {!isHome && (
+          <button
+            className={`nav-hamburger${menuOpen ? ' open' : ''}`}
+            onClick={onMenuToggle}
+            aria-label="Toggle navigation"
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+        )}
       </div>
     </nav>
   )
@@ -108,14 +131,27 @@ export function App() {
   const hash = useHash()
   const isDocsPage = hash.startsWith('#/docs')
   const DocPage = docRoutes[hash]
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  // Close menu on navigation
+  useEffect(() => {
+    setMenuOpen(false)
+  }, [hash])
 
   return (
     <>
       <DisclaimerBar />
-      <DocsNav hash={hash} />
+      <DocsNav
+        hash={hash}
+        onMenuToggle={() => setMenuOpen((v) => !v)}
+        menuOpen={menuOpen}
+      />
       {isDocsPage ? (
         <div className="docs-layout">
-          <Sidebar currentHash={hash} />
+          <Sidebar currentHash={hash} mobileOpen={menuOpen} onClose={() => setMenuOpen(false)} />
+          {menuOpen && (
+            <div className="sidebar-overlay" onClick={() => setMenuOpen(false)} />
+          )}
           <main className="docs-content">
             {DocPage ? <DocPage /> : <GettingStarted />}
           </main>
