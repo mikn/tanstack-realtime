@@ -162,6 +162,7 @@ onInsert: async ({ transaction }) => {
 // }
 
 // 4. Envelope is published to all channel subscribers
+//    (When serverPublish: true, steps 3-4 happen server-side instead)
 
 // 5. Each subscriber's onInsert / onUpdate / onDelete is called with row
 

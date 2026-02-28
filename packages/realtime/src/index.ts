@@ -145,6 +145,10 @@ export type {
 export { withRest } from './core/withRest.js'
 export type { WithRestOptions } from './core/withRest.js'
 
+// Server function composition helper — server authority by default
+export { withServerFn } from './core/withServerFn.js'
+export type { WithServerFnOptions, ServerMutationFn } from './core/withServerFn.js'
+
 // Core utilities
 export { createDedup } from './core/dedup.js'
 export type { DedupOptions, DeduplicationFilter } from './core/dedup.js'

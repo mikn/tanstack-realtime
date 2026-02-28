@@ -211,6 +211,23 @@ export interface RealtimeCollectionConfig<
   onUpdate?: UpdateMutationFn<T, TKey>
   /** Called after a local delete. Should persist to the server. */
   onDelete?: DeleteMutationFn<T, TKey>
+
+  /**
+   * When `true`, the library skips its automatic `client.publish()` call after
+   * each `onInsert` / `onUpdate` / `onDelete` callback succeeds. Instead, the
+   * server is expected to publish the message to the channel as part of the
+   * callback execution (e.g. inside a TanStack Start server function or an API
+   * route).
+   *
+   * Use this for **server authority**: the server validates, persists, **and**
+   * publishes atomically — the client never touches the channel for writes.
+   *
+   * When combined with `withServerFn`, the server function handles the
+   * publish call so the client code requires zero extra wiring.
+   *
+   * @default false
+   */
+  serverPublish?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -501,6 +518,7 @@ export function realtimeCollectionOptions<
     queryFn,
     refetchOnReconnect = false,
     optimistic = false,
+    serverPublish = false,
     onOptimisticError,
     onInsert,
     onUpdate,
@@ -766,7 +784,7 @@ export function realtimeCollectionOptions<
           }
           syncedEntries.set(key, entry)
 
-          if (primaryChannel && client) {
+          if (!serverPublish && primaryChannel && client) {
             try {
               await client.publish(
                 primaryChannel,
@@ -777,6 +795,9 @@ export function realtimeCollectionOptions<
               // to prevent it from leaking in pendingNonces forever.
               if (nonce) pendingNonces.delete(nonce)
             }
+          } else if (serverPublish && nonce) {
+            // Server will publish — nonce tracking is not needed on client.
+            pendingNonces.delete(nonce)
           }
         } else if (nonce) {
           pendingNonces.delete(nonce)
@@ -810,7 +831,7 @@ export function realtimeCollectionOptions<
           }
           syncedEntries.set(key, entry)
 
-          if (primaryChannel && client) {
+          if (!serverPublish && primaryChannel && client) {
             // buildPublishMessage calls buildCrdtFields which reads entry.row
             // as the previous state for delta computation. We must NOT update
             // entry.row until after the message is built.
@@ -821,6 +842,9 @@ export function realtimeCollectionOptions<
             } catch {
               if (nonce) pendingNonces.delete(nonce)
             }
+          } else {
+            entry.row = result
+            if (serverPublish && nonce) pendingNonces.delete(nonce)
           }
         } else if (nonce) {
           pendingNonces.delete(nonce)
@@ -849,7 +873,7 @@ export function realtimeCollectionOptions<
         if (result != null) {
           syncedEntries.delete(getKey(result))
 
-          if (primaryChannel && client) {
+          if (!serverPublish && primaryChannel && client) {
             try {
               await client.publish(
                 primaryChannel,
@@ -858,6 +882,8 @@ export function realtimeCollectionOptions<
             } catch {
               if (nonce) pendingNonces.delete(nonce)
             }
+          } else if (serverPublish && nonce) {
+            pendingNonces.delete(nonce)
           }
         } else if (nonce) {
           pendingNonces.delete(nonce)

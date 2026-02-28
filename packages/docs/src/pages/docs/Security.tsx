@@ -125,39 +125,46 @@ export const nodeServer = createNodeServer({
         before it is broadcast.
       </p>
       <p>
-        The recommended approach is to route writes through a server function
-        (TanStack Start) or API endpoint, and publish from the server — never
-        trust a client-originated payload for persisted data.
+        The recommended approach is <code>withServerFn</code> + TanStack Start
+        server functions. This makes server authority the default — no manual
+        publish wiring required. Setting <code>serverPublish: true</code>{' '}
+        (included automatically by <code>withServerFn</code>) suppresses the
+        client&rsquo;s auto-publish so only the server can broadcast.
       </p>
       <CodeBlock
-        title="Pattern 1 — server function (TanStack Start)"
-        code={`// app/functions/tasks.ts
-import { createServerFn } from '@tanstack/start'
-import { nodeServer } from '../server/realtime'
-import { serializeKey } from '@tanstack/realtime'
+        title="Recommended — withServerFn (server authority by default)"
+        code={`import { withServerFn, realtimeCollectionOptions, serializeKey } from '@tanstack/realtime'
+import { insertTask, updateTask, deleteTask } from './functions/tasks'
+import { nodeServer } from './server/realtime'
 
-export const createTask = createServerFn({ method: 'POST' })
-  .validator((body: unknown) => {
-    // zod, valibot, or manual validation
-    return taskSchema.parse(body)
-  })
-  .handler(async ({ data }) => {
-    // Server creates the record — client never touches the DB directly
-    const task = await db.tasks.create({ data: { ...data, createdBy: ctx.userId } })
-
-    // Server publishes — clients cannot spoof the channel or the payload
-    nodeServer.publish(
-      serializeKey(['tasks', { projectId: data.projectId }]),
-      { action: 'insert', data: task },
-    )
-    return task
+const tasksOptions = (projectId: string) =>
+  realtimeCollectionOptions({
+    ...withServerFn<Task, string>({
+      getKey: (t) => t.id,
+      queryFn: () => fetch(\`/api/tasks?projectId=\${projectId}\`).then(r => r.json()),
+      channel: ['tasks', { projectId }],
+      publish: (ch, data) => {
+        nodeServer.publish(typeof ch === 'string' ? ch : serializeKey(ch), data)
+        return Promise.resolve()
+      },
+      onInsert: insertTask,  // TanStack Start server function
+      onUpdate: updateTask,
+      onDelete: deleteTask,
+    }),
+    client: realtimeClient,
+    channel: ['tasks', { projectId }],
+    // serverPublish: true is included by withServerFn — client never publishes
   })`}
       />
+      <p>
+        If you cannot use <code>withServerFn</code>, you can still achieve
+        server authority manually by setting <code>serverPublish: true</code>{' '}
+        and publishing from your API handler:
+      </p>
       <CodeBlock
-        title="Pattern 2 — REST API with server-side publish"
+        title="Manual — REST API with serverPublish: true"
         code={`// server/routes/tasks.ts
 router.post('/api/tasks', async (req, res) => {
-  // Validate and authorize server-side
   const user = await authenticate(req)
   const parsed = taskSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json(parsed.error)
@@ -170,6 +177,12 @@ router.post('/api/tasks', async (req, res) => {
     { action: 'insert', data: task },
   )
   res.json(task)
+})
+
+// collection config
+realtimeCollectionOptions({
+  // ...
+  serverPublish: true, // suppress client-side auto-publish
 })`}
       />
 

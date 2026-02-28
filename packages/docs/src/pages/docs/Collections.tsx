@@ -10,12 +10,90 @@ export function Collections() {
         mutations through a channel, and resolve conflicts with CRDTs.
       </p>
 
-      <h2 id="with-rest">withRest &mdash; the 80% case</h2>
+      <h2 id="with-server-fn">
+        withServerFn &mdash; server authority (recommended)
+      </h2>
+      <p>
+        Spread <code>withServerFn</code> into{' '}
+        <code>realtimeCollectionOptions</code> to wire TanStack Start server
+        functions as your mutation callbacks. Each server function validates,
+        persists, <strong>and publishes</strong> &mdash; the client never touches
+        the channel for writes. <code>serverPublish: true</code> is included
+        automatically.
+      </p>
+      <CodeBlock
+        title="app/functions/tasks.ts — server functions"
+        code={`import { createServerFn } from '@tanstack/start'
+
+export const insertTask = createServerFn({ method: 'POST' })
+  .validator(taskSchema)
+  .handler(async ({ data }) => {
+    return db.tasks.create({ data: { ...data, createdBy: ctx.userId } })
+  })
+
+export const updateTask = createServerFn({ method: 'POST' })
+  .validator(taskSchema.partial())
+  .handler(async ({ data }) => {
+    return db.tasks.update({ where: { id: data.id }, data })
+  })
+
+export const deleteTask = createServerFn({ method: 'POST' })
+  .handler(async ({ data }) => {
+    return db.tasks.delete({ where: { id: (data as Task).id } })
+  })`}
+      />
+      <CodeBlock
+        title="app/collections/tasks.ts — wire it up"
+        code={`import { withServerFn, realtimeCollectionOptions, serializeKey } from '@tanstack/realtime'
+import { insertTask, updateTask, deleteTask } from '../functions/tasks'
+import { nodeServer } from '../server/realtime'
+
+const tasksOptions = (projectId: string) =>
+  realtimeCollectionOptions({
+    ...withServerFn<Task, string>({
+      getKey: (t) => t.id,
+      queryFn: () => fetch(\`/api/tasks?projectId=\${projectId}\`).then((r) => r.json()),
+      channel: ['tasks', { projectId }],
+      publish: (ch, data) => {
+        nodeServer.publish(typeof ch === 'string' ? ch : serializeKey(ch), data)
+        return Promise.resolve()
+      },
+      onInsert: insertTask,
+      onUpdate: updateTask,
+      onDelete: deleteTask,
+    }),
+    client: realtimeClient,
+    channel: ['tasks', { projectId }],
+    // serverPublish: true is already set by withServerFn
+    fields: { title: 'lww', status: 'lww', assignees: 'or-set' },
+  })`}
+      />
+      <div className="doc-callout">
+        <p>
+          <strong>Why server authority matters:</strong> With{' '}
+          <code>withRest</code>, the client publishes the mutation result to the
+          channel <em>after</em> the REST call returns. A tampered client could
+          modify the payload before it reaches other subscribers.{' '}
+          <code>withServerFn</code> avoids this &mdash; the server function is
+          the only code that calls <code>publish</code>, and{' '}
+          <code>serverPublish: true</code> suppresses the client&rsquo;s
+          automatic publish. See <a href="#/docs/security">Security</a> for the
+          full trade-off analysis.
+        </p>
+      </div>
+
+      <h2 id="with-rest">withRest &mdash; quick prototyping</h2>
       <p>
         Spread <code>withRest</code> into <code>realtimeCollectionOptions</code>{' '}
         to wire <code>getKey</code>, <code>queryFn</code>, <code>onInsert</code>
         , <code>onUpdate</code>, and <code>onDelete</code> to standard REST/JSON
         endpoints in one call. Your server routes are plain CRUD.
+      </p>
+      <p>
+        Note: <code>withRest</code> publishes from the <em>client</em> after the
+        REST call succeeds. This is convenient for prototyping but gives clients
+        control over the broadcast payload. For production use,{' '}
+        <code>withServerFn</code> is recommended.
       </p>
       <CodeBlock
         title="features/tasks/collection.ts"
@@ -107,9 +185,13 @@ export async function syncInventory(productId: string) {
       <div className="doc-callout">
         <p>
           After <code>onInsert</code> or <code>onUpdate</code> returns a value,
-          the library automatically publishes it to the channel. You only call{' '}
-          <code>nodeServer.publish()</code> directly for changes that originate
-          outside a client mutation.
+          the library automatically publishes it to the channel from the client.
+          This is the default behaviour. When{' '}
+          <code>serverPublish: true</code> is set (automatically included by{' '}
+          <code>withServerFn</code>), this client-side publish is suppressed and
+          the server is expected to publish instead. You only call{' '}
+          <code>nodeServer.publish()</code> manually for changes that originate
+          outside a client mutation (background jobs, webhooks, etc.).
         </p>
       </div>
 
