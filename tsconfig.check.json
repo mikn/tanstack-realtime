@@ -18,6 +18,9 @@
       ],
       "@tanstack/realtime-adapter-sse": [
         "./packages/realtime-adapter-sse/src/index.ts"
+      ],
+      "@tanstack/realtime-preset-start": [
+        "./packages/realtime-preset-start/src/index.ts"
       ]
     }
   },
@@ -27,6 +30,7 @@
     "packages/realtime-preset-node/src",
     "packages/realtime-adapter-centrifugo/src",
     "packages/realtime-adapter-sse/src",
+    "packages/realtime-preset-start/src",
     "packages/__tests__"
   ],
   "exclude": ["node_modules", "dist", "packages/docs"]
