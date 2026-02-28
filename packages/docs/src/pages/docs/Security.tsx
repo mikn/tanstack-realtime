@@ -110,80 +110,82 @@ export const nodeServer = createNodeServer({
       />
       <div className="doc-callout">
         <p>
-          <strong>Important:</strong> Channel authorization controls access to
-          the transport layer. If a user has <code>publish: true</code> on a
-          channel, they can send any payload to that channel. To enforce what{' '}
-          <em>data</em> reaches the channel, use server authority (below).
+          <strong>
+            <code>{'authorize: { publish: false }'}</code> is the real security
+            boundary.
+          </strong>{' '}
+          If a channel denies client publishes at the transport level, no
+          tampered client can broadcast to it regardless of what collection
+          flags are set. Channel authorization is enforced server-side, before
+          any data is relayed to other subscribers.
         </p>
       </div>
 
       <h2 id="server-authority">Server authority over data</h2>
       <p>
-        A client with publish access can broadcast arbitrary data to a channel.
-        If that data is persisted or drives UI decisions for other users, you
-        need server authority: the server validates and rewrites the payload
-        before it is broadcast.
+        For persisted data, set <code>publish: false</code> in{' '}
+        <code>authorize</code> and publish from your server function or API
+        handler instead. The server function calls{' '}
+        <code>nodeServer.publish()</code> directly &mdash; it is server-only
+        code that can import <code>nodeServer</code>, which clients cannot.
       </p>
       <p>
-        The recommended approach is <code>withServerFn</code> + TanStack Start
-        server functions. This makes server authority the default — no manual
-        publish wiring required. Setting <code>serverPublish: true</code>{' '}
-        (included automatically by <code>withServerFn</code>) suppresses the
-        client&rsquo;s auto-publish so only the server can broadcast.
+        Use <code>withServerFn</code> on the collection to adapt the callback
+        signatures and set <code>serverPublish: true</code> (skips the
+        otherwise rejected <code>client.publish()</code> round-trip):
       </p>
       <CodeBlock
-        title="Recommended — withServerFn (server authority by default)"
-        code={`import { withServerFn, realtimeCollectionOptions, serializeKey } from '@tanstack/realtime'
-import { insertTask, updateTask, deleteTask } from './functions/tasks'
-import { nodeServer } from './server/realtime'
+        title="app/functions/tasks.ts — server-only"
+        code={`import { createServerFn } from '@tanstack/start'
+import { nodeServer } from '../server/realtime'
+import { serializeKey } from '@tanstack/realtime'
 
-const tasksOptions = (projectId: string) =>
-  realtimeCollectionOptions({
-    ...withServerFn<Task, string>({
-      getKey: (t) => t.id,
-      queryFn: () => fetch(\`/api/tasks?projectId=\${projectId}\`).then(r => r.json()),
-      channel: ['tasks', { projectId }],
-      publish: (ch, data) => {
-        nodeServer.publish(typeof ch === 'string' ? ch : serializeKey(ch), data)
-        return Promise.resolve()
-      },
-      onInsert: insertTask,  // TanStack Start server function
-      onUpdate: updateTask,
-      onDelete: deleteTask,
-    }),
-    client: realtimeClient,
-    channel: ['tasks', { projectId }],
-    // serverPublish: true is included by withServerFn — client never publishes
+export const insertTask = createServerFn({ method: 'POST' })
+  .validator(taskSchema)
+  .handler(async ({ data }) => {
+    const task = await db.tasks.create({ data: { ...data, createdBy: ctx.userId } })
+    // publish is server-side — nodeServer cannot be imported by clients
+    nodeServer.publish(
+      serializeKey(['tasks', { projectId: task.projectId }]),
+      { action: 'insert', data: task },
+    )
+    return task
   })`}
       />
-      <p>
-        If you cannot use <code>withServerFn</code>, you can still achieve
-        server authority manually by setting <code>serverPublish: true</code>{' '}
-        and publishing from your API handler:
-      </p>
       <CodeBlock
-        title="Manual — REST API with serverPublish: true"
-        code={`// server/routes/tasks.ts
-router.post('/api/tasks', async (req, res) => {
-  const user = await authenticate(req)
-  const parsed = taskSchema.safeParse(req.body)
-  if (!parsed.success) return res.status(400).json(parsed.error)
+        title="app/collections/tasks.ts — client or isomorphic"
+        code={`import { withServerFn, realtimeCollectionOptions } from '@tanstack/realtime'
+import { insertTask, updateTask, deleteTask } from '../functions/tasks'
 
-  const task = await db.tasks.create({ data: { ...parsed.data, createdBy: user.id } })
-
-  // Only trusted server code publishes to the channel
-  nodeServer.publish(
-    serializeKey(['tasks', { projectId: task.projectId }]),
-    { action: 'insert', data: task },
-  )
-  res.json(task)
-})
-
-// collection config
 realtimeCollectionOptions({
-  // ...
-  serverPublish: true, // suppress client-side auto-publish
+  ...withServerFn({
+    getKey: (t: Task) => t.id,
+    queryFn: () => fetch('/api/tasks').then(r => r.json()),
+    onInsert: (data) => insertTask({ data }),
+    onUpdate: (data) => updateTask({ data }),
+    onDelete: (data) => deleteTask({ data }),
+    // serverPublish: true is set automatically — skips the rejected round-trip
+  }),
+  client: realtimeClient,
+  channel: ['tasks', { projectId }],
 })`}
+      />
+      <CodeBlock
+        title="server/realtime.ts — deny client publish on persisted channels"
+        code={`authorize: async (user, channel) => {
+  const [name] = channel
+  // Clients can subscribe but never publish to persisted data channels.
+  // publish: false is the enforcement boundary — withServerFn / serverPublish
+  // are optimizations that avoid the rejected round-trip.
+  if (name === 'tasks' || name === 'messages') {
+    return { subscribe: true, publish: false, presence: true }
+  }
+  // Ephemeral signals may publish directly — low latency, non-persisted
+  if (name === 'cursors' || name === 'typing') {
+    return { subscribe: true, publish: true, presence: false }
+  }
+  return { subscribe: false, publish: false, presence: false }
+}`}
       />
 
       <h2 id="client-publish-caveats">When client-side publish is acceptable</h2>

@@ -14,71 +14,89 @@ export function Collections() {
         withServerFn &mdash; server authority (recommended)
       </h2>
       <p>
-        Spread <code>withServerFn</code> into{' '}
-        <code>realtimeCollectionOptions</code> to wire TanStack Start server
-        functions as your mutation callbacks. Each server function validates,
-        persists, <strong>and publishes</strong> &mdash; the client never touches
-        the channel for writes. <code>serverPublish: true</code> is included
-        automatically.
+        <code>withServerFn</code> is a thin adapter that maps plain async
+        functions to TanStack DB&rsquo;s mutation callback signature and sets{' '}
+        <code>serverPublish: true</code> automatically. The server function
+        itself is responsible for calling <code>nodeServer.publish()</code>{' '}
+        &mdash; <code>withServerFn</code> does not call publish and has no
+        opinion about your server framework.
+      </p>
+      <p>
+        This works with TanStack Start <code>createServerFn</code>, tRPC
+        mutations, Hono route handlers called via fetch, or any plain async
+        function. The library does not import <code>@tanstack/start</code>.
       </p>
       <CodeBlock
-        title="app/functions/tasks.ts — server functions"
+        title="app/functions/tasks.ts — server-only, can import nodeServer"
         code={`import { createServerFn } from '@tanstack/start'
+import { nodeServer } from '../server/realtime'
+import { serializeKey } from '@tanstack/realtime'
 
 export const insertTask = createServerFn({ method: 'POST' })
   .validator(taskSchema)
   .handler(async ({ data }) => {
-    return db.tasks.create({ data: { ...data, createdBy: ctx.userId } })
+    const task = await db.tasks.create({ data: { ...data, createdBy: ctx.userId } })
+    // publish happens here, server-side — nodeServer is a server-only module
+    nodeServer.publish(
+      serializeKey(['tasks', { projectId: task.projectId }]),
+      { action: 'insert', data: task },
+    )
+    return task // returned so TanStack DB can reconcile optimistic state
   })
 
 export const updateTask = createServerFn({ method: 'POST' })
   .validator(taskSchema.partial())
   .handler(async ({ data }) => {
-    return db.tasks.update({ where: { id: data.id }, data })
+    const task = await db.tasks.update({ where: { id: data.id }, data })
+    nodeServer.publish(
+      serializeKey(['tasks', { projectId: task.projectId }]),
+      { action: 'update', data: task },
+    )
+    return task
   })
 
 export const deleteTask = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
-    return db.tasks.delete({ where: { id: (data as Task).id } })
+    const task = await db.tasks.delete({ where: { id: (data as Task).id } })
+    nodeServer.publish(
+      serializeKey(['tasks', { projectId: task.projectId }]),
+      { action: 'delete', data: task },
+    )
+    return task
   })`}
       />
       <CodeBlock
-        title="app/collections/tasks.ts — wire it up"
-        code={`import { withServerFn, realtimeCollectionOptions, serializeKey } from '@tanstack/realtime'
+        title="app/collections/tasks.ts — client or isomorphic"
+        code={`import { withServerFn, realtimeCollectionOptions } from '@tanstack/realtime'
 import { insertTask, updateTask, deleteTask } from '../functions/tasks'
-import { nodeServer } from '../server/realtime'
 
+// withServerFn adapts (data) => Promise<T> to TanStack DB's callback shape
+// and sets serverPublish: true so the library does not also call client.publish()
 const tasksOptions = (projectId: string) =>
   realtimeCollectionOptions({
     ...withServerFn<Task, string>({
       getKey: (t) => t.id,
       queryFn: () => fetch(\`/api/tasks?projectId=\${projectId}\`).then((r) => r.json()),
-      channel: ['tasks', { projectId }],
-      publish: (ch, data) => {
-        nodeServer.publish(typeof ch === 'string' ? ch : serializeKey(ch), data)
-        return Promise.resolve()
-      },
-      onInsert: insertTask,
-      onUpdate: updateTask,
-      onDelete: deleteTask,
+      onInsert: (data) => insertTask({ data }),
+      onUpdate: (data) => updateTask({ data }),
+      onDelete: (data) => deleteTask({ data }),
     }),
     client: realtimeClient,
     channel: ['tasks', { projectId }],
-    // serverPublish: true is already set by withServerFn
     fields: { title: 'lww', status: 'lww', assignees: 'or-set' },
   })`}
       />
       <div className="doc-callout">
         <p>
-          <strong>Why server authority matters:</strong> With{' '}
-          <code>withRest</code>, the client publishes the mutation result to the
-          channel <em>after</em> the REST call returns. A tampered client could
-          modify the payload before it reaches other subscribers.{' '}
-          <code>withServerFn</code> avoids this &mdash; the server function is
-          the only code that calls <code>publish</code>, and{' '}
-          <code>serverPublish: true</code> suppresses the client&rsquo;s
-          automatic publish. See <a href="#/docs/security">Security</a> for the
-          full trade-off analysis.
+          <strong>Why this is secure:</strong> The real security boundary is
+          the server&rsquo;s{' '}
+          <code>{'authorize: { publish: false }'}</code> setting &mdash; if a
+          channel denies client publishes at the transport level, no tampered
+          client can broadcast to it regardless of collection config.{' '}
+          <code>serverPublish: true</code> (set automatically by{' '}
+          <code>withServerFn</code>) is an optimization that avoids the
+          unnecessary rejected round-trip. See{' '}
+          <a href="#/docs/security">Security</a> for the full picture.
         </p>
       </div>
 

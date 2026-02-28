@@ -1,164 +1,139 @@
-import { serializeKey } from './serializeKey.js'
 import type {
   DeleteMutationFn,
   InsertMutationFn,
   UpdateMutationFn,
 } from '@tanstack/db'
-import type { QueryKey } from './types.js'
-import type { PublishFn } from '../server/index.js'
-
-// ---------------------------------------------------------------------------
-// Public types
-// ---------------------------------------------------------------------------
-
-/**
- * A TanStack Start server function (or any async function that runs on the
- * server). The library does not import `@tanstack/start` — any function
- * matching this shape works.
- */
-export type ServerMutationFn<T> = (args: { data: unknown }) => Promise<T>
-
-export interface WithServerFnOptions<
-  T extends object,
-  TKey extends string | number,
-> {
-  /** Extract the primary key from a row. */
-  getKey: (item: T) => TKey
-
-  /**
-   * Fetch initial data. Runs on the client, exactly like `withRest`'s queryFn.
-   *
-   * You can also supply a TanStack Start server function here — all that
-   * matters is that it returns `Promise<T[]>`.
-   */
-  queryFn: () => Promise<Array<T>>
-
-  /**
-   * The channel this collection publishes to. Must match the channel passed
-   * to `realtimeCollectionOptions` so the server publishes to the same key.
-   */
-  channel: QueryKey | string
-
-  /**
-   * Server-side publish function from your preset.
-   *
-   * @example
-   * import { nodeServer } from './realtime.server'
-   * publish: (ch, data) => { nodeServer.publish(ch, data); return Promise.resolve() }
-   */
-  publish: PublishFn
-
-  /**
-   * Server function called for inserts. Receives the row data, should
-   * validate, persist, and return the saved row. The library will call
-   * `publish` with the result automatically.
-   */
-  onInsert: ServerMutationFn<T>
-
-  /**
-   * Server function called for updates. Receives the row data, should
-   * validate, persist, and return the updated row.
-   */
-  onUpdate: ServerMutationFn<T>
-
-  /**
-   * Server function called for deletes. Receives the row data, should
-   * delete the record and return the deleted row (for broadcast).
-   */
-  onDelete?: ServerMutationFn<T>
-}
 
 // ---------------------------------------------------------------------------
 // withServerFn
 // ---------------------------------------------------------------------------
 
 /**
- * Generate `{ getKey, queryFn, onInsert, onUpdate, onDelete, serverPublish }`
- * that wire TanStack Start server functions (or any async server-side
- * handlers) to `realtimeCollectionOptions`.
+ * Adapts plain async server functions to the TanStack DB mutation callback
+ * signature, and sets `serverPublish: true` so the library does not also
+ * call `client.publish()` after each mutation.
  *
- * Each mutation is validated and persisted by the server function, then
- * the result is published to the channel server-side — the client never
- * touches the channel for writes.
+ * The server function is responsible for calling `nodeServer.publish()` itself.
+ * `withServerFn` does **not** call publish — it cannot, because `nodeServer` is
+ * a server-only module that cannot be imported in client code.
  *
- * Spread the result into `realtimeCollectionOptions`:
+ * ## Correct usage
  *
  * ```ts
+ * // app/functions/tasks.ts  — server-only, can import nodeServer
+ * import { createServerFn } from '@tanstack/start'
+ * import { nodeServer } from '../server/realtime'
+ * import { serializeKey } from '@tanstack/realtime'
+ *
+ * export const insertTask = createServerFn({ method: 'POST' })
+ *   .validator(taskSchema)
+ *   .handler(async ({ data }) => {
+ *     const task = await db.tasks.create({ data: { ...data, createdBy: ctx.userId } })
+ *     // publish happens server-side, inside the server function
+ *     nodeServer.publish(
+ *       serializeKey(['tasks', { projectId: task.projectId }]),
+ *       { action: 'insert', data: task },
+ *     )
+ *     return task
+ *   })
+ *
+ * // app/collections/tasks.ts  — client or isomorphic
  * import { withServerFn, realtimeCollectionOptions } from '@tanstack/realtime'
- * import { insertTask, updateTask, deleteTask } from './functions/tasks'
- * import { nodeServer } from './server/realtime'
+ * import { insertTask, updateTask, deleteTask } from '../functions/tasks'
  *
  * const tasksOptions = (projectId: string) =>
  *   realtimeCollectionOptions({
- *     ...withServerFn<Task, string>({
- *       getKey: (t) => t.id,
- *       queryFn: () => fetch('/api/tasks').then((r) => r.json()),
- *       channel: ['tasks', { projectId }],
- *       publish: (ch, data) => {
- *         nodeServer.publish(
- *           typeof ch === 'string' ? ch : serializeKey(ch),
- *           data,
- *         )
- *         return Promise.resolve()
- *       },
- *       onInsert: insertTask,
- *       onUpdate: updateTask,
- *       onDelete: deleteTask,
+ *     ...withServerFn({
+ *       getKey: (t: Task) => t.id,
+ *       queryFn: () => fetch(`/api/tasks?projectId=${projectId}`).then(r => r.json()),
+ *       onInsert: (data) => insertTask({ data }),
+ *       onUpdate: (data) => updateTask({ data }),
+ *       onDelete: (data) => deleteTask({ data }),
  *     }),
  *     client: realtimeClient,
  *     channel: ['tasks', { projectId }],
+ *     // serverPublish: true is set automatically by withServerFn
  *   })
  * ```
  *
- * **Key difference from `withRest`**: `withRest` publishes from the client
- * after the REST call succeeds. `withServerFn` publishes from the server
- * inside the mutation, and sets `serverPublish: true` so the client's
- * auto-publish is suppressed.
+ * ## What it does
+ *
+ * - Adapts `(data: T) => Promise<T>` to TanStack DB's
+ *   `({ transaction }) => Promise<T>` callback shape.
+ * - Sets `serverPublish: true` to suppress the library's automatic
+ *   `client.publish()` call (the server function already published).
+ *
+ * ## Security
+ *
+ * The primary security boundary is the server's `authorize` callback:
+ * set `publish: false` for channels whose data is persisted. Even without
+ * `serverPublish: true`, a client cannot broadcast to a channel that denies
+ * publish access. `serverPublish: true` is an optimization — it avoids an
+ * unnecessary rejected round-trip.
+ *
+ * ## Framework agnostic
+ *
+ * Any plain async function works: TanStack Start `createServerFn`, an HTTP
+ * fetch to your own API, a tRPC mutation, a Hono route handler, etc. The
+ * library does not import `@tanstack/start`.
  */
-export function withServerFn<T extends object, TKey extends string | number>(
-  options: WithServerFnOptions<T, TKey>,
-): {
+export function withServerFn<T extends object, TKey extends string | number>(options: {
+  /** Extract the primary key from a row. */
+  getKey: (item: T) => TKey
+
+  /**
+   * Fetch initial data. Any async function returning `T[]` — a server
+   * function, a plain fetch, etc.
+   */
+  queryFn: () => Promise<Array<T>>
+
+  /**
+   * Called on insert. Should validate, persist, publish (via nodeServer),
+   * and return the saved row.
+   */
+  onInsert?: (data: T) => Promise<T | null | undefined>
+
+  /**
+   * Called on update. Should validate, persist, publish (via nodeServer),
+   * and return the updated row.
+   */
+  onUpdate?: (data: T) => Promise<T | null | undefined>
+
+  /**
+   * Called on delete. Should delete the record, publish (via nodeServer),
+   * and return the deleted row.
+   */
+  onDelete?: (data: T) => Promise<T | null | undefined>
+}): {
   getKey: (item: T) => TKey
   queryFn: () => Promise<Array<T>>
-  onInsert: InsertMutationFn<T, TKey>
-  onUpdate: UpdateMutationFn<T, TKey>
+  onInsert: InsertMutationFn<T, TKey> | undefined
+  onUpdate: UpdateMutationFn<T, TKey> | undefined
   onDelete: DeleteMutationFn<T, TKey> | undefined
   serverPublish: true
 } {
-  const { getKey, queryFn, channel, publish, onInsert, onUpdate, onDelete } =
-    options
-
-  const serializedChannel =
-    typeof channel === 'string' ? channel : serializeKey(channel)
+  const { getKey, queryFn, onInsert, onUpdate, onDelete } = options
 
   return {
     getKey,
     queryFn,
-
-    // The library signals that the server handles the publish.
     serverPublish: true as const,
 
-    onInsert: async ({ transaction }) => {
-      const data = transaction.mutations[0].modified
-      const result = await onInsert({ data })
-      // Server function returned the persisted row — now broadcast it.
-      await publish(serializedChannel, { action: 'insert', data: result })
-      return result
-    },
+    onInsert: onInsert
+      ? async ({ transaction }) => {
+          return onInsert(transaction.mutations[0].modified as T)
+        }
+      : undefined,
 
-    onUpdate: async ({ transaction }) => {
-      const data = transaction.mutations[0].modified
-      const result = await onUpdate({ data })
-      await publish(serializedChannel, { action: 'update', data: result })
-      return result
-    },
+    onUpdate: onUpdate
+      ? async ({ transaction }) => {
+          return onUpdate(transaction.mutations[0].modified as T)
+        }
+      : undefined,
 
     onDelete: onDelete
       ? async ({ transaction }) => {
-          const data = transaction.mutations[0].modified
-          const result = await onDelete({ data })
-          await publish(serializedChannel, { action: 'delete', data: result })
-          return result
+          return onDelete(transaction.mutations[0].modified as T)
         }
       : undefined,
   }
