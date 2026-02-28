@@ -11,6 +11,7 @@ import { Streaming } from './pages/docs/Streaming'
 import { Transports } from './pages/docs/Transports'
 import { Resilience } from './pages/docs/Resilience'
 import { Hooks } from './pages/docs/Hooks'
+import { ServerFunctions } from './pages/docs/ServerFunctions'
 
 // ---------------------------------------------------------------------------
 // Simple hash router
@@ -32,6 +33,7 @@ function useHash() {
 const docRoutes: Partial<Record<string, () => React.JSX.Element>> = {
   '#/docs/getting-started': GettingStarted,
   '#/docs/collections': Collections,
+  '#/docs/server-functions': ServerFunctions,
   '#/docs/crdts': CRDTs,
   '#/docs/presence': Presence,
   '#/docs/channels': Channels,
