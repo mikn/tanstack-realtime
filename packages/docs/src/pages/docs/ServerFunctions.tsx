@@ -53,7 +53,7 @@ export const realtime = createStartHandler({
   },
   authorize: async (userId, channel) => ({
     subscribe: !!userId,
-    publish: false,   // clients never publish directly
+    publish: !!userId,  // clients publish mutation results back to the channel
     presence: true,
   }),
 })`}
@@ -205,42 +205,36 @@ export const todosOptions = (projectId: string) =>
 
       <h2 id="component">6. Component</h2>
       <p>
-        Read the collection with <code>useCollection</code>. Mutations go
-        through the standard TanStack DB mutation API — the server function
-        handles persistence and the broadcast propagates the result to every
-        subscriber.
+        Read the collection with <code>useCollection</code>. Trigger writes by
+        calling <code>collection.insert()</code>,{' '}
+        <code>collection.update()</code>, or <code>collection.delete()</code>{' '}
+        directly — TanStack DB creates a transaction, calls the{' '}
+        <code>onInsert</code> / <code>onUpdate</code> / <code>onDelete</code>{' '}
+        callback wired by <code>withServerFns</code>, and the auto-broadcast
+        propagates the confirmed row to every subscriber.
       </p>
       <CodeBlock
         title="app/features/todos/TodoList.tsx"
-        code={`import { useCollection, useMutation } from '@tanstack/react-db'
+        code={`import { useCollection } from '@tanstack/react-db'
 import { todosOptions } from './collection'
-import { createTodo } from '../../server/todos'
 
 export function TodoList({ projectId }: { projectId: string }) {
-  const options = todosOptions(projectId)
-  const todos   = useCollection(options)
+  const options    = todosOptions(projectId)
+  const todos      = useCollection(options)
+  const collection = options.collection   // the underlying TanStack DB collection
 
-  const { mutate: addTodo } = useMutation({
-    collection:  options,
-    mutationFn: ({ transaction }) =>
-      createTodo({ data: transaction.mutations[0].modified }),
-  })
+  const addTodo = () =>
+    collection.insert({
+      id:        crypto.randomUUID(),
+      projectId,
+      title:     'New todo',
+      done:      false,
+      createdAt: new Date(),
+    })
 
   return (
     <>
-      <button
-        onClick={() =>
-          addTodo({
-            id:        crypto.randomUUID(),
-            projectId,
-            title:     'New todo',
-            done:      false,
-            createdAt: new Date(),
-          })
-        }
-      >
-        Add todo
-      </button>
+      <button onClick={addTodo}>Add todo</button>
       <ul>
         {todos.map((todo) => (
           <li key={todo.id}>{todo.title}</li>
@@ -256,15 +250,17 @@ export function TodoList({ projectId }: { projectId: string }) {
       <div className="doc-callout">
         <p>
           When <code>onInsert</code> or <code>onUpdate</code> returns a value,{' '}
-          <code>realtimeCollectionOptions</code> automatically publishes{' '}
-          <code>{'{ action: "insert" | "update", data: <row> }'}</code> to the
-          channel. All subscribers — including other browser tabs and other
-          users — receive the Drizzle-confirmed row.
+          <code>realtimeCollectionOptions</code> calls{' '}
+          <code>client.publish()</code> with the result — the originating
+          browser tab sends the Drizzle-confirmed row to the channel. All
+          subscribers receive it and update their local state. This is why{' '}
+          <code>authorize.publish</code> must be <code>true</code> for
+          authenticated users.
         </p>
         <p>
-          <code>onDelete</code> is fire-and-forget; the library publishes a{' '}
-          <code>delete</code> action with the optimistic row so subscribers can
-          remove it from their local state.
+          <code>onDelete</code> follows the same path; the originating client
+          publishes a <code>delete</code> action so all subscribers remove the
+          row from their local state.
         </p>
       </div>
 
