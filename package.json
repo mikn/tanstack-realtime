@@ -20,7 +20,8 @@
     "changeset": "changeset",
     "version": "changeset version",
     "release": "pnpm build && changeset publish",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:playwright": "pnpm --filter @tanstack/realtime-e2e test"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.4",

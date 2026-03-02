@@ -138,6 +138,51 @@ importers:
         specifier: ^7.3.1
         version: 7.3.1(@types/node@22.19.12)(jiti@2.6.1)(yaml@2.8.2)
 
+  packages/e2e:
+    devDependencies:
+      '@playwright/test':
+        specifier: ^1.58.2
+        version: 1.58.2
+      '@tanstack/react-realtime':
+        specifier: workspace:*
+        version: link:../react-realtime
+      '@tanstack/react-store':
+        specifier: ^0.9.1
+        version: 0.9.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@tanstack/realtime':
+        specifier: workspace:*
+        version: link:../realtime
+      '@tanstack/realtime-adapter-centrifugo':
+        specifier: workspace:*
+        version: link:../realtime-adapter-centrifugo
+      '@tanstack/store':
+        specifier: ^0.9.1
+        version: 0.9.1
+      '@types/node':
+        specifier: ^22.10.10
+        version: 22.19.12
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.14)
+      '@vitejs/plugin-react':
+        specifier: ^5.1.4
+        version: 5.1.4(vite@7.3.1(@types/node@22.19.12)(jiti@2.6.1)(yaml@2.8.2))
+      react:
+        specifier: ^19.2.4
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.2.4
+        version: 19.2.4(react@19.2.4)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite:
+        specifier: ^7.3.1
+        version: 7.3.1(@types/node@22.19.12)(jiti@2.6.1)(yaml@2.8.2)
+
   packages/react-realtime:
     dependencies:
       '@tanstack/db':
