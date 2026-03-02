@@ -51,7 +51,7 @@ function SyncStatus() {
       <CodeBlock
         code={`// Option A — collection level (queryFn required)
 const tasksOptions = realtimeCollectionOptions({
-  ...withRest({ url: '/api/tasks', getKey: (t) => t.id }),
+  ...withServerFns({ query: () => fetchTasks({ data: { projectId } }), insert: createTask, update: updateTask, delete: deleteTask }),
   channel: ['tasks', { projectId }],
   refetchOnReconnect: true,
 })

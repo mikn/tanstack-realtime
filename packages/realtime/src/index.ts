@@ -141,12 +141,11 @@ export type {
   TickTransport,
 } from './core/tickTransport.js'
 
-// REST/DB composition helpers
-export { withRest } from './core/withRest.js'
-export type { WithRestOptions } from './core/withRest.js'
-
+// DB composition helpers
 export { withServerFns } from './core/withServerFns.js'
 export type { WithServerFnsOptions } from './core/withServerFns.js'
+
+export { ConflictError, isConflictError } from './core/conflictError.js'
 
 // Core utilities
 export { createDedup } from './core/dedup.js'
