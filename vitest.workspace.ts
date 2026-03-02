@@ -30,6 +30,10 @@ const sourceAliases = [
     find: /^@tanstack\/realtime-adapter-sse$/,
     replacement: resolve(root, 'packages/realtime-adapter-sse/src/index.ts'),
   },
+  {
+    find: /^@tanstack\/realtime-preset-start$/,
+    replacement: resolve(root, 'packages/realtime-preset-start/src/index.ts'),
+  },
 ]
 
 export default defineWorkspace([
@@ -70,6 +74,7 @@ export default defineWorkspace([
         'packages/__tests__/streamResilience.test.ts',
         'packages/__tests__/tickTransport.test.ts',
         'packages/__tests__/coreInvariants.test.ts',
+        'packages/__tests__/startPreset.test.ts',
       ],
       pool: 'forks',
       poolOptions: { forks: { singleFork: true } },

@@ -175,13 +175,14 @@ function QuickStart() {
 
           <div className="qs-step">
             <div className="qs-number">2</div>
-            <h3>Create client and wrap your app</h3>
+            <h3>Create a client</h3>
             <CodeBlock
-              code={`import { createRealtimeClient, wsTransport } from '@tanstack/realtime'
+              code={`import { createRealtimeClient } from '@tanstack/realtime'
+import { sseTransport } from '@tanstack/realtime-adapter-sse'
 import { RealtimeProvider } from '@tanstack/react-realtime'
 
 const client = createRealtimeClient({
-  transport: wsTransport({ url: 'ws://localhost:3001' }),
+  transport: sseTransport({ url: '/api/realtime' }),
 })
 
 function App() {
@@ -196,7 +197,7 @@ function App() {
 
           <div className="qs-step">
             <div className="qs-number">3</div>
-            <h3>Define a live collection and use it</h3>
+            <h3>Add a channel to any collection</h3>
             <CodeBlock
               code={`import { realtimeCollectionOptions, withRest } from '@tanstack/realtime'
 import { useCollection } from '@tanstack/react-db'
@@ -252,8 +253,8 @@ function Ecosystem() {
           <div className="eco-card">
             <h3>TanStack Start</h3>
             <p>
-              Server functions provide the queryFn. WebSocket transport handles
-              the rest.
+              Deep integration via <code>withServerFns</code>: server functions
+              become collection callbacks with full type safety end-to-end.
             </p>
           </div>
         </div>

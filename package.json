@@ -30,6 +30,7 @@
     "@tanstack/realtime": "workspace:*",
     "@tanstack/react-realtime": "workspace:*",
     "@tanstack/realtime-preset-node": "workspace:*",
+    "@tanstack/realtime-preset-start": "workspace:*",
     "@tanstack/realtime-adapter-centrifugo": "workspace:*",
     "@tanstack/realtime-adapter-sse": "workspace:*",
     "@tanstack/eslint-config": "^0.4.0",

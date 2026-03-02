@@ -46,6 +46,9 @@ importers:
       '@tanstack/realtime-preset-node':
         specifier: workspace:*
         version: link:packages/realtime-preset-node
+      '@tanstack/realtime-preset-start':
+        specifier: workspace:*
+        version: link:packages/realtime-preset-start
       '@tanstack/store':
         specifier: ^0.9.1
         version: 0.9.1
@@ -192,6 +195,15 @@ importers:
       ws:
         specifier: '*'
         version: 8.19.0
+
+  packages/realtime-preset-start:
+    dependencies:
+      '@tanstack/realtime':
+        specifier: workspace:*
+        version: link:../realtime
+      '@tanstack/realtime-adapter-sse':
+        specifier: workspace:*
+        version: link:../realtime-adapter-sse
 
 packages:
   '@babel/code-frame@7.29.0':

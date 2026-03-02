@@ -78,7 +78,7 @@ function driveSync(config: CollectionConfig<any, any, any, any>): {
 }
 
 // ---------------------------------------------------------------------------
-// 1. withRest — the 80% case (docs: DatabaseIntegration use case 01)
+// 1. withRest — bring your own backend (docs: Collections "withRest" section)
 // ---------------------------------------------------------------------------
 
 describe('docs: withRest helper', () => {

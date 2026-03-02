@@ -1,0 +1,29 @@
+{
+  "name": "@tanstack/realtime-preset-start",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "TanStack Start / TanStack Router preset for @tanstack/realtime — transport-agnostic server-side publishing",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup"
+  },
+  "dependencies": {
+    "@tanstack/realtime": "workspace:*",
+    "@tanstack/realtime-adapter-sse": "workspace:*"
+  }
+}

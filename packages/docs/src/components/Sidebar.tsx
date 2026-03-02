@@ -7,6 +7,12 @@ const sections = [
     ],
   },
   {
+    title: 'Guides',
+    items: [
+      { label: 'TanStack Start + Drizzle', hash: '#/docs/server-functions' },
+    ],
+  },
+  {
     title: 'Features',
     items: [
       { label: 'CRDTs', hash: '#/docs/crdts' },

@@ -10,12 +10,13 @@ export function Collections() {
         mutations through a channel, and resolve conflicts with CRDTs.
       </p>
 
-      <h2 id="with-rest">withRest &mdash; the 80% case</h2>
+      <h2 id="with-rest">withRest &mdash; bring your own backend</h2>
       <p>
         Spread <code>withRest</code> into <code>realtimeCollectionOptions</code>{' '}
         to wire <code>getKey</code>, <code>queryFn</code>, <code>onInsert</code>
         , <code>onUpdate</code>, and <code>onDelete</code> to standard REST/JSON
-        endpoints in one call. Your server routes are plain CRUD.
+        endpoints in one call. Your server routes stay as plain CRUD — no
+        changes required.
       </p>
       <CodeBlock
         title="features/tasks/collection.ts"
@@ -27,9 +28,9 @@ const tasksOptions = (projectId: string) =>
       url: \`/api/tasks?projectId=\${projectId}\`,
       getKey: (t) => t.id,
     }),
-    client: realtimeClient,
+    client:  realtimeClient,
     channel: ['tasks', { projectId }],
-    fields: { title: 'lww', status: 'lww', assignees: 'or-set' },
+    fields:  { title: 'lww', status: 'lww', assignees: 'or-set' },
   })`}
       />
       <CodeBlock
@@ -52,16 +53,17 @@ router.delete('/api/tasks/:id', async (req) => {
       <h2 id="custom-callbacks">Custom callbacks</h2>
       <p>
         Write <code>onInsert</code> / <code>onUpdate</code> manually when you
-        need custom logic. Return the saved row and the library handles the
-        broadcast.
+        need custom logic — multi-table writes, conditional branching, or
+        returning a shaped response. Return the saved row and the library
+        handles the broadcast.
       </p>
       <CodeBlock
         title="features/chat/collection.ts"
         code={`const messagesOptions = (roomId: string) =>
   realtimeCollectionOptions({
-    client: realtimeClient,
+    client:  realtimeClient,
     channel: ['messages', { roomId }],
-    getKey: (m) => m.id,
+    getKey:  (m) => m.id,
 
     queryFn: () =>
       fetch(\`/api/rooms/\${roomId}/messages?limit=50\`)
@@ -74,7 +76,7 @@ router.delete('/api/tasks/:id', async (req) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       })
-      return res.json() // broadcast happens automatically
+      return res.json() // returning the saved row triggers auto-broadcast
     },
   })`}
       />
@@ -107,9 +109,21 @@ export async function syncInventory(productId: string) {
       <div className="doc-callout">
         <p>
           After <code>onInsert</code> or <code>onUpdate</code> returns a value,
-          the library automatically publishes it to the channel. You only call{' '}
-          <code>nodeServer.publish()</code> directly for changes that originate
-          outside a client mutation.
+          the originating tab calls <code>client.publish()</code> automatically.
+          You only call <code>nodeServer.publish()</code> directly for changes
+          that originate outside a client mutation.
+        </p>
+      </div>
+
+      <h2 id="full-stack">Full-stack with TanStack Start</h2>
+      <div className="doc-callout">
+        <p>
+          Using TanStack Start? <code>withServerFns</code> wires{' '}
+          <code>createServerFn</code> callables directly into collection
+          callbacks — no REST layer, full type safety from DB schema to UI, and
+          built-in support for optimistic locking with{' '}
+          <code>ConflictError</code>. See the{' '}
+          <a href="#/docs/server-functions">TanStack Start + Drizzle</a> guide.
         </p>
       </div>
 
@@ -117,14 +131,22 @@ export async function syncInventory(productId: string) {
       <p>
         Enable <code>optimistic: true</code> to add a nonce to each mutation.
         The echo from the server is suppressed so there are no duplicate
-        flashes.
+        flashes. Use <code>onOptimisticError</code> to handle failures —
+        including conflicts detected by the server.
       </p>
       <CodeBlock
-        code={`realtimeCollectionOptions({
+        code={`import { isConflictError } from '@tanstack/realtime'
+
+realtimeCollectionOptions({
   // ...
   optimistic: true,
-  onOptimisticError: (error, nonce) => {
-    console.error('Mutation failed, nonce cleaned up:', nonce)
+  onOptimisticError: ({ error, action, key }) => {
+    if (isConflictError(error)) {
+      // error.current holds the authoritative server state
+      showConflictDialog({ current: error.current, attempted: action.modified })
+    } else {
+      console.error('Mutation failed for key', key, error)
+    }
   },
 })`}
       />

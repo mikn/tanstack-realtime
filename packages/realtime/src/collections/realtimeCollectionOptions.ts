@@ -193,6 +193,47 @@ export interface RealtimeCollectionConfig<
   optimistic?: boolean
 
   /**
+   * When `true`, the client subscribes to the channel but never publishes
+   * back after mutations. Use this when server functions are the exclusive
+   * publishers — i.e. your `onInsert` / `onUpdate` / `onDelete` callbacks
+   * call a `createServerFn` that performs the DB write and then calls
+   * `realtimePublish(channel, { action, data })`.
+   *
+   * In this mode the channel is consume-only for the client. Echo suppression
+   * via nonces is not used — the server broadcast is the authoritative
+   * confirmation of every mutation and will overwrite any optimistic state
+   * with the server's ground truth.
+   *
+   * ```ts
+   * // Server function (the only publisher)
+   * export const updateTodo = createServerFn({ method: 'POST' })
+   *   .handler(async ({ data }) => {
+   *     const updated = await db.todos.update(data.id, data)
+   *     await realtimePublish(['todos', { projectId: data.projectId }], {
+   *       action: 'update',
+   *       data: updated,
+   *     })
+   *     return updated
+   *   })
+   *
+   * // Client collection (consume-only)
+   * realtimeCollectionOptions({
+   *   client,
+   *   channel: ['todos', { projectId }],
+   *   serverAuthoritative: true,
+   *   optimistic: true,
+   *   getKey: (t) => t.id,
+   *   queryFn: () => fetchTodos(projectId),
+   *   onUpdate: async ({ transaction }) =>
+   *     updateTodo({ data: transaction.mutations[0].modified }),
+   * })
+   * ```
+   *
+   * @default false
+   */
+  serverAuthoritative?: boolean
+
+  /**
    * Called when an optimistic mutation fails (the `onInsert`/`onUpdate`/
    * `onDelete` callback throws). Useful for showing toast notifications.
    *
@@ -449,6 +490,7 @@ function buildCrdtFields<T extends object>(
  * | `queryFn`                       | Server-only data loading             |
  * | `+ onInsert/Update/Delete`      | Server-persisted mutations            |
  * | `+ client + channel`            | Realtime peer sync                   |
+ * | `+ serverAuthoritative`         | Server-only publishing (consume-only channel) |
  * | `+ fields`                      | Per-field CRDT convergence           |
  * | `+ refetchOnReconnect`          | Automatic gap recovery               |
  *
@@ -501,6 +543,7 @@ export function realtimeCollectionOptions<
     queryFn,
     refetchOnReconnect = false,
     optimistic = false,
+    serverAuthoritative = false,
     onOptimisticError,
     onInsert,
     onUpdate,
@@ -743,7 +786,8 @@ export function realtimeCollectionOptions<
 
   const wrappedOnInsert: InsertMutationFn<T, TKey> | undefined = onInsert
     ? async (params) => {
-        const nonce = optimistic ? generateNonce() : undefined
+        const nonce =
+          optimistic && !serverAuthoritative ? generateNonce() : undefined
         if (nonce) pendingNonces.add(nonce)
 
         let result: T | null | undefined
@@ -766,7 +810,7 @@ export function realtimeCollectionOptions<
           }
           syncedEntries.set(key, entry)
 
-          if (primaryChannel && client) {
+          if (!serverAuthoritative && primaryChannel && client) {
             try {
               await client.publish(
                 primaryChannel,
@@ -787,7 +831,8 @@ export function realtimeCollectionOptions<
 
   const wrappedOnUpdate: UpdateMutationFn<T, TKey> | undefined = onUpdate
     ? async (params) => {
-        const nonce = optimistic ? generateNonce() : undefined
+        const nonce =
+          optimistic && !serverAuthoritative ? generateNonce() : undefined
         if (nonce) pendingNonces.add(nonce)
 
         let result: T | null | undefined
@@ -810,7 +855,7 @@ export function realtimeCollectionOptions<
           }
           syncedEntries.set(key, entry)
 
-          if (primaryChannel && client) {
+          if (!serverAuthoritative && primaryChannel && client) {
             // buildPublishMessage calls buildCrdtFields which reads entry.row
             // as the previous state for delta computation. We must NOT update
             // entry.row until after the message is built.
@@ -831,7 +876,8 @@ export function realtimeCollectionOptions<
 
   const wrappedOnDelete: DeleteMutationFn<T, TKey> | undefined = onDelete
     ? async (params) => {
-        const nonce = optimistic ? generateNonce() : undefined
+        const nonce =
+          optimistic && !serverAuthoritative ? generateNonce() : undefined
         if (nonce) pendingNonces.add(nonce)
 
         let result: T | null | undefined
@@ -849,7 +895,7 @@ export function realtimeCollectionOptions<
         if (result != null) {
           syncedEntries.delete(getKey(result))
 
-          if (primaryChannel && client) {
+          if (!serverAuthoritative && primaryChannel && client) {
             try {
               await client.publish(
                 primaryChannel,
