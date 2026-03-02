@@ -5,8 +5,8 @@ export function Resilience() {
     <article className="doc-article">
       <h1>Resilience</h1>
       <p className="doc-lead">
-        Three transport wrappers that stack on top of any adapter. Use one, two,
-        or all three in any combination.
+        Transport wrappers that stack on top of any adapter &mdash; SSE,
+        Centrifugo, or custom. Use one, two, or all three in any combination.
       </p>
 
       <h2 id="offline-queue">Offline queue</h2>
@@ -19,12 +19,13 @@ export function Resilience() {
         code={`import {
   createOfflineQueue,
   createLocalStorageAdapter,
-  wsTransport,
+  createRealtimeClient,
 } from '@tanstack/realtime'
+import { sseTransport } from '@tanstack/realtime-adapter-sse'
 import { useStore } from '@tanstack/react-store'
 
 const transport = createOfflineQueue(
-  wsTransport({ url: 'wss://rt.example.com' }),
+  sseTransport({ url: '/api/realtime' }),
   {
     maxSize: 500,
     storage: createLocalStorageAdapter(),
@@ -57,10 +58,11 @@ const tasksOptions = realtimeCollectionOptions({
 })
 
 // Option B — transport level
-import { withGapRecovery, wsTransport } from '@tanstack/realtime'
+import { withGapRecovery } from '@tanstack/realtime'
+import { sseTransport } from '@tanstack/realtime-adapter-sse'
 
 const transport = withGapRecovery(
-  wsTransport({ url: 'wss://rt.example.com' }),
+  sseTransport({ url: '/api/realtime' }),
   {
     onGap: async (channel) => {
       await refetchCollection(channel)
@@ -71,7 +73,7 @@ const transport = withGapRecovery(
 
       <h2 id="multi-tab">Multi-tab coordination</h2>
       <p>
-        Six browser tabs, six WebSocket connections, six times the server cost.{' '}
+        Six browser tabs means six open connections.{' '}
         <code>createCoordinatedTransport</code> shares a single connection
         across all tabs automatically.
       </p>
@@ -82,10 +84,11 @@ const transport = withGapRecovery(
         it. Zero config.
       </p>
       <CodeBlock
-        code={`import { createCoordinatedTransport, wsTransport } from '@tanstack/realtime'
+        code={`import { createCoordinatedTransport } from '@tanstack/realtime'
+import { sseTransport } from '@tanstack/realtime-adapter-sse'
 
 const transport = createCoordinatedTransport({
-  transport: () => wsTransport({ url: 'wss://rt.example.com' }),
+  transport: () => sseTransport({ url: '/api/realtime' }),
 })`}
       />
 
@@ -96,10 +99,11 @@ const transport = createCoordinatedTransport({
       </p>
       <CodeBlock
         title="realtime.worker.ts"
-        code={`import { createSharedWorkerCoordinator, wsTransport } from '@tanstack/realtime'
+        code={`import { createSharedWorkerCoordinator } from '@tanstack/realtime'
+import { sseTransport } from '@tanstack/realtime-adapter-sse'
 
 const coordinator = createSharedWorkerCoordinator(
-  wsTransport({ url: 'wss://rt.example.com' }),
+  sseTransport({ url: '/api/realtime' }),
 )
 self.addEventListener('connect', (e) => {
   coordinator.connect(e.ports[0])
@@ -107,8 +111,11 @@ self.addEventListener('connect', (e) => {
       />
       <CodeBlock
         title="app code"
-        code={`const transport = createCoordinatedTransport({
-  transport: () => wsTransport({ url: 'wss://rt.example.com' }),
+        code={`import { createCoordinatedTransport } from '@tanstack/realtime'
+import { sseTransport } from '@tanstack/realtime-adapter-sse'
+
+const transport = createCoordinatedTransport({
+  transport: () => sseTransport({ url: '/api/realtime' }),
   workerUrl: new URL('./realtime.worker.ts', import.meta.url),
 })`}
       />

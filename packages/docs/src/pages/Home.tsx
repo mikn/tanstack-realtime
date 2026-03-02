@@ -177,11 +177,12 @@ function QuickStart() {
             <div className="qs-number">2</div>
             <h3>Create a client</h3>
             <CodeBlock
-              code={`import { createRealtimeClient, wsTransport } from '@tanstack/realtime'
+              code={`import { createRealtimeClient } from '@tanstack/realtime'
+import { sseTransport } from '@tanstack/realtime-adapter-sse'
 import { RealtimeProvider } from '@tanstack/react-realtime'
 
 const client = createRealtimeClient({
-  transport: wsTransport({ url: 'wss://rt.example.com' }),
+  transport: sseTransport({ url: '/api/realtime' }),
 })
 
 function App() {
