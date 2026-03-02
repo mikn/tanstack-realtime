@@ -18,15 +18,13 @@ function Hero() {
         <div className="hero-code">
           <CodeBlock
             code={`const todosOptions = realtimeCollectionOptions({
-  ...withServerFns({
-    query:  () => fetchTodos(),
-    insert: createTodo,
-    update: updateTodo,
-    delete: deleteTodo,
+  ...withRest({
+    url: '/api/todos',
+    getKey: (t) => t.id,
   }),
-  client:  realtimeClient,
+  client: realtimeClient,
   channel: ['todos'],
-  fields:  { title: 'lww', votes: 'pn-counter' },
+  fields: { title: 'lww', votes: 'pn-counter' },
 })`}
           />
         </div>
@@ -171,49 +169,41 @@ function QuickStart() {
             <div className="qs-number">1</div>
             <h3>Install</h3>
             <CodeBlock
-              code={`npm i @tanstack/realtime @tanstack/react-realtime @tanstack/realtime-preset-start @tanstack/realtime-adapter-sse`}
+              code={`npm i @tanstack/realtime @tanstack/react-realtime`}
             />
           </div>
 
           <div className="qs-step">
             <div className="qs-number">2</div>
-            <h3>Create server handler and client</h3>
+            <h3>Create a client</h3>
             <CodeBlock
-              code={`// app/server/realtime.ts
-import { createStartHandler } from '@tanstack/realtime-preset-start'
+              code={`import { createRealtimeClient, wsTransport } from '@tanstack/realtime'
+import { RealtimeProvider } from '@tanstack/react-realtime'
 
-export const realtime = createStartHandler({
-  getUser: async (req) => getSession(req).then((s) => s ? { userId: s.userId } : null),
-  authorize: async (userId) => ({ subscribe: !!userId, publish: !!userId, presence: true }),
+const client = createRealtimeClient({
+  transport: wsTransport({ url: 'wss://rt.example.com' }),
 })
-export const realtimePublish = realtime.publish
 
-// app/client/realtime.ts
-import { createRealtimeClient } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
-
-export const realtimeClient = createRealtimeClient({
-  transport: sseTransport({ url: '/api/realtime' }),
-})`}
+function App() {
+  return (
+    <RealtimeProvider client={client}>
+      <YourApp />
+    </RealtimeProvider>
+  )
+}`}
             />
           </div>
 
           <div className="qs-step">
             <div className="qs-number">3</div>
-            <h3>Define a live collection and use it</h3>
+            <h3>Add a channel to any collection</h3>
             <CodeBlock
-              code={`import { realtimeCollectionOptions, withServerFns } from '@tanstack/realtime'
+              code={`import { realtimeCollectionOptions, withRest } from '@tanstack/realtime'
 import { useCollection } from '@tanstack/react-db'
-import { fetchTodos, createTodo, updateTodo, deleteTodo } from '../server/todos'
 
 const todosOptions = realtimeCollectionOptions({
-  ...withServerFns({
-    query:  () => fetchTodos(),
-    insert: createTodo,
-    update: updateTodo,
-    delete: deleteTodo,
-  }),
-  client:  realtimeClient,
+  ...withRest({ url: '/api/todos', getKey: (t: Todo) => t.id }),
+  client,
   channel: ['todos'],
 })
 
@@ -262,8 +252,8 @@ function Ecosystem() {
           <div className="eco-card">
             <h3>TanStack Start</h3>
             <p>
-              Server functions wire directly into collections via{' '}
-              <code>withServerFns</code>. SSE transport included.
+              Deep integration via <code>withServerFns</code>: server functions
+              become collection callbacks with full type safety end-to-end.
             </p>
           </div>
         </div>
