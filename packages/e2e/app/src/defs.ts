@@ -24,11 +24,11 @@ export const roomPresence = createPresenceChannel({
 // Stream channel — useStream
 // ---------------------------------------------------------------------------
 
-export interface StreamState {
+interface StreamState {
   content: string
 }
 
-export interface StreamEvent {
+interface StreamEvent {
   type: 'token' | 'done' | 'error'
   token?: string
   message?: string

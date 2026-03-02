@@ -20,6 +20,9 @@
     "packages/__tests__": {
       "entry": ["**/*.test.ts"],
       "ignore": ["setup.ts", "workerd-test-worker.ts"]
+    },
+    "packages/e2e": {
+      "entry": ["app/src/main.tsx", "app/vite.config.ts", "tests/**/*.spec.ts"]
     }
   },
   "ignore": ["packages/docs/**", "packages/__tests__/workerd-test-worker.ts"]
