@@ -40,6 +40,7 @@ const sections = [
     title: 'Reference',
     items: [
       { label: 'React Hooks', hash: '#/docs/hooks' },
+      { label: 'API Reference', hash: '#/docs/api-reference' },
       { label: 'Error Reference', hash: '#/docs/error-reference' },
     ],
   },

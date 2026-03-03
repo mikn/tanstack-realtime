@@ -419,16 +419,23 @@ export function Ephemeral() {
       </p>
       <CodeBlock
         title="server/routes/reactions.ts"
-        code={`import { createValidatedPublish } from '@tanstack/realtime/server'
+        code={`import { createValidatedPublish } from '@tanstack/realtime'
+import { realtime } from './realtime.server'
 
 // Validate and re-broadcast incoming reaction events.
 // The payload is discarded after TTL ms — no database write needed.
 export const publishReaction = createValidatedPublish({
-  validate: (raw) => {
-    const e = raw as { type: string; emoji: string; userId: string }
-    if (e.type !== 'reaction') return null
-    if (!['👍','❤️','😂','🔥','🎉'].includes(e.emoji)) return null
-    return { type: 'reaction', emoji: e.emoji, userId: e.userId }
+  publish: realtime.publish,
+  validate: ({ data }) => {
+    const e = data as { type: string; emoji: string; userId: string }
+    if (e.type !== 'reaction') return { accepted: false, reason: 'Not a reaction' }
+    if (!['👍','❤️','😂','🔥','🎉'].includes(e.emoji)) {
+      return { accepted: false, reason: 'Invalid emoji' }
+    }
+    return {
+      accepted: true,
+      data: { type: 'reaction', emoji: e.emoji, userId: e.userId },
+    }
   },
 })`}
       />

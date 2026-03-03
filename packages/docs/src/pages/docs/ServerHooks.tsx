@@ -170,7 +170,7 @@ export const realtime = createStartHandler({
         code={`authorize?: (params: {
   userId: string
   action: 'subscribe' | 'publish'
-  channel: string    // serialized channel key, e.g. "todos~projectId=abc"
+  channel: string    // serialized channel key, e.g. "todos:projectId=abc"
 }) => boolean | Promise<boolean>`}
       />
 
@@ -195,17 +195,18 @@ export const realtime = createStartHandler({
 
       <h3>Namespace-based access control</h3>
       <p>
-        Parse the channel string to branch on the namespace (the first path
-        segment before the <code>~</code> separator).
+        Parse the channel string to branch on the namespace (the first segment
+        before the <code>:</code> separator). Parameters within the channel are
+        separated by <code>,</code>.
       </p>
       <CodeBlock
         code={`authorize: async ({ userId, action, channel }) => {
-  // channel format: "namespace~key=value~..."
-  const namespace = channel.split('~')[0]
+  // channel format: "namespace:key=value,key=value"
+  const namespace = channel.split(':')[0]
 
   switch (namespace) {
     case 'todos': {
-      const projectId = channel.match(/projectId=([^~]+)/)?.[1]
+      const projectId = channel.match(/projectId=([^,]+)/)?.[1]
       if (!projectId) return false
       const isMember = await db.projectMembers.exists({ userId, projectId })
       return isMember
@@ -311,13 +312,13 @@ export const realtimePublish = createValidatedPublish({
         sensitive fields or attach server-side metadata before broadcasting.
       </p>
       <CodeBlock
-        code={`validate: async ({ channel, data, userId }) => {
+        code={`validate: async ({ channel, data }) => {
   if (channel.namespace === 'chat') {
     const msg = data as { text: string; clientSecret: string }
-    // Strip the client-only field and attach the server-verified userId
+    // Strip the client-only field before broadcasting
     return {
       accepted: true,
-      data: { text: msg.text, authorId: userId },
+      data: { text: msg.text, timestamp: Date.now() },
     }
   }
   return { accepted: true }
@@ -458,22 +459,14 @@ export const Route = createAPIFileRoute('/api/health')({
     }),
 })`}
       />
-      <p>
-        To expose <code>connectionCount()</code> from{' '}
-        <code>createStartHandler</code>, keep a reference to the underlying SSE
-        handler:
-      </p>
-      <CodeBlock
-        title="app/server/realtime.ts"
-        code={`import { createSseHandler } from '@tanstack/realtime-adapter-sse'
-import { createStartHandler } from '@tanstack/realtime-preset-start'
-
-// Keep the raw SSE handler so you can call connectionCount()
-export const sseHandler = createSseHandler({ getUser: resolveUser })
-
-export const realtime = createStartHandler({ getUser: resolveUser })
-export const realtimePublish = realtime.publish`}
-      />
+      <div className="doc-callout">
+        <strong>Note.</strong> <code>connectionCount()</code> is available
+        directly on the <code>SseHandler</code> returned by{' '}
+        <code>createSseHandler</code>. If you use{' '}
+        <code>createStartHandler</code>, it creates an internal SSE handler that
+        is not directly exposed &mdash; use <code>createSseHandler</code>{' '}
+        directly when you need metrics access.
+      </div>
 
       <h3 id="pattern-auth">Full authentication + authorization setup</h3>
       <CodeBlock
@@ -504,9 +497,9 @@ export const realtime = createStartHandler({
 
   // 2. Per-channel access control
   authorize: async ({ userId, action, channel }) => {
-    const namespace = channel.split('~')[0]
+    const namespace = channel.split(':')[0]
     if (namespace === 'todos') {
-      const projectId = channel.match(/projectId=([^~]+)/)?.[1]
+      const projectId = channel.match(/projectId=([^,]+)/)?.[1]
       if (!projectId) return false
       if (action === 'publish') return db.isProjectOwner(userId, projectId)
       return db.isProjectMember(userId, projectId)
