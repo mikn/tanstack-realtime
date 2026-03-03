@@ -22,6 +22,8 @@ import { Tick } from './pages/docs/Tick'
 import { ReadReceipts } from './pages/docs/ReadReceipts'
 import { ServerHooks } from './pages/docs/ServerHooks'
 import { ApiReference } from './pages/docs/ApiReference'
+import { WireProtocol } from './pages/docs/WireProtocol'
+import { Testing } from './pages/docs/Testing'
 
 // ---------------------------------------------------------------------------
 // Simple hash router
@@ -61,6 +63,62 @@ const docRoutes: Partial<Record<string, () => React.JSX.Element>> = {
   '#/docs/read-receipts': ReadReceipts,
   '#/docs/server-hooks': ServerHooks,
   '#/docs/api-reference': ApiReference,
+  '#/docs/wire-protocol': WireProtocol,
+  '#/docs/testing': Testing,
+}
+
+// ---------------------------------------------------------------------------
+// Prev / Next navigation order
+// ---------------------------------------------------------------------------
+
+const docOrder = [
+  { hash: '#/docs/getting-started', label: 'Getting Started' },
+  { hash: '#/docs/collections', label: 'Collections' },
+  { hash: '#/docs/server-functions', label: 'TanStack Start + Drizzle' },
+  { hash: '#/docs/authentication', label: 'Authentication' },
+  { hash: '#/docs/rich-text-crdts', label: 'Rich Text (Y.js)' },
+  { hash: '#/docs/centrifugo', label: 'Centrifugo Guide' },
+  { hash: '#/docs/read-receipts', label: 'Read Receipts' },
+  { hash: '#/docs/testing', label: 'Testing' },
+  { hash: '#/docs/crdts', label: 'CRDTs' },
+  { hash: '#/docs/presence', label: 'Presence' },
+  { hash: '#/docs/channels', label: 'Channels & Pub/Sub' },
+  { hash: '#/docs/streaming', label: 'Streaming' },
+  { hash: '#/docs/ephemeral', label: 'Ephemeral Channels' },
+  { hash: '#/docs/tick', label: 'Tick-Based Sync' },
+  { hash: '#/docs/transports', label: 'Transports' },
+  { hash: '#/docs/resilience', label: 'Resilience' },
+  { hash: '#/docs/scaling', label: 'Scaling to Production' },
+  { hash: '#/docs/server-hooks', label: 'Server Hooks' },
+  { hash: '#/docs/hooks', label: 'React Hooks' },
+  { hash: '#/docs/api-reference', label: 'API Reference' },
+  { hash: '#/docs/error-reference', label: 'Error Reference' },
+  { hash: '#/docs/wire-protocol', label: 'Wire Protocol' },
+]
+
+function PrevNextNav({ hash }: { hash: string }) {
+  const idx = docOrder.findIndex((d) => d.hash === hash)
+  if (idx === -1) return null
+  const prev = idx > 0 ? docOrder[idx - 1] : null
+  const next = idx < docOrder.length - 1 ? docOrder[idx + 1] : null
+  return (
+    <nav className="prev-next-nav">
+      {prev ? (
+        <a href={prev.hash} className="prev-next-link prev-link">
+          &larr; {prev.label}
+        </a>
+      ) : (
+        <span />
+      )}
+      {next ? (
+        <a href={next.hash} className="prev-next-link next-link">
+          {next.label} &rarr;
+        </a>
+      ) : (
+        <span />
+      )}
+    </nav>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -140,6 +198,7 @@ export function App() {
           <Sidebar currentHash={hash} />
           <main className="docs-content">
             {DocPage ? <DocPage /> : <GettingStarted />}
+            <PrevNextNav hash={hash} />
           </main>
         </div>
       ) : (
