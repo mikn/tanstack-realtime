@@ -188,10 +188,11 @@ typingUsers.subscribe((entries) => {
       <CodeBlock
         title="realtime-worker.ts"
         code={`import { createSharedWorkerCoordinator } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
 
+// createSharedWorkerCoordinator requires a PresenceCapable transport
 const coordinator = createSharedWorkerCoordinator(
-  sseTransport({ url: '/api/realtime' }),
+  centrifugoTransport({ url: 'ws://localhost:8000/connection/websocket' }),
 )
 
 self.addEventListener('connect', (e) => {
@@ -201,9 +202,8 @@ self.addEventListener('connect', (e) => {
 
       <h3>Vite</h3>
       <p>
-        Vite understands <code>new URL(..., import.meta.url)</code> natively.
-        Pass <code>{"{ type: 'module' }"}</code> so Vite preserves ES imports
-        inside the worker.
+        Vite understands <code>new URL(..., import.meta.url)</code> natively and
+        will emit the worker as a separate chunk automatically.
       </p>
       <CodeBlock
         code={`import { createCoordinatedTransport } from '@tanstack/realtime'

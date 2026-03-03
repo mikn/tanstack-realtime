@@ -96,8 +96,9 @@ docker run -d --name centrifugo -p 8000:8000 \\
       <h2 id="client-setup">Client setup</h2>
       <p>
         Create a <code>centrifugoTransport</code> and pass it to{' '}
-        <code>createRealtimeClient</code>. The only required options are{' '}
-        <code>url</code> and <code>token</code>.
+        <code>createRealtimeClient</code>. The only required option is{' '}
+        <code>url</code>. Pass <code>token</code> when Centrifugo requires
+        authentication (production).
       </p>
       <CodeBlock
         title="app/client/realtime.ts"
@@ -332,20 +333,31 @@ export async function GET(req: Request) {
         from your data stream.
       </p>
       <CodeBlock
+        title="app/features/chat/presence.ts"
+        code={`import { createPresenceChannel } from '@tanstack/realtime'
+
+export const chatPresence = createPresenceChannel({
+  id: 'chat-presence',
+  channel: (params: { roomId: string }) => \`app:chat-\${params.roomId}\`,
+})`}
+      />
+      <CodeBlock
         title="app/features/chat/ChatRoom.tsx"
         code={`import { usePresence } from '@tanstack/react-realtime'
+import { chatPresence } from './presence'
 
+// Must be rendered inside <RealtimeProvider>
 function ChatRoom({ roomId }: { roomId: string }) {
-  const { users, join, update, leave } = usePresence(realtimeClient, {
-    channel: \`app:chat-\${roomId}\`,
-    initialData: { name: currentUser.name, status: 'active' },
+  const { others, updatePresence } = usePresence(chatPresence, {
+    params: { roomId },
+    initial: { name: currentUser.name, status: 'active' },
   })
 
   return (
     <div>
-      <h3>Online ({users.length})</h3>
+      <h3>Online ({others.length})</h3>
       <ul>
-        {users.map((u) => (
+        {others.map((u) => (
           <li key={u.connectionId}>{(u.data as any).name}</li>
         ))}
       </ul>
@@ -363,21 +375,20 @@ function ChatRoom({ roomId }: { roomId: string }) {
       </div>
       <p>
         Under the hood, the adapter sends three message types on the sidecar
-        channel:
+        channel. These are transport-level methods called automatically by the{' '}
+        <code>usePresence</code> hook &mdash; you do not call them directly:
       </p>
       <ul>
         <li>
-          <code>prs:join</code> &mdash; broadcast when{' '}
-          <code>joinPresence()</code> is called
+          <code>prs:join</code> &mdash; sent automatically when the hook mounts
         </li>
         <li>
-          <code>prs:update</code> &mdash; broadcast when{' '}
-          <code>updatePresence()</code> is called (merges with existing data)
+          <code>prs:update</code> &mdash; sent when you call{' '}
+          <code>updatePresence()</code> (merges with existing data)
         </li>
         <li>
-          <code>prs:leave</code> &mdash; broadcast when{' '}
-          <code>leavePresence()</code> is called, then the sidecar subscription
-          is removed
+          <code>prs:leave</code> &mdash; sent automatically when the hook
+          unmounts, then the sidecar subscription is removed
         </li>
       </ul>
 
@@ -474,7 +485,7 @@ const todosOptions = realtimeCollectionOptions({
     getKey: (t) => t.id,
   }),
   client: realtimeClient,
-  channel: ['app:todos'],
+  channel: 'app:todos',
   refetchOnReconnect: true,   // fallback if epoch/offset recovery fails
 })`}
       />
