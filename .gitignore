@@ -32,6 +32,9 @@ Thumbs.db
 # Nx
 .nx/
 
+# Claude Code worktrees
+.claude/
+
 # Misc
 .cache/
 *.tgz

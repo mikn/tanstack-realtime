@@ -22,5 +22,9 @@
       "ignore": ["setup.ts", "workerd-test-worker.ts"]
     }
   },
-  "ignore": ["packages/docs/**", "packages/__tests__/workerd-test-worker.ts"]
+  "ignore": [
+    "packages/docs/**",
+    "packages/__tests__/workerd-test-worker.ts",
+    ".claude/**"
+  ]
 }
