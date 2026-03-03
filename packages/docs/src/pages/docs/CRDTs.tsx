@@ -686,7 +686,10 @@ function EditableTitle({ docId }: { docId: string }) {
         <code>UndoManager</code> that tracks operations per-client and can
         reverse them without affecting other users&rsquo; concurrent edits.
       </p>
-      <p>A Y.js integration guide is planned.</p>
+      <p>
+        See the <a href="#/docs/rich-text-crdts">Rich Text (Y.js) guide</a> for
+        a full walkthrough.
+      </p>
 
       <div className="doc-callout">
         <p>

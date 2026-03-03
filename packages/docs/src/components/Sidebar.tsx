@@ -14,6 +14,7 @@ const sections = [
       { label: 'Rich Text (Y.js)', hash: '#/docs/rich-text-crdts' },
       { label: 'Centrifugo Guide', hash: '#/docs/centrifugo' },
       { label: 'Read Receipts', hash: '#/docs/read-receipts' },
+      { label: 'Testing', hash: '#/docs/testing' },
     ],
   },
   {
@@ -42,6 +43,7 @@ const sections = [
       { label: 'React Hooks', hash: '#/docs/hooks' },
       { label: 'API Reference', hash: '#/docs/api-reference' },
       { label: 'Error Reference', hash: '#/docs/error-reference' },
+      { label: 'Wire Protocol', hash: '#/docs/wire-protocol' },
     ],
   },
 ]

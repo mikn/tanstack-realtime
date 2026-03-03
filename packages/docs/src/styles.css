@@ -1699,6 +1699,27 @@ code {
 }
 
 /* ---------------------------------------------------------------------------
+   Prev / Next navigation
+   --------------------------------------------------------------------------- */
+
+.prev-next-nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+.prev-next-link {
+  color: var(--accent-1);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+.prev-next-link:hover {
+  text-decoration: underline;
+}
+
+/* ---------------------------------------------------------------------------
    Docs responsive
    --------------------------------------------------------------------------- */
 

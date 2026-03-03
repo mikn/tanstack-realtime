@@ -46,17 +46,17 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 > Auth is the first production blocker after "hello world."
 
-- [ ] Create new doc page: `packages/docs/src/pages/docs/Authentication.tsx`
-- [ ] Add to sidebar under "Guides" section in `Sidebar.tsx`
-- [ ] Document `getUser(req)` — what it receives, what to return, what happens on null
-- [ ] Document per-channel authorization via `authorize` function
-  - [ ] Show `ChannelPermissions` return shape (`{ subscribe, publish, presence }`)
-  - [ ] Example: project membership check
-- [ ] Document token-based auth for WebSocket transport (`getToken` client option)
-- [ ] Document SSE Bearer token pattern with middleware example
-- [ ] Document Centrifugo subscription token flow
-- [ ] Document what happens when auth expires mid-session (must reconnect for WS)
-- [ ] Document `ValidatePublishFn` for server-side message validation
+- [x] Create new doc page: `packages/docs/src/pages/docs/Authentication.tsx`
+- [x] Add to sidebar under "Guides" section in `Sidebar.tsx`
+- [x] Document `getUser(req)` — what it receives, what to return, what happens on null
+- [x] Document per-channel authorization via `authorize` function
+  - [x] Show `ChannelPermissions` return shape (`{ subscribe, publish, presence }`)
+  - [x] Example: project membership check
+- [x] Document token-based auth for WebSocket transport (`getToken` client option)
+- [x] Document SSE Bearer token pattern with middleware example
+- [x] Document Centrifugo subscription token flow
+- [x] Document what happens when auth expires mid-session (must reconnect for WS)
+- [x] Document `ValidatePublishFn` for server-side message validation
 - [ ] Add interactive demo: authorized vs. denied subscription (show error state)
 
 ---
@@ -73,9 +73,9 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 - [ ] Implement `TestRealtimeProvider` for React — auto-connects with mock transport
 - [ ] Add usage examples in JSDoc and README
 - [ ] Write tests for the test utilities themselves
-- [ ] Document testing patterns in a new doc page: `packages/docs/src/pages/docs/Testing.tsx`
-  - [ ] Add to sidebar under "Guides"
-  - [ ] Show: testing a collection hook, testing presence, testing optimistic rollback
+- [x] Document testing patterns in a new doc page: `packages/docs/src/pages/docs/Testing.tsx`
+  - [x] Add to sidebar under "Guides"
+  - [x] Show: testing a collection hook, testing presence, testing optimistic rollback
 
 ---
 
@@ -100,16 +100,16 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 > Developers need confidence it works beyond a prototype.
 
-- [ ] Create new doc page: `packages/docs/src/pages/docs/Scaling.tsx`
-- [ ] Add to sidebar under "Infrastructure" section
-- [ ] Explain why single-process breaks (each server only sees its own subscribers)
-- [ ] Document the `PublishBackend` interface with full TypeScript signature
-- [ ] Example: Redis PUBLISH/SUBSCRIBE implementation
-- [ ] Example: Postgres LISTEN/NOTIFY implementation
+- [x] Create new doc page: `packages/docs/src/pages/docs/Scaling.tsx`
+- [x] Add to sidebar under "Infrastructure" section
+- [x] Explain why single-process breaks (each server only sees its own subscribers)
+- [x] Document the `PublishBackend` interface with full TypeScript signature
+- [x] Example: Redis PUBLISH/SUBSCRIBE implementation
+- [x] Example: Postgres LISTEN/NOTIFY implementation
 - [ ] Example: Cloudflare Durable Objects approach
 - [ ] Show how to pair `PublishBackend` with `createNodeServer` (not just TanStack Start)
 - [ ] Show how to pair `PublishBackend` with `createSseHandler`
-- [ ] Add "When you need this" decision criteria (> 1 server process, horizontal auto-scaling, etc.)
+- [x] Add "When you need this" decision criteria (> 1 server process, horizontal auto-scaling, etc.)
 
 ---
 
@@ -145,7 +145,7 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 - [ ] Add `autoConnect` prop to `RealtimeProvider` (default: `true`)
 - [ ] When `autoConnect` is true, call `client.connect()` in provider mount effect
 - [ ] Add dev-mode console warning when hooks detect `status === 'disconnected'` for > 2 seconds
-- [ ] Update Getting Started doc page to reflect auto-connect behavior
+- [x] Update Getting Started doc page to reflect auto-connect behavior
 - [ ] Add test for auto-connect and manual-connect modes
 
 ---
@@ -154,27 +154,27 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 > Several implemented features are invisible on the website.
 
-- [ ] **Ephemeral channels page** — `packages/docs/src/pages/docs/Ephemeral.tsx`
-  - [ ] Document `ephemeralLiveOptions` with TTL-based expiry
-  - [ ] Example: typing indicators
-  - [ ] Example: emoji reactions
-  - [ ] Example: "user is viewing" notifications
-  - [ ] Add to sidebar under "Features"
-- [ ] **Tick/game-state page** — `packages/docs/src/pages/docs/Tick.tsx`
-  - [ ] Document `tickCollectionOptions` with delta compression
-  - [ ] Document `tickTransport` at 60Hz
-  - [ ] Example: multiplayer game state sync
-  - [ ] Example: live dashboard gauge
-  - [ ] Add to sidebar under "Features"
+- [x] **Ephemeral channels page** — `packages/docs/src/pages/docs/Ephemeral.tsx`
+  - [x] Document `ephemeralLiveOptions` with TTL-based expiry
+  - [x] Example: typing indicators
+  - [x] Example: emoji reactions
+  - [x] Example: "user is viewing" notifications
+  - [x] Add to sidebar under "Features"
+- [x] **Tick/game-state page** — `packages/docs/src/pages/docs/Tick.tsx`
+  - [x] Document `tickCollectionOptions` with delta compression
+  - [x] Document `tickTransport` at 60Hz
+  - [x] Example: multiplayer game state sync
+  - [x] Example: live dashboard gauge
+  - [x] Add to sidebar under "Features"
 - [ ] **Add to existing Streaming page:**
   - [ ] Document `staleAfter` option and `'stale'` status in `useStream`
 - [ ] **Add to existing Channels page:**
   - [ ] Document `useLiveChannel` hook (distinct from `liveChannelOptions`)
   - [ ] Document `createValidatedPublish` for stateless server validation
-- [ ] **Wire protocol page** — `packages/docs/src/pages/docs/WireProtocol.tsx`
-  - [ ] Document message format for custom transport authors
-  - [ ] List all message types: subscribe, publish, presence:join, etc.
-  - [ ] Add to sidebar under "Reference"
+- [x] **Wire protocol page** — `packages/docs/src/pages/docs/WireProtocol.tsx`
+  - [x] Document message format for custom transport authors
+  - [x] List all message types: subscribe, publish, presence:join, etc.
+  - [x] Add to sidebar under "Reference"
 
 ---
 
@@ -184,11 +184,11 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 - [ ] Research: confirm Y.js awareness protocol can run over TanStack Realtime's transport
 - [ ] Build proof-of-concept: Y.js document synced via `wsTransport` channel
-- [ ] Create doc page: `packages/docs/src/pages/docs/RichTextCRDTs.tsx`
-  - [ ] Explain when to use field-level CRDTs vs. Y.js/Automerge
-  - [ ] Step-by-step: wiring Y.js awareness + document sync through a TanStack Realtime channel
-  - [ ] Show the split: TanStack Realtime for transport/presence, Y.js for text CRDT
-  - [ ] Add to sidebar under "Guides"
+- [x] Create doc page: `packages/docs/src/pages/docs/RichTextCRDTs.tsx`
+  - [x] Explain when to use field-level CRDTs vs. Y.js/Automerge
+  - [x] Step-by-step: wiring Y.js awareness + document sync through a TanStack Realtime channel
+  - [x] Show the split: TanStack Realtime for transport/presence, Y.js for text CRDT
+  - [x] Add to sidebar under "Guides"
 - [ ] Consider: `withYjs(transport)` adapter that bridges Y.js provider protocol
 
 ---
@@ -197,16 +197,16 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 > Scattered error docs = hours of debugging.
 
-- [ ] Create doc page: `packages/docs/src/pages/docs/ErrorReference.tsx`
-- [ ] Add to sidebar under "Reference"
-- [ ] Document `ConflictError<T>` — when it fires, what `expected`/`received` contain, how to handle
-- [ ] Document subscribe errors — authorization denied, channel not found, transport errors
-- [ ] Document publish errors — validation rejected, unauthorized, transport errors
-- [ ] Document offline queue flush errors — `onFlushError` callback, retry behavior
-- [ ] Document gap recovery errors — `onGapError` callback, fallback strategies
-- [ ] Document stream errors — `status: 'error'`, server-side `stream.error()`, HMAC failures
-- [ ] Document connection errors — transport-level, reconnection behavior
-- [ ] For each error: what triggers it, how to handle it, what the user sees if unhandled
+- [x] Create doc page: `packages/docs/src/pages/docs/ErrorReference.tsx`
+- [x] Add to sidebar under "Reference"
+- [x] Document `ConflictError<T>` — when it fires, what `expected`/`received` contain, how to handle
+- [x] Document subscribe errors — authorization denied, channel not found, transport errors
+- [x] Document publish errors — validation rejected, unauthorized, transport errors
+- [x] Document offline queue flush errors — `onFlushError` callback, retry behavior
+- [x] Document gap recovery errors — `onGapError` callback, fallback strategies
+- [x] Document stream errors — `status: 'error'`, server-side `stream.error()`, HMAC failures
+- [x] Document connection errors — transport-level, reconnection behavior
+- [x] For each error: what triggers it, how to handle it, what the user sees if unhandled
 
 ---
 
@@ -259,13 +259,13 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 > Unlocks a powerful, battle-tested scaling path.
 
-- [ ] Create doc page: `packages/docs/src/pages/docs/Centrifugo.tsx`
-- [ ] Add to sidebar under "Guides"
-- [ ] Step-by-step: installing and configuring Centrifugo
-- [ ] Document namespace configuration for TanStack Realtime channels
-- [ ] Document token generation (connection token + subscription token)
-- [ ] Document presence setup via Centrifugo
-- [ ] Document server-assisted gap recovery (epoch/offset)
+- [x] Create doc page: `packages/docs/src/pages/docs/Centrifugo.tsx`
+- [x] Add to sidebar under "Guides"
+- [x] Step-by-step: installing and configuring Centrifugo
+- [x] Document namespace configuration for TanStack Realtime channels
+- [x] Document token generation (connection token + subscription token)
+- [x] Document presence setup via Centrifugo
+- [x] Document server-assisted gap recovery (epoch/offset)
 - [ ] Show production deployment topology diagram
 
 ---
@@ -277,8 +277,8 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 - [ ] Evaluate TypeDoc vs. API Extractor vs. custom TSDoc parser
 - [ ] Configure chosen tool against `packages/realtime-core/`
 - [ ] Generate API reference pages for all public exports
-- [ ] Integrate into docs site (static pages or iframe)
-- [ ] Add to sidebar under "Reference"
+- [x] Integrate into docs site (static pages or iframe)
+- [x] Add to sidebar under "Reference"
 - [ ] Add CI step to regenerate on each commit
 
 ---
@@ -291,7 +291,7 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 - [ ] Implement in `createNodeServer` (WebSocket server)
 - [ ] Implement in `createSseHandler`
 - [ ] Add test coverage for each lifecycle event
-- [ ] Document in Scaling guide (Project 5) and/or a dedicated server events section
+- [x] Document in Scaling guide (Project 5) and/or a dedicated server events section
 
 ---
 
@@ -299,11 +299,11 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 > Practical blocker for multi-tab coordination.
 
-- [ ] Add section to Resilience doc page (or new "Multi-Tab" page)
-- [ ] Document Vite SharedWorker entrypoint setup
-- [ ] Document Webpack SharedWorker loader config
-- [ ] Document what happens when SharedWorker is unavailable (BroadcastChannel fallback)
-- [ ] Provide copy-paste worker file template
+- [x] Add section to Resilience doc page (or new "Multi-Tab" page)
+- [x] Document Vite SharedWorker entrypoint setup
+- [x] Document Webpack SharedWorker loader config
+- [x] Document what happens when SharedWorker is unavailable (BroadcastChannel fallback)
+- [x] Provide copy-paste worker file template
 
 ---
 
@@ -311,10 +311,10 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 > Make ephemeral features discoverable.
 
-- [ ] Add "Recipes" section to the Ephemeral channels page (Project 8)
-- [ ] Recipe: emoji reactions (ephemeral event → animate → discard)
+- [x] Add "Recipes" section to the Ephemeral channels page (Project 8)
+- [x] Recipe: emoji reactions (ephemeral event → animate → discard)
 - [ ] Recipe: confetti / celebration animation
-- [ ] Recipe: "user is viewing this record" indicator
+- [x] Recipe: "user is viewing this record" indicator
 - [ ] Recipe: toast notifications from server events
 
 ---
@@ -323,9 +323,9 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 > Needed before reaching 1.0.
 
-- [ ] Create `CHANGELOG.md` at repository root
-- [ ] Backfill notable changes from git history
-- [ ] Adopt a changelog format (Keep a Changelog or Conventional Changelog)
+- [x] Create `CHANGELOG.md` at repository root
+- [x] Backfill notable changes from git history
+- [x] Adopt a changelog format (Keep a Changelog or Conventional Changelog)
 - [ ] Add changelogger tooling to CI (e.g., changesets, or manual)
 - [ ] Move relevant content from `NEW_FEATURES.md` into changelog entries
 
@@ -347,10 +347,10 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 > Too app-specific for a generic primitive, but guidance is needed.
 
-- [ ] Add recipe to Channels or Ephemeral doc page
-- [ ] Pattern: using presence to track "last read message ID" per user
-- [ ] Pattern: using ephemeral channel for delivery acknowledgments
-- [ ] Discuss trade-offs (presence-based vs. persistent storage-based)
+- [x] Add recipe to Channels or Ephemeral doc page
+- [x] Pattern: using presence to track "last read message ID" per user
+- [x] Pattern: using ephemeral channel for delivery acknowledgments
+- [x] Discuss trade-offs (presence-based vs. persistent storage-based)
 
 ---
 
@@ -358,10 +358,10 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 > Document the limitation and available workarounds.
 
-- [ ] Add section to CRDTs doc page
-- [ ] Explain why CRDT convergence !== undo (no causal ordering per-author)
-- [ ] Pattern: per-field LWW snapshots for lightweight undo
-- [ ] Reference Y.js UndoManager for rich text use cases (link to Project 9)
+- [x] Add section to CRDTs doc page
+- [x] Explain why CRDT convergence !== undo (no causal ordering per-author)
+- [x] Pattern: per-field LWW snapshots for lightweight undo
+- [x] Reference Y.js UndoManager for rich text use cases (link to Project 9)
 
 ---
 
@@ -371,7 +371,7 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 ### Navigation & Information Architecture
 
-- [ ] Restructure sidebar into clearer sections:
+- [x] Restructure sidebar into clearer sections:
   - **Getting Started**: Getting Started, Quick Examples
   - **Core Concepts**: Collections, Channels & Pub/Sub, Streaming, Presence
   - **Advanced Features**: CRDTs, Ephemeral Channels, Tick/Game State, Rich Text (Y.js)
@@ -379,7 +379,7 @@ Each section is a self-contained project. Tasks are ordered by dependency within
   - **Infrastructure**: Transports (with decision matrix), Resilience
   - **Reference**: React Hooks, API Reference, Error Reference, Wire Protocol
 - [ ] Add breadcrumbs or "You are here" indicator
-- [ ] Add previous/next page navigation at the bottom of each doc page
+- [x] Add previous/next page navigation at the bottom of each doc page
 - [ ] Add "Edit this page on GitHub" links
 
 ### Home Page
@@ -395,7 +395,7 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 - [ ] Add transport selection guidance (link to decision matrix, Project 20)
 - [ ] Add "Next steps" section at the bottom linking to the progressive spectrum
 - [ ] Show the 3-step path: (1) basic query, (2) add realtime, (3) add CRDTs — with working code
-- [ ] Add note about `autoConnect` behavior (Project 7)
+- [x] Add note about `autoConnect` behavior (Project 7)
 
 ### Collections Page
 
@@ -412,8 +412,8 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 ### CRDTs Page
 
-- [ ] Add undo/redo limitations section (Project 22)
-- [ ] Add "When to use Y.js instead" callout linking to Rich Text guide (Project 9)
+- [x] Add undo/redo limitations section (Project 22)
+- [x] Add "When to use Y.js instead" callout linking to Rich Text guide (Project 9)
 - [ ] Add visual diagram showing field-level merge behavior
 
 ### Presence Page
@@ -436,7 +436,7 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 ### Resilience Page
 
-- [ ] Add SharedWorker bundler setup section (Project 17)
+- [x] Add SharedWorker bundler setup section (Project 17)
 - [ ] Add "what happens when..." FAQ: offline, tab closed, token expired, server restart
 
 ### Hooks Reference Page
