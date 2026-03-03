@@ -11,6 +11,10 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url))
 export default [
   ...tanstackConfig,
   {
+    name: 'tanstack/realtime/ignores',
+    ignores: ['.claude/**'],
+  },
+  {
     // Use projectService so TypeScript ESLint handles the monorepo tsconfigs
     // and files excluded from package-level tsconfigs (*.config.ts).
     name: 'tanstack/realtime/project-service',

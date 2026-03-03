@@ -952,6 +952,59 @@ code {
 }
 
 /* ---------------------------------------------------------------------------
+   Doc table (decision matrix, etc.)
+   --------------------------------------------------------------------------- */
+
+.doc-article table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.25rem 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.doc-article thead th {
+  text-align: left;
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  padding: 0.6rem 0.75rem;
+  border-bottom: 2px solid var(--border-bright);
+  white-space: nowrap;
+}
+
+.doc-article tbody td {
+  padding: 0.55rem 0.75rem;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.doc-article tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.doc-article tbody td:first-child {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .doc-article table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .doc-article thead th,
+  .doc-article tbody td {
+    font-size: 0.8rem;
+    padding: 0.45rem 0.6rem;
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Doc callout
    --------------------------------------------------------------------------- */
 

@@ -10,6 +10,9 @@ const sections = [
     title: 'Guides',
     items: [
       { label: 'TanStack Start + Drizzle', hash: '#/docs/server-functions' },
+      { label: 'Authentication', hash: '#/docs/authentication' },
+      { label: 'Rich Text (Y.js)', hash: '#/docs/rich-text-crdts' },
+      { label: 'Centrifugo Guide', hash: '#/docs/centrifugo' },
     ],
   },
   {
@@ -19,6 +22,8 @@ const sections = [
       { label: 'Presence', hash: '#/docs/presence' },
       { label: 'Channels & Pub/Sub', hash: '#/docs/channels' },
       { label: 'Streaming', hash: '#/docs/streaming' },
+      { label: 'Ephemeral Channels', hash: '#/docs/ephemeral' },
+      { label: 'Tick-Based Sync', hash: '#/docs/tick' },
     ],
   },
   {
@@ -26,11 +31,15 @@ const sections = [
     items: [
       { label: 'Transports', hash: '#/docs/transports' },
       { label: 'Resilience', hash: '#/docs/resilience' },
+      { label: 'Scaling to Production', hash: '#/docs/scaling' },
     ],
   },
   {
     title: 'Reference',
-    items: [{ label: 'React Hooks', hash: '#/docs/hooks' }],
+    items: [
+      { label: 'React Hooks', hash: '#/docs/hooks' },
+      { label: 'Error Reference', hash: '#/docs/error-reference' },
+    ],
   },
 ]
 
