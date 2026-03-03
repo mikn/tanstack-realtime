@@ -79,8 +79,7 @@ export interface PresenceUser<T = unknown> {
       <h2 id="websocket-messages">WebSocket transport messages</h2>
       <p>
         The built-in WebSocket transport (<code>wsTransport</code>) communicates
-        with <code>createNodeServer</code> using JSON messages over a single
-        WebSocket connection.
+        using JSON messages over a single WebSocket connection.
       </p>
 
       <h3>Client to server</h3>

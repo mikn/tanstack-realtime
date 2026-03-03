@@ -83,13 +83,13 @@ router.delete('/api/tasks/:id', async (req) => {
 
       <h2 id="server-push">Server-initiated push</h2>
       <p>
-        The one case where you call <code>nodeServer.publish()</code> directly:
-        changes that originate outside a client mutation &mdash; background
-        jobs, cron tasks, webhooks.
+        The one case where you call <code>sseHandler.broadcast()</code>{' '}
+        directly: changes that originate outside a client mutation &mdash;
+        background jobs, cron tasks, webhooks.
       </p>
       <CodeBlock
         title="server/jobs/inventorySync.ts"
-        code={`import { nodeServer } from '../realtime'
+        code={`import { sseHandler } from '../realtime'
 import { serializeKey } from '@tanstack/realtime'
 
 export async function syncInventory(productId: string) {
@@ -98,7 +98,7 @@ export async function syncInventory(productId: string) {
     where: { id: productId },
     data: { stock: latestStock },
   })
-  nodeServer.publish(
+  sseHandler.broadcast(
     serializeKey(['products', { id: productId }]),
     { action: 'update', data: product },
   )
@@ -110,7 +110,7 @@ export async function syncInventory(productId: string) {
         <p>
           After <code>onInsert</code> or <code>onUpdate</code> returns a value,
           the originating tab calls <code>client.publish()</code> automatically.
-          You only call <code>nodeServer.publish()</code> directly for changes
+          You only call <code>sseHandler.broadcast()</code> directly for changes
           that originate outside a client mutation.
         </p>
       </div>

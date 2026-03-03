@@ -89,20 +89,6 @@ export function Transports() {
         of the box &mdash; no <code>PublishBackend</code> wiring required.
       </p>
 
-      <h2 id="websocket">Built-in WebSocket</h2>
-      <p>
-        <code>wsTransport</code> lives in the base package. Connects to a{' '}
-        <code>createNodeServer</code> instance. Works in browsers,
-        SharedWorkers, and Node.js.
-      </p>
-      <CodeBlock
-        code={`import { createRealtimeClient, wsTransport } from '@tanstack/realtime'
-
-const client = createRealtimeClient({
-  transport: wsTransport({ url: 'ws://localhost:3001' }),
-})`}
-      />
-
       <h2 id="centrifugo">Centrifugo</h2>
       <p>
         Production WebSocket infrastructure with token auth and server-assisted

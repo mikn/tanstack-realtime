@@ -918,13 +918,13 @@ function CelebrationOverlay({ projectId }: { projectId: string }) {
         title="server/routes/goals.ts"
         code={`// Server — trigger confetti when a goal is reached
 import { serializeKey } from '@tanstack/realtime'
-import { nodeServer } from './realtime.server'
+import { sseHandler } from './realtime.server'
 
 export async function completeGoal(goalId: string, projectId: string) {
   await db.goals.update({ where: { id: goalId }, data: { completed: true } })
 
   // Ephemeral celebration event — no storage needed
-  nodeServer.publish(
+  sseHandler.broadcast(
     serializeKey(['celebrations', { projectId }]),
     { type: 'confetti', message: \`Goal "\${goalId}" completed!\` },
   )
@@ -989,14 +989,14 @@ function App() {
         title="server/routes/notifications.ts"
         code={`// Server — broadcast a toast notification to all connected clients
 import { serializeKey } from '@tanstack/realtime'
-import { nodeServer } from './realtime.server'
+import { sseHandler } from './realtime.server'
 
 export async function broadcastNotification(notification: {
   type: 'info' | 'warning' | 'success' | 'error'
   title: string
   body?: string
 }) {
-  nodeServer.publish(
+  sseHandler.broadcast(
     serializeKey(['notifications', { scope: 'global' }]),
     notification,
   )

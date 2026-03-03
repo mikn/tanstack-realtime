@@ -132,9 +132,9 @@ export const realtime = createStartHandler({
         <p>
           <strong>Recommended:</strong> The <code>AuthorizeFn</code> signature
           from <code>@tanstack/realtime</code> works across{' '}
-          <strong>all presets</strong> &mdash; <code>createNodeServer</code>,{' '}
-          <code>createSseHandler</code>, and <code>createStartHandler</code>.
-          Write one authorize function and use it everywhere.
+          <strong>all presets</strong> &mdash; <code>createSseHandler</code> and{' '}
+          <code>createStartHandler</code>. Write one authorize function and use
+          it everywhere.
         </p>
       </div>
       <p>
@@ -198,17 +198,17 @@ export const authorize: AuthorizeFn = async (
       />
       <p>
         Because the same function works everywhere, you can share it between
-        your SSE handler and a standalone Node server without any adapters:
+        your SSE handler and the Start preset without any adapters:
       </p>
       <CodeBlock
         title="Shared across presets"
         code={`import { authorize } from './authorize'
 
-// SSE / TanStack Start
+// TanStack Start
 const startHandler = createStartHandler({ getUser, authorize })
 
-// Standalone WebSocket server
-const nodeServer = createNodeServer({ getUser, authorize })`}
+// Standalone SSE handler
+const sseHandler = createSseHandler({ getUser, authorize })`}
       />
 
       <h3 id="legacy-sse-authorize">
@@ -437,13 +437,16 @@ const cursorSchema = z.object({
   userId: z.string(),
 })
 
-import { nodeServer } from './realtime.server'
+import { sseHandler } from './realtime.server'
 
 const validatedPublish = createValidatedPublish({
-  publish: (channel, data) => nodeServer.publish(
-    typeof channel === 'string' ? channel : JSON.stringify(channel),
-    data,
-  ),
+  publish: (channel, data) => {
+    sseHandler.broadcast(
+      typeof channel === 'string' ? channel : JSON.stringify(channel),
+      data,
+    )
+    return Promise.resolve()
+  },
   validate: async ({ channel, data }) => {
     switch (channel.namespace) {
       case 'todos': {

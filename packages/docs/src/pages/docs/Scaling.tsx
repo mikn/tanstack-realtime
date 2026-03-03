@@ -194,49 +194,6 @@ export const realtime = createStartHandler({
 export const realtimePublish = realtime.publish`}
       />
 
-      <h2 id="pairing-node">Pairing with createNodeServer</h2>
-      <p>
-        The <code>createNodeServer</code> from{' '}
-        <code>@tanstack/realtime-preset-node</code> is an in-process WebSocket
-        server designed for local development and single-process deployments.
-        Its <code>NodeServerOptions</code> interface accepts{' '}
-        <code>getUser</code>, <code>authorize</code>, <code>path</code>, and{' '}
-        <code>onPublish</code> &mdash; there is no <code>backend</code> option.
-        Instead, you wire the backend manually by connecting its{' '}
-        <code>subscribe</code> callback to <code>nodeServer.publish</code> and
-        routing server-side publishes through the backend.
-      </p>
-      <CodeBlock
-        title="server/realtime.ts"
-        code={`import { createNodeServer } from '@tanstack/realtime-preset-node'
-import { redisBackend } from './redis-backend'
-
-const nodeServer = createNodeServer({
-  getUser: async (req) => {
-    const session = await getSession(req)
-    return session ? { userId: session.userId } : null
-  },
-  authorize,
-})
-
-// Wire backend subscribe → nodeServer.publish for fan-out
-// When any server instance publishes via the backend, Redis
-// pushes the message here so we can fan out to local WebSocket
-// connections.
-redisBackend.subscribe?.((channel, data) => {
-  nodeServer.publish(channel, data)
-})
-
-// Route server-side publishes through the backend so every
-// instance receives the message via the subscribe callback above.
-export async function publish(channel: string, data: unknown) {
-  await redisBackend.publish(channel, data)
-}
-
-// Attach to your HTTP server during startup
-nodeServer.attach(httpServer)`}
-      />
-
       <h2 id="pairing-sse">Pairing with createSseHandler</h2>
       <p>
         If you use the lower-level <code>createSseHandler</code> directly
@@ -407,11 +364,11 @@ export class RealtimeChannel extends DurableObject {
 
       <h2 id="lifecycle-hooks">Server lifecycle hooks</h2>
       <p>
-        All server constructors &mdash; <code>createNodeServer</code>,{' '}
-        <code>createSseHandler</code>, and <code>createStartHandler</code>{' '}
-        &mdash; accept optional lifecycle callbacks for observing connection and
-        subscription events. These are fire-and-forget: errors inside callbacks
-        are logged to <code>console.error</code> but never propagate to clients.
+        All server constructors &mdash; <code>createSseHandler</code> and{' '}
+        <code>createStartHandler</code> &mdash; accept optional lifecycle
+        callbacks for observing connection and subscription events. These are
+        fire-and-forget: errors inside callbacks are logged to{' '}
+        <code>console.error</code> but never propagate to clients.
       </p>
       <CodeBlock
         title="Lifecycle hook signatures"
@@ -485,25 +442,6 @@ export const realtime = createStartHandler({
   },
 })`}
       />
-      <p>
-        The same hooks work identically on <code>createNodeServer</code>:
-      </p>
-      <CodeBlock
-        title="Node server with lifecycle hooks"
-        code={`import { createNodeServer } from '@tanstack/realtime-preset-node'
-
-const nodeServer = createNodeServer({
-  getUser,
-  authorize,
-  onClientConnect: ({ connectionId, userId }) => {
-    console.log(\`[ws] connected: \${userId} (\${connectionId})\`)
-  },
-  onChannelEmpty: (channel) => {
-    console.log(\`[ws] channel empty: \${channel}\`)
-  },
-})`}
-      />
-
       <h2 id="summary">Summary</h2>
       <p>
         The <code>PublishBackend</code> interface is deliberately minimal:

@@ -275,13 +275,13 @@ function ChatRoom({ roomId }: { roomId: string }) {
       <CodeBlock
         title="server/realtime.ts"
         code={`import { createValidatedPublish } from '@tanstack/realtime'
-import { nodeServer } from './realtime.server'
+import { sseHandler } from './realtime.server'
 import { todoSchema } from '../shared/schemas'
 
 const validatedPublish = createValidatedPublish({
   publish: (channel, data) => {
     const ch = typeof channel === 'string' ? channel : serializeKey(channel)
-    nodeServer.publish(ch, data)
+    sseHandler.broadcast(ch, data)
     return Promise.resolve()
   },
 
