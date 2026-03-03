@@ -43,6 +43,16 @@ export function GettingStarted() {
       @tanstack/realtime-preset-start @tanstack/realtime-adapter-sse`}
       />
 
+      <div className="doc-callout">
+        <p>
+          <strong>Which transport?</strong> SSE is the default for most apps.
+          Use Centrifugo when you need built-in fan-out across multiple server
+          instances. See the{' '}
+          <a href="#/docs/transports">Transport decision matrix</a> for a full
+          comparison.
+        </p>
+      </div>
+
       <h2 id="server-setup">Server setup</h2>
       <p>
         Add a <code>createStartHandler</code> API route to your TanStack Start
@@ -67,9 +77,9 @@ const realtime = createStartHandler({
   }),
 })
 
-// For multi-instance fan-out, add a PublishBackend here:
+// For multi-instance fan-out, pass a PublishBackend in the config above:
 // import { createUpstashBackend } from '@tanstack/realtime-backend-upstash'
-// realtime.setBackend(createUpstashBackend({ url: env.UPSTASH_URL, token: env.UPSTASH_TOKEN }))
+// backend: createUpstashBackend({ url: env.UPSTASH_URL, token: env.UPSTASH_TOKEN }),
 
 export const { GET } = realtime`}
       />
@@ -156,6 +166,26 @@ function TodoList() {
       />
 
       <h2 id="next-steps">Next steps</h2>
+      <p>
+        You now have a live collection. From here you can add capabilities one
+        config key at a time &mdash; the{' '}
+        <a href="#/docs/collections">progressive spectrum</a>:
+      </p>
+      <ol>
+        <li>
+          <strong>Basic query</strong> &mdash; <code>queryFn</code> alone
+          fetches data on mount (what you built above).
+        </li>
+        <li>
+          <strong>Add realtime</strong> &mdash; add <code>channel</code> and
+          mutations broadcast to all subscribers instantly.
+        </li>
+        <li>
+          <strong>Add CRDTs</strong> &mdash; add <code>fields</code> and
+          concurrent edits merge automatically (LWW, PN-Counter, OR-Set).
+        </li>
+      </ol>
+      <h3>Explore further</h3>
       <ul>
         <li>
           <a href="#/docs/collections">Collections</a> &mdash; custom callbacks,
@@ -166,14 +196,25 @@ function TodoList() {
           edits with LWW, PN-Counter, and OR-Set
         </li>
         <li>
+          <a href="#/docs/channels">Channels &amp; Pub/Sub</a> &mdash; live
+          feeds, validated publishing, append-only channels
+        </li>
+        <li>
+          <a href="#/docs/presence">Presence</a> &mdash; live cursors, online
+          user lists, typing indicators
+        </li>
+        <li>
+          <a href="#/docs/ephemeral">Ephemeral Channels</a> &mdash; reactions,
+          toasts, confetti, and short-lived events
+        </li>
+        <li>
           <a href="#/docs/transports">Transports</a> &mdash; Centrifugo (fan-out
           included), PublishBackend for multi-instance SSE, offline queue,
           multi-tab coordination
         </li>
         <li>
           <a href="#/docs/server-functions">TanStack Start + Drizzle</a> &mdash;
-          full-stack guide: server functions as collection callbacks, server
-          authority, and conflict handling end-to-end
+          full-stack guide with server functions as collection callbacks
         </li>
       </ul>
     </article>

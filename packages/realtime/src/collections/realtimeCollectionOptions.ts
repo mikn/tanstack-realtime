@@ -670,6 +670,17 @@ export function realtimeCollectionOptions<
           })
           unsubs.push(unsub)
         }
+
+        // Surface subscribe auth errors for all channels this collection uses.
+        const channelSet = new Set(allChannels)
+        const unsubErr = client.onSubscribeError((ch, reason, code) => {
+          if (channelSet.has(ch)) {
+            console.error(
+              `[realtime] Subscribe rejected for "${ch}": ${reason}${code != null ? ` (${code})` : ''}`,
+            )
+          }
+        })
+        unsubs.push(unsubErr)
       }
 
       if (queryFn) {

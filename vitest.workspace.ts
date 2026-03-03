@@ -68,6 +68,8 @@ export default defineWorkspace([
         'packages/__tests__/tickTransport.test.ts',
         'packages/__tests__/coreInvariants.test.ts',
         'packages/__tests__/startPreset.test.ts',
+        'packages/__tests__/testingUtils.test.ts',
+        'packages/__tests__/subscribeError.test.ts',
       ],
       pool: 'forks',
       poolOptions: { forks: { singleFork: true } },

@@ -699,6 +699,34 @@ function EditableTitle({ docId }: { docId: string }) {
           transport with Y.js as the CRDT engine.
         </p>
       </div>
+
+      <h2 id="merge-diagram">How field-level merge works</h2>
+      <p>
+        Each field resolves independently based on its CRDT type. Concurrent
+        edits to <em>different</em> fields never conflict. Concurrent edits to
+        the <em>same</em> field merge according to the field&rsquo;s strategy:
+      </p>
+      <CodeBlock
+        code={`// Two clients edit the same todo concurrently:
+//
+//   Client A                          Client B
+//   ────────                          ────────
+//   title = "Buy milk"  (lww)         votes = increment()  (pn-counter)
+//   tags  = add("urgent") (or-set)    tags  = add("shop")  (or-set)
+//
+// Merged result:
+// ┌─────────┬───────────────────┬──────────────────────────────┐
+// │  Field  │  CRDT type        │  Merged value                │
+// ├─────────┼───────────────────┼──────────────────────────────┤
+// │  title  │  lww              │  "Buy milk" (latest wins)    │
+// │  votes  │  pn-counter       │  +1 (increments add up)      │
+// │  tags   │  or-set           │  {"urgent","shop"} (union)   │
+// └─────────┴───────────────────┴──────────────────────────────┘
+//
+// Key insight: each field is an independent CRDT.
+// Editing "title" on Client A never conflicts with
+// incrementing "votes" on Client B.`}
+      />
     </article>
   )
 }

@@ -65,14 +65,14 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 > Professional teams can't adopt without a testing story.
 
-- [ ] Create `@tanstack/realtime/testing` entry point (or `@tanstack/realtime-testing` package)
-- [ ] Implement `createMockTransport()` — controllable fake transport
-  - [ ] Methods: `simulateMessage(channel, data)`, `simulateDisconnect()`, `simulateReconnect()`
-  - [ ] Observable message log for assertions
-- [ ] Implement `createMockPresenceTransport()` — extends mock with presence join/leave/update
+- [x] Create `@tanstack/realtime/testing` entry point (or `@tanstack/realtime-testing` package)
+- [x] Implement `createMockTransport()` — controllable fake transport
+  - [x] Methods: `simulateMessage(channel, data)`, `simulateDisconnect()`, `simulateReconnect()`
+  - [x] Observable message log for assertions
+- [x] Implement `createMockPresenceTransport()` — extends mock with presence join/leave/update
 - [ ] Implement `TestRealtimeProvider` for React — auto-connects with mock transport
 - [ ] Add usage examples in JSDoc and README
-- [ ] Write tests for the test utilities themselves
+- [x] Write tests for the test utilities themselves
 - [x] Document testing patterns in a new doc page: `packages/docs/src/pages/docs/Testing.tsx`
   - [x] Add to sidebar under "Guides"
   - [x] Show: testing a collection hook, testing presence, testing optimistic rollback
@@ -83,15 +83,15 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 > Silent failures are the worst DX bug class.
 
-- [ ] Add `onSubscribeError(channel, reason)` callback to transport interface
-- [ ] Propagate subscribe errors in `wsTransport` (currently `console.warn` only)
-- [ ] Propagate subscribe errors in `sseTransport`
-- [ ] Propagate subscribe errors in `centrifugoTransport`
-- [ ] Surface `subscribeError` state in `realtimeCollectionOptions`
-- [ ] Surface `subscribeError` state in `liveChannelOptions`
+- [x] Add `onSubscribeError(channel, reason)` callback to transport interface
+- [x] Propagate subscribe errors in `wsTransport` (currently `console.warn` only)
+- [x] Propagate subscribe errors in `sseTransport`
+- [x] Propagate subscribe errors in `centrifugoTransport`
+- [x] Surface `subscribeError` state in `realtimeCollectionOptions`
+- [x] Surface `subscribeError` state in `liveChannelOptions`
 - [ ] Surface `subscribeError` in React hooks (`useRealtimeCollection`, `useLiveChannel`, `useSubscribe`)
-- [ ] Add dev-mode console error with actionable message ("Check your authorize function")
-- [ ] Add test coverage for subscribe error propagation
+- [x] Add dev-mode console error with actionable message ("Check your authorize function")
+- [x] Add test coverage for subscribe error propagation
 - [ ] Document error handling in the Authentication guide (Project 2)
 
 ---
@@ -378,23 +378,23 @@ Each section is a self-contained project. Tasks are ordered by dependency within
   - **Guides**: Authentication, TanStack Start + Drizzle, Centrifugo, Scaling to Production, Testing, Multi-Tab / SharedWorker
   - **Infrastructure**: Transports (with decision matrix), Resilience
   - **Reference**: React Hooks, API Reference, Error Reference, Wire Protocol
-- [ ] Add breadcrumbs or "You are here" indicator
+- [x] Add breadcrumbs or "You are here" indicator
 - [x] Add previous/next page navigation at the bottom of each doc page
-- [ ] Add "Edit this page on GitHub" links
+- [x] Add "Edit this page on GitHub" links
 
 ### Home Page
 
-- [ ] Update feature cards to include: Ephemeral Channels, Tick/Game State, AI Streaming, DevTools (when ready)
+- [x] Update feature cards to include: Ephemeral Channels, Tick/Game State, AI Streaming, DevTools (when ready)
 - [ ] Add "Examples" section linking to runnable example apps (Project 1)
 - [ ] Add "Framework Support" badges (React + Vue/Solid when Project 6 ships)
-- [ ] Refresh the "When to use" section to reference competitive landscape from analysis doc
+- [x] Refresh the "When to use" section to reference competitive landscape from analysis doc
 - [ ] Add testimonials/social proof section (when available)
 
 ### Getting Started Page
 
-- [ ] Add transport selection guidance (link to decision matrix, Project 20)
-- [ ] Add "Next steps" section at the bottom linking to the progressive spectrum
-- [ ] Show the 3-step path: (1) basic query, (2) add realtime, (3) add CRDTs — with working code
+- [x] Add transport selection guidance (link to decision matrix, Project 20)
+- [x] Add "Next steps" section at the bottom linking to the progressive spectrum
+- [x] Show the 3-step path: (1) basic query, (2) add realtime, (3) add CRDTs — with working code
 - [x] Add note about `autoConnect` behavior (Project 7)
 
 ### Collections Page
@@ -408,13 +408,13 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 - [x] Document `useLiveChannel` hook (Project 8)
 - [x] Document `createValidatedPublish` (Project 8)
 - [ ] Add pagination/history section when Project 12 ships
-- [ ] Add "Recipes" linking to read receipts (Project 21) and reactions (Project 18)
+- [x] Add "Recipes" linking to read receipts (Project 21) and reactions (Project 18)
 
 ### CRDTs Page
 
 - [x] Add undo/redo limitations section (Project 22)
 - [x] Add "When to use Y.js instead" callout linking to Rich Text guide (Project 9)
-- [ ] Add visual diagram showing field-level merge behavior
+- [x] Add visual diagram showing field-level merge behavior
 
 ### Presence Page
 
@@ -426,7 +426,7 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 - [x] Document `staleAfter` and `'stale'` status (Project 8)
 - [ ] Link to AI streaming example (Project 1)
-- [ ] Add server-side checkpoint persistence patterns
+- [x] Add server-side checkpoint persistence patterns
 
 ### Transports Page
 
@@ -441,15 +441,15 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 ### Hooks Reference Page
 
-- [ ] Add all hooks (ensure `useLiveChannel`, `useEphemeral`, `useSyncedFields`, `useSyncedCounter` are listed)
-- [ ] For each hook: signature, return type, options, example, "See also" link to concept page
+- [x] Add all hooks (ensure `useLiveChannel`, `useEphemeral`, `useSyncedFields`, `useSyncedCounter` are listed)
+- [x] For each hook: signature, return type, options, example, "See also" link to concept page
 - [ ] Add framework tabs when Project 6 ships (React / Vue / Solid equivalents)
 
 ### Cross-Cutting Docs Quality
 
 - [ ] Add search functionality to the docs site (e.g., Algolia DocSearch or local Fuse.js)
 - [ ] Add syntax highlighting theme consistent with TanStack brand
-- [ ] Ensure all `<CodeBlock>` examples have file path titles for context
-- [ ] Add copy-to-clipboard button on all code blocks
-- [ ] Review all existing pages for broken internal links after restructure
-- [ ] Add OpenGraph meta tags for social sharing previews
+- [x] Ensure all `<CodeBlock>` examples have file path titles for context
+- [x] Add copy-to-clipboard button on all code blocks
+- [x] Review all existing pages for broken internal links after restructure
+- [x] Add OpenGraph meta tags for social sharing previews

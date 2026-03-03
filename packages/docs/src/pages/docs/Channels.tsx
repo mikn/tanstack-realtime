@@ -122,6 +122,7 @@ export function Channels() {
 
       <h2 id="use-subscribe">useSubscribe &mdash; raw channel events</h2>
       <CodeBlock
+        title="features/chat/TypingIndicator.tsx"
         code={`import { useSubscribe } from '@tanstack/react-realtime'
 
 function TypingIndicator({ roomId }: { roomId: string }) {
@@ -139,6 +140,7 @@ function TypingIndicator({ roomId }: { roomId: string }) {
 
       <h2 id="use-publish">usePublish &mdash; publish to a channel</h2>
       <CodeBlock
+        title="features/chat/TypingBroadcast.tsx"
         code={`import { usePublish } from '@tanstack/react-realtime'
 
 function TypingBroadcast({ roomId }: { roomId: string }) {
@@ -155,6 +157,7 @@ function TypingBroadcast({ roomId }: { roomId: string }) {
 
       <h2 id="use-channel">useChannel &mdash; subscribe + publish</h2>
       <CodeBlock
+        title="features/chat/ChatRoom.tsx"
         code={`import { useChannel } from '@tanstack/react-realtime'
 
 function ChatRoom({ roomId }: { roomId: string }) {
@@ -338,6 +341,22 @@ export const updateTodo = createServerFn()(async ({ id, data }) => {
           which events to keep.
         </p>
       </div>
+
+      <h2 id="recipes">Recipes</h2>
+      <ul>
+        <li>
+          <a href="#/docs/read-receipts">Read Receipts</a> &mdash; track which
+          messages each user has seen using a per-user high-water mark
+        </li>
+        <li>
+          <a href="#/docs/ephemeral">Emoji Reactions</a> &mdash; ephemeral
+          flying-emoji animations paired with persistent PN-Counter totals
+        </li>
+        <li>
+          <a href="#/docs/ephemeral#toast-notifications">Toast Notifications</a>{' '}
+          &mdash; fire-and-forget server alerts via <code>useSubscribe</code>
+        </li>
+      </ul>
     </article>
   )
 }

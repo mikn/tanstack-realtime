@@ -61,7 +61,19 @@ function Features() {
     },
     {
       title: 'Presence & pub/sub',
-      desc: "Track who's online, broadcast ephemeral events, show live cursors.",
+      desc: "Track who's online, share cursor positions, and broadcast messages across subscribers.",
+    },
+    {
+      title: 'Ephemeral channels',
+      desc: 'Auto-expiring events like typing indicators, emoji reactions, and toasts that disappear after a configurable TTL.',
+    },
+    {
+      title: 'AI streaming',
+      desc: 'Ordered, resumable streams with reduce-based state and HMAC-signed checkpoints.',
+    },
+    {
+      title: 'Tick-based sync',
+      desc: 'Delta-compressed 60 Hz updates for game state, simulations, and high-frequency data.',
     },
     {
       title: 'Offline & multi-tab',
@@ -294,20 +306,58 @@ function Positioning() {
             <h3>Look elsewhere</h3>
             <ul>
               <li>
-                <strong>Already using ElectricSQL</strong> &mdash; it syncs
-                Postgres directly to client collections
+                <strong>Postgres sync</strong> &mdash; ElectricSQL and PowerSync
+                sync Postgres directly to client collections
               </li>
               <li>
-                <strong>Rich text editing</strong> &mdash; Yjs and Hocuspocus
-                are purpose-built for this
+                <strong>Rich text editing</strong> &mdash; Yjs/Hocuspocus or
+                Automerge are purpose-built; see our{' '}
+                <a href="#/docs/rich-text-crdts">Y.js integration guide</a> for
+                pairing with TanStack Realtime as the transport
               </li>
               <li>
-                <strong>Polling works fine</strong> &mdash; TanStack Query with
-                a refetchInterval is simpler
+                <strong>Polling is enough</strong> &mdash; TanStack Query with a{' '}
+                <code>refetchInterval</code> is simpler when sub-second latency
+                is not required
+              </li>
+              <li>
+                <strong>Managed services</strong> &mdash; Ably, Pusher, and
+                Liveblocks handle infrastructure for you; TanStack Realtime is
+                for teams that want to own the transport layer
               </li>
             </ul>
           </div>
         </div>
+      </div>
+    </section>
+  )
+}
+
+function Community() {
+  return (
+    <section className="section section-alt">
+      <div className="container">
+        <h2>Built for the community</h2>
+        <p className="section-sub">
+          TanStack Realtime is MIT-licensed and community-driven. Join the
+          conversation on{' '}
+          <a
+            href="https://github.com/mikn/tanstack-realtime"
+            target="_blank"
+            rel="noopener"
+          >
+            GitHub
+          </a>{' '}
+          or{' '}
+          <a
+            href="https://discord.com/invite/WrRKjPJ"
+            target="_blank"
+            rel="noopener"
+          >
+            Discord
+          </a>
+          .
+        </p>
       </div>
     </section>
   )
@@ -383,6 +433,7 @@ export function Home() {
       <QuickStart />
       <Ecosystem />
       <Positioning />
+      <Community />
       <Footer />
     </>
   )

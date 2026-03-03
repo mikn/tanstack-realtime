@@ -725,6 +725,13 @@ export function createBroadcastChannelTransport(
         }
       }
     },
+
+    onSubscribeError(callback) {
+      if (inner?.onSubscribeError) {
+        return inner.onSubscribeError(callback)
+      }
+      return () => {}
+    },
   }
 
   return transport

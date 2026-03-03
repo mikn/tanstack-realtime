@@ -688,6 +688,13 @@ export function createSharedWorkerTransport(
         } satisfies TabToWorkerMsg)
       }
     },
+
+    onSubscribeError(_callback) {
+      // Subscribe errors are handled inside the SharedWorker coordinator.
+      // The tab ↔ worker protocol does not currently relay them, so this
+      // is a no-op stub for API compatibility.
+      return () => {}
+    },
   }
 
   return transport

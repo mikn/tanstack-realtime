@@ -306,6 +306,44 @@ function AIResponse({ requestId }: { requestId: string }) {
   // Open-ended — no isDone, stream runs until unmount
 })`}
       />
+
+      <h2 id="checkpoint-persistence">Server-side checkpoint persistence</h2>
+      <p>
+        For long-running streams (AI responses, ETL pipelines), persist
+        checkpoints so clients can resume after a page reload or reconnection
+        without replaying the entire stream from the beginning.
+      </p>
+      <CodeBlock
+        title="server/routes/ai-stream.ts"
+        code={`import { nodeServer } from '../realtime'
+import { db } from '../db'
+
+const stream = nodeServer.createStream({
+  channel: ['ai', { requestId }],
+  // Persist checkpoint to database after every N events
+  checkpoint: {
+    channelDef: aiResponseStream,
+    interval: { events: 50 },
+    handler: async (cp) => {
+      await db.streamCheckpoints.upsert({
+        where: { streamId: requestId },
+        update: { checkpoint: JSON.stringify(cp), updatedAt: new Date() },
+        create: { streamId: requestId, checkpoint: JSON.stringify(cp) },
+      })
+    },
+  },
+})`}
+      />
+
+      <div className="doc-callout">
+        <p>
+          <strong>Checkpoint granularity.</strong> Checkpointing every event
+          adds database writes. For AI token streams, checkpoint every 50-100
+          tokens or every 2-3 seconds. The <code>checkpointInterval</code>{' '}
+          option controls this: <code>{'checkpointInterval: 50'}</code>{' '}
+          checkpoints every 50th event.
+        </p>
+      </div>
     </article>
   )
 }

@@ -87,6 +87,15 @@ export function liveChannelOptions<
       const pending: Array<unknown> = []
       let initialized = !initialData // true immediately when there is no history
 
+      // Surface subscribe auth errors for this channel.
+      const unsubErr = client.onSubscribeError((ch, reason, code) => {
+        if (ch === serializedChannel) {
+          console.error(
+            `[realtime] Subscribe rejected for "${ch}": ${reason}${code != null ? ` (${code})` : ''}`,
+          )
+        }
+      })
+
       // Subscribe to incoming channel events.
       const unsub = client.subscribe(serializedChannel, (raw) => {
         if (stopped) return
@@ -145,6 +154,7 @@ export function liveChannelOptions<
       return () => {
         stopped = true
         unsub()
+        unsubErr()
       }
     },
   }

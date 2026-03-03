@@ -39,6 +39,7 @@ export type {
   PresenceUser,
   ParsedChannel,
   QueryKey,
+  SubscribeError,
   // Core transport interface (no presence required for custom implementations)
   RealtimeTransport,
   // Optional presence extension — implement alongside RealtimeTransport
@@ -238,3 +239,16 @@ export type {
   ExplicitCheckpointConfig,
   ChannelDefCheckpointConfig,
 } from './server/index.js'
+
+// Testing utilities
+export {
+  createMockTransport,
+  createMockPresenceTransport,
+} from './testing/index.js'
+export type {
+  MockTransport,
+  MockTransportOptions,
+  PublishRecord,
+  MockPresenceTransport,
+  MockPresenceTransportOptions,
+} from './testing/index.js'

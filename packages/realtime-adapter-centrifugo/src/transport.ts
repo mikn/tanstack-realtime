@@ -220,6 +220,11 @@ export function centrifugoTransport(
   // channel → Map<clientId, data> (maintained client-side for sidecar presence)
   const presenceState = new Map<string, Map<string, unknown>>()
 
+  // subscribe error callbacks
+  const subscribeErrorListeners = new Set<
+    (channel: string, reason: string, code?: number) => void
+  >()
+
   // channel → last known recovery position (epoch + offset)
   // Populated from subscribe replies and updated as publications arrive.
   const channelRecovery = new Map<string, RecoveryPosition>()
@@ -385,7 +390,14 @@ export function centrifugoTransport(
     pending.delete(reply.id)
 
     if (reply.error) {
+      // If this was a subscribe command, fire subscribe error callbacks.
+      const errorChannel = cmdChannels.get(reply.id)
       cmdChannels.delete(reply.id)
+      if (errorChannel) {
+        for (const cb of subscribeErrorListeners) {
+          cb(errorChannel, reply.error.message, reply.error.code)
+        }
+      }
       p.reject(
         new Error(
           `[realtime:centrifugo] Command ${reply.id} error ${reply.error.code}: ${reply.error.message}`,
@@ -725,6 +737,13 @@ export function centrifugoTransport(
         if (presenceListeners.get(channel)?.size === 0) {
           presenceListeners.delete(channel)
         }
+      }
+    },
+
+    onSubscribeError(callback) {
+      subscribeErrorListeners.add(callback)
+      return () => {
+        subscribeErrorListeners.delete(callback)
       }
     },
   }

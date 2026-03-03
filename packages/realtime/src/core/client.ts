@@ -115,6 +115,14 @@ export function createRealtimeClient(
       if (!hasPresence(transport)) presenceNotSupported('onPresenceChange')
       return transport.onPresenceChange(channel, callback)
     },
+
+    onSubscribeError(callback) {
+      if (transport.onSubscribeError) {
+        return transport.onSubscribeError(callback)
+      }
+      // No-op for transports that don't support subscribe errors
+      return () => {}
+    },
   }
 
   return client
