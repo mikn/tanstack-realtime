@@ -103,7 +103,6 @@ const client = createRealtimeClient({
 })`}
       />
 
-
       <h2 id="centrifugo">Centrifugo</h2>
       <p>
         Production WebSocket infrastructure with token auth and server-assisted
