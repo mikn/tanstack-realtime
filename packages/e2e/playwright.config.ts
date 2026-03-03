@@ -35,7 +35,7 @@ export default defineConfig({
   // vinxi dev (TanStack Start) provides the SSE backend via webServer below.
 
   webServer: {
-    command: `${join(import.meta.dirname, 'node_modules/.bin/vinxi')} dev`,
+    command: `${join(import.meta.dirname, 'node_modules/.bin/vite')}`,
     cwd: join(import.meta.dirname, 'app'),
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env['CI'],
