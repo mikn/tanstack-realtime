@@ -28,10 +28,10 @@
         "app/app/client.tsx",
         "app/app/ssr.tsx",
         "app/app/router.tsx",
+        "app/app/routeTree.gen.ts",
         "app/app/routes/**/*.{ts,tsx}",
         "tests/**/*.spec.ts"
-      ],
-      "ignore": ["app/app/routeTree.gen.ts"]
+      ]
     }
   },
   "ignore": ["packages/docs/**", "packages/__tests__/workerd-test-worker.ts"]
