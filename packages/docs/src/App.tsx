@@ -19,6 +19,8 @@ import { Scaling } from './pages/docs/Scaling'
 import { Centrifugo } from './pages/docs/Centrifugo'
 import { Ephemeral } from './pages/docs/Ephemeral'
 import { Tick } from './pages/docs/Tick'
+import { ReadReceipts } from './pages/docs/ReadReceipts'
+import { ServerHooks } from './pages/docs/ServerHooks'
 
 // ---------------------------------------------------------------------------
 // Simple hash router
@@ -55,6 +57,8 @@ const docRoutes: Partial<Record<string, () => React.JSX.Element>> = {
   '#/docs/centrifugo': Centrifugo,
   '#/docs/ephemeral': Ephemeral,
   '#/docs/tick': Tick,
+  '#/docs/read-receipts': ReadReceipts,
+  '#/docs/server-hooks': ServerHooks,
 }
 
 // ---------------------------------------------------------------------------

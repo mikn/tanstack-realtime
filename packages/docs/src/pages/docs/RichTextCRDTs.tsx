@@ -141,7 +141,7 @@ export function RichTextCRDTs() {
       <h2 id="setup">Step-by-step setup</h2>
 
       <h3>1. Install dependencies</h3>
-      <CodeBlock code={`npm install yjs @tanstack/realtime`} />
+      <CodeBlock code={`npm install yjs y-protocols @tanstack/realtime`} />
 
       <h3>2. Create a Y.js document</h3>
       <CodeBlock
@@ -214,13 +214,12 @@ export class RealtimeYjsProvider {
       <CodeBlock
         title="app.ts"
         code={`import * as Y from 'yjs'
-import { createRealtimeClient } from '@tanstack/realtime'
-import { wsTransport } from '@tanstack/realtime/ws-transport'
+import { createRealtimeClient, wsTransport } from '@tanstack/realtime'
 import { RealtimeYjsProvider } from './realtime-yjs-provider'
 
 // Create the TanStack Realtime client
 const client = createRealtimeClient({
-  transport: wsTransport({ url: 'ws://localhost:3000/realtime' }),
+  transport: wsTransport({ url: 'ws://localhost:3000' }),
 })
 
 // Create the Y.js document
@@ -281,7 +280,11 @@ provider.connect()
 
       <CodeBlock
         title="awareness-bridge.ts"
-        code={`import { Awareness } from 'y-protocols/awareness'
+        code={`import {
+  Awareness,
+  encodeAwarenessUpdate,
+  applyAwarenessUpdate,
+} from 'y-protocols/awareness'
 import type { RealtimeClient } from '@tanstack/realtime'
 import type * as Y from 'yjs'
 
@@ -311,7 +314,7 @@ export function setupAwareness(
     removed: Array<number>
   }) => {
     const changedClients = added.concat(updated, removed)
-    const update = Awareness.encodeAwarenessUpdate(awareness, changedClients)
+    const update = encodeAwarenessUpdate(awareness, changedClients)
     client.publish(channel + ':awareness', {
       update: Array.from(update),
     })
@@ -321,7 +324,7 @@ export function setupAwareness(
   const unsub = client.subscribe<{ update: Array<number> }>(
     channel + ':awareness',
     (message) => {
-      Awareness.applyAwarenessUpdate(
+      applyAwarenessUpdate(
         awareness,
         new Uint8Array(message.update),
         'remote',
@@ -346,6 +349,16 @@ export function setupAwareness(
   }
 }`}
       />
+      <div className="doc-callout">
+        <strong>Transport requirement.</strong> The <code>joinPresence</code>{' '}
+        and <code>leavePresence</code> methods are only available on transports
+        that implement the <code>PresenceCapable</code> interface (e.g.{' '}
+        <code>centrifugoTransport</code>). If your transport does not support
+        presence natively (e.g. <code>sseTransport</code>), omit the presence
+        calls and rely solely on Y.js Awareness for cursor sharing, or use
+        TanStack Realtime&rsquo;s <code>createPresenceChannel</code> with a
+        separate pub/sub channel instead.
+      </div>
       <p>
         With this setup, the editor renders remote cursors from Y.js Awareness
         (keystroke-level updates), while the UI sidebar shows collaborator names
