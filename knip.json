@@ -20,6 +20,20 @@
     "packages/__tests__": {
       "entry": ["**/*.test.ts"],
       "ignore": ["setup.ts", "workerd-test-worker.ts"]
+    },
+    "packages/realtime-preset-start": {},
+    "packages/e2e": {
+      "entry": [
+        "app/vite.config.ts",
+        "playwright.config.ts",
+        "global-setup.ts",
+        "global-teardown.ts",
+        "app/app/client.tsx",
+        "app/app/router.tsx",
+        "app/app/routeTree.gen.ts",
+        "app/app/routes/**/*.{ts,tsx}",
+        "tests/**/*.spec.ts"
+      ]
     }
   },
   "ignore": ["packages/docs/**", "packages/__tests__/workerd-test-worker.ts"]

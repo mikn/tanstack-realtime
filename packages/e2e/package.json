@@ -1,0 +1,30 @@
+{
+  "name": "@tanstack/realtime-e2e",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "dev": "vite"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@tanstack/react-router": "^1.163.3",
+    "@tanstack/react-realtime": "workspace:*",
+    "@tanstack/react-store": "^0.9.1",
+    "@tanstack/realtime": "workspace:*",
+    "@tanstack/realtime-adapter-sse": "workspace:*",
+    "@tanstack/realtime-preset-start": "workspace:*",
+    "@tanstack/router-plugin": "^1.163.3",
+    "@tanstack/store": "^0.9.1",
+    "@types/node": "^22.10.10",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "typescript": "^5.9.3",
+    "vite": "^7.0.0"
+  }
+}
