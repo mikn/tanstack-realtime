@@ -218,14 +218,15 @@ describe('createSseHandler — unified AuthorizeFn', () => {
     const handler = createSseHandler({
       pingInterval: 0,
       getUser: () => ({ userId: 'u1' }),
-      authorize: async (
+      authorize: (
         _userId: string,
         _channel: ParsedChannel,
-      ): Promise<ChannelPermissions> => ({
-        subscribe: true,
-        publish: true,
-        presence: false,
-      }),
+      ): Promise<ChannelPermissions> =>
+        Promise.resolve({
+          subscribe: true,
+          publish: true,
+          presence: false,
+        }),
     })
 
     const streamRes = await handler.handle(

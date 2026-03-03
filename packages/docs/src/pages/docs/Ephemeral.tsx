@@ -179,9 +179,10 @@ function ViewingIndicatorDemo() {
   }
 
   useEffect(() => {
+    const currentTimers = timers.current
     return () => {
       // Cleanup timers on unmount
-      for (const t of Object.values(timers.current)) clearTimeout(t)
+      for (const t of Object.values(currentTimers)) clearTimeout(t)
     }
   }, [])
 

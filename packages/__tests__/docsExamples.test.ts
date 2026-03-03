@@ -220,7 +220,7 @@ describe('docs: withRest helper', () => {
     const opts = withRest<{ id: string }, string>({
       url: '/api/tasks',
       getKey: (t) => t.id,
-      headers: async () => ({ Authorization: 'Bearer token123' }),
+      headers: () => ({ Authorization: 'Bearer token123' }),
     })
 
     await opts.queryFn()
@@ -313,7 +313,7 @@ describe('docs: auto-broadcast after onInsert / onUpdate', () => {
     expect((transport.publishCalls[0].data as any).action).toBe('update')
   })
 
-  it('does NOT publish when onInsert is absent (no channel noise)', async () => {
+  it('does NOT publish when onInsert is absent (no channel noise)', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
 
@@ -778,8 +778,9 @@ describe('docs: createOfflineQueue', () => {
       subscribe() {
         return () => {}
       },
-      async publish(channel, data) {
+      publish(channel, data) {
         innerPublishCalls.push({ channel, data })
+        return Promise.resolve()
       },
     }
 
@@ -821,8 +822,9 @@ describe('docs: createOfflineQueue', () => {
       subscribe() {
         return () => {}
       },
-      async publish(channel, data) {
+      publish(channel, data) {
         innerPublishCalls.push({ channel, data })
+        return Promise.resolve()
       },
     }
 
@@ -857,7 +859,7 @@ describe('docs: withGapRecovery', () => {
 
     const gapCalls: Array<string> = []
     const transport = withGapRecovery(innerTransport, {
-      onGap: async (channel) => {
+      onGap: (channel) => {
         gapCalls.push(channel)
       },
     })
@@ -898,7 +900,7 @@ describe('docs: withGapRecovery', () => {
 
     const gapCalls: Array<string> = []
     const transport = withGapRecovery(innerTransport, {
-      onGap: async (channel) => {
+      onGap: (channel) => {
         gapCalls.push(channel)
       },
     })

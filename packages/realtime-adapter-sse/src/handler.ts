@@ -510,9 +510,10 @@ export function createSseHandler(options: SseHandlerOptions = {}): SseHandler {
     }): ServerStream<TEvent> {
       const handler = this
       return createServerStream<TEvent>({
-        publish: async (ch, data) => {
+        publish: (ch, data) => {
           const serialized = typeof ch === 'string' ? ch : serializeKey(ch)
           handler.broadcast(serialized, data)
+          return Promise.resolve()
         },
         channel: opts.channel,
         hmacKey: opts.hmacKey,

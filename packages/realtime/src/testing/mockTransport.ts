@@ -53,9 +53,10 @@ export function createMockTransport(
   return {
     store,
 
-    async connect() {
+    connect() {
       store.setState(() => 'connecting')
       store.setState(() => 'connected')
+      return Promise.resolve()
     },
 
     disconnect() {
@@ -77,8 +78,9 @@ export function createMockTransport(
       }
     },
 
-    async publish(channel, data) {
+    publish(channel, data) {
       publishLog.push({ channel, data, timestamp: Date.now() })
+      return Promise.resolve()
     },
 
     onSubscribeError(callback) {
