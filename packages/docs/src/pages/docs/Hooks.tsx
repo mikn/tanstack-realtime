@@ -43,7 +43,8 @@ function ConnectionBadge() {
       <p>Subscribe to raw channel events for the component lifetime.</p>
       <CodeBlock
         title="TypingIndicator.tsx"
-        code={`import { useSubscribe } from '@tanstack/react-realtime'
+        code={`import { useState } from 'react'
+import { useSubscribe } from '@tanstack/react-realtime'
 
 function TypingIndicator({ roomId }: { roomId: string }) {
   const [typing, setTyping] = useState<string[]>([])
@@ -99,7 +100,8 @@ function TypingBroadcast({ roomId }: { roomId: string }) {
       <p>Combined subscribe + publish for one channel.</p>
       <CodeBlock
         title="ChatRoom.tsx"
-        code={`import { useChannel } from '@tanstack/react-realtime'
+        code={`import { useState } from 'react'
+import { useChannel } from '@tanstack/react-realtime'
 
 function ChatRoom({ roomId }: { roomId: string }) {
   const [messages, setMessages] = useState<Message[]>([])

@@ -385,12 +385,10 @@ export function centrifugoTransport(
   }
 
   function handleReply(reply: CentrifugoReply): void {
-    const p = pending.get(reply.id)
-    if (!p) return
-    pending.delete(reply.id)
-
+    // Fire subscribe error callbacks before checking the pending map, because
+    // initial subscribes use send() (fire-and-forget) not sendCmd(), so
+    // they have no pending entry.
     if (reply.error) {
-      // If this was a subscribe command, fire subscribe error callbacks.
       const errorChannel = cmdChannels.get(reply.id)
       cmdChannels.delete(reply.id)
       if (errorChannel) {
@@ -398,6 +396,13 @@ export function centrifugoTransport(
           cb(errorChannel, reply.error.message, reply.error.code)
         }
       }
+    }
+
+    const p = pending.get(reply.id)
+    if (!p) return
+    pending.delete(reply.id)
+
+    if (reply.error) {
       p.reject(
         new Error(
           `[realtime:centrifugo] Command ${reply.id} error ${reply.error.code}: ${reply.error.message}`,

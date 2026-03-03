@@ -96,7 +96,9 @@ function StreamDemo() {
             )}
           </span>
         )}
-        {status === 'error' && <div className="demo-stream-error">{error}</div>}
+        {status === 'error' && (
+          <div className="demo-stream-error-msg">{error}</div>
+        )}
       </div>
       <div className="demo-stream-status">
         Status:{' '}
@@ -339,8 +341,8 @@ const stream = nodeServer.createStream({
         <p>
           <strong>Checkpoint granularity.</strong> Checkpointing every event
           adds database writes. For AI token streams, checkpoint every 50-100
-          tokens or every 2-3 seconds. The <code>checkpointInterval</code>{' '}
-          option controls this: <code>{'checkpointInterval: 50'}</code>{' '}
+          tokens or every 2-3 seconds. The <code>checkpoint.interval</code>{' '}
+          option controls this: <code>{'interval: { events: 50 }'}</code>{' '}
           checkpoints every 50th event.
         </p>
       </div>

@@ -123,7 +123,8 @@ export function Channels() {
       <h2 id="use-subscribe">useSubscribe &mdash; raw channel events</h2>
       <CodeBlock
         title="features/chat/TypingIndicator.tsx"
-        code={`import { useSubscribe } from '@tanstack/react-realtime'
+        code={`import { useState } from 'react'
+import { useSubscribe } from '@tanstack/react-realtime'
 
 function TypingIndicator({ roomId }: { roomId: string }) {
   const [typing, setTyping] = useState<string[]>([])
@@ -158,7 +159,8 @@ function TypingBroadcast({ roomId }: { roomId: string }) {
       <h2 id="use-channel">useChannel &mdash; subscribe + publish</h2>
       <CodeBlock
         title="features/chat/ChatRoom.tsx"
-        code={`import { useChannel } from '@tanstack/react-realtime'
+        code={`import { useState } from 'react'
+import { useChannel } from '@tanstack/react-realtime'
 
 function ChatRoom({ roomId }: { roomId: string }) {
   const [messages, setMessages] = useState<Message[]>([])

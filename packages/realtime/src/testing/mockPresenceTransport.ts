@@ -39,6 +39,14 @@ export function createMockPresenceTransport(
   return {
     ...base,
 
+    // Re-define getters that were flattened by the spread operator
+    get publishLog() {
+      return base.publishLog
+    },
+    get activeChannels() {
+      return base.activeChannels
+    },
+
     joinPresence(channel, data) {
       if (!presenceState.has(channel)) presenceState.set(channel, [])
       const users = presenceState.get(channel)!
