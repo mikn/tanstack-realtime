@@ -23,9 +23,6 @@
     "packages/e2e": {
       "entry": [
         "app/vite.config.ts",
-        "playwright.config.ts",
-        "global-setup.ts",
-        "global-teardown.ts",
         "app/app/client.tsx",
         "app/app/router.tsx",
         "app/app/routeTree.gen.ts",
@@ -34,9 +31,5 @@
       ]
     }
   },
-  "ignore": [
-    "packages/docs/**",
-    "packages/__tests__/workerd-test-worker.ts",
-    ".claude/**"
-  ]
+  "ignore": ["packages/docs/**"]
 }
