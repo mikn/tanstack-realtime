@@ -34,5 +34,9 @@
       ]
     }
   },
-  "ignore": ["packages/docs/**"]
+  "ignore": [
+    "packages/docs/**",
+    "packages/__tests__/workerd-test-worker.ts",
+    ".claude/**"
+  ]
 }
