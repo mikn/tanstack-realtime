@@ -17,16 +17,17 @@
  *
  * @example
  * ```ts
- * import { createCoordinatedTransport, wsTransport } from '@tanstack/realtime'
+ * import { createCoordinatedTransport } from '@tanstack/realtime'
+ * import { sseTransport } from '@tanstack/realtime-adapter-sse'
  *
  * // Automatic — picks BroadcastChannel in browsers, errors on server
  * const transport = createCoordinatedTransport({
- *   transport: () => wsTransport({ url: 'wss://rt.example.com' }),
+ *   transport: () => sseTransport({ url: '/api/realtime/sse' }),
  * })
  *
  * // Best: SharedWorker when available, falls back to BroadcastChannel
  * const transport = createCoordinatedTransport({
- *   transport: () => wsTransport({ url: 'wss://rt.example.com' }),
+ *   transport: () => sseTransport({ url: '/api/realtime/sse' }),
  *   workerUrl: new URL('./realtime.worker.ts', import.meta.url),
  * })
  * ```
@@ -50,7 +51,7 @@ import type { PresenceCapable, RealtimeTransport } from './types.js'
 
 export interface CoordinatedTransportOptions {
   /**
-   * Factory that creates the underlying transport (e.g. `wsTransport`,
+   * Factory that creates the underlying transport (e.g. `sseTransport`,
    * `centrifugoTransport`). Called lazily — only when this tab needs to
    * own the connection (leader in BroadcastChannel mode, or direct fallback).
    *
@@ -106,8 +107,8 @@ export function createCoordinatedTransport(
     throw new Error(
       '[realtime] createCoordinatedTransport is for browser environments.\n' +
         'On the server, use the transport directly:\n\n' +
-        '  import { wsTransport } from "@tanstack/realtime"\n' +
-        '  const transport = wsTransport({ url: "ws://localhost:3000" })\n',
+        '  import { sseTransport } from "@tanstack/realtime-adapter-sse"\n' +
+        '  const transport = sseTransport({ url: "http://localhost:3000/sse" })\n',
     )
   }
 

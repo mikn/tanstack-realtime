@@ -99,13 +99,13 @@ function createMockTransportWithPresence(): RealtimeTransport &
 // ===========================================================================
 
 describe('S1: Wire protocol validation', () => {
-  // These tests verify the validation functions exist in wsTransport.
-  // We test the behavior indirectly through the transport's message handling.
+  // These tests verify wire protocol validation logic.
+  // We test the behavior indirectly through message shape assertions.
 
-  describe('client-side (wsTransport message validation)', () => {
+  describe('client-side (message validation)', () => {
     it('rejects messages without a type field', () => {
       // Invalid messages should be silently ignored (not crash).
-      // The wsTransport validation function rejects { no_type: true }
+      // The transport validation function rejects { no_type: true }
       const invalidMessages = [
         null,
         undefined,

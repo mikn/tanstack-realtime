@@ -16,7 +16,7 @@
 - **One feature at a time** — start with `queryFn`. Add `channel` when ready. Add `fields` for CRDTs when you need conflict resolution. Each step is one config key — stop at any point.
 - **Pub/sub + presence** — chat, typing indicators, live cursors, and activity feeds are first-class. These aren't database rows — they need channels and presence, not table sync.
 - **Client-side CRDTs** — `{ votes: 'pn-counter', tags: 'or-set' }`. Merging happens on the client. Your server just stores and relays — no CRDT logic server-side.
-- **Swap transports, not code** — `wsTransport` → `centrifugoTransport` → `sseTransport`. One import swap. Your collections and hooks don't change.
+- **Swap transports, not code** — `sseTransport` → `centrifugoTransport`. One import swap. Your collections and hooks don't change.
 - **Resilient by default** — offline queue, gap recovery, deduplication, and automatic multi-tab coordination (SharedWorker → BroadcastChannel → direct)
 
 ## Packages
@@ -25,7 +25,6 @@
 | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | [`@tanstack/realtime`](#tanstackrealtime)                                       | Core client, collection helpers, CRDT primitives, and type definitions |
 | [`@tanstack/react-realtime`](#tanstackreact-realtime)                           | React hooks and provider                                               |
-| [`@tanstack/realtime-preset-node`](#tanstackrealtime-preset-node)               | Node.js server for local dev and self-hosted deployments               |
 | [`@tanstack/realtime-adapter-centrifugo`](#tanstackrealtime-adapter-centrifugo) | Transport adapter for [Centrifugo](https://centrifugal.dev)            |
 | [`@tanstack/realtime-adapter-sse`](#tanstackrealtime-adapter-sse)               | Server-Sent Events transport adapter                                   |
 
@@ -47,13 +46,13 @@ npm install @tanstack/realtime
 import {
   createCoordinatedTransport,
   createRealtimeClient,
-  wsTransport,
 } from '@tanstack/realtime'
+import { sseTransport } from '@tanstack/realtime-adapter-sse'
 
 // Recommended: automatic multi-tab coordination
 export const client = createRealtimeClient({
   transport: createCoordinatedTransport({
-    transport: () => wsTransport({ url: 'ws://localhost:3000' }),
+    transport: () => sseTransport({ url: '/api/realtime/sse' }),
   }),
 })
 
@@ -75,10 +74,10 @@ When a user opens your app in multiple browser tabs, each tab would normally ope
 ```ts
 // realtime.worker.ts — a separate file your bundler produces
 import { createSharedWorkerCoordinator } from '@tanstack/realtime'
-import { wsTransport } from '@tanstack/realtime'
+import { sseTransport } from '@tanstack/realtime-adapter-sse'
 
 const coordinator = createSharedWorkerCoordinator(
-  wsTransport({ url: 'wss://rt.example.com' }),
+  sseTransport({ url: '/api/realtime/sse' }),
 )
 
 self.addEventListener('connect', (e) => {
@@ -90,7 +89,7 @@ Then in your app code you point to it:
 
 ```ts
 const transport = createCoordinatedTransport({
-  transport: () => wsTransport({ url: 'wss://rt.example.com' }),
+  transport: () => sseTransport({ url: '/api/realtime/sse' }),
   workerUrl: new URL('./realtime.worker.ts', import.meta.url),
 })
 ```
@@ -216,61 +215,6 @@ function StatusBar() {
 | `useRealtimeCollection(config)`    | Returns a TanStack DB `Collection` backed by a realtime channel        |
 | `useLiveChannel(config)`           | Returns a TanStack DB `Collection` for append-only event streams       |
 | `useRealtime()`                    | Returns `{ status, connect, disconnect, client }`                      |
-
----
-
-## `@tanstack/realtime-preset-node`
-
-Node.js WebSocket server for local development, self-hosted deployments, and server-side tests. The client transport (`wsTransport`) lives in the base `@tanstack/realtime` package.
-
-### Installation
-
-```bash
-npm install @tanstack/realtime-preset-node
-```
-
-### Server
-
-```ts
-import http from 'node:http'
-import { createNodeServer } from '@tanstack/realtime-preset-node'
-
-const realtime = createNodeServer({
-  // Identify the user from the upgrade request (cookie, header, etc.).
-  // Return null to reject the connection.
-  async getUser(req) {
-    const userId = await getUserIdFromRequest(req)
-    return userId ? { userId } : null
-  },
-
-  // Return per-channel permissions for this user.
-  async authorize(userId, channel) {
-    return { subscribe: true, publish: false, presence: true }
-  },
-
-  path: '/_realtime', // default
-})
-
-const httpServer = http.createServer(myApp)
-realtime.attach(httpServer)
-httpServer.listen(3000)
-
-// Server-side publish from a background job or API route
-realtime.publish('todos:teamId=123', { type: 'created', todo })
-```
-
-### Client transport
-
-```ts
-import { createRealtimeClient, wsTransport } from '@tanstack/realtime'
-
-export const client = createRealtimeClient({
-  transport: wsTransport({
-    url: 'ws://localhost:3000', // omit in the browser — derived from window.location
-    path: '/_realtime', // default
-  }),
-})
-```
 
 ---
 

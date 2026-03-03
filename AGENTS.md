@@ -48,8 +48,8 @@ This has critical architectural implications:
 - **`createValidatedPublish`** and **`createServerStream`** are designed for this
   model: stateless wrappers around a `PublishFn` that run within a single server
   function invocation.
-- **`createNodeServer`** and **`createSseHandler`** are for persistent server
-  processes (local dev, self-hosted). They maintain in-memory connection state.
+- **`createSseHandler`** is for persistent server processes (local dev,
+  self-hosted). It maintains in-memory connection state.
   Do not mix the two models.
 
 ## Architecture & Conventions
@@ -81,18 +81,18 @@ export function createOfflineQueue(
 ): OfflineQueueTransport
 
 // Non-middleware: single options object
-export function wsTransport(options: WsTransportOptions): RealtimeTransport
+export function sseTransport(options: SseTransportOptions): RealtimeTransport
 ```
 
 ### Naming Conventions
 
 | Kind               | Pattern                                   | Example                                             |
 | ------------------ | ----------------------------------------- | --------------------------------------------------- |
-| Transport factory  | `*Transport`                              | `wsTransport`, `tickTransport`                      |
+| Transport factory  | `*Transport`                              | `sseTransport`, `tickTransport`                     |
 | Middleware factory | `create*` or `with*`                      | `createOfflineQueue`, `withGapRecovery`             |
 | Collection factory | `*CollectionOptions` or `*ChannelOptions` | `realtimeCollectionOptions`, `streamChannelOptions` |
-| Server factory     | `create*`                                 | `createNodeServer`, `createSseHandler`              |
-| Options type       | `*Options`                                | `WsTransportOptions`                                |
+| Server factory     | `create*`                                 | `createSseHandler`                                  |
+| Options type       | `*Options`                                | `SseTransportOptions`                               |
 | Config type        | `*Config`                                 | `RealtimeCollectionConfig`                          |
 | Type guard         | `has*` / `is*`                            | `hasPresence`                                       |
 
@@ -185,14 +185,14 @@ Prefix throw messages with `[module]` for debuggability.
 - Use `deferred<T>()` for controlling async timing in tests.
 - Use `vi.useFakeTimers()` for time-dependent behavior.
 - No real network calls in unit tests. Integration tests that need a real server
-  use `createNodeServer` with `node:http`.
+  use `createSseHandler` with `node:http`.
 
 ### Commit Messages
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
-feat: add reconnect limit option to wsTransport
+feat: add reconnect limit option to sseTransport
 fix: prevent stale closure in useSubscribe
 ```
 
@@ -220,8 +220,6 @@ fix: prevent stale closure in useSubscribe
 1. **Lint** — `pnpm lint` — zero errors required (warnings are acceptable).
 2. **Typecheck** — `pnpm typecheck` — must pass with no errors.
 3. **Tests** — `pnpm vitest run --project node` — all tests must pass.
-   - The `workerd` project requires a prior build step and may fail in dev
-     environments; run it with `pnpm test` when a full build is available.
 4. **Docs build** (if docs were changed) — `cd packages/docs && npx vite build`.
 
 Do not commit until all applicable checks pass. If a pre-commit hook rejects

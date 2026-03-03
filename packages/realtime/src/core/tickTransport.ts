@@ -153,10 +153,11 @@ export function applyDelta(
  * supports them.
  *
  * @example
- * import { tickTransport, wsTransport } from '@tanstack/realtime'
+ * import { tickTransport } from '@tanstack/realtime'
+ * import { sseTransport } from '@tanstack/realtime-adapter-sse'
  *
  * const tick = tickTransport(
- *   wsTransport({ url: 'ws://localhost:3001' }),
+ *   sseTransport({ url: '/api/realtime/sse' }),
  *   { tickMs: 16 },
  * )
  *

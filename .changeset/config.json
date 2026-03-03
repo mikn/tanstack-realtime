@@ -7,7 +7,6 @@
     [
       "@tanstack/realtime",
       "@tanstack/react-realtime",
-      "@tanstack/realtime-preset-node",
       "@tanstack/realtime-adapter-centrifugo",
       "@tanstack/realtime-adapter-sse"
     ]

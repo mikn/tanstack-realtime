@@ -5,7 +5,7 @@
  * and presence for TanStack DB.
  *
  * For React hooks and provider, use @tanstack/react-realtime.
- * For the Node.js preset, use @tanstack/realtime-preset-node.
+ * For transport adapters, use @tanstack/realtime-adapter-sse or @tanstack/realtime-adapter-centrifugo.
  */
 
 // Core primitives
@@ -123,11 +123,6 @@ export type {
   SyncedSetConfig,
   SyncedSetDef,
 } from './collections/index.js'
-
-// Built-in WebSocket transport — browser-safe, no Node.js dependencies.
-// Connects to a createNodeServer instance using the built-in wire protocol.
-export { wsTransport } from './core/wsTransport.js'
-export type { WsTransportOptions } from './core/wsTransport.js'
 
 // Tick-based transport — batches updates per tick interval for game state.
 export {

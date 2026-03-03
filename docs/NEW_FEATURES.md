@@ -168,29 +168,6 @@ export const updateTodo = createServerFn()(async ({ id, data }) => {
 On rejection, throws `PublishValidationError` with the reason string. On
 acceptance with data transformation, the transformed data is published.
 
-### B. `onPublish` hook in `createNodeServer`
-
-For deployments with a persistent Node.js server:
-
-```ts
-const nodeServer = createNodeServer({
-  getUser,
-  authorize,
-  onPublish: async ({ channel, data, userId }) => {
-    if (channel.namespace === 'todos') {
-      const result = todoSchema.safeParse(data)
-      if (!result.success)
-        return { accepted: false, reason: result.error.message }
-      return { accepted: true, data: result.data }
-    }
-    return { accepted: true }
-  },
-})
-```
-
-When a client publishes with a `requestId`, the server sends back
-`publish:ack` or `publish:error` so the client can await confirmation.
-
 ### Type signatures
 
 ```ts
@@ -212,8 +189,7 @@ type ValidatePublishFn = (
 
 ### Breaking changes
 
-None. `onPublish` is optional on `NodeServerOptions`; `createValidatedPublish`
-is a new API.
+None. `createValidatedPublish` is a new API.
 
 ---
 
@@ -272,12 +248,11 @@ streamChannelOptions({
 })
 ```
 
-### NodeServer / SseHandler convenience
+### SseHandler convenience
 
-Both `NodeServer` and `SseHandler` expose a `createStream()` method:
+`SseHandler` exposes a `createStream()` method:
 
 ```ts
-const stream = nodeServer.createStream({ channel: ['ai', { sessionId }] })
 const stream = sseHandler.createStream({ channel: ['ai', { sessionId }] })
 ```
 
@@ -460,9 +435,10 @@ tick interval and sends them as a single frame.
 ### Transport wrapper
 
 ```ts
-import { tickTransport, wsTransport } from '@tanstack/realtime'
+import { tickTransport } from '@tanstack/realtime'
+import { sseTransport } from '@tanstack/realtime-adapter-sse'
 
-const tick = tickTransport(wsTransport({ url: 'ws://localhost:3001' }), {
+const tick = tickTransport(sseTransport({ url: '/api/realtime/sse' }), {
   tickMs: 16,
   deltaCompression: true,
 })
@@ -550,9 +526,9 @@ Client → Server Function → External Pub/Sub → Subscribers
 1. **Client** calls a TanStack Start server function (mutation, AI request).
 2. **Server function** validates, persists, then publishes to an external
    channel via `PublishFn`.
-3. **External pub/sub** (Centrifugo, managed WS service, or the Node preset
+3. **External pub/sub** (Centrifugo, managed WS service, or the SSE adapter
    for single-process deployments) fans out to all subscribers.
-4. **Subscribers** receive via their WebSocket/SSE connection.
+4. **Subscribers** receive via their SSE/WebSocket connection.
 
 The server function never holds a reference to connected clients — it
 publishes via a `PublishFn` that routes to the external service.
