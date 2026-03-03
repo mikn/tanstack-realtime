@@ -89,7 +89,7 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 - [x] Propagate subscribe errors in `centrifugoTransport`
 - [x] Surface `subscribeError` state in `realtimeCollectionOptions`
 - [x] Surface `subscribeError` state in `liveChannelOptions`
-- [ ] Surface `subscribeError` in React hooks (`useRealtimeCollection`, `useLiveChannel`, `useSubscribe`)
+- [x] Surface `subscribeError` in React hooks (`useRealtimeCollection`, `useLiveChannel`, `useSubscribe`)
 - [x] Add dev-mode console error with actionable message ("Check your authorize function")
 - [x] Add test coverage for subscribe error propagation
 - [ ] Document error handling in the Authentication guide (Project 2)
