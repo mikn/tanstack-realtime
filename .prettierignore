@@ -5,3 +5,4 @@ coverage
 .nx
 **/test-results
 **/playwright-report
+.claude

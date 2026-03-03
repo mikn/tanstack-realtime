@@ -11,7 +11,14 @@ import { Streaming } from './pages/docs/Streaming'
 import { Transports } from './pages/docs/Transports'
 import { Resilience } from './pages/docs/Resilience'
 import { Hooks } from './pages/docs/Hooks'
+import { ErrorReference } from './pages/docs/ErrorReference'
 import { ServerFunctions } from './pages/docs/ServerFunctions'
+import { RichTextCRDTs } from './pages/docs/RichTextCRDTs'
+import { Authentication } from './pages/docs/Authentication'
+import { Scaling } from './pages/docs/Scaling'
+import { Centrifugo } from './pages/docs/Centrifugo'
+import { Ephemeral } from './pages/docs/Ephemeral'
+import { Tick } from './pages/docs/Tick'
 
 // ---------------------------------------------------------------------------
 // Simple hash router
@@ -41,6 +48,13 @@ const docRoutes: Partial<Record<string, () => React.JSX.Element>> = {
   '#/docs/transports': Transports,
   '#/docs/resilience': Resilience,
   '#/docs/hooks': Hooks,
+  '#/docs/error-reference': ErrorReference,
+  '#/docs/rich-text-crdts': RichTextCRDTs,
+  '#/docs/authentication': Authentication,
+  '#/docs/scaling': Scaling,
+  '#/docs/centrifugo': Centrifugo,
+  '#/docs/ephemeral': Ephemeral,
+  '#/docs/tick': Tick,
 }
 
 // ---------------------------------------------------------------------------

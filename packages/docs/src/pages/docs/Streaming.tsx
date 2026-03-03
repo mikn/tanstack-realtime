@@ -219,6 +219,74 @@ app.post('/api/chat', async (req) => {
 })`}
       />
 
+      <h2 id="stale-after">
+        Stale detection with <code>staleAfter</code>
+      </h2>
+      <p>
+        Long-running streams can silently stall &mdash; the producer crashes,
+        the network drops, or an upstream service times out. The{' '}
+        <code>staleAfter</code> option adds a silence timer: if no events
+        (including heartbeats) arrive within the configured window, the stream
+        status transitions to <code>&apos;stale&apos;</code>.
+      </p>
+      <CodeBlock
+        title="features/ai/stream.ts"
+        code={`import { createStreamChannel, serverStreamCallbacks } from '@tanstack/realtime'
+
+export const aiResponseStream = createStreamChannel({
+  id: 'ai-response',
+  channel: (params: { requestId: string }) => ['ai', params],
+
+  initial: { content: '' },
+
+  reduce: (state, event: { type: string; token?: string }) =>
+    event.type === 'token'
+      ? { content: state.content + (event.token ?? '') }
+      : state,
+
+  ...serverStreamCallbacks,
+
+  // If no event arrives for 15 seconds, mark the stream as stale.
+  // Choose a value 2-3x the server's heartbeat interval.
+  staleAfter: 15_000,
+})`}
+      />
+      <p>
+        In your component, check for the <code>&apos;stale&apos;</code> status
+        alongside the other lifecycle states:
+      </p>
+      <CodeBlock
+        title="features/ai/AIResponse.tsx"
+        code={`import { useStream } from '@tanstack/react-realtime'
+import { aiResponseStream } from './stream'
+
+function AIResponse({ requestId }: { requestId: string }) {
+  const { state, status, error } = useStream(aiResponseStream, {
+    params: { requestId },
+  })
+
+  if (status === 'pending')   return <span>Thinking...</span>
+  if (status === 'error')     return <span>Error: {error}</span>
+  if (status === 'stale')     return <span>Stream may have disconnected...</span>
+
+  return (
+    <p>
+      {state.content}
+      {status === 'streaming' && <span className="cursor">|</span>}
+    </p>
+  )
+}`}
+      />
+      <div className="doc-callout">
+        <p>
+          Stale is a <strong>soft failure</strong>. The stream is not stopped,
+          just flagged. If a new event arrives while stale, status reverts to{' '}
+          <code>&apos;streaming&apos;</code> automatically. You can also
+          override <code>staleAfter</code> per-hook instance via the{' '}
+          <code>useStream</code> options.
+        </p>
+      </div>
+
       <h2 id="other-uses">Beyond AI</h2>
       <p>
         <code>streamChannelOptions</code> works for any accumulated stream.

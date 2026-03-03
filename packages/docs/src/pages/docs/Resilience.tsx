@@ -167,6 +167,98 @@ typingUsers.subscribe((entries) => {
   setTyping(entries.map((e) => e.value.name))
 })`}
       />
+
+      <h2 id="sharedworker-setup">SharedWorker bundler setup</h2>
+      <p>
+        <code>createCoordinatedTransport()</code> auto-detects the best
+        multi-tab strategy: <strong>SharedWorker</strong> &rarr;{' '}
+        <strong>BroadcastChannel</strong> &rarr; <strong>Direct</strong>{' '}
+        fallback. SharedWorker provides the best deduplication &mdash; a single
+        WebSocket connection shared across all tabs via a dedicated worker
+        process that survives tab close and crashes. Using it requires a small
+        worker file and bundler configuration so the browser can load it.
+      </p>
+
+      <h3>Worker file template</h3>
+      <p>
+        Create a worker file (e.g. <code>realtime-worker.ts</code>) in your
+        source directory. This file runs inside the SharedWorker and holds the
+        real transport connection on behalf of every tab.
+      </p>
+      <CodeBlock
+        title="realtime-worker.ts"
+        code={`import { createSharedWorkerCoordinator } from '@tanstack/realtime'
+import { sseTransport } from '@tanstack/realtime-adapter-sse'
+
+const coordinator = createSharedWorkerCoordinator(
+  sseTransport({ url: '/api/realtime' }),
+)
+
+self.addEventListener('connect', (e) => {
+  coordinator.connect(e.ports[0])
+})`}
+      />
+
+      <h3>Vite</h3>
+      <p>
+        Vite understands <code>new URL(..., import.meta.url)</code> natively.
+        Pass <code>{"{ type: 'module' }"}</code> so Vite preserves ES imports
+        inside the worker.
+      </p>
+      <CodeBlock
+        code={`import { createCoordinatedTransport } from '@tanstack/realtime'
+import { sseTransport } from '@tanstack/realtime-adapter-sse'
+
+const transport = createCoordinatedTransport({
+  transport: () => sseTransport({ url: '/api/realtime' }),
+  workerUrl: new URL('./realtime-worker.ts', import.meta.url),
+})`}
+      />
+
+      <h3>Webpack 5</h3>
+      <p>
+        Webpack 5 detects <code>new URL(..., import.meta.url)</code> and emits
+        the worker file as a separate chunk automatically. No additional loader
+        or plugin is required.
+      </p>
+      <CodeBlock
+        code={`import { createCoordinatedTransport } from '@tanstack/realtime'
+import { sseTransport } from '@tanstack/realtime-adapter-sse'
+
+const transport = createCoordinatedTransport({
+  transport: () => sseTransport({ url: '/api/realtime' }),
+  workerUrl: new URL('./realtime-worker.ts', import.meta.url),
+})`}
+      />
+
+      <h3>What happens without SharedWorker</h3>
+      <p>
+        When no <code>workerUrl</code> is provided, or when SharedWorker is
+        unavailable (e.g. Safari on iOS before 16),{' '}
+        <code>createCoordinatedTransport</code> falls back automatically:
+      </p>
+      <ul>
+        <li>
+          <strong>BroadcastChannel (default fallback)</strong> &mdash; one tab
+          is elected leader and holds the connection. Other tabs proxy through
+          BroadcastChannel. If the leader tab closes, a new leader is elected
+          and reconnects. Each tab still only sees one connection, but a brief
+          reconnect happens during leader failover.
+        </li>
+        <li>
+          <strong>Direct (last resort)</strong> &mdash; when BroadcastChannel is
+          also unavailable (rare), every tab opens its own independent
+          connection. There is no cross-tab coordination or deduplication.
+        </li>
+      </ul>
+
+      <div className="doc-callout">
+        <p>
+          SharedWorker is optional. If you don&apos;t configure it,{' '}
+          <code>createCoordinatedTransport</code> falls back to BroadcastChannel
+          automatically. Most apps work fine without a SharedWorker.
+        </p>
+      </div>
     </article>
   )
 }

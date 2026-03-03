@@ -370,6 +370,7 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 > Revise the overall docs site to better surface all of the above and improve first-impression quality.
 
 ### Navigation & Information Architecture
+
 - [ ] Restructure sidebar into clearer sections:
   - **Getting Started**: Getting Started, Quick Examples
   - **Core Concepts**: Collections, Channels & Pub/Sub, Streaming, Presence
@@ -382,6 +383,7 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 - [ ] Add "Edit this page on GitHub" links
 
 ### Home Page
+
 - [ ] Update feature cards to include: Ephemeral Channels, Tick/Game State, AI Streaming, DevTools (when ready)
 - [ ] Add "Examples" section linking to runnable example apps (Project 1)
 - [ ] Add "Framework Support" badges (React + Vue/Solid when Project 6 ships)
@@ -389,52 +391,62 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 - [ ] Add testimonials/social proof section (when available)
 
 ### Getting Started Page
+
 - [ ] Add transport selection guidance (link to decision matrix, Project 20)
 - [ ] Add "Next steps" section at the bottom linking to the progressive spectrum
 - [ ] Show the 3-step path: (1) basic query, (2) add realtime, (3) add CRDTs — with working code
 - [ ] Add note about `autoConnect` behavior (Project 7)
 
 ### Collections Page
+
 - [ ] Add section on subscribe error handling (link to Error Reference, Project 10)
 - [ ] Add note about offline queue integration
 - [ ] Add "See also" links to related pages (CRDTs, Resilience, Scaling)
 
 ### Channels Page
+
 - [ ] Document `useLiveChannel` hook (Project 8)
 - [ ] Document `createValidatedPublish` (Project 8)
 - [ ] Add pagination/history section when Project 12 ships
 - [ ] Add "Recipes" linking to read receipts (Project 21) and reactions (Project 18)
 
 ### CRDTs Page
+
 - [ ] Add undo/redo limitations section (Project 22)
 - [ ] Add "When to use Y.js instead" callout linking to Rich Text guide (Project 9)
 - [ ] Add visual diagram showing field-level merge behavior
 
 ### Presence Page
+
 - [ ] Add "contextual presence" pattern (presence data scoped to a specific entity/cell)
 - [ ] Add throttling guidance for high-frequency cursor updates
 - [ ] Link to live-cursors example (Project 1)
 
 ### Streaming Page
+
 - [ ] Document `staleAfter` and `'stale'` status (Project 8)
 - [ ] Link to AI streaming example (Project 1)
 - [ ] Add server-side checkpoint persistence patterns
 
 ### Transports Page
+
 - [ ] Add decision matrix (Project 20)
 - [ ] Link to Centrifugo guide (Project 14)
 - [ ] Link to Scaling guide (Project 5)
 
 ### Resilience Page
+
 - [ ] Add SharedWorker bundler setup section (Project 17)
 - [ ] Add "what happens when..." FAQ: offline, tab closed, token expired, server restart
 
 ### Hooks Reference Page
+
 - [ ] Add all hooks (ensure `useLiveChannel`, `useEphemeral`, `useSyncedFields`, `useSyncedCounter` are listed)
 - [ ] For each hook: signature, return type, options, example, "See also" link to concept page
 - [ ] Add framework tabs when Project 6 ships (React / Vue / Solid equivalents)
 
 ### Cross-Cutting Docs Quality
+
 - [ ] Add search functionality to the docs site (e.g., Algolia DocSearch or local Fuse.js)
 - [ ] Add syntax highlighting theme consistent with TanStack brand
 - [ ] Ensure all `<CodeBlock>` examples have file path titles for context
