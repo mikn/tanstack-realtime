@@ -471,11 +471,11 @@ export function isSharedWorkerSupported(): boolean {
  *
  * @example
  * // With automatic fallback to a direct transport
- * import { wsTransport } from '@tanstack/realtime'
+ * import { sseTransport } from '@tanstack/realtime-adapter-sse'
  *
  * const transport = createSharedWorkerTransport(
  *   { url: new URL('./realtime.worker.ts', import.meta.url) },
- *   () => wsTransport({ url: 'wss://realtime.example.com' }),
+ *   () => sseTransport({ url: '/api/realtime/sse' }),
  * )
  * const client = createRealtimeClient({ transport })
  * // No explicit client.connect() needed — the worker auto-connects.

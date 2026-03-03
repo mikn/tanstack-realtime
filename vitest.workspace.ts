@@ -1,7 +1,6 @@
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineWorkspace } from 'vitest/config'
-import { defineWorkersProject } from '@cloudflare/vitest-pool-workers/config'
 
 const root = fileURLToPath(new URL('.', import.meta.url))
 
@@ -14,10 +13,6 @@ const sourceAliases = [
   {
     find: /^@tanstack\/realtime$/,
     replacement: resolve(root, 'packages/realtime/src/index.ts'),
-  },
-  {
-    find: /^@tanstack\/realtime-preset-node$/,
-    replacement: resolve(root, 'packages/realtime-preset-node/src/index.ts'),
   },
   {
     find: /^@tanstack\/realtime-adapter-centrifugo$/,
@@ -45,7 +40,6 @@ export default defineWorkspace([
       globals: true,
       setupFiles: ['packages/__tests__/setup.ts'],
       include: [
-        'packages/__tests__/integration.test.ts',
         'packages/__tests__/stream.test.ts',
         'packages/__tests__/centrifugo.test.ts',
         'packages/__tests__/dedup.test.ts',
@@ -63,7 +57,6 @@ export default defineWorkspace([
         'packages/__tests__/ephemeralLive.test.ts',
         'packages/__tests__/sharedWorkerFallback.test.ts',
         'packages/__tests__/sse.test.ts',
-        'packages/__tests__/reconnectEdgeCases.test.ts',
         'packages/__tests__/spectrum.test.ts',
         'packages/__tests__/docsExamples.test.ts',
         'packages/__tests__/broadcastChannelTransport.test.ts',
@@ -103,26 +96,4 @@ export default defineWorkspace([
     },
     resolve: { alias: sourceAliases },
   },
-
-  // ── Workerd runtime compatibility tests ──────────────────────────────────
-  // Runs inside the real workerd runtime via @cloudflare/vitest-pool-workers.
-  // Verifies that wsTransport from @tanstack/realtime is workerd-compatible:
-  // it uses globalThis.WebSocket (which exists in workerd) with no
-  // Node.js-specific dependencies.
-  //
-  // NOTE: wrangler bundles via esbuild and resolves @tanstack/realtime-preset-node
-  // from the built dist/ via the workspace symlink. Run `npm run build` before
-  // this test project (CI does; locally: npm run build -w @tanstack/realtime-preset-node)
-  defineWorkersProject({
-    test: {
-      name: 'workerd',
-      globals: true,
-      include: ['packages/__tests__/integration.workerd-client.test.ts'],
-      poolOptions: {
-        workers: {
-          wrangler: { configPath: './wrangler.test.toml' },
-        },
-      },
-    },
-  }),
 ])

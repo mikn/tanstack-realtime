@@ -26,7 +26,7 @@ export interface RealtimeProviderProps {
  * Typical nesting order in a full TanStack application:
  *
  * @example
- * const realtimeClient = createRealtimeClient({ transport: wsTransport({ url: 'ws://localhost:3001' }) })
+ * const realtimeClient = createRealtimeClient({ transport: sseTransport({ url: '/api/realtime/sse' }) })
  * await realtimeClient.connect()
  *
  * function Root() {

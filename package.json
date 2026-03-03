@@ -6,8 +6,8 @@
   "packageManager": "pnpm@10.29.3",
   "scripts": {
     "build": "nx run-many --target=build",
-    "test": "vitest run --project node --project workerd",
-    "test:watch": "vitest --project node --project workerd",
+    "test": "vitest run --project node",
+    "test:watch": "vitest --project node",
     "test:e2e": "vitest run --project centrifugo-e2e",
     "download-centrifugo": "node scripts/download-centrifugo.mjs",
     "lint": "eslint .",
@@ -25,12 +25,10 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.4",
-    "@cloudflare/vitest-pool-workers": "^0.12.14",
     "@size-limit/preset-small-lib": "^11.2.0",
     "@tanstack/db": "^0.5.28",
     "@tanstack/realtime": "workspace:*",
     "@tanstack/react-realtime": "workspace:*",
-    "@tanstack/realtime-preset-node": "workspace:*",
     "@tanstack/realtime-preset-start": "workspace:*",
     "@tanstack/realtime-adapter-centrifugo": "workspace:*",
     "@tanstack/realtime-adapter-sse": "workspace:*",
@@ -55,7 +53,6 @@
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^2.0.0",
-    "wrangler": "^4.67.0",
     "ws": "^8.18.0"
   },
   "size-limit": [

@@ -171,4 +171,4 @@ jobs:
         run: pnpm build
 
       - name: Publish previews
-        run: npx pkg-pr-new publish './packages/realtime' './packages/realtime-preset-node' './packages/realtime-adapter-centrifugo' './packages/realtime-adapter-sse' './packages/react-realtime'
+        run: npx pkg-pr-new publish './packages/realtime' './packages/realtime-adapter-centrifugo' './packages/realtime-adapter-sse' './packages/react-realtime'

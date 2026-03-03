@@ -10,9 +10,6 @@
     "paths": {
       "@tanstack/realtime": ["./packages/realtime/src/index.ts"],
       "@tanstack/react-realtime": ["./packages/react-realtime/src/index.ts"],
-      "@tanstack/realtime-preset-node": [
-        "./packages/realtime-preset-node/src/index.ts"
-      ],
       "@tanstack/realtime-adapter-centrifugo": [
         "./packages/realtime-adapter-centrifugo/src/index.ts"
       ],
@@ -27,7 +24,6 @@
   "include": [
     "packages/realtime/src",
     "packages/react-realtime/src",
-    "packages/realtime-preset-node/src",
     "packages/realtime-adapter-centrifugo/src",
     "packages/realtime-adapter-sse/src",
     "packages/realtime-preset-start/src",

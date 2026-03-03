@@ -7,19 +7,17 @@
         "@tanstack/react-db",
         "@tanstack/react-realtime",
         "@tanstack/react-store",
-        "react",
-        "wrangler"
+        "react"
       ],
       "ignoreBinaries": ["pkg-pr-new"]
     },
     "packages/realtime": {},
     "packages/react-realtime": {},
-    "packages/realtime-preset-node": {},
     "packages/realtime-adapter-centrifugo": {},
     "packages/realtime-adapter-sse": {},
     "packages/__tests__": {
       "entry": ["**/*.test.ts"],
-      "ignore": ["setup.ts", "workerd-test-worker.ts"]
+      "ignore": ["setup.ts"]
     },
     "packages/realtime-preset-start": {},
     "packages/e2e": {
@@ -36,5 +34,5 @@
       ]
     }
   },
-  "ignore": ["packages/docs/**", "packages/__tests__/workerd-test-worker.ts"]
+  "ignore": ["packages/docs/**"]
 }

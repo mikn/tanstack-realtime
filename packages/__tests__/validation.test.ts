@@ -5,25 +5,15 @@
  * - `createValidatedPublish` wrapper (TanStack Start compatible)
  * - `PublishValidationError` on rejection
  * - Data transformation on validation pass
- * - `onPublish` hook in createNodeServer (integration)
+ * - Data transformation and error handling
  */
 
-import { createServer } from 'node:http'
 import { describe, expect, it, vi } from 'vitest'
 import {
   PublishValidationError,
-  createRealtimeClient,
   createValidatedPublish,
-  wsTransport,
 } from '@tanstack/realtime'
-import { createNodeServer } from '@tanstack/realtime-preset-node'
-import type { Server } from 'node:http'
-import type {
-  PublishFn,
-  RealtimeClient,
-  ValidatePublishFn,
-} from '@tanstack/realtime'
-import type { NodeServer } from '@tanstack/realtime-preset-node'
+import type { PublishFn, ValidatePublishFn } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Tests: createValidatedPublish
@@ -211,146 +201,5 @@ describe('createValidatedPublish', () => {
     expect(err).toBeInstanceOf(PublishValidationError)
     expect((err as PublishValidationError).reason).toBe('Custom reason')
     expect((err as PublishValidationError).name).toBe('PublishValidationError')
-  })
-})
-
-// ---------------------------------------------------------------------------
-// Tests: createNodeServer with onPublish
-// ---------------------------------------------------------------------------
-
-describe('createNodeServer — onPublish validation', () => {
-  let httpServer: Server
-  let nodeServer: NodeServer
-  let port: number
-
-  async function startServer(onPublish?: ValidatePublishFn): Promise<void> {
-    httpServer = createServer()
-    nodeServer = createNodeServer({
-      getUser: () => Promise.resolve({ userId: 'test-user' }),
-      authorize: () =>
-        Promise.resolve({
-          subscribe: true,
-          publish: true,
-          presence: false,
-        }),
-      onPublish,
-    })
-    nodeServer.attach(httpServer)
-    await new Promise<void>((resolve) => {
-      httpServer.listen(0, () => {
-        port = (httpServer.address() as { port: number }).port
-        resolve()
-      })
-    })
-  }
-
-  async function createClient(): Promise<RealtimeClient> {
-    const client = createRealtimeClient({
-      transport: wsTransport({ url: `ws://localhost:${port}` }),
-    })
-    await client.connect()
-    return client
-  }
-
-  async function teardown(): Promise<void> {
-    await nodeServer.close()
-    await new Promise<void>((resolve) => httpServer.close(() => resolve()))
-  }
-
-  function waitFor(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms))
-  }
-
-  it('fans out normally when onPublish is not provided', async () => {
-    await startServer()
-    try {
-      const clientA = await createClient()
-      const clientB = await createClient()
-
-      // Both clients subscribe — clientA needs to be authorized to publish
-      clientA.subscribe('test-ch', () => {})
-      const received: Array<unknown> = []
-      clientB.subscribe('test-ch', (data) => received.push(data))
-
-      // Wait for subscriptions to register on the server
-      await waitFor(100)
-
-      await clientA.publish('test-ch', { hello: 'world' })
-      await waitFor(100)
-
-      expect(received).toHaveLength(1)
-      expect(received[0]).toEqual({ hello: 'world' })
-
-      clientA.disconnect()
-      clientB.disconnect()
-    } finally {
-      await teardown()
-    }
-  })
-
-  it('blocks fan-out when onPublish rejects', async () => {
-    await startServer(({ data }) => {
-      const msg = data as { forbidden?: boolean }
-      if (msg.forbidden) {
-        return { accepted: false, reason: 'Not allowed' }
-      }
-      return { accepted: true }
-    })
-
-    try {
-      const clientA = await createClient()
-      const clientB = await createClient()
-
-      clientA.subscribe('test-ch', () => {})
-      const received: Array<unknown> = []
-      clientB.subscribe('test-ch', (data) => received.push(data))
-
-      await waitFor(100)
-
-      // This should be rejected by onPublish
-      await clientA.publish('test-ch', { forbidden: true })
-      await waitFor(100)
-
-      // This should pass
-      await clientA.publish('test-ch', { forbidden: false })
-      await waitFor(100)
-
-      expect(received).toHaveLength(1)
-      expect(received[0]).toEqual({ forbidden: false })
-
-      clientA.disconnect()
-      clientB.disconnect()
-    } finally {
-      await teardown()
-    }
-  })
-
-  it('fans out transformed data when onPublish returns data', async () => {
-    await startServer(({ data }) => ({
-      accepted: true,
-      data: { ...(data as Record<string, unknown>), serverValidated: true },
-    }))
-
-    try {
-      const clientA = await createClient()
-      const clientB = await createClient()
-
-      clientA.subscribe('test-ch', () => {})
-      const received: Array<unknown> = []
-      clientB.subscribe('test-ch', (data) => received.push(data))
-
-      await waitFor(100)
-
-      await clientA.publish('test-ch', { title: 'Hello' })
-      await waitFor(100)
-
-      expect(received).toHaveLength(1)
-      expect(received[0]).toEqual({ title: 'Hello', serverValidated: true })
-
-      clientA.disconnect()
-      clientB.disconnect()
-    } finally {
-      await teardown()
-    }
   })
 })

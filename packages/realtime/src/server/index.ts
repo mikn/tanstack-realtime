@@ -61,7 +61,7 @@ export type AuthorizeFn = (
  *
  * @example
  * // server/functions/ai.ts
- * // `publish` is provided by your preset — e.g. @tanstack/realtime-preset-node
+ * // `publish` is provided by your preset — e.g. @tanstack/realtime-preset-start
  * import { publish } from '../realtime.server.js'
  *
  * for await (const chunk of stream) {

@@ -5,25 +5,19 @@
  * - `createServerStream` push/done/error
  * - Sentinel events (`__stream:done`, `__stream:error`)
  * - Integration with `streamChannelOptions`
- * - `NodeServer.createStream` convenience method
+ * - Integration with `streamChannelOptions`
  */
 
-import { createServer } from 'node:http'
 import { describe, expect, it } from 'vitest'
 import {
   STREAM_DONE,
   STREAM_ERROR,
-  createRealtimeClient,
   createServerStream,
   serverStreamCallbacks,
   streamChannelOptions,
   verifyEventSignature,
-  wsTransport,
 } from '@tanstack/realtime'
-import { createNodeServer } from '@tanstack/realtime-preset-node'
-import type { Server } from 'node:http'
-import type { PublishFn, RealtimeClient } from '@tanstack/realtime'
-import type { NodeServer } from '@tanstack/realtime-preset-node'
+import type { PublishFn } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Tests: createServerStream (standalone)
@@ -410,76 +404,5 @@ describe('createServerStream + streamChannelOptions integration', () => {
     expect(updates[0]).toEqual({ status: 'streaming', state: 'Hello' })
     expect(updates[1]).toEqual({ status: 'streaming', state: 'Hello, World' })
     expect(updates[2]).toEqual({ status: 'done', state: 'Hello, World' })
-  })
-})
-
-// ---------------------------------------------------------------------------
-// Tests: NodeServer.createStream
-// ---------------------------------------------------------------------------
-
-describe('NodeServer.createStream', () => {
-  let httpServer: Server
-  let nodeServer: NodeServer
-  let port: number
-
-  async function setup(): Promise<void> {
-    httpServer = createServer()
-    nodeServer = createNodeServer({
-      getUser: () => Promise.resolve({ userId: 'test-user' }),
-      authorize: () =>
-        Promise.resolve({
-          subscribe: true,
-          publish: true,
-          presence: false,
-        }),
-    })
-    nodeServer.attach(httpServer)
-    await new Promise<void>((resolve) => {
-      httpServer.listen(0, () => {
-        port = (httpServer.address() as { port: number }).port
-        resolve()
-      })
-    })
-  }
-
-  async function createClient(): Promise<RealtimeClient> {
-    const client = createRealtimeClient({
-      transport: wsTransport({ url: `ws://localhost:${port}` }),
-    })
-    await client.connect()
-    return client
-  }
-
-  async function teardown(): Promise<void> {
-    await nodeServer.close()
-    await new Promise<void>((resolve) => httpServer.close(() => resolve()))
-  }
-
-  it('server stream pushes tokens to subscribed clients', async () => {
-    await setup()
-    try {
-      const client = await createClient()
-
-      const received: Array<unknown> = []
-      client.subscribe('ai-test', (data) => received.push(data))
-
-      await new Promise((r) => setTimeout(r, 50))
-
-      const stream = nodeServer.createStream({ channel: 'ai-test' })
-      await stream.push({ type: 'token', content: 'Hi' })
-      await stream.push({ type: 'token', content: '!' })
-      await stream.done()
-
-      await new Promise((r) => setTimeout(r, 50))
-
-      expect(received).toHaveLength(3)
-      expect(received[0]).toMatchObject({ type: 'token', content: 'Hi' })
-      expect(received[1]).toMatchObject({ type: 'token', content: '!' })
-      expect(received[2]).toMatchObject({ type: STREAM_DONE })
-
-      client.disconnect()
-    } finally {
-      await teardown()
-    }
   })
 })

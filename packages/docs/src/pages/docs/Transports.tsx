@@ -9,20 +9,6 @@ export function Transports() {
         application code.
       </p>
 
-      <h2 id="websocket">Built-in WebSocket</h2>
-      <p>
-        <code>wsTransport</code> lives in the base package. Connects to a{' '}
-        <code>createNodeServer</code> instance. Works in browsers,
-        SharedWorkers, and Node.js.
-      </p>
-      <CodeBlock
-        code={`import { createRealtimeClient, wsTransport } from '@tanstack/realtime'
-
-const client = createRealtimeClient({
-  transport: wsTransport({ url: 'ws://localhost:3001' }),
-})`}
-      />
-
       <h2 id="centrifugo">Centrifugo</h2>
       <p>
         Production WebSocket infrastructure with token auth and server-assisted
@@ -60,10 +46,11 @@ const client = createRealtimeClient({
       </p>
       <CodeBlock
         title="game/transport.ts"
-        code={`import { tickTransport, wsTransport } from '@tanstack/realtime'
+        code={`import { tickTransport } from '@tanstack/realtime'
+import { sseTransport } from '@tanstack/realtime-adapter-sse'
 
 const tick = tickTransport(
-  wsTransport({ url: 'wss://rt.example.com' }),
+  sseTransport({ url: '/api/realtime/sse' }),
   { tickMs: 16, deltaCompression: true },  // ~60 Hz
 )
 

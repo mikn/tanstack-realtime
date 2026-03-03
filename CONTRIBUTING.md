@@ -10,7 +10,6 @@ This is a pnpm workspace monorepo with [Nx](https://nx.dev/) for task orchestrat
 | -------------------------------------- | ------------------------------------------------------------------------ |
 | `packages/realtime`                    | `@tanstack/realtime` — core client, collection helpers, CRDTs, and types |
 | `packages/react-realtime`              | `@tanstack/react-realtime` — React hooks and provider                    |
-| `packages/realtime-preset-node`        | `@tanstack/realtime-preset-node` — WebSocket transport + Node.js server  |
 | `packages/realtime-adapter-centrifugo` | `@tanstack/realtime-adapter-centrifugo` — Centrifugo transport adapter   |
 | `packages/realtime-adapter-sse`        | `@tanstack/realtime-adapter-sse` — Server-Sent Events transport adapter  |
 | `packages/docs`                        | Documentation site (not published)                                       |
@@ -62,7 +61,7 @@ pnpm test
 Use the [Conventional Commits](https://www.conventionalcommits.org/) format:
 
 ```
-feat: add reconnect limit option to wsTransport
+feat: add reconnect limit option to sseTransport
 fix: prevent stale closure in useSubscribe
 docs: correct onPresenceChange return type
 test: add self-exclusion invariant for presence

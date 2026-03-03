@@ -18,10 +18,11 @@
  *
  * @example
  * ```ts
- * import { createBroadcastChannelTransport, wsTransport } from '@tanstack/realtime'
+ * import { createBroadcastChannelTransport } from '@tanstack/realtime'
+ * import { sseTransport } from '@tanstack/realtime-adapter-sse'
  *
  * const transport = createBroadcastChannelTransport(
- *   () => wsTransport({ url: 'wss://rt.example.com' }),
+ *   () => sseTransport({ url: '/api/realtime/sse' }),
  * )
  * const client = createRealtimeClient({ transport })
  * ```

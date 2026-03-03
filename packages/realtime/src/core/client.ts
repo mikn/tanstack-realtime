@@ -14,7 +14,7 @@ function presenceNotSupported(method: string): never {
     `[realtime] ${method}() requires the transport to implement PresenceCapable ` +
       `(joinPresence, updatePresence, leavePresence, onPresenceChange). ` +
       `Check hasPresence(transport) before calling presence methods, or use a ` +
-      `transport that includes presence support (Node preset, Centrifugo adapter, SharedWorker).`,
+      `transport that includes presence support (Centrifugo adapter, SharedWorker).`,
   )
 }
 
@@ -22,10 +22,11 @@ function presenceNotSupported(method: string): never {
  * Creates a framework-agnostic realtime client that wraps a transport.
  *
  * @example
- * import { createRealtimeClient, wsTransport } from '@tanstack/realtime'
+ * import { createRealtimeClient } from '@tanstack/realtime'
+ * import { sseTransport } from '@tanstack/realtime-adapter-sse'
  *
  * export const realtimeClient = createRealtimeClient({
- *   transport: wsTransport({ url: 'ws://localhost:3001' }),
+ *   transport: sseTransport({ url: '/api/realtime/sse' }),
  * })
  */
 export function createRealtimeClient(
