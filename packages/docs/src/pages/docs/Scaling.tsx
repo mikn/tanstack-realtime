@@ -405,6 +405,105 @@ export class RealtimeChannel extends DurableObject {
         </tbody>
       </table>
 
+      <h2 id="lifecycle-hooks">Server lifecycle hooks</h2>
+      <p>
+        All server constructors &mdash; <code>createNodeServer</code>,{' '}
+        <code>createSseHandler</code>, and <code>createStartHandler</code>{' '}
+        &mdash; accept optional lifecycle callbacks for observing connection and
+        subscription events. These are fire-and-forget: errors inside callbacks
+        are logged to <code>console.error</code> but never propagate to clients.
+      </p>
+      <CodeBlock
+        title="Lifecycle hook signatures"
+        code={`interface LifecycleHooks {
+  onClientConnect?: (info: { connectionId: string; userId: string }) => void
+  onClientDisconnect?: (info: { connectionId: string; userId: string }) => void
+  onFirstSubscriber?: (channel: string) => void
+  onChannelEmpty?: (channel: string) => void
+}`}
+      />
+      <ul>
+        <li>
+          <strong>
+            <code>onClientConnect</code>
+          </strong>{' '}
+          &mdash; fires after <code>getUser</code> succeeds and the connection
+          is ready.
+        </li>
+        <li>
+          <strong>
+            <code>onClientDisconnect</code>
+          </strong>{' '}
+          &mdash; fires when a client disconnects (WebSocket close or SSE stream
+          cancel).
+        </li>
+        <li>
+          <strong>
+            <code>onFirstSubscriber</code>
+          </strong>{' '}
+          &mdash; fires when the first subscriber joins a previously-empty
+          channel. Useful for spinning up live queries or background tasks.
+        </li>
+        <li>
+          <strong>
+            <code>onChannelEmpty</code>
+          </strong>{' '}
+          &mdash; fires when the last subscriber leaves a channel. Useful for
+          tearing down expensive resources.
+        </li>
+      </ul>
+      <CodeBlock
+        title="Example: metrics + resource management"
+        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
+import { redisBackend } from './redis-backend'
+import { metrics } from './metrics'
+import { startLiveQuery, stopLiveQuery } from './live-queries'
+
+export const realtime = createStartHandler({
+  backend: redisBackend,
+  getUser: async (req) => {
+    const session = await getSession(req)
+    return session ? { userId: session.userId } : null
+  },
+
+  onClientConnect: ({ connectionId, userId }) => {
+    metrics.increment('realtime.connections', { userId })
+  },
+
+  onClientDisconnect: ({ connectionId, userId }) => {
+    metrics.decrement('realtime.connections', { userId })
+  },
+
+  onFirstSubscriber: (channel) => {
+    // Spin up an expensive live query only when someone is listening
+    startLiveQuery(channel)
+  },
+
+  onChannelEmpty: (channel) => {
+    // Tear it down when the last subscriber leaves
+    stopLiveQuery(channel)
+  },
+})`}
+      />
+      <p>
+        The same hooks work identically on <code>createNodeServer</code>:
+      </p>
+      <CodeBlock
+        title="Node server with lifecycle hooks"
+        code={`import { createNodeServer } from '@tanstack/realtime-preset-node'
+
+const nodeServer = createNodeServer({
+  getUser,
+  authorize,
+  onClientConnect: ({ connectionId, userId }) => {
+    console.log(\`[ws] connected: \${userId} (\${connectionId})\`)
+  },
+  onChannelEmpty: (channel) => {
+    console.log(\`[ws] channel empty: \${channel}\`)
+  },
+})`}
+      />
+
       <h2 id="summary">Summary</h2>
       <p>
         The <code>PublishBackend</code> interface is deliberately minimal:
@@ -413,7 +512,9 @@ export class RealtimeChannel extends DurableObject {
         exactly the same. Redis and Postgres are the two most common choices,
         but any message bus that supports pub/sub semantics will work. If you
         prefer a fully managed solution, Centrifugo removes the need for a
-        backend entirely.
+        backend entirely. Lifecycle hooks give you visibility into connection
+        and subscription events across all presets without modifying handler
+        logic.
       </p>
     </article>
   )

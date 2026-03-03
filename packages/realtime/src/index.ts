@@ -217,6 +217,7 @@ export type {
 // can implement the same contract without an additional import path.
 export {
   createValidatedPublish,
+  normalizePermissions,
   PublishValidationError,
   createServerStream,
   verifyEventSignature,
@@ -227,6 +228,7 @@ export {
 export type {
   ChannelPermissions,
   AuthorizeFn,
+  LifecycleHooks,
   PublishFn,
   PublishValidation,
   PublishValidationResult,

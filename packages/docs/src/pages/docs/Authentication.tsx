@@ -72,19 +72,19 @@ export const realtime = createStartHandler({
       </h2>
       <p>
         Once the user is authenticated, the <code>authorize</code> callback
-        decides whether the action is allowed on the requested channel. It
-        receives <code>{`{ userId, action, channel }`}</code> and returns a
-        boolean. When it returns <code>false</code>, the handler responds with{' '}
-        <strong>403 Forbidden</strong>.
-      </p>
-      <p>
-        The <code>action</code> is either <code>'subscribe'</code> or{' '}
-        <code>'publish'</code>. Unsubscribe actions are always permitted because
-        they are cleanup operations that cannot be used to exfiltrate data.
-      </p>
-      <p>
+        decides whether the action is allowed on the requested channel. When it
+        denies access, the handler responds with <strong>403 Forbidden</strong>.
         When <code>authorize</code> is omitted, all authenticated users are
         permitted on all channels.
+      </p>
+      <p>
+        The SSE handler accepts two signatures &mdash; a legacy per-action form
+        (shown below) and a{' '}
+        <a href="#unified-authorize">
+          unified <code>AuthorizeFn</code>
+        </a>{' '}
+        that works across all presets.{' '}
+        <strong>New code should use the unified signature.</strong>
       </p>
       <CodeBlock
         title="app/server/realtime.ts"
@@ -125,51 +125,42 @@ export const realtime = createStartHandler({
 })`}
       />
 
-      <h3>
-        Using <code>AuthorizeFn</code> with <code>ChannelPermissions</code>
-      </h3>
+      <h2 id="unified-authorize">
+        Unified <code>AuthorizeFn</code>
+      </h2>
       <div className="doc-callout">
         <p>
-          <strong>Important:</strong> <code>AuthorizeFn</code> (from{' '}
-          <code>@tanstack/realtime</code>) and the <code>authorize</code>{' '}
-          callback on <code>createSseHandler</code> /{' '}
-          <code>createStartHandler</code> are{' '}
-          <strong>two different interfaces</strong>:
-        </p>
-        <ul>
-          <li>
-            <strong>
-              <code>authorize</code> on <code>createSseHandler</code> /{' '}
-              <code>createStartHandler</code>
-            </strong>{' '}
-            &mdash; takes <code>{`{ userId, action, channel: string }`}</code>{' '}
-            and returns a <code>boolean</code>. Use this for SSE-based
-            deployments (the common case with TanStack Start).
-          </li>
-          <li>
-            <strong>
-              <code>AuthorizeFn</code> from <code>@tanstack/realtime</code>
-            </strong>{' '}
-            &mdash; takes <code>(userId: string, channel: ParsedChannel)</code>{' '}
-            and returns <code>{`Promise<ChannelPermissions>`}</code> with
-            granular <code>subscribe</code> / <code>publish</code> /{' '}
-            <code>presence</code> booleans. Use this for custom server
-            implementations (e.g. a standalone WebSocket server built with{' '}
-            <code>createNodeServer</code>).
-          </li>
-        </ul>
-        <p>
-          They are <strong>not</strong> interchangeable. The examples below show{' '}
-          <code>AuthorizeFn</code> for reference &mdash; if you are using{' '}
-          <code>createStartHandler</code>, use the simpler{' '}
-          <code>authorize</code> callback shown in the section above.
+          <strong>Recommended:</strong> The <code>AuthorizeFn</code> signature
+          from <code>@tanstack/realtime</code> works across{' '}
+          <strong>all presets</strong> &mdash; <code>createNodeServer</code>,{' '}
+          <code>createSseHandler</code>, and <code>createStartHandler</code>.
+          Write one authorize function and use it everywhere.
         </p>
       </div>
       <p>
-        The core package also exports an <code>AuthorizeFn</code> type and a{' '}
-        <code>ChannelPermissions</code> interface for structured per-channel
-        authorization. This is useful when you need to return granular
-        permissions including presence access in custom server implementations.
+        The unified signature receives the user ID and a parsed channel, and
+        returns either a <code>ChannelPermissions</code> object for fine-grained
+        control or a plain <code>boolean</code> as shorthand for all-or-nothing
+        access:
+      </p>
+      <CodeBlock
+        title="Signature"
+        code={`type AuthorizeFn = (
+  userId: string,
+  channel: ParsedChannel,  // { namespace, params, raw }
+) => ChannelPermissions | boolean | Promise<ChannelPermissions | boolean>
+
+interface ChannelPermissions {
+  subscribe: boolean
+  publish: boolean
+  presence: boolean
+}`}
+      />
+      <p>
+        When you return a boolean, it is expanded to all-or-nothing permissions
+        via <code>normalizePermissions</code>: <code>true</code> becomes{' '}
+        <code>{`{ subscribe: true, publish: true, presence: true }`}</code> and{' '}
+        <code>false</code> denies everything.
       </p>
       <CodeBlock
         title="app/server/authorize.ts"
@@ -203,6 +194,92 @@ export const authorize: AuthorizeFn = async (
     default:
       return { subscribe: false, publish: false, presence: false }
   }
+}`}
+      />
+      <p>
+        Because the same function works everywhere, you can share it between
+        your SSE handler and a standalone Node server without any adapters:
+      </p>
+      <CodeBlock
+        title="Shared across presets"
+        code={`import { authorize } from './authorize'
+
+// SSE / TanStack Start
+const startHandler = createStartHandler({ getUser, authorize })
+
+// Standalone WebSocket server
+const nodeServer = createNodeServer({ getUser, authorize })`}
+      />
+
+      <h3 id="legacy-sse-authorize">
+        Legacy SSE <code>authorize</code> (backward compatible)
+      </h3>
+      <p>
+        The SSE handler (<code>createSseHandler</code> /{' '}
+        <code>createStartHandler</code>) still accepts the older per-action
+        signature for backward compatibility:
+      </p>
+      <CodeBlock
+        title="Legacy signature (still works)"
+        code={`authorize: async ({ userId, action, channel }) => {
+  if (action === 'publish') return userId === 'admin'
+  return true  // allow all subscribes
+}`}
+      />
+      <p>
+        The handler detects which signature you passed by checking the function
+        arity. New code should use the unified <code>AuthorizeFn</code> shown
+        above.
+      </p>
+
+      <h3 id="authorize-migration">Migration: per-action to unified</h3>
+      <p>
+        To migrate from the legacy per-action SSE authorize to the unified
+        signature:
+      </p>
+      <ol>
+        <li>
+          Replace <code>{`({ userId, action, channel })`}</code> with two
+          positional params <code>(userId, channel)</code>.
+        </li>
+        <li>
+          Instead of branching on <code>action</code>, return a{' '}
+          <code>ChannelPermissions</code> object with explicit{' '}
+          <code>subscribe</code>, <code>publish</code>, and{' '}
+          <code>presence</code> booleans.
+        </li>
+        <li>
+          Use <code>channel.namespace</code> and <code>channel.params</code>{' '}
+          instead of manually parsing the raw channel string.
+        </li>
+      </ol>
+      <CodeBlock
+        title="Before (legacy)"
+        code={`authorize: async ({ userId, action, channel }) => {
+  const [namespace] = channel.split(':')
+  if (namespace === 'todos') {
+    const projectId = channel.split('projectId=')[1]
+    const member = await db.getProjectMember(userId, projectId)
+    if (!member) return false
+    if (action === 'publish') return member.role === 'admin'
+    return true
+  }
+  return false
+}`}
+      />
+      <CodeBlock
+        title="After (unified)"
+        code={`authorize: async (userId, channel) => {
+  if (channel.namespace === 'todos') {
+    const member = await db.getProjectMember(userId, channel.params.projectId)
+    if (!member) return false
+    return {
+      subscribe: true,
+      publish: member.role === 'admin',
+      presence: true,
+    }
+  }
+  return false
 }`}
       />
 

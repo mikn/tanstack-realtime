@@ -70,6 +70,8 @@ export default defineWorkspace([
         'packages/__tests__/startPreset.test.ts',
         'packages/__tests__/testingUtils.test.ts',
         'packages/__tests__/subscribeError.test.ts',
+        'packages/__tests__/unifiedAuthorize.test.ts',
+        'packages/__tests__/lifecycleHooks.test.ts',
       ],
       pool: 'forks',
       poolOptions: { forks: { singleFork: true } },

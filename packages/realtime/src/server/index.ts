@@ -25,8 +25,12 @@ export interface ChannelPermissions {
  *
  * One function. Granular permissions. No provider-specific types.
  *
+ * Return a `ChannelPermissions` object for fine-grained control, or a plain
+ * `boolean` as a shorthand for all-or-nothing (maps to `{ subscribe, publish,
+ * presence }` all set to the same value).
+ *
  * @example
- * // server/realtime.auth.ts
+ * // Fine-grained permissions
  * export async function authorize(
  *   userId: string,
  *   channel: ParsedChannel,
@@ -42,11 +46,84 @@ export interface ChannelPermissions {
  *       return { subscribe: false, publish: false, presence: false }
  *   }
  * }
+ *
+ * @example
+ * // Boolean shorthand (all-or-nothing)
+ * export async function authorize(userId: string, channel: ParsedChannel) {
+ *   return !!userId // authenticated users get full access
+ * }
  */
 export type AuthorizeFn = (
   userId: string,
   channel: ParsedChannel,
-) => Promise<ChannelPermissions>
+) => ChannelPermissions | boolean | Promise<ChannelPermissions | boolean>
+
+/**
+ * Convert a boolean or {@link ChannelPermissions} to a full
+ * `ChannelPermissions` object.
+ *
+ * When `result` is a boolean it maps to all-or-nothing permissions
+ * (`{ subscribe: result, publish: result, presence: result }`).
+ */
+export function normalizePermissions(
+  result: ChannelPermissions | boolean,
+): ChannelPermissions {
+  if (typeof result === 'boolean') {
+    return { subscribe: result, publish: result, presence: result }
+  }
+  return result
+}
+
+// ---------------------------------------------------------------------------
+// Server lifecycle hooks
+// ---------------------------------------------------------------------------
+
+/**
+ * Optional callbacks for observing connection and subscription lifecycle
+ * events on the server. Pass these to `createNodeServer`, `createSseHandler`,
+ * or `createStartHandler` to hook into key moments without modifying the
+ * handler itself.
+ *
+ * All callbacks are fire-and-forget — they must not throw. Errors inside
+ * callbacks are logged to `console.error` but do not affect the handler.
+ *
+ * @example
+ * createNodeServer({
+ *   getUser,
+ *   authorize,
+ *   onClientConnect: ({ connectionId, userId }) => {
+ *     metrics.gauge('ws.connections', 1, { userId })
+ *   },
+ *   onChannelEmpty: (channel) => {
+ *     // Tear down expensive resources when nobody is listening.
+ *     stopLiveQuery(channel)
+ *   },
+ * })
+ */
+export interface LifecycleHooks {
+  /**
+   * Called when a new client connection is authenticated and ready.
+   * Fires after `getUser` succeeds and the `connected` event is sent.
+   */
+  onClientConnect?: (info: { connectionId: string; userId: string }) => void
+
+  /**
+   * Called when a client disconnects (WebSocket close or SSE stream cancel).
+   */
+  onClientDisconnect?: (info: { connectionId: string; userId: string }) => void
+
+  /**
+   * Called when the first subscriber joins a previously-empty channel.
+   * Useful for spinning up live queries, starting background tasks, etc.
+   */
+  onFirstSubscriber?: (channel: string) => void
+
+  /**
+   * Called when the last subscriber leaves a channel (subscriber count → 0).
+   * Useful for tearing down resources that are no longer needed.
+   */
+  onChannelEmpty?: (channel: string) => void
+}
 
 // ---------------------------------------------------------------------------
 // Server-side publish
