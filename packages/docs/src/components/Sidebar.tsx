@@ -13,6 +13,7 @@ const sections = [
       { label: 'Authentication', hash: '#/docs/authentication' },
       { label: 'Rich Text (Y.js)', hash: '#/docs/rich-text-crdts' },
       { label: 'Centrifugo Guide', hash: '#/docs/centrifugo' },
+      { label: 'Read Receipts', hash: '#/docs/read-receipts' },
     ],
   },
   {
@@ -32,6 +33,7 @@ const sections = [
       { label: 'Transports', hash: '#/docs/transports' },
       { label: 'Resilience', hash: '#/docs/resilience' },
       { label: 'Scaling to Production', hash: '#/docs/scaling' },
+      { label: 'Server Hooks', hash: '#/docs/server-hooks' },
     ],
   },
   {

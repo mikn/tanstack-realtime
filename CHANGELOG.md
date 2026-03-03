@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SSE transport adapter** (`@tanstack/realtime-adapter-sse`) with `createSseHandler`
   server utility, auth middleware, and token refresh support.
 - **Centrifugo transport adapter** (`@tanstack/realtime-adapter-centrifugo`) with
-  `centrifugoTransport` supporting WebSocket connections to Centrifugo v6, including
+  `centrifugoTransport` supporting WebSocket connections to Centrifugo v4+, including
   optional `WebSocket` constructor injection for Node < 21.
 - **TanStack Start preset** (`@tanstack/realtime-preset-start`) for
   transport-agnostic publishing with `withServerFns` helper for server-function
@@ -47,16 +47,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   handle missed messages during transient disconnections.
 - **8 realtime utility modules** covering common patterns with comprehensive test
   suites.
-- **Centrifugo E2E test suite** running against a real Centrifugo v6 binary with
+- **Centrifugo E2E test suite** running against a real Centrifugo binary with
   auto-download in `globalSetup`.
-- **Playwright multi-user integration tests** covering all realtime patterns
-  (collection sync, presence, streaming) across multiple browser contexts.
 - **Documentation site** with interactive demos, syntax highlighting, TanStack Start
   - Drizzle end-to-end guide, and mobile-friendly formatting.
-- **CI pipeline** with GitHub Actions for lint, typecheck, tests (unit and E2E),
-  GitHub Pages deployment, and Playwright test jobs.
+- **CI pipeline** with GitHub Actions for lint, typecheck, tests, GitHub Pages
+  deployment, and size-limit checks.
 - **Size-limit checks** keeping `@tanstack/realtime` under 15 kB and
-  `@tanstack/react-realtime` under 20 kB (reduced from 33 kB to 7 kB).
+  `@tanstack/react-realtime` under 20 kB.
 - **Changesets workflow** (`@changesets/cli`) for versioning and release management.
 - **Schema validation** via StandardSchema for runtime message validation.
 - **Message adapters** for Supabase Realtime and Debezium CDC wire formats
@@ -77,14 +75,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Aligned project architecture and tooling with TanStack ecosystem standards (pnpm,
   Nx, ESLint, Prettier).
 - Extracted shared stream processor and envelope middleware into dedicated modules.
-- Replaced `@tanstack/start` + vinxi with plain Vite SPA in the E2E test package.
 - Simplified documentation site to match TanStack project conventions.
 
 ### Removed
 
-- **`@tanstack/realtime-preset-node`** package and `wsTransport` -- the project now
-  uses an SSE-first approach for server connections, with WebSocket reserved for
-  fan-out via Centrifugo.
 - Stale tests for removed `merge`/`retainMergeState` APIs.
 - `PLAN.md` internal planning document.
 
@@ -96,13 +90,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - React Strict Mode compatibility across all hooks.
 - TypeScript excess-property errors in transport middleware.
 - WebSocket polyfill setup for Node 20 CI environments.
-- Bundle size regression in `@tanstack/react-realtime` (33 kB down to 7 kB).
+- Bundle size regression in `@tanstack/react-realtime`.
 - 65 `require-await` and `unused-var` ESLint warnings resolved.
 - 17 architectural review issues and 14 security/bug review findings addressed.
 - Centrifugo adapter uses `WebSocketImpl.OPEN` instead of global `WebSocket.OPEN`
   for broader runtime compatibility.
 - CI deploy workflow for documentation site.
-- Knip configuration for E2E package registration and unused export cleanup.
+- Knip configuration and unused export cleanup.
 
 ### Security
 
