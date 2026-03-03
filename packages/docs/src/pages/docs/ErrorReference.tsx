@@ -254,6 +254,10 @@ const transport = sseTransport({
         <code>false</code> to discard it. Defaults to{' '}
         <code>() =&gt; false</code> (discard on failure).
       </p>
+      <p>
+        If <code>onFlushError</code> is omitted, failed messages are silently
+        discarded with no notification.
+      </p>
 
       <h3>How to handle</h3>
       <CodeBlock
@@ -495,7 +499,7 @@ try {
         code={`import { useRealtime } from '@tanstack/react-realtime'
 
 function ConnectionBanner() {
-  const { status } = useRealtime()
+  const { status, client } = useRealtime()
 
   if (status === 'connected') return null
 

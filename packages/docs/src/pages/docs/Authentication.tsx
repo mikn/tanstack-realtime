@@ -360,9 +360,13 @@ const cursorSchema = z.object({
   userId: z.string(),
 })
 
-// realtime is from createStartHandler() — see the Start + Drizzle guide
+import { nodeServer } from './realtime.server'
+
 const validatedPublish = createValidatedPublish({
-  publish: realtime.publish,
+  publish: (channel, data) => nodeServer.publish(
+    typeof channel === 'string' ? channel : JSON.stringify(channel),
+    data,
+  ),
   validate: async ({ channel, data }) => {
     switch (channel.namespace) {
       case 'todos': {

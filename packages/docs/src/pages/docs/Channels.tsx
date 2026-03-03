@@ -280,7 +280,7 @@ const validatedPublish = createValidatedPublish({
     return Promise.resolve()
   },
 
-  validate: async ({ channel, data, userId }) => {
+  validate: async ({ channel, data }) => {
     if (channel.namespace === 'todos') {
       const result = todoSchema.safeParse(data)
       if (!result.success) {
@@ -318,8 +318,7 @@ export const updateTodo = createServerFn()(async ({ id, data }) => {
         <p>
           The validate function receives the parsed channel (with{' '}
           <code>namespace</code> and <code>params</code>), the raw channel
-          string, the data payload, and optionally the <code>userId</code>.
-          Return{' '}
+          string, and the data payload. Return{' '}
           <code>
             {'{'}accepted: true, data: transformed{'}'}
           </code>{' '}
