@@ -21,6 +21,7 @@ import { Ephemeral } from './pages/docs/Ephemeral'
 import { Tick } from './pages/docs/Tick'
 import { ReadReceipts } from './pages/docs/ReadReceipts'
 import { ServerHooks } from './pages/docs/ServerHooks'
+import { ApiReference } from './pages/docs/ApiReference'
 
 // ---------------------------------------------------------------------------
 // Simple hash router
@@ -59,6 +60,7 @@ const docRoutes: Partial<Record<string, () => React.JSX.Element>> = {
   '#/docs/tick': Tick,
   '#/docs/read-receipts': ReadReceipts,
   '#/docs/server-hooks': ServerHooks,
+  '#/docs/api-reference': ApiReference,
 }
 
 // ---------------------------------------------------------------------------

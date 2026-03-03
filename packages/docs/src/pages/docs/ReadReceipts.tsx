@@ -439,42 +439,39 @@ export interface ReadReceipt {
       </p>
       <CodeBlock
         title="features/chat/readReceiptsCollection.ts"
-        code={`import { realtimeCollectionOptions } from '@tanstack/realtime'
-import { realtimeClient } from '../../client/realtime'
-import type { ReadReceipt } from '../../db/schema'
+        code={`import type { ReadReceipt } from '../../db/schema'
 
-export const readReceiptsOptions = (roomId: string) =>
-  realtimeCollectionOptions<ReadReceipt>({
-    client: realtimeClient,
-    // Composite key keeps one row per user per room
-    getKey: (r) => r.id,
-    channel: ['read-receipts', { roomId }],
+// Return raw config — useRealtimeCollection wraps it with the client
+export const readReceiptsOptions = (roomId: string) => ({
+  // Composite key keeps one row per user per room
+  getKey: (r: ReadReceipt) => r.id,
+  channel: ['read-receipts', { roomId }],
 
-    // Load existing receipts on mount
-    queryFn: () =>
-      fetch(\`/api/rooms/\${roomId}/read-receipts\`).then((r) => r.json()),
+  // Load existing receipts on mount
+  queryFn: () =>
+    fetch(\`/api/rooms/\${roomId}/read-receipts\`).then((r) => r.json()),
 
-    // Called when the current user upserts their receipt
-    onInsert: async ({ transaction }) => {
-      const data = transaction.mutations[0].modified
-      const res = await fetch('/api/read-receipts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-      return res.json()  // returning the saved row triggers auto-broadcast
-    },
+  // Called when the current user upserts their receipt
+  onInsert: async ({ transaction }: { transaction: { mutations: Array<{ modified: ReadReceipt }> } }) => {
+    const data = transaction.mutations[0].modified
+    const res = await fetch('/api/read-receipts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    return res.json()  // returning the saved row triggers auto-broadcast
+  },
 
-    onUpdate: async ({ transaction }) => {
-      const data = transaction.mutations[0].modified
-      const res = await fetch(\`/api/read-receipts/\${data.id}\`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-      return res.json()
-    },
-  })`}
+  onUpdate: async ({ transaction }: { transaction: { mutations: Array<{ modified: ReadReceipt }> } }) => {
+    const data = transaction.mutations[0].modified
+    const res = await fetch(\`/api/read-receipts/\${data.id}\`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    return res.json()
+  },
+})`}
       />
 
       <h3 id="collection-hook">3. Use the collection in a component</h3>
@@ -503,18 +500,17 @@ function ChatRoom({ roomId, currentUser }: { roomId: string; currentUser: User }
   )
 
   // Mark the current user as having read up to a message
-  const markRead = async (messageId: string) => {
+  const markRead = (messageId: string) => {
     const receiptId = \`\${currentUser.id}:\${roomId}\`
     const existing = receipts.find((r) => r.id === receiptId)
 
     if (existing) {
-      await receiptsCollection.update({
-        ...existing,
-        lastReadMessageId: messageId,
-        readAt: new Date().toISOString(),
+      receiptsCollection.update(receiptId, (draft) => {
+        draft.lastReadMessageId = messageId
+        draft.readAt = new Date().toISOString()
       })
     } else {
-      await receiptsCollection.insert({
+      receiptsCollection.insert({
         id: receiptId,
         userId: currentUser.id,
         roomId,
