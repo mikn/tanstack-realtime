@@ -106,9 +106,9 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 - [x] Document the `PublishBackend` interface with full TypeScript signature
 - [x] Example: Redis PUBLISH/SUBSCRIBE implementation
 - [x] Example: Postgres LISTEN/NOTIFY implementation
-- [ ] Example: Cloudflare Durable Objects approach
-- [ ] Show how to pair `PublishBackend` with `createNodeServer` (not just TanStack Start)
-- [ ] Show how to pair `PublishBackend` with `createSseHandler`
+- [x] Example: Cloudflare Durable Objects approach
+- [x] Show how to pair `PublishBackend` with `createNodeServer` (not just TanStack Start)
+- [x] Show how to pair `PublishBackend` with `createSseHandler`
 - [x] Add "When you need this" decision criteria (> 1 server process, horizontal auto-scaling, etc.)
 
 ---
@@ -166,11 +166,11 @@ Each section is a self-contained project. Tasks are ordered by dependency within
   - [x] Example: multiplayer game state sync
   - [x] Example: live dashboard gauge
   - [x] Add to sidebar under "Features"
-- [ ] **Add to existing Streaming page:**
-  - [ ] Document `staleAfter` option and `'stale'` status in `useStream`
-- [ ] **Add to existing Channels page:**
-  - [ ] Document `useLiveChannel` hook (distinct from `liveChannelOptions`)
-  - [ ] Document `createValidatedPublish` for stateless server validation
+- [x] **Add to existing Streaming page:**
+  - [x] Document `staleAfter` option and `'stale'` status in `useStream`
+- [x] **Add to existing Channels page:**
+  - [x] Document `useLiveChannel` hook (distinct from `liveChannelOptions`)
+  - [x] Document `createValidatedPublish` for stateless server validation
 - [x] **Wire protocol page** — `packages/docs/src/pages/docs/WireProtocol.tsx`
   - [x] Document message format for custom transport authors
   - [x] List all message types: subscribe, publish, presence:join, etc.
@@ -266,7 +266,7 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 - [x] Document token generation (connection token + subscription token)
 - [x] Document presence setup via Centrifugo
 - [x] Document server-assisted gap recovery (epoch/offset)
-- [ ] Show production deployment topology diagram
+- [x] Show production deployment topology diagram
 
 ---
 
@@ -313,9 +313,9 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 - [x] Add "Recipes" section to the Ephemeral channels page (Project 8)
 - [x] Recipe: emoji reactions (ephemeral event → animate → discard)
-- [ ] Recipe: confetti / celebration animation
+- [x] Recipe: confetti / celebration animation
 - [x] Recipe: "user is viewing this record" indicator
-- [ ] Recipe: toast notifications from server events
+- [x] Recipe: toast notifications from server events
 
 ---
 
@@ -335,11 +335,11 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 > "Which transport should I use?" is the first question.
 
-- [ ] Add decision matrix to existing Transports doc page (`Transports.tsx`)
-  - [ ] Criteria: bidirectional, presence, proxy-friendliness, scaling, infrastructure
-  - [ ] Rows: WebSocket, SSE, Centrifugo
-- [ ] Add "When to use each" narrative section with recommendations per app type
-- [ ] Link to Centrifugo walkthrough (Project 14) for the Centrifugo row
+- [x] Add decision matrix to existing Transports doc page (`Transports.tsx`)
+  - [x] Criteria: bidirectional, presence, proxy-friendliness, scaling, infrastructure
+  - [x] Rows: WebSocket, SSE, Centrifugo
+- [x] Add "When to use each" narrative section with recommendations per app type
+- [x] Link to Centrifugo walkthrough (Project 14) for the Centrifugo row
 
 ---
 
@@ -399,14 +399,14 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 ### Collections Page
 
-- [ ] Add section on subscribe error handling (link to Error Reference, Project 10)
-- [ ] Add note about offline queue integration
-- [ ] Add "See also" links to related pages (CRDTs, Resilience, Scaling)
+- [x] Add section on subscribe error handling (link to Error Reference, Project 10)
+- [x] Add note about offline queue integration
+- [x] Add "See also" links to related pages (CRDTs, Resilience, Scaling)
 
 ### Channels Page
 
-- [ ] Document `useLiveChannel` hook (Project 8)
-- [ ] Document `createValidatedPublish` (Project 8)
+- [x] Document `useLiveChannel` hook (Project 8)
+- [x] Document `createValidatedPublish` (Project 8)
 - [ ] Add pagination/history section when Project 12 ships
 - [ ] Add "Recipes" linking to read receipts (Project 21) and reactions (Project 18)
 
@@ -418,26 +418,26 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 ### Presence Page
 
-- [ ] Add "contextual presence" pattern (presence data scoped to a specific entity/cell)
-- [ ] Add throttling guidance for high-frequency cursor updates
-- [ ] Link to live-cursors example (Project 1)
+- [x] Add "contextual presence" pattern (presence data scoped to a specific entity/cell)
+- [x] Add throttling guidance for high-frequency cursor updates
+- [x] Link to live-cursors example (Project 1)
 
 ### Streaming Page
 
-- [ ] Document `staleAfter` and `'stale'` status (Project 8)
+- [x] Document `staleAfter` and `'stale'` status (Project 8)
 - [ ] Link to AI streaming example (Project 1)
 - [ ] Add server-side checkpoint persistence patterns
 
 ### Transports Page
 
-- [ ] Add decision matrix (Project 20)
-- [ ] Link to Centrifugo guide (Project 14)
-- [ ] Link to Scaling guide (Project 5)
+- [x] Add decision matrix (Project 20)
+- [x] Link to Centrifugo guide (Project 14)
+- [x] Link to Scaling guide (Project 5)
 
 ### Resilience Page
 
 - [x] Add SharedWorker bundler setup section (Project 17)
-- [ ] Add "what happens when..." FAQ: offline, tab closed, token expired, server restart
+- [x] Add "what happens when..." FAQ: offline, tab closed, token expired, server restart
 
 ### Hooks Reference Page
 

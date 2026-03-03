@@ -259,6 +259,93 @@ const transport = createCoordinatedTransport({
           automatically. Most apps work fine without a SharedWorker.
         </p>
       </div>
+
+      <h2 id="what-happens-when">What happens when&hellip;</h2>
+      <table className="doc-table">
+        <thead>
+          <tr>
+            <th scope="col">Scenario</th>
+            <th scope="col">What happens</th>
+            <th scope="col">Recovery</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Network goes offline</td>
+            <td>
+              Publishes buffer in the offline queue. Subscriptions pause &mdash;
+              no events are received.
+            </td>
+            <td>
+              Queue replays on reconnect. If{' '}
+              <code>refetchOnReconnect: true</code>, collections re-query to
+              fill any gap.
+            </td>
+          </tr>
+          <tr>
+            <td>Tab is closed</td>
+            <td>
+              Connection closes. With <code>createCoordinatedTransport</code>,
+              BroadcastChannel elects a new leader tab and reconnects.
+              SharedWorker keeps the connection alive. Without coordination, the
+              connection is simply dropped.
+            </td>
+            <td>
+              Other tabs continue receiving events without interruption
+              (BroadcastChannel: brief reconnect; SharedWorker: seamless).
+            </td>
+          </tr>
+          <tr>
+            <td>Auth token expires</td>
+            <td>
+              Transport-dependent. WebSocket/Centrifugo close with an auth
+              error. SSE returns 401 on reconnect.
+            </td>
+            <td>
+              Provide a <code>getToken</code> function (WebSocket, SSE) or a{' '}
+              <code>token</code> callback (Centrifugo) that returns a fresh
+              token on each connect. The transport calls it automatically during
+              reconnection.
+            </td>
+          </tr>
+          <tr>
+            <td>Server restarts</td>
+            <td>
+              All connections drop. Clients enter reconnection backoff
+              (exponential with jitter).
+            </td>
+            <td>
+              Clients reconnect automatically. Use{' '}
+              <code>refetchOnReconnect</code> or Centrifugo epoch/offset
+              recovery to fill any missed messages.
+            </td>
+          </tr>
+          <tr>
+            <td>Laptop sleep / resume</td>
+            <td>Same as network offline. Connections time out during sleep.</td>
+            <td>
+              On wake, the client detects the stale connection and reconnects.
+              Offline queue replays any buffered mutations.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2 id="see-also">See also</h2>
+      <ul>
+        <li>
+          <a href="#/docs/transports">Transports</a> &mdash; overview of all
+          available transports and when to use each
+        </li>
+        <li>
+          <a href="#/docs/scaling">Scaling to Production</a> &mdash; the
+          PublishBackend interface for multi-process fan-out
+        </li>
+        <li>
+          <a href="#/docs/error-reference">Error Reference</a> &mdash;
+          connection errors, flush errors, and gap recovery errors
+        </li>
+      </ul>
     </article>
   )
 }

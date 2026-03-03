@@ -392,10 +392,10 @@ export function Ephemeral() {
       <h1>Ephemeral &amp; Reaction Patterns</h1>
       <p className="doc-lead">
         Ephemeral data has a short life — typing indicators, cursors, emoji
-        reactions, and "user is viewing" badges. This guide shows four
+        reactions, and "user is viewing" badges. This guide shows six
         production-ready patterns built on <code>ephemeralLiveOptions</code>,{' '}
-        <code>usePublish</code>, <code>usePresence</code>, and{' '}
-        <code>useSyncedCounter</code>.
+        <code>usePublish</code>, <code>usePresence</code>,{' '}
+        <code>useSubscribe</code>, and <code>useSyncedCounter</code>.
       </p>
 
       {/* ------------------------------------------------------------------
@@ -882,6 +882,146 @@ function PostReactions({ postId }: { postId: string }) {
       </div>
 
       {/* ------------------------------------------------------------------
+          5. Confetti / celebration animation
+      ------------------------------------------------------------------ */}
+      <h2 id="confetti">5. Confetti / celebration animation</h2>
+      <p>
+        Fire a full-screen confetti burst when a milestone is reached. The event
+        is ephemeral &mdash; every connected client sees the animation, but
+        nothing is stored. Use <code>useSubscribe</code> with a callback that
+        triggers the confetti library.
+      </p>
+
+      <h3 id="confetti-client">Client &mdash; celebration event listener</h3>
+      <CodeBlock
+        title="features/celebrations/CelebrationOverlay.tsx"
+        code={`import { useSubscribe } from '@tanstack/react-realtime'
+import confetti from 'canvas-confetti'
+
+function CelebrationOverlay({ projectId }: { projectId: string }) {
+  useSubscribe(['celebrations', { projectId }], (event) => {
+    const e = event as { type: string; message: string }
+    if (e.type === 'confetti') {
+      confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } })
+    }
+  })
+
+  return null // overlay is purely side-effect-based
+}`}
+      />
+
+      <h3 id="confetti-server">
+        Server &mdash; trigger confetti when a goal is reached
+      </h3>
+      <CodeBlock
+        title="server/routes/goals.ts"
+        code={`// Server — trigger confetti when a goal is reached
+import { serializeKey } from '@tanstack/realtime'
+import { nodeServer } from './realtime.server'
+
+export async function completeGoal(goalId: string, projectId: string) {
+  await db.goals.update({ where: { id: goalId }, data: { completed: true } })
+
+  // Ephemeral celebration event — no storage needed
+  nodeServer.publish(
+    serializeKey(['celebrations', { projectId }]),
+    { type: 'confetti', message: \`Goal "\${goalId}" completed!\` },
+  )
+}`}
+      />
+
+      <div className="doc-callout">
+        <p>
+          <strong>Side-effect-only components.</strong> The{' '}
+          <code>CelebrationOverlay</code> renders <code>null</code> &mdash; it
+          exists purely to subscribe and trigger the confetti side effect. Mount
+          it once inside your <code>RealtimeProvider</code> and every page in
+          the app will receive celebration events without extra wiring.
+        </p>
+      </div>
+
+      {/* ------------------------------------------------------------------
+          6. Toast notifications from server events
+      ------------------------------------------------------------------ */}
+      <h2 id="toast-notifications">
+        6. Toast notifications from server events
+      </h2>
+      <p>
+        Display system-wide alerts, deployment notifications, or admin messages
+        as toast popups. Subscribe to a notifications channel and pipe each
+        event into your toast library. The events are fire-and-forget &mdash;
+        clients that are offline when the toast fires simply never see it.
+      </p>
+
+      <h3 id="toast-client">Client &mdash; notification listener</h3>
+      <CodeBlock
+        title="features/notifications/NotificationListener.tsx"
+        code={`import { useSubscribe } from '@tanstack/react-realtime'
+import { toast } from 'your-toast-library'  // sonner, react-hot-toast, etc.
+
+function NotificationListener() {
+  useSubscribe(['notifications', { scope: 'global' }], (event) => {
+    const e = event as {
+      type: 'info' | 'warning' | 'success' | 'error'
+      title: string
+      body?: string
+    }
+    toast[e.type](e.title, { description: e.body })
+  })
+
+  return null
+}
+
+// Mount once at the app root, inside <RealtimeProvider>
+function App() {
+  return (
+    <RealtimeProvider client={realtimeClient}>
+      <NotificationListener />
+      <Router />
+    </RealtimeProvider>
+  )
+}`}
+      />
+
+      <h3 id="toast-server">Server &mdash; broadcast a notification</h3>
+      <CodeBlock
+        title="server/routes/notifications.ts"
+        code={`// Server — broadcast a toast notification to all connected clients
+import { serializeKey } from '@tanstack/realtime'
+import { nodeServer } from './realtime.server'
+
+export async function broadcastNotification(notification: {
+  type: 'info' | 'warning' | 'success' | 'error'
+  title: string
+  body?: string
+}) {
+  nodeServer.publish(
+    serializeKey(['notifications', { scope: 'global' }]),
+    notification,
+  )
+}
+
+// Usage: deploy hook, admin action, cron job, etc.
+await broadcastNotification({
+  type: 'success',
+  title: 'Deployment complete',
+  body: 'v2.4.1 is now live across all regions.',
+})`}
+      />
+
+      <div className="doc-callout">
+        <p>
+          <strong>Any toast library works.</strong> The{' '}
+          <code>NotificationListener</code> component is agnostic &mdash; swap{' '}
+          <code>{'your-toast-library'}</code> for <code>sonner</code>,{' '}
+          <code>react-hot-toast</code>, or any library that exposes{' '}
+          <code>toast.info()</code> / <code>toast.error()</code> style APIs.
+          Because the listener returns <code>null</code>, it adds zero DOM
+          nodes.
+        </p>
+      </div>
+
+      {/* ------------------------------------------------------------------
           Quick reference
       ------------------------------------------------------------------ */}
       <h2 id="quick-reference">Quick reference</h2>
@@ -913,6 +1053,14 @@ function PostReactions({ postId }: { postId: string }) {
           </p>
         </div>
         <div className="doc-grid-card">
+          <h3>useSubscribe</h3>
+          <p>
+            Raw channel listener &mdash; runs a callback on every event. Returns
+            nothing; purely side-effect-based. Use for confetti, toasts, sound
+            effects, and analytics pings.
+          </p>
+        </div>
+        <div className="doc-grid-card">
           <h3>useSyncedCounter</h3>
           <p>
             PN-Counter CRDT hook. Concurrent <code>increment()</code> calls from
@@ -937,7 +1085,10 @@ updatePresence({ cursor: { x, y } })       // partial merge, not replace
 
 // Durable reaction count + ephemeral animation
 useSyncedCounter(counterDef, { params })   // persistent total
-usePublish(channel)                         // ephemeral animation trigger`}
+usePublish(channel)                         // ephemeral animation trigger
+
+// Side-effect on channel event (confetti, toast, sound)
+useSubscribe(channel, (event) => { /* fire and forget */ })`}
       />
     </article>
   )

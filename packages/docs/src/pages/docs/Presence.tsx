@@ -228,6 +228,135 @@ function DocumentPage({ docId }: { docId: string }) {
           cursor update doesn't overwrite the user's name.
         </p>
       </div>
+
+      <h2 id="contextual-presence">Contextual presence</h2>
+      <p>
+        Scope presence to a specific entity &mdash; a spreadsheet cell, a
+        document paragraph, or a kanban card &mdash; so users see{' '}
+        <em>who is editing what</em>, not just who is online.
+      </p>
+      <CodeBlock
+        title="features/spreadsheet/CellPresence.tsx"
+        code={`import { usePresence } from '@tanstack/react-realtime'
+import { createPresenceChannel } from '@tanstack/realtime'
+import { useState } from 'react'
+
+// One presence channel per cell -- join when focused, leave on blur.
+const cellPresence = createPresenceChannel({
+  id: 'cell-presence',
+  channel: (params: { sheetId: string; cellId: string }) =>
+    ['sheet:cell', params],
+})
+
+// Inner component -- always calls usePresence (Rules of Hooks safe).
+function CellEditor({ sheetId, cellId, onBlur }: {
+  sheetId: string
+  cellId: string
+  onBlur: () => void
+}) {
+  const { others } = usePresence(cellPresence, {
+    params: { sheetId, cellId },
+    initial: { name: currentUser.name, color: currentUser.color },
+  })
+
+  return (
+    <>
+      {others.map((u) => (
+        <span key={u.connectionId} className="cell-editor-badge"
+              style={{ background: u.data.color }}>
+          {u.data.name}
+        </span>
+      ))}
+    </>
+  )
+}
+
+function Cell({ sheetId, cellId }: { sheetId: string; cellId: string }) {
+  const [focused, setFocused] = useState(false)
+
+  return (
+    <td
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+    >
+      {/* Mount CellEditor only when focused -- usePresence joins/leaves cleanly */}
+      {focused && <CellEditor sheetId={sheetId} cellId={cellId} onBlur={() => setFocused(false)} />}
+    </td>
+  )
+}`}
+      />
+      <div className="doc-callout">
+        <p>
+          Keep contextual presence channels short-lived. Join when the user
+          focuses the entity, leave on blur. This avoids accumulating hundreds
+          of idle presence subscriptions across a large document.
+        </p>
+      </div>
+
+      <h2 id="throttling">Throttling high-frequency updates</h2>
+      <p>
+        Cursor positions change dozens of times per second. Without throttling,
+        each <code>mousemove</code> triggers a publish &mdash; flooding the
+        server and peers. Use the built-in <code>throttle</code> utility to cap
+        the update rate.
+      </p>
+      <CodeBlock
+        title="features/Canvas.tsx"
+        code={`import { throttle } from '@tanstack/realtime'
+import { usePresence } from '@tanstack/react-realtime'
+import { useMemo, useCallback } from 'react'
+
+function Canvas({ docId }: { docId: string }) {
+  const { updatePresence } = usePresence(docPresence, {
+    params: { docId },
+    initial: { name: user.name, cursor: null },
+  })
+
+  // Cap updates to ~30 per second (33 ms interval).
+  const throttledUpdate = useMemo(
+    () =>
+      throttle(
+        (cursor: { x: number; y: number }) => {
+          updatePresence({ cursor })
+        },
+        { interval: 33 },
+      ),
+    [updatePresence],
+  )
+
+  // Read currentTarget eagerly -- before the throttled callback fires.
+  const onMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      const rect = e.currentTarget.getBoundingClientRect()
+      throttledUpdate({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+    },
+    [throttledUpdate],
+  )
+
+  return <div onMouseMove={onMouseMove} onMouseLeave={() => updatePresence({ cursor: null })} />
+}`}
+      />
+      <div className="doc-callout">
+        <p>
+          <strong>Rule of thumb:</strong> 30&ndash;60 updates/second is enough
+          for smooth cursors. For slower-moving data like scroll position,
+          5&ndash;10 updates/second is sufficient. The <code>throttle</code>{' '}
+          utility uses a trailing-edge strategy, so the final position is always
+          sent.
+        </p>
+      </div>
+
+      <h2 id="see-also">See also</h2>
+      <ul>
+        <li>
+          <a href="#/docs/ephemeral">Ephemeral Channels</a> &mdash; cursor
+          sharing recipe using ephemeral events instead of presence
+        </li>
+        <li>
+          <a href="#/docs/channels">Channels &amp; Pub/Sub</a> &mdash; raw
+          subscribe/publish for one-way cursor broadcasts
+        </li>
+      </ul>
     </article>
   )
 }

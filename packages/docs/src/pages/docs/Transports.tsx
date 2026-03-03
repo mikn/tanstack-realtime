@@ -15,7 +15,7 @@ export function Transports() {
         and infrastructure requirements. Use the matrix below to compare them at
         a glance.
       </p>
-      <table>
+      <table className="doc-table">
         <thead>
           <tr>
             <th scope="col">Criterion</th>
@@ -204,6 +204,23 @@ tick.onTick('game:room-1', (frame) => {
   },
 })`}
       />
+
+      <h2 id="see-also">See also</h2>
+      <ul>
+        <li>
+          <a href="#/docs/centrifugo">Centrifugo Guide</a> &mdash; end-to-end
+          walkthrough: installation, tokens, presence, gap recovery, and
+          production topology
+        </li>
+        <li>
+          <a href="#/docs/scaling">Scaling to Production</a> &mdash; the
+          PublishBackend interface for multi-process SSE / WebSocket fan-out
+        </li>
+        <li>
+          <a href="#/docs/resilience">Resilience</a> &mdash; offline queue, gap
+          recovery, and multi-tab coordination
+        </li>
+      </ul>
     </article>
   )
 }

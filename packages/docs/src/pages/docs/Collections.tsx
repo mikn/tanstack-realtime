@@ -163,6 +163,85 @@ realtimeCollectionOptions({
   refetchOnReconnect: true,
 })`}
       />
+
+      <h2 id="subscribe-errors">Subscribe error handling</h2>
+      <p>
+        When a subscription is rejected &mdash; authorization denied, channel
+        not found, or a transport error &mdash; the transport emits a warning to
+        the console. To surface these errors in your UI, check the
+        client&rsquo;s connection status and handle transport-level events.
+      </p>
+      <CodeBlock
+        code={`// The transport logs subscribe rejections as console.warn messages.
+// To react programmatically, wrap the transport and intercept errors:
+
+import { createRealtimeClient, wsTransport } from '@tanstack/realtime'
+
+const baseTransport = wsTransport({ url: 'ws://localhost:3001' })
+
+// Listen for connection status changes
+const client = createRealtimeClient({ transport: baseTransport })
+
+// In your component, check status to show a banner
+function SyncBanner() {
+  const { status } = useRealtime()
+  if (status === 'disconnected') {
+    return <div>Live updates unavailable. Check your connection.</div>
+  }
+  return null
+}`}
+      />
+      <div className="doc-callout">
+        <p>
+          See the <a href="#/docs/error-reference">Error Reference</a> for
+          details on subscribe errors, authorization failures, and how to debug
+          them.
+        </p>
+      </div>
+
+      <h2 id="offline-queue">Offline queue integration</h2>
+      <p>
+        Wrap your transport with <code>createOfflineQueue</code> to buffer
+        publishes while the client is offline. Queued messages replay
+        automatically in FIFO order when the connection is restored. Pair with{' '}
+        <code>optimistic: true</code> on your collections so local writes appear
+        instantly while the queue waits to flush.
+      </p>
+      <CodeBlock
+        code={`import { createOfflineQueue, createLocalStorageAdapter } from '@tanstack/realtime'
+
+const transport = createOfflineQueue(baseTransport, {
+  maxSize: 500,
+  storage: createLocalStorageAdapter(),
+})
+
+// Collections using this transport automatically buffer offline mutations.
+const client = createRealtimeClient({ transport })`}
+      />
+      <p>
+        See <a href="#/docs/resilience">Resilience</a> for full offline queue
+        options including IndexedDB storage and pending-count badges.
+      </p>
+
+      <h2 id="see-also">See also</h2>
+      <ul>
+        <li>
+          <a href="#/docs/crdts">CRDTs</a> &mdash; field-level conflict
+          resolution with LWW registers, PN-Counters, and OR-Sets
+        </li>
+        <li>
+          <a href="#/docs/resilience">Resilience</a> &mdash; offline queue, gap
+          recovery, and multi-tab coordination
+        </li>
+        <li>
+          <a href="#/docs/scaling">Scaling to Production</a> &mdash; the
+          PublishBackend interface for multi-process fan-out
+        </li>
+        <li>
+          <a href="#/docs/error-reference">Error Reference</a> &mdash; handling
+          ConflictError, subscribe errors, and flush errors
+        </li>
+      </ul>
     </article>
   )
 }
