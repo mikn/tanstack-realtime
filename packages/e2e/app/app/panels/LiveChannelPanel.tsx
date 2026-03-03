@@ -8,7 +8,7 @@
 
 import { useRef, useState } from 'react'
 import { liveChannelOptions } from '@tanstack/realtime'
-import { client, userId } from '../client.js'
+import { client, userId } from '../transport.js'
 import { useCollectionSync } from '../useCollectionSync.js'
 
 interface ChatMessage {

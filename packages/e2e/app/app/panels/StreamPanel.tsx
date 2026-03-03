@@ -9,7 +9,7 @@
 
 import { useStream } from '@tanstack/react-realtime'
 import { textStream } from '../defs.js'
-import { client } from '../client.js'
+import { client } from '../transport.js'
 
 const STREAM_CHANNEL = 'e2e-stream'
 

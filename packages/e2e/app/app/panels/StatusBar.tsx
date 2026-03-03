@@ -4,7 +4,7 @@
  */
 
 import { useStore } from '@tanstack/react-store'
-import { client, userId } from '../client.js'
+import { client, userId } from '../transport.js'
 
 export function StatusBar() {
   const status = useStore(client.store, (s) => s.status)

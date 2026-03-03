@@ -21,8 +21,17 @@
       "entry": ["**/*.test.ts"],
       "ignore": ["setup.ts", "workerd-test-worker.ts"]
     },
+    "packages/realtime-preset-start": {},
     "packages/e2e": {
-      "entry": ["app/src/main.tsx", "app/vite.config.ts", "tests/**/*.spec.ts"]
+      "entry": [
+        "app/app.config.ts",
+        "app/app/client.tsx",
+        "app/app/ssr.tsx",
+        "app/app/router.tsx",
+        "app/app/routes/**/*.{ts,tsx}",
+        "tests/**/*.spec.ts"
+      ],
+      "ignore": ["app/app/routeTree.gen.ts"]
     }
   },
   "ignore": ["packages/docs/**", "packages/__tests__/workerd-test-worker.ts"]

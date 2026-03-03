@@ -15,7 +15,7 @@
 import { useEffect } from 'react'
 import { usePresence, useSyncedValue } from '@tanstack/react-realtime'
 import { roomPresence, sharedValue } from '../defs.js'
-import { userId } from '../client.js'
+import { userId } from '../transport.js'
 
 interface UserPresenceData {
   name: string

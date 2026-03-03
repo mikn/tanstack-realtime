@@ -3,11 +3,8 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { defineConfig, devices } from '@playwright/test'
 
-// Use a pre-cached Chromium binary if the canonical Playwright revision is not
-// available (common in sandboxed CI / offline environments).
 function resolveChromiumExecutable(): string | undefined {
   const candidates = [
-    // Full Chromium (preferred — headless_shell may drop WebSocket frames).
     join(
       homedir(),
       '.cache',
@@ -16,7 +13,6 @@ function resolveChromiumExecutable(): string | undefined {
       'chrome-linux',
       'chrome',
     ),
-    // Headless shell fallback.
     join(
       homedir(),
       '.cache',
@@ -25,7 +21,6 @@ function resolveChromiumExecutable(): string | undefined {
       'chrome-linux',
       'headless_shell',
     ),
-    // System Chromium fallbacks.
     '/usr/bin/chromium-browser',
     '/usr/bin/chromium',
     '/usr/bin/google-chrome',
@@ -36,27 +31,24 @@ function resolveChromiumExecutable(): string | undefined {
 const executablePath = resolveChromiumExecutable()
 
 export default defineConfig({
-  globalSetup: './global-setup.ts',
-  globalTeardown: './global-teardown.ts',
+  // No globalSetup/Teardown — Centrifugo not needed.
+  // vinxi dev (TanStack Start) provides the SSE backend via webServer below.
 
-  // Start the Vite dev server before the tests run.
   webServer: {
-    command: 'node_modules/.bin/vite app/ --port 5173',
-    url: 'http://localhost:5173',
+    command: 'node_modules/.bin/vinxi dev',
+    cwd: join(import.meta.dirname, 'app'),
+    url: 'http://localhost:3000',
     reuseExistingServer: !process.env['CI'],
-    timeout: 30_000,
+    timeout: 60_000,
   },
 
   use: {
-    baseURL: 'http://localhost:5173',
-    // Generous timeout for realtime sync across two browser contexts.
+    baseURL: 'http://localhost:3000',
     actionTimeout: 10_000,
     ...(executablePath ? { launchOptions: { executablePath } } : {}),
   },
 
-  // Run tests serially to avoid Centrifugo channel name collisions.
   workers: 1,
-
   timeout: 30_000,
 
   projects: [

@@ -1,50 +1,26 @@
 /**
  * Multi-user integration tests for @tanstack/realtime.
  *
- * Each `describe` block exercises a different library pattern by coordinating
- * two Playwright browser contexts (alice + bob) against a real Centrifugo
- * instance started by global-setup.ts.
+ * Coordinates two Playwright browser contexts (alice + bob) against the
+ * TanStack Start dev server (vinxi dev, SSE backend via createStartHandler).
  *
- * Patterns covered:
+ * Patterns covered (all 9):
  *   1. realtimeCollectionOptions  — server-synced collection (insert / delete)
  *   2. liveChannelOptions         — append-only event stream (chat)
- *   3. usePresence                — presence channel (who's online)
+ *   3. usePresence                — presence over pub/sub (withPresence wrapper)
  *   4. ephemeralLiveOptions       — typing indicators with TTL auto-expiry
  *   5. streamChannelOptions       — token-accumulation stream (useStream)
  *   6. tickCollectionOptions      — game-state batch updates
  *   7. useSyncedCounter           — PN-Counter CRDT
  *   8. useSyncedValue             — LWW-Register CRDT
  *   9. useSyncedSet               — OR-Set CRDT
- *
- * How it works
- * ─────────────
- * global-setup.ts writes the Centrifugo port to .centrifugo-port.tmp.
- * Each test reads that file and navigates both contexts to
- *   http://localhost:5173/?userId=<id>&centrifugoPort=<port>
- * The app reads those params and creates a client connected to Centrifugo.
  */
 
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
 import type { Browser, BrowserContext, Page } from '@playwright/test'
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-// ESM-safe __dirname equivalent
-const __dirname = dirname(fileURLToPath(import.meta.url))
-
-const PORT_FILE = join(__dirname, '..', '.centrifugo-port.tmp')
-
-function centrifugoPort(): string {
-  return readFileSync(PORT_FILE, 'utf8').trim()
-}
-
 function appUrl(userId: string): string {
-  return `/?userId=${userId}&centrifugoPort=${centrifugoPort()}`
+  return `/?userId=${userId}`
 }
 
 async function openContext(
@@ -54,21 +30,15 @@ async function openContext(
   const ctx = await browser.newContext()
   const page = await ctx.newPage()
   await page.goto(appUrl(userId))
-  // Wait until the realtime client reports "connected".
   await expect(page.getByTestId('status')).toHaveText('connected', {
     timeout: 15_000,
   })
-  // Wait until the panels are mounted and subscriptions are set up.
-  // App.tsx defers panel rendering until the first successful connection, so
-  // there is one extra React render cycle after the status text updates.
-  // Waiting for a panel element ensures all hooks (e.g. useSyncedValue) have
-  // subscribed to their channels before we start performing test actions.
   await expect(page.getByTestId('todo-input')).toBeVisible({ timeout: 5_000 })
   return { ctx, page }
 }
 
 // ---------------------------------------------------------------------------
-// 1. realtimeCollectionOptions — Todos
+// 1. realtimeCollectionOptions
 // ---------------------------------------------------------------------------
 
 test.describe('realtimeCollectionOptions — multi-user todo sync', () => {
@@ -78,20 +48,15 @@ test.describe('realtimeCollectionOptions — multi-user todo sync', () => {
     const { ctx: ctxA, page: pageA } = await openContext(browser, 'alice')
     const { ctx: ctxB, page: pageB } = await openContext(browser, 'bob')
 
-    // Alice adds a todo.
     const todoText = `Buy milk ${Date.now()}`
     await pageA.getByTestId('todo-input').fill(todoText)
     await pageA.getByTestId('add-todo').click()
 
-    // Bob should see the new todo.
     await expect(pageB.getByTestId('todo-list')).toContainText(todoText, {
       timeout: 8_000,
     })
 
-    // Alice deletes the todo (first delete button in her list).
     await pageA.getByTestId('delete-todo').first().click()
-
-    // Bob should no longer see the todo.
     await expect(pageB.getByTestId('todo-list')).not.toContainText(todoText, {
       timeout: 8_000,
     })
@@ -102,7 +67,7 @@ test.describe('realtimeCollectionOptions — multi-user todo sync', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 2. liveChannelOptions — Chat
+// 2. liveChannelOptions
 // ---------------------------------------------------------------------------
 
 test.describe('liveChannelOptions — multi-user chat', () => {
@@ -112,20 +77,16 @@ test.describe('liveChannelOptions — multi-user chat', () => {
     const { ctx: ctxA, page: pageA } = await openContext(browser, 'alice')
     const { ctx: ctxB, page: pageB } = await openContext(browser, 'bob')
 
-    // Alice sends.
     const msgA = `Hello from alice ${Date.now()}`
     await pageA.getByTestId('chat-input').fill(msgA)
     await pageA.getByTestId('send-message').click()
-
     await expect(pageB.getByTestId('chat-messages')).toContainText(msgA, {
       timeout: 8_000,
     })
 
-    // Bob replies.
     const msgB = `Hi alice from bob ${Date.now()}`
     await pageB.getByTestId('chat-input').fill(msgB)
     await pageB.getByTestId('send-message').click()
-
     await expect(pageA.getByTestId('chat-messages')).toContainText(msgB, {
       timeout: 8_000,
     })
@@ -136,7 +97,7 @@ test.describe('liveChannelOptions — multi-user chat', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 3. usePresence — online users
+// 3. usePresence (over pub/sub via withPresence)
 // ---------------------------------------------------------------------------
 
 test.describe('usePresence — presence channel', () => {
@@ -146,8 +107,7 @@ test.describe('usePresence — presence channel', () => {
     const { ctx: ctxA, page: pageA } = await openContext(browser, 'alice')
     const { ctx: ctxB, page: pageB } = await openContext(browser, 'bob')
 
-    // Both should appear in each other's presence list.
-    // Give presence a moment to propagate after both have connected.
+    // withPresence uses 2s heartbeat for late-joiner discovery.
     await expect(pageA.getByTestId('presence-users')).toContainText('bob', {
       timeout: 8_000,
     })
@@ -161,7 +121,7 @@ test.describe('usePresence — presence channel', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 4. ephemeralLiveOptions — typing indicators with TTL
+// 4. ephemeralLiveOptions
 // ---------------------------------------------------------------------------
 
 test.describe('ephemeralLiveOptions — typing indicators', () => {
@@ -171,19 +131,12 @@ test.describe('ephemeralLiveOptions — typing indicators', () => {
     const { ctx: ctxA, page: pageA } = await openContext(browser, 'alice')
     const { ctx: ctxB, page: pageB } = await openContext(browser, 'bob')
 
-    // Suppress unused variable warning — pageA is used below.
-    void pageA
-
-    // Alice sends a typing event.
     await pageA.getByTestId('start-typing').click()
-
-    // Bob should see the indicator.
     await expect(pageB.getByTestId('typing-indicators')).toContainText(
       'alice',
       { timeout: 8_000 },
     )
 
-    // After the TTL (2000ms) + buffer, the indicator should disappear.
     await pageB.waitForTimeout(3000)
     await expect(pageB.getByTestId('typing-indicators')).not.toContainText(
       'alice',
@@ -195,7 +148,7 @@ test.describe('ephemeralLiveOptions — typing indicators', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 5. streamChannelOptions / useStream — token accumulation
+// 5. streamChannelOptions / useStream
 // ---------------------------------------------------------------------------
 
 test.describe('streamChannelOptions — token stream', () => {
@@ -205,10 +158,8 @@ test.describe('streamChannelOptions — token stream', () => {
     const { ctx: ctxA, page: pageA } = await openContext(browser, 'alice')
     const { ctx: ctxB, page: pageB } = await openContext(browser, 'bob')
 
-    // Alice triggers the stream.
     await pageA.getByTestId('start-stream').click()
 
-    // Bob should accumulate tokens and reach "done".
     await expect(pageB.getByTestId('stream-content')).toContainText(
       'Hello World!',
       { timeout: 10_000 },
@@ -223,7 +174,7 @@ test.describe('streamChannelOptions — token stream', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 6. tickCollectionOptions — game-state batch updates
+// 6. tickCollectionOptions
 // ---------------------------------------------------------------------------
 
 test.describe('tickCollectionOptions — game entity positions', () => {
@@ -233,13 +184,9 @@ test.describe('tickCollectionOptions — game entity positions', () => {
     const { ctx: ctxA, page: pageA } = await openContext(browser, 'alice')
     const { ctx: ctxB, page: pageB } = await openContext(browser, 'bob')
 
-    // Wait for tick transports to connect.
     await pageA.waitForTimeout(500)
-
-    // Alice clicks "Move Entity" — the tick transport will batch and publish.
     await pageA.getByTestId('move-entity').click()
 
-    // Bob should see entity1 in the tick entities list.
     await expect(pageB.getByTestId('tick-entities')).toContainText('entity1', {
       timeout: 10_000,
     })
@@ -250,7 +197,7 @@ test.describe('tickCollectionOptions — game entity positions', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 7. useSyncedCounter — PN-Counter CRDT
+// 7. useSyncedCounter
 // ---------------------------------------------------------------------------
 
 test.describe('useSyncedCounter — concurrent increments', () => {
@@ -260,15 +207,11 @@ test.describe('useSyncedCounter — concurrent increments', () => {
     const { ctx: ctxA, page: pageA } = await openContext(browser, 'alice')
     const { ctx: ctxB, page: pageB } = await openContext(browser, 'bob')
 
-    // Both increment concurrently.
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 3; i++)
       await pageA.getByTestId('counter-increment').click()
-    }
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 2; i++)
       await pageB.getByTestId('counter-increment').click()
-    }
 
-    // Both should converge to 5.
     await expect(pageA.getByTestId('counter-value')).toHaveText('5', {
       timeout: 8_000,
     })
@@ -282,7 +225,7 @@ test.describe('useSyncedCounter — concurrent increments', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 8. useSyncedValue — LWW-Register CRDT
+// 8. useSyncedValue
 // ---------------------------------------------------------------------------
 
 test.describe('useSyncedValue — last-write-wins shared text', () => {
@@ -292,7 +235,6 @@ test.describe('useSyncedValue — last-write-wins shared text', () => {
 
     const sharedText = `shared-${Date.now()}`
     await pageA.getByTestId('value-input').fill(sharedText)
-    // The useSyncedValue hook publishes on every keystroke (onChange).
 
     await expect(pageB.getByTestId('value-display')).toContainText(sharedText, {
       timeout: 8_000,
@@ -304,7 +246,7 @@ test.describe('useSyncedValue — last-write-wins shared text', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 9. useSyncedSet — OR-Set CRDT
+// 9. useSyncedSet
 // ---------------------------------------------------------------------------
 
 test.describe('useSyncedSet — concurrent add / add convergence', () => {
@@ -314,25 +256,18 @@ test.describe('useSyncedSet — concurrent add / add convergence', () => {
     const { ctx: ctxA, page: pageA } = await openContext(browser, 'alice')
     const { ctx: ctxB, page: pageB } = await openContext(browser, 'bob')
 
-    // Alice adds item-a.
     await pageA.getByTestId('set-add-a').click()
     await expect(pageB.getByTestId('set-display')).toContainText('item-a', {
       timeout: 8_000,
     })
 
-    // Bob adds item-b concurrently — it should appear on alice's side.
     await pageB.getByTestId('set-add-b').click()
     await expect(pageA.getByTestId('set-display')).toContainText('item-b', {
       timeout: 8_000,
     })
 
-    // Both should see both items (OR-Set union convergence).
-    await expect(pageA.getByTestId('set-display')).toContainText('item-a', {
-      timeout: 8_000,
-    })
-    await expect(pageB.getByTestId('set-display')).toContainText('item-b', {
-      timeout: 8_000,
-    })
+    await expect(pageA.getByTestId('set-display')).toContainText('item-a')
+    await expect(pageB.getByTestId('set-display')).toContainText('item-b')
 
     await ctxA.close()
     await ctxB.close()

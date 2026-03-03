@@ -6,15 +6,14 @@
  * and publishes a tick frame. User B's tickCollectionOptions receives the
  * frame and updates the entity position.
  *
- * Implementation note: each panel instance creates its own tickTransport
- * wrapping a fresh centrifugoTransport. This is acceptable for a demo;
- * production apps would share a single tick transport.
+ * Uses sseTransport as the inner transport (second SSE connection used
+ * exclusively for tick frames — publishes go to the same /api/realtime
+ * endpoint which broadcasts to all e2e-tick-game subscribers).
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
+import { sseTransport } from '@tanstack/realtime-adapter-sse'
 import { tickCollectionOptions, tickTransport } from '@tanstack/realtime'
-import { centrifugoPort } from '../client.js'
 import { useCollectionSync } from '../useCollectionSync.js'
 
 interface GameEntity {
@@ -29,11 +28,9 @@ export function TickPanel() {
   const tickTpRef = useRef<ReturnType<typeof tickTransport> | null>(null)
   const [connected, setConnected] = useState(false)
 
-  // Create and connect the tick transport on mount.
   useEffect(() => {
-    const inner = centrifugoTransport({
-      url: `ws://127.0.0.1:${centrifugoPort}/connection/websocket`,
-      presencePrefix: 'prs:',
+    const inner = sseTransport({
+      url: '/api/realtime',
       initialDelay: 50,
       maxDelay: 200,
       jitter: 0,
@@ -50,16 +47,8 @@ export function TickPanel() {
   }, [])
 
   const entities = useCollectionSync<GameEntity>(() => {
-    // The tick transport may not be ready yet; use a placeholder that the
-    // effect will re-run for. In practice, the tick transport is connected
-    // before the first tick frame arrives.
     if (!tickTpRef.current) {
-      // Return a no-op config if the transport isn't ready yet.
-      return {
-        sync: {
-          sync: () => () => {},
-        },
-      } as any
+      return { sync: { sync: () => () => {} } } as any
     }
 
     return tickCollectionOptions<GameEntity, string>({
