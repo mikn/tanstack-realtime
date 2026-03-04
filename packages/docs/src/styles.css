@@ -30,7 +30,7 @@
 
   /* Spacing */
   --section-y: 6rem;
-  --container-max: 64rem;
+  --container-max: 72rem;
   --disclaimer-height: 36px;
 }
 
@@ -243,7 +243,7 @@ code {
   font-size: 1.1rem;
   color: var(--text-secondary);
   line-height: 1.7;
-  max-width: 34rem;
+  max-width: 40rem;
   margin: 0 auto 2.5rem;
 }
 
@@ -254,7 +254,7 @@ code {
 }
 
 .hero-code {
-  max-width: 30rem;
+  max-width: 36rem;
   margin: 0 auto 2.5rem;
   text-align: left;
 }
@@ -332,7 +332,7 @@ code {
 .section-sub {
   color: var(--text-secondary);
   font-size: 1.05rem;
-  max-width: 38rem;
+  max-width: 44rem;
   margin-bottom: 2.5rem;
   line-height: 1.7;
 }
@@ -383,7 +383,7 @@ code {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  max-width: 40rem;
+  max-width: 48rem;
 }
 
 .spectrum-step {
@@ -525,7 +525,7 @@ code {
   display: flex;
   flex-direction: column;
   gap: 1.75rem;
-  max-width: 40rem;
+  max-width: 48rem;
 }
 
 .qs-step {
@@ -852,7 +852,7 @@ code {
 .docs-content {
   flex: 1;
   min-width: 0;
-  max-width: 52rem;
+  max-width: 60rem;
   padding: 2.5rem 3rem 4rem;
 }
 
@@ -1004,7 +1004,7 @@ code {
   font-size: 1.05rem !important;
   color: var(--text-secondary) !important;
   line-height: 1.75 !important;
-  max-width: 42rem;
+  max-width: 48rem;
   margin-bottom: 1.5rem !important;
 }
 
