@@ -12,9 +12,9 @@ function Hero() {
         </h1>
         <p className="hero-sub">
           Keep your server, your database, your deploy target. Add a{' '}
-          <code>channel</code> to any collection and it goes live &mdash;
-          with type-safe CRDTs, presence, pub/sub, and offline support.
-          Not a platform, just a library.
+          <code>channel</code> to any collection and it goes live &mdash; with
+          type-safe CRDTs, presence, pub/sub, and offline support. Not a
+          platform, just a library.
         </p>
 
         <div className="hero-code">
