@@ -19,11 +19,15 @@ function TodoList({ projectId }: { projectId: string }) {
     channel: ['todos', { projectId }],
   })
 
-  const { data } = useLiveQuery((q) =>
-    q.from({ todos }).select()
-  )
+  const { data } = useLiveQuery((q) => q.from({ todos }).select())
 
-  return <ul>{data.map(t => <li key={t.id}>{t.text}</li>)}</ul>
+  return (
+    <ul>
+      {data.map((t) => (
+        <li key={t.id}>{t.text}</li>
+      ))}
+    </ul>
+  )
 }
 ```
 
@@ -37,21 +41,27 @@ function TodoList({ projectId }: { projectId: string }) {
     queryFn: () => fetchTodos(projectId),
   })
 
-  return <ul>{todos?.map(t => <li key={t.id}>{t.text}</li>)}</ul>
+  return (
+    <ul>
+      {todos?.map((t) => (
+        <li key={t.id}>{t.text}</li>
+      ))}
+    </ul>
+  )
 }
 ```
 
 The gap isn't just line count — it's **concept count**:
 
-| Concept | TanStack Query | TanStack Realtime (current) |
-|---------|---------------|---------------------------|
-| Config factory | — | `realtimeCollectionOptions` |
-| Data helper | — | `withRest` + spread pattern |
-| Realtime hook | — | `useRealtimeCollection` |
-| Query hook | `useQuery` | `useLiveQuery` (separate package) |
-| Query builder | — | `(q) => q.from({ todos }).select()` |
-| Generic params | inferred | `<Todo, string>` on `withRest` |
-| **Total concepts** | **1** | **6** |
+| Concept            | TanStack Query | TanStack Realtime (current)         |
+| ------------------ | -------------- | ----------------------------------- |
+| Config factory     | —              | `realtimeCollectionOptions`         |
+| Data helper        | —              | `withRest` + spread pattern         |
+| Realtime hook      | —              | `useRealtimeCollection`             |
+| Query hook         | `useQuery`     | `useLiveQuery` (separate package)   |
+| Query builder      | —              | `(q) => q.from({ todos }).select()` |
+| Generic params     | inferred       | `<Todo, string>` on `withRest`      |
+| **Total concepts** | **1**          | **6**                               |
 
 ## Why It's Hard (Constraints)
 
@@ -94,7 +104,13 @@ function TodoList({ projectId }: { projectId: string }) {
     channel: ['todos', { projectId }],
   })
 
-  return <ul>{todos.map(t => <li key={t.id}>{t.text}</li>)}</ul>
+  return (
+    <ul>
+      {todos.map((t) => (
+        <li key={t.id}>{t.text}</li>
+      ))}
+    </ul>
+  )
 }
 ```
 
@@ -113,7 +129,7 @@ const { data } = useRealtimeQuery({
 const { data } = useRealtimeQuery({
   url: '/api/todos',
   getKey: (t: Todo) => t.id,
-  channel: ['todos'],                    // ← one line
+  channel: ['todos'], // ← one line
 })
 
 // Step 3: Add CRDTs
@@ -121,7 +137,7 @@ const { data } = useRealtimeQuery({
   url: '/api/todos',
   getKey: (t: Todo) => t.id,
   channel: ['todos'],
-  fields: { title: 'lww', tags: 'or-set' },  // ← one line
+  fields: { title: 'lww', tags: 'or-set' }, // ← one line
 })
 
 // Step 4: Add optimistic updates
@@ -130,7 +146,7 @@ const { data, collection } = useRealtimeQuery({
   getKey: (t: Todo) => t.id,
   channel: ['todos'],
   fields: { title: 'lww', tags: 'or-set' },
-  optimistic: true,                            // ← one line
+  optimistic: true, // ← one line
 })
 
 // Mutations via the returned collection
@@ -153,7 +169,9 @@ interface UseRealtimeQueryConfig<
   /** Custom item URL builder for PATCH/DELETE. Default: `${baseUrl}/${key}` */
   itemUrl?: (key: TKey) => string
   /** Headers for REST requests. Static object or async factory. */
-  headers?: Record<string, string> | (() => Record<string, string> | Promise<Record<string, string>>)
+  headers?:
+    | Record<string, string>
+    | (() => Record<string, string> | Promise<Record<string, string>>)
 
   /** Manual query function — use instead of `url` for non-REST data sources. */
   queryFn?: () => Promise<Array<T>>
@@ -175,7 +193,11 @@ interface UseRealtimeQueryConfig<
   refetchOnReconnect?: boolean
   onMessage?: (raw: unknown) => RealtimeChannelMessage<T> | null | undefined
   onSubscribeError?: (channel: string, reason: string, code?: number) => void
-  onOptimisticError?: (params: { action: string; key: TKey; error: unknown }) => void
+  onOptimisticError?: (params: {
+    action: string
+    key: TKey
+    error: unknown
+  }) => void
 
   // --- Query options ---
   /** Custom query builder. Default: `(q) => q.from({ collection }).select()` */
@@ -234,7 +256,7 @@ export function useRealtimeQuery<
   const { data } = useLiveQuery(
     config.select
       ? (q) => config.select!(q, collection)
-      : (q) => q.from({ collection }).select()
+      : (q) => q.from({ collection }).select(),
   )
 
   return { data: data as Array<T>, collection }
@@ -251,7 +273,8 @@ const { data } = useRealtimeQuery({
   url: '/api/todos',
   getKey: (t: Todo) => t.id,
   channel: ['todos'],
-  select: (q, todos) => q.from({ todos }).where(({ todos }) => todos.done === false),
+  select: (q, todos) =>
+    q.from({ todos }).where(({ todos }) => todos.done === false),
 })
 
 // Ordering
@@ -259,7 +282,8 @@ const { data } = useRealtimeQuery({
   url: '/api/todos',
   getKey: (t: Todo) => t.id,
   channel: ['todos'],
-  select: (q, todos) => q.from({ todos }).orderBy(({ todos }) => todos.createdAt),
+  select: (q, todos) =>
+    q.from({ todos }).orderBy(({ todos }) => todos.createdAt),
 })
 ```
 
@@ -273,8 +297,10 @@ Use `queryFn` + `onInsert/Update/Delete` directly (no `url`):
 const { data } = useRealtimeQuery({
   getKey: (t: Todo) => t.id,
   queryFn: () => myCustomFetch('/todos'),
-  onInsert: async ({ transaction }) => myCustomCreate(transaction.mutations[0].modified),
-  onUpdate: async ({ transaction }) => myCustomUpdate(transaction.mutations[0].modified),
+  onInsert: async ({ transaction }) =>
+    myCustomCreate(transaction.mutations[0].modified),
+  onUpdate: async ({ transaction }) =>
+    myCustomUpdate(transaction.mutations[0].modified),
   channel: ['todos'],
 })
 ```
@@ -290,9 +316,12 @@ Same pattern — just pass the function references directly:
 const { data } = useRealtimeQuery({
   getKey: (t: Todo) => t.id,
   queryFn: () => fetchTodos(),
-  onInsert: async ({ transaction }) => createTodo({ data: transaction.mutations[0].modified }),
-  onUpdate: async ({ transaction }) => updateTodo({ data: transaction.mutations[0].modified }),
-  onDelete: async ({ transaction }) => deleteTodo({ data: transaction.mutations[0].modified }),
+  onInsert: async ({ transaction }) =>
+    createTodo({ data: transaction.mutations[0].modified }),
+  onUpdate: async ({ transaction }) =>
+    updateTodo({ data: transaction.mutations[0].modified }),
+  onDelete: async ({ transaction }) =>
+    deleteTodo({ data: transaction.mutations[0].modified }),
   channel: ['todos'],
   serverAuthoritative: true,
 })
@@ -303,7 +332,12 @@ Or we could add a `serverFns` shorthand equivalent to the `url` shorthand:
 ```tsx
 const { data } = useRealtimeQuery({
   getKey: (t: Todo) => t.id,
-  serverFns: { query: fetchTodos, insert: createTodo, update: updateTodo, delete: deleteTodo },
+  serverFns: {
+    query: fetchTodos,
+    insert: createTodo,
+    update: updateTodo,
+    delete: deleteTodo,
+  },
   channel: ['todos'],
   serverAuthoritative: true,
 })
@@ -348,13 +382,13 @@ for advanced cases.
 
 ## Naming Alternatives
 
-| Name | Pros | Cons |
-|------|------|------|
-| `useRealtimeQuery` | Familiar to TanStack Query users, implies "data in, data out" | Could confuse users who think it IS TanStack Query |
-| `useRealtimeData` | Clear, no naming collision | Less familiar, no precedent |
-| `useLiveCollection` | Matches `useLiveQuery`, indicates reactivity | Could confuse with `useRealtimeCollection` |
-| `useRealtime` | Already taken (returns connection status) | — |
-| `useRealtimeList` | Implies flat array return | Too specific, doesn't hint at mutations |
+| Name                | Pros                                                          | Cons                                               |
+| ------------------- | ------------------------------------------------------------- | -------------------------------------------------- |
+| `useRealtimeQuery`  | Familiar to TanStack Query users, implies "data in, data out" | Could confuse users who think it IS TanStack Query |
+| `useRealtimeData`   | Clear, no naming collision                                    | Less familiar, no precedent                        |
+| `useLiveCollection` | Matches `useLiveQuery`, indicates reactivity                  | Could confuse with `useRealtimeCollection`         |
+| `useRealtime`       | Already taken (returns connection status)                     | —                                                  |
+| `useRealtimeList`   | Implies flat array return                                     | Too specific, doesn't hint at mutations            |
 
 **Recommendation: `useRealtimeQuery`** — the familiarity benefit outweighs the
 confusion risk, and the behavior IS analogous (declarative data fetching with

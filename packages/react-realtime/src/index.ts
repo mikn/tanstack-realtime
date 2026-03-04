@@ -31,6 +31,12 @@ export type { UseStreamOptions, UseStreamResult } from './useStream.js'
 export { useRealtimeCollection } from './useRealtimeCollection.js'
 export type { UseRealtimeCollectionConfig } from './useRealtimeCollection.js'
 
+export { useRealtimeQuery } from './useRealtimeQuery.js'
+export type {
+  UseRealtimeQueryConfig,
+  UseRealtimeQueryResult,
+} from './useRealtimeQuery.js'
+
 export { useLiveChannel } from './useLiveChannel.js'
 export type { UseLiveChannelConfig } from './useLiveChannel.js'
 

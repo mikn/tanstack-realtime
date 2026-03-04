@@ -26,28 +26,28 @@ The result: **instant is the baseline. Anything less feels broken.** Users don't
 
 ### Table Stakes (users get annoyed if missing)
 
-| What the user thinks | Feature | Reference apps |
-|---|---|---|
-| "I shouldn't have to refresh to see changes" | Live data updates | Google Docs, Notion, Linear |
-| "When I click Save, it should feel instant" | Optimistic UI | Gmail, every modern SaaS |
-| "I can see who's online / looking at this" | Presence | Figma, Notion, Slack |
-| "I see when someone is typing" | Typing indicators | iMessage, WhatsApp, Slack |
-| "If I lose wifi, my edits don't vanish" | Offline resilience | Notion, Linear, iMessage |
-| "If my connection drops, it recovers itself" | Auto-reconnection | Every chat app, Figma |
-| "Unread counts update in real time" | Live counters/badges | Reddit, X, YouTube |
-| "Messages appear instantly, in order" | Chat / messaging | Every messaging app |
+| What the user thinks                         | Feature              | Reference apps              |
+| -------------------------------------------- | -------------------- | --------------------------- |
+| "I shouldn't have to refresh to see changes" | Live data updates    | Google Docs, Notion, Linear |
+| "When I click Save, it should feel instant"  | Optimistic UI        | Gmail, every modern SaaS    |
+| "I can see who's online / looking at this"   | Presence             | Figma, Notion, Slack        |
+| "I see when someone is typing"               | Typing indicators    | iMessage, WhatsApp, Slack   |
+| "If I lose wifi, my edits don't vanish"      | Offline resilience   | Notion, Linear, iMessage    |
+| "If my connection drops, it recovers itself" | Auto-reconnection    | Every chat app, Figma       |
+| "Unread counts update in real time"          | Live counters/badges | Reddit, X, YouTube          |
+| "Messages appear instantly, in order"        | Chat / messaging     | Every messaging app         |
 
 ### WOW features (users remember and talk about these)
 
-| What the user thinks | Feature | Reference apps |
-|---|---|---|
-| "I can see where others are working, live" | Multiplayer cursors | Figma, Google Docs, Miro |
-| "Two people edited at the same time and nothing broke" | Conflict-free editing | Google Docs, Notion, Figma |
-| "The AI response types out word by word" | AI streaming | ChatGPT, Cursor, Notion AI |
-| "We both edited the Kanban board at once and it worked" | Live structured data collaboration | Notion databases, Airtable |
-| "I reacted with an emoji and everyone saw it pop" | Instant reactions | Slack, Discord, Zoom |
-| "The dashboard updates at 60fps, no jank" | Smooth high-frequency updates | Trading platforms, live sports |
-| "I can undo MY change without undoing yours" | Collaborative undo | Google Docs, Figma |
+| What the user thinks                                    | Feature                            | Reference apps                 |
+| ------------------------------------------------------- | ---------------------------------- | ------------------------------ |
+| "I can see where others are working, live"              | Multiplayer cursors                | Figma, Google Docs, Miro       |
+| "Two people edited at the same time and nothing broke"  | Conflict-free editing              | Google Docs, Notion, Figma     |
+| "The AI response types out word by word"                | AI streaming                       | ChatGPT, Cursor, Notion AI     |
+| "We both edited the Kanban board at once and it worked" | Live structured data collaboration | Notion databases, Airtable     |
+| "I reacted with an emoji and everyone saw it pop"       | Instant reactions                  | Slack, Discord, Zoom           |
+| "The dashboard updates at 60fps, no jank"               | Smooth high-frequency updates      | Trading platforms, live sports |
+| "I can undo MY change without undoing yours"            | Collaborative undo                 | Google Docs, Figma             |
 
 ---
 
@@ -59,30 +59,30 @@ Developers have been burned by realtime complexity. The competitive bar is set b
 
 ### Table stakes for developers
 
-| Expectation | What "good" looks like | Anti-pattern |
-|---|---|---|
-| < 50 lines to first live feature | `npm install` -> provider -> hook -> live | "Deploy Redis and configure 4 YAML files first" |
-| Works with my existing stack | BYO database, server, auth | "Migrate your entire backend to our service" |
-| TypeScript-first | Generics on channels, messages, presence. IDE autocomplete. | `data: any` everywhere |
-| Framework hooks | `usePresence()`, `useSubscribe()` | "Here's a WebSocket, call addEventListener yourself" |
-| Auto-reconnection | Library handles it. I never write retry logic. | "Implement your own reconnection strategy" |
-| Optimistic updates | Declare mutation, get instant UI | "Manage your own optimistic cache" |
-| Connection status | `status === 'connected' \| 'reconnecting'` for UI | No visibility into connection state |
-| Auth integration | Token-based auth, per-channel authorization | "Auth? That's your problem" |
-| Testing story | Mock transports, deterministic tests | "Good luck testing WebSocket code" |
-| Scales beyond one server | Clear path from prototype to production | "Works in development, falls apart at scale" |
+| Expectation                      | What "good" looks like                                      | Anti-pattern                                         |
+| -------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------- |
+| < 50 lines to first live feature | `npm install` -> provider -> hook -> live                   | "Deploy Redis and configure 4 YAML files first"      |
+| Works with my existing stack     | BYO database, server, auth                                  | "Migrate your entire backend to our service"         |
+| TypeScript-first                 | Generics on channels, messages, presence. IDE autocomplete. | `data: any` everywhere                               |
+| Framework hooks                  | `usePresence()`, `useSubscribe()`                           | "Here's a WebSocket, call addEventListener yourself" |
+| Auto-reconnection                | Library handles it. I never write retry logic.              | "Implement your own reconnection strategy"           |
+| Optimistic updates               | Declare mutation, get instant UI                            | "Manage your own optimistic cache"                   |
+| Connection status                | `status === 'connected' \| 'reconnecting'` for UI           | No visibility into connection state                  |
+| Auth integration                 | Token-based auth, per-channel authorization                 | "Auth? That's your problem"                          |
+| Testing story                    | Mock transports, deterministic tests                        | "Good luck testing WebSocket code"                   |
+| Scales beyond one server         | Clear path from prototype to production                     | "Works in development, falls apart at scale"         |
 
 ### WOW features for developers
 
-| Feature | Why developers love it |
-|---|---|
-| Progressive disclosure | Start simple, add complexity one config prop at a time |
-| Transport-agnostic | Swap WebSocket for SSE without touching app code |
-| Automatic conflict resolution | `fields: { votes: 'pn-counter' }` and never think about merges |
-| Multiplayer as hooks | `usePresence()` returning typed `others[]` — 3 lines instead of 200 |
-| Offline queue | One line: `createOfflineQueue({ storage: createIndexedDBStorage() })` |
-| Multi-tab coordination | Zero-config: library deduplicates connections automatically |
-| Declarative CRDTs | Mix per field: `title: 'lww'`, `votes: 'pn-counter'`, `tags: 'or-set'` |
+| Feature                       | Why developers love it                                                 |
+| ----------------------------- | ---------------------------------------------------------------------- |
+| Progressive disclosure        | Start simple, add complexity one config prop at a time                 |
+| Transport-agnostic            | Swap WebSocket for SSE without touching app code                       |
+| Automatic conflict resolution | `fields: { votes: 'pn-counter' }` and never think about merges         |
+| Multiplayer as hooks          | `usePresence()` returning typed `others[]` — 3 lines instead of 200    |
+| Offline queue                 | One line: `createOfflineQueue({ storage: createIndexedDBStorage() })`  |
+| Multi-tab coordination        | Zero-config: library deduplicates connections automatically            |
+| Declarative CRDTs             | Mix per field: `title: 'lww'`, `votes: 'pn-counter'`, `tags: 'or-set'` |
 
 ---
 
@@ -92,53 +92,53 @@ Developers have been burned by realtime complexity. The competitive bar is set b
 
 This is the crown jewel. No other library lets you do this:
 
-| Step | What you add | What you get |
-|---|---|---|
-| 0 | `getKey` + `queryFn` | Server-only data (no realtime at all) |
-| 1 | `+ channel` | Peer sync via pub/sub |
-| 2 | `+ onInsert/Update/Delete` | Server persistence |
-| 3 | `+ fields` | CRDT conflict resolution |
-| 4 | `+ serverAuthoritative` | Server-only publishing |
-| 5 | `+ refetchOnReconnect` | Gap recovery |
+| Step | What you add               | What you get                          |
+| ---- | -------------------------- | ------------------------------------- |
+| 0    | `getKey` + `queryFn`       | Server-only data (no realtime at all) |
+| 1    | `+ channel`                | Peer sync via pub/sub                 |
+| 2    | `+ onInsert/Update/Delete` | Server persistence                    |
+| 3    | `+ fields`                 | CRDT conflict resolution              |
+| 4    | `+ serverAuthoritative`    | Server-only publishing                |
+| 5    | `+ refetchOnReconnect`     | Gap recovery                          |
 
 Each step is literally adding one config key. The mental model doesn't change — same collection, same hooks. Liveblocks, Firebase, and Convex all require upfront architectural commitment. TanStack Realtime is the only library where realtime is an incremental capability you layer on.
 
 ### 3.2 Scorecard: end-user features
 
-| Feature | Support | Score | Notes |
-|---|---|---|---|
-| Live data updates | `realtimeCollectionOptions` + channel | **Excellent** | The progressive spectrum is best-in-class |
-| Optimistic UI | `optimistic: true` + echo suppression | **Excellent** | Nonce-based dedup, `ConflictError<T>` for rollback |
-| Presence | `usePresence()` with typed channels | **Excellent** | Join/leave/update lifecycle is clean |
-| Typing indicators | `ephemeralLiveOptions` with TTL | **Good** | Works, but was undiscoverable before doc page was added |
-| Offline resilience | `createOfflineQueue` + IndexedDB | **Excellent** | Reactive `queueStore` for pending badges |
-| Reconnection | Exponential backoff + gap recovery | **Excellent** | Two complementary strategies |
-| Live counters | `useSyncedCounter` (PN-Counter) | **Excellent** | Concurrent increments always converge |
-| Chat / messaging | `liveChannelOptions` + presence | **Good** | Missing: history/pagination, threads |
-| Multiplayer cursors | `usePresence` + cursor in data | **Excellent** | Clean pattern, well-documented |
-| Conflict-free editing | `fields: { title: 'lww' }` | **Good** | Field-level only. No char-level rich text CRDT |
-| AI streaming | `useStream` + `createServerStream` | **Excellent** | Full lifecycle, HMAC signing, checkpoints |
-| High-frequency updates | `tickTransport` at 60Hz | **Good** | Works, now has doc page |
-| Instant reactions | Via ephemeral channels | **Good** | Now has recipes in Ephemeral doc page |
-| Undo across collaborators | None | **Gap** | Documented limitation, Y.js UndoManager referenced |
+| Feature                   | Support                               | Score         | Notes                                                   |
+| ------------------------- | ------------------------------------- | ------------- | ------------------------------------------------------- |
+| Live data updates         | `realtimeCollectionOptions` + channel | **Excellent** | The progressive spectrum is best-in-class               |
+| Optimistic UI             | `optimistic: true` + echo suppression | **Excellent** | Nonce-based dedup, `ConflictError<T>` for rollback      |
+| Presence                  | `usePresence()` with typed channels   | **Excellent** | Join/leave/update lifecycle is clean                    |
+| Typing indicators         | `ephemeralLiveOptions` with TTL       | **Good**      | Works, but was undiscoverable before doc page was added |
+| Offline resilience        | `createOfflineQueue` + IndexedDB      | **Excellent** | Reactive `queueStore` for pending badges                |
+| Reconnection              | Exponential backoff + gap recovery    | **Excellent** | Two complementary strategies                            |
+| Live counters             | `useSyncedCounter` (PN-Counter)       | **Excellent** | Concurrent increments always converge                   |
+| Chat / messaging          | `liveChannelOptions` + presence       | **Good**      | Missing: history/pagination, threads                    |
+| Multiplayer cursors       | `usePresence` + cursor in data        | **Excellent** | Clean pattern, well-documented                          |
+| Conflict-free editing     | `fields: { title: 'lww' }`            | **Good**      | Field-level only. No char-level rich text CRDT          |
+| AI streaming              | `useStream` + `createServerStream`    | **Excellent** | Full lifecycle, HMAC signing, checkpoints               |
+| High-frequency updates    | `tickTransport` at 60Hz               | **Good**      | Works, now has doc page                                 |
+| Instant reactions         | Via ephemeral channels                | **Good**      | Now has recipes in Ephemeral doc page                   |
+| Undo across collaborators | None                                  | **Gap**       | Documented limitation, Y.js UndoManager referenced      |
 
 ### 3.3 Scorecard: developer ergonomics
 
-| Expectation | Support | Score | Notes |
-|---|---|---|---|
-| Quick start (< 50 lines) | ~60-80 lines for full setup | **Good** | Progressive spectrum helps, but initial boilerplate is real (see below) |
-| Works with existing stack | BYO everything | **Excellent** | Transport-agnostic, `withRest`, `withServerFns` |
-| TypeScript-first | Generics everywhere | **Excellent** | One of the strongest typed realtime APIs |
-| Framework hooks | 14 React hooks | **Good** | React-only. No Vue/Solid/Svelte |
-| Auto-reconnection | All transports have backoff | **Excellent** | |
-| Optimistic updates | `optimistic: true` | **Excellent** | Echo suppression, auto-rollback |
-| Connection status | `Store<ConnectionStatus>` | **Excellent** | |
-| Auth integration | `getUser` + `authorize` | **Good** | Auth guide now exists. Token refresh mid-session still unsupported for WS |
-| Testing story | `createMockTransport` exported | **Good** | Mock transports exist; `TestRealtimeProvider` for React still missing |
-| Scales beyond one server | `PublishBackend` interface | **Good** | Scaling guide now exists with Redis/Postgres/DO examples |
-| Progressive disclosure | The spectrum | **Excellent** | Best-in-class |
-| Transport-agnostic | SSE/WS/Centrifugo swap | **Excellent** | |
-| Multi-tab coordination | Zero-config auto-detection | **Excellent** | |
+| Expectation               | Support                        | Score         | Notes                                                                     |
+| ------------------------- | ------------------------------ | ------------- | ------------------------------------------------------------------------- |
+| Quick start (< 50 lines)  | ~60-80 lines for full setup    | **Good**      | Progressive spectrum helps, but initial boilerplate is real (see below)   |
+| Works with existing stack | BYO everything                 | **Excellent** | Transport-agnostic, `withRest`, `withServerFns`                           |
+| TypeScript-first          | Generics everywhere            | **Excellent** | One of the strongest typed realtime APIs                                  |
+| Framework hooks           | 14 React hooks                 | **Good**      | React-only. No Vue/Solid/Svelte                                           |
+| Auto-reconnection         | All transports have backoff    | **Excellent** |                                                                           |
+| Optimistic updates        | `optimistic: true`             | **Excellent** | Echo suppression, auto-rollback                                           |
+| Connection status         | `Store<ConnectionStatus>`      | **Excellent** |                                                                           |
+| Auth integration          | `getUser` + `authorize`        | **Good**      | Auth guide now exists. Token refresh mid-session still unsupported for WS |
+| Testing story             | `createMockTransport` exported | **Good**      | Mock transports exist; `TestRealtimeProvider` for React still missing     |
+| Scales beyond one server  | `PublishBackend` interface     | **Good**      | Scaling guide now exists with Redis/Postgres/DO examples                  |
+| Progressive disclosure    | The spectrum                   | **Excellent** | Best-in-class                                                             |
+| Transport-agnostic        | SSE/WS/Centrifugo swap         | **Excellent** |                                                                           |
+| Multi-tab coordination    | Zero-config auto-detection     | **Excellent** |                                                                           |
 
 ---
 
@@ -177,6 +177,7 @@ That's 3 concepts (provider, hook, done). TanStack Realtime requires 7 because i
 > "RealtimeProvider does not call client.connect() automatically. Call it once during app initialization."
 
 This is a genuine footgun. A developer will:
+
 1. Install packages
 2. Create client, wrap provider, add hook
 3. See nothing working
@@ -190,6 +191,7 @@ The `TODO.md` lists this as Project 7 (`autoConnect` prop, default `true`). It's
 ### 4.3 No runnable examples
 
 This remains the single biggest adoption blocker. The `examples/` directory does not exist. The E2E test app (`packages/e2e/app/`) is the closest thing to a runnable reference, but it's:
+
 - Not discoverable (buried in test infrastructure)
 - Uses Centrifugo transport (requires running a Centrifugo binary)
 - Built for test verification, not for learning
@@ -225,6 +227,7 @@ const realtime = createStartHandler({
 ```
 
 Before a developer has seen anything working, they must implement:
+
 - User session extraction
 - Authorization logic
 - Route handler mounting
@@ -263,6 +266,7 @@ const { data } = useQuery({ queryKey: ['todos'], queryFn: fetchTodos })
 ```
 
 One line, inline, self-contained. The realtime equivalent requires:
+
 1. A separate module-level config
 2. Spreading a helper
 3. Passing the client explicitly
@@ -299,6 +303,7 @@ A developer will hit this the moment they try to do per-channel authorization on
 ### 5.1 What's there (22 pages, well-structured)
 
 The sidebar organizes into 5 logical sections:
+
 - **Overview** (2): Getting Started, Collections
 - **Guides** (6): TanStack Start + Drizzle, Authentication, Rich Text, Centrifugo, Read Receipts, Testing
 - **Features** (6): CRDTs, Presence, Channels, Streaming, Ephemeral, Tick-Based
@@ -330,6 +335,7 @@ This decision tree doesn't exist on any page. It should be on the Getting Starte
 ### 5.3 JSDoc quality is exceptional
 
 Every exported function has comprehensive JSDoc with:
+
 - Description of purpose and behavior
 - `@param` with types and explanations
 - `@returns` with shape descriptions
@@ -356,6 +362,7 @@ Already covered. Every new developer will hit this. Ship `autoConnect={true}` as
 ### Gap 3: No `TestRealtimeProvider` for React (High)
 
 `createMockTransport` and `createMockPresenceTransport` are now exported — good. But React developers need a `TestRealtimeProvider` that:
+
 - Creates a mock transport internally
 - Auto-connects
 - Exposes `simulateMessage`, `simulateDisconnect` etc. on the returned wrapper
@@ -412,32 +419,32 @@ These are genuine competitive advantages that no other library matches:
 
 ### Immediate (common-case ergonomics)
 
-| # | Action | Impact | Effort |
-|---|---|---|---|
-| 1 | Ship `autoConnect={true}` as RealtimeProvider default | Eliminates #1 first-time failure | Small |
-| 2 | Add "zero-auth" Getting Started fast path before production auth | Reduces time-to-first-render from 30min to 5min | Small |
-| 3 | Add "which pattern should I use?" decision tree to docs | Reduces decision paralysis across 7 collection types | Small |
-| 4 | Create at least one runnable example (collaborative todos) | Transforms evaluation experience | Medium |
-| 5 | Ship `TestRealtimeProvider` for React | Completes testing story | Small |
+| #   | Action                                                           | Impact                                               | Effort |
+| --- | ---------------------------------------------------------------- | ---------------------------------------------------- | ------ |
+| 1   | Ship `autoConnect={true}` as RealtimeProvider default            | Eliminates #1 first-time failure                     | Small  |
+| 2   | Add "zero-auth" Getting Started fast path before production auth | Reduces time-to-first-render from 30min to 5min      | Small  |
+| 3   | Add "which pattern should I use?" decision tree to docs          | Reduces decision paralysis across 7 collection types | Small  |
+| 4   | Create at least one runnable example (collaborative todos)       | Transforms evaluation experience                     | Medium |
+| 5   | Ship `TestRealtimeProvider` for React                            | Completes testing story                              | Small  |
 
 ### Soon (high impact, medium effort)
 
-| # | Action | Impact | Effort |
-|---|---|---|---|
-| 6 | Add "Quick Examples" doc page (5-line version of each pattern) | Dramatically improves discoverability | Small |
-| 7 | Consider `useRealtimeQuery` hook mirroring TanStack Query inline style | Lowers conceptual barrier for common case | Medium |
-| 8 | Add search to docs site | 22 pages without search = guessing | Medium |
-| 9 | Ship `liveChannelOptions` pagination / `loadMore` | Completes chat use case | Medium |
-| 10 | Vue + Solid adapters | TanStack brand promise, doubles market | Medium |
+| #   | Action                                                                 | Impact                                    | Effort |
+| --- | ---------------------------------------------------------------------- | ----------------------------------------- | ------ |
+| 6   | Add "Quick Examples" doc page (5-line version of each pattern)         | Dramatically improves discoverability     | Small  |
+| 7   | Consider `useRealtimeQuery` hook mirroring TanStack Query inline style | Lowers conceptual barrier for common case | Medium |
+| 8   | Add search to docs site                                                | 22 pages without search = guessing        | Medium |
+| 9   | Ship `liveChannelOptions` pagination / `loadMore`                      | Completes chat use case                   | Medium |
+| 10  | Vue + Solid adapters                                                   | TanStack brand promise, doubles market    | Medium |
 
 ### Later (important but not blocking)
 
-| # | Action | Impact | Effort |
-|---|---|---|---|
-| 11 | DevTools panel | Debugging realtime is developers' top pain point | Large |
-| 12 | Y.js transport adapter (proof of concept) | Turns "possible in theory" into working code | Medium |
-| 13 | Auto-generated API reference from JSDoc | JSDoc is excellent, just needs a generator | Medium |
-| 14 | `useCollectionSync` vs `useRealtimeCollection` explainer | Currently undocumented distinction | Small |
+| #   | Action                                                   | Impact                                           | Effort |
+| --- | -------------------------------------------------------- | ------------------------------------------------ | ------ |
+| 11  | DevTools panel                                           | Debugging realtime is developers' top pain point | Large  |
+| 12  | Y.js transport adapter (proof of concept)                | Turns "possible in theory" into working code     | Medium |
+| 13  | Auto-generated API reference from JSDoc                  | JSDoc is excellent, just needs a generator       | Medium |
+| 14  | `useCollectionSync` vs `useRealtimeCollection` explainer | Currently undocumented distinction               | Small  |
 
 ---
 
