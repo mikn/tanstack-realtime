@@ -7,12 +7,14 @@ function Hero() {
       <div className="container">
         <span className="badge">v0.1 &middot; Alpha</span>
         <h1>
-          Realtime primitives <span className="gradient-text">for React</span>
+          Add realtime to{' '}
+          <span className="gradient-text">your existing app</span>
         </h1>
         <p className="hero-sub">
-          Type-safe, transport-agnostic realtime. Plug into your existing server
-          and database &mdash; add a <code>channel</code> to any collection and
-          it goes live.
+          Keep your server, your database, your deploy target. Add a{' '}
+          <code>channel</code> to any collection and it goes live &mdash; with
+          type-safe CRDTs, presence, pub/sub, and offline support. Not a
+          platform, just a library.
         </p>
 
         <div className="hero-code">
@@ -106,9 +108,11 @@ function Spectrum() {
   return (
     <section id="spectrum" className="section section-alt">
       <div className="container">
-        <h2>Grow without rewriting</h2>
+        <h2>One config key at a time</h2>
         <p className="section-sub">
-          Each step adds one config key. You can stop at any point.
+          Start with a plain <code>queryFn</code>. Add <code>channel</code> when
+          you&rsquo;re ready for live updates. Add <code>fields</code> when you
+          need conflict resolution. Stop at any point.
         </p>
 
         <div className="spectrum-steps">
@@ -281,8 +285,9 @@ function Positioning() {
       <div className="container">
         <h2>When to use</h2>
         <p className="section-sub">
-          A pub/sub layer between your server and your React components. Not a
-          database, CDC pipeline, or collaborative editing engine.
+          For teams that already have a backend they like and want realtime
+          without vendor lock-in. Not a database, CDC pipeline, or rich-text
+          editing engine.
         </p>
 
         <div className="positioning-grid">
@@ -370,7 +375,7 @@ function Footer() {
         <div className="footer-brand">
           <span className="logo-tan">TanStack</span>{' '}
           <span className="logo-realtime">Realtime</span>
-          <p>A transport layer for live apps.</p>
+          <p>Realtime for the stack you already have.</p>
         </div>
         <div className="footer-links">
           <div>
