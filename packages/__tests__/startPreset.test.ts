@@ -543,7 +543,7 @@ describe('createStartHandler — auth passthrough', () => {
     const h = createStartHandler({
       pingInterval: 0,
       getUser: () => ({ userId: 'u1' }),
-      authorize: ({ action }) => action !== 'subscribe',
+      authorize: () => ({ subscribe: false, publish: true, presence: true }),
     })
     const res = await h.handle(
       new Request(SSE_URL, {
@@ -559,7 +559,7 @@ describe('createStartHandler — auth passthrough', () => {
     expect(res.status).toBe(403)
   })
 
-  it('authorize is called with userId, action, and channel', async () => {
+  it('authorize is called with userId and parsedChannel', async () => {
     const authorize = vi.fn().mockReturnValue(true)
     const h = createStartHandler({
       pingInterval: 0,
@@ -580,11 +580,14 @@ describe('createStartHandler — auth passthrough', () => {
       }),
     )
 
-    expect(authorize).toHaveBeenCalledWith({
-      userId: 'alice',
-      action: 'subscribe',
-      channel: 'orders',
-    })
+    expect(authorize).toHaveBeenCalledWith(
+      'alice',
+      expect.objectContaining({
+        namespace: 'orders',
+        params: {},
+        raw: 'orders',
+      }),
+    )
     await cancel()
   })
 })

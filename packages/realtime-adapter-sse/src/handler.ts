@@ -60,19 +60,6 @@ export interface SseHandler {
   }) => ServerStream<TEvent>
 }
 
-/**
- * Legacy per-action authorize signature accepted by the SSE handler for
- * backward compatibility. Prefer `AuthorizeFn` from `@tanstack/realtime`.
- *
- * @deprecated Use `AuthorizeFn` instead for unified authorization that works
- * across all presets (Node, SSE, Start, Centrifugo).
- */
-export type LegacySseAuthorizeFn = (params: {
-  userId: string
-  action: 'subscribe' | 'publish'
-  channel: string
-}) => boolean | Promise<boolean>
-
 export interface SseHandlerOptions extends LifecycleHooks {
   /**
    * Interval in milliseconds for sending SSE keep-alive pings.
@@ -129,15 +116,9 @@ export interface SseHandlerOptions extends LifecycleHooks {
   /**
    * Authorize a channel action for an already-authenticated user.
    *
-   * Accepts two signatures:
-   *
-   * 1. **Unified `AuthorizeFn`** (recommended) — receives
-   *    `(userId, parsedChannel)` and returns
-   *    `ChannelPermissions | boolean`. The handler checks the relevant
-   *    permission (`subscribe` or `publish`) per action.
-   *
-   * 2. **Legacy per-action** — receives `{ userId, action, channel }` and
-   *    returns a boolean. Still supported for backward compatibility.
+   * Receives `(userId, parsedChannel)` and returns
+   * `ChannelPermissions | boolean`. The handler checks the relevant
+   * permission (`subscribe` or `publish`) per action.
    *
    * When omitted all authenticated users are permitted on all channels.
    *
@@ -146,22 +127,14 @@ export interface SseHandlerOptions extends LifecycleHooks {
    * data and must succeed to avoid subscription leaks).
    *
    * @example
-   * // Unified authorize (same function works across all presets)
    * authorize: async (userId, channel) => {
    *   const member = await db.getProjectMember(userId, channel.params.projectId)
    *   return member
    *     ? { subscribe: true, publish: member.role === 'editor', presence: true }
    *     : false
    * }
-   *
-   * @example
-   * // Legacy per-action (still supported)
-   * authorize: async ({ userId, action, channel }) => {
-   *   if (action === 'publish') return db.isChannelOwner(userId, channel)
-   *   return true
-   * }
    */
-  authorize?: AuthorizeFn | LegacySseAuthorizeFn
+  authorize?: AuthorizeFn
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +175,7 @@ export interface SseHandlerOptions extends LifecycleHooks {
  *     const token = req.headers.get('Authorization')?.slice(7)
  *     return token ? await verifyToken(token) : null
  *   },
- *   authorize: ({ userId, action, channel }) => canAccess(userId, channel),
+ *   authorize: (userId, channel) => canAccess(userId, channel),
  * })
  *
  * app.all('/_realtime/sse', (c) => sse.handle(c.req.raw))
@@ -248,11 +221,6 @@ export function createSseHandler(options: SseHandlerOptions = {}): SseHandler {
 
   // connectionId → userId (for lifecycle hooks)
   const connectionUserIds = new Map<string, string>()
-
-  // Detect whether the authorize callback uses the legacy per-action signature
-  // (single params object → fn.length ≤ 1) or the unified AuthorizeFn
-  // (two positional params → fn.length ≥ 2).
-  const isLegacyAuthorize = authorize != null && authorize.length <= 1
 
   // ---------------------------------------------------------------------------
   // Helpers
@@ -324,14 +292,8 @@ export function createSseHandler(options: SseHandlerOptions = {}): SseHandler {
   ): Promise<boolean> {
     if (!authorize) return true
 
-    if (isLegacyAuthorize) {
-      // Legacy signature: (params: { userId, action, channel }) => boolean
-      return (authorize as LegacySseAuthorizeFn)({ userId, action, channel })
-    }
-
-    // Unified AuthorizeFn: (userId, parsedChannel) => ChannelPermissions | boolean
     const parsed = parseChannel(channel)
-    const result = await (authorize as AuthorizeFn)(userId, parsed)
+    const result = await authorize(userId, parsed)
     const perms = normalizePermissions(result)
     return perms[action]
   }

@@ -246,24 +246,6 @@ authorize: (userId, channel) => {
 }`}
       />
 
-      <h3 id="legacy-authorize">Legacy SSE authorize (backward compatible)</h3>
-      <p>
-        The SSE handler still accepts the older per-action signature for
-        backward compatibility. The handler detects which form you passed by
-        checking function arity.{' '}
-        <strong>
-          New code should use the unified <code>AuthorizeFn</code> shown above.
-        </strong>
-      </p>
-      <CodeBlock
-        title="Legacy signature (still works)"
-        code={`// Legacy: single params object, boolean return, per-action branching
-authorize: async ({ userId, action, channel }) => {
-  if (action === 'publish') return userId === 'admin'
-  return true
-}`}
-      />
-
       {/* ------------------------------------------------------------------ */}
       <h2 id="lifecycle-hooks">Lifecycle hooks</h2>
       <p>

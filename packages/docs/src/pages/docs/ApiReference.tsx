@@ -1661,17 +1661,13 @@ export function ApiReference() {
               <code>authorize</code>
             </td>
             <td>
-              <code>AuthorizeFn | LegacySseAuthorizeFn</code>
+              <code>AuthorizeFn</code>
             </td>
             <td>—</td>
             <td>
-              Per-channel access control. The unified <code>AuthorizeFn</code>{' '}
-              receives <code>(userId, parsedChannel)</code> and returns{' '}
-              <code>ChannelPermissions | boolean</code>. The legacy form{' '}
-              <code>
-                ({'{'} userId, action, channel {'}'}) =&gt; boolean
-              </code>{' '}
-              is still supported for backward compatibility.
+              Per-channel access control. Receives{' '}
+              <code>(userId, parsedChannel)</code> and returns{' '}
+              <code>ChannelPermissions | boolean</code>.
             </td>
           </tr>
           <tr>

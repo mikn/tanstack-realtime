@@ -2,8 +2,7 @@
  * Tests for P13 — unified authorize signatures.
  *
  * Verifies that:
- * - createSseHandler accepts the new AuthorizeFn (userId, parsedChannel) signature
- * - createSseHandler still accepts the legacy (params) => boolean signature
+ * - createSseHandler accepts the AuthorizeFn (userId, parsedChannel) signature
  * - All presets accept boolean returns from authorize
  * - normalizePermissions maps booleans to all-or-nothing ChannelPermissions
  * - createStartHandler inherits unified authorize from SSE
@@ -247,67 +246,6 @@ describe('createSseHandler — unified AuthorizeFn', () => {
       }),
     )
     expect(res.status).toBe(204)
-
-    await streamRes.body?.cancel()
-  })
-})
-
-// ---------------------------------------------------------------------------
-// createSseHandler — legacy signature (backward compatibility)
-// ---------------------------------------------------------------------------
-
-describe('createSseHandler — legacy authorize (backward compat)', () => {
-  it('still accepts ({ userId, action, channel }) => boolean', async () => {
-    const authorize = vi.fn(
-      ({ action }: { action: string }) => action === 'subscribe',
-    )
-
-    const handler = createSseHandler({
-      pingInterval: 0,
-      getUser: () => ({ userId: 'alice' }),
-      authorize,
-    })
-
-    const streamRes = await handler.handle(
-      new Request(SSE_URL, { method: 'GET' }),
-    )
-    const [connEvent] = await readSseEvents(streamRes, 1)
-    const cid = connEvent.connectionId as string
-
-    // Subscribe should be allowed
-    const subRes = await handler.handle(
-      new Request(SSE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'subscribe',
-          connectionId: cid,
-          channel: 'ch',
-        }),
-      }),
-    )
-    expect(subRes.status).toBe(204)
-
-    // Legacy signature receives the params object
-    expect(authorize).toHaveBeenCalledWith({
-      userId: 'alice',
-      action: 'subscribe',
-      channel: 'ch',
-    })
-
-    // Publish should be denied (our mock denies non-subscribe)
-    const pubRes = await handler.handle(
-      new Request(SSE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'publish',
-          channel: 'ch',
-          data: {},
-        }),
-      }),
-    )
-    expect(pubRes.status).toBe(403)
 
     await streamRes.body?.cancel()
   })
