@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@tanstack/db": "*",
+    "@tanstack/react-db": "*",
     "@tanstack/realtime": "workspace:*"
   },
   "peerDependencies": {

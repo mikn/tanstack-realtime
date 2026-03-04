@@ -1,7 +1,6 @@
-import { use, useEffect, useRef, useState } from 'react'
-import { createCollection } from '@tanstack/db'
-import { realtimeCollectionOptions, withRest } from '@tanstack/realtime'
-import { RealtimeContext } from './context.js'
+import { useLiveQuery } from '@tanstack/react-db'
+import { withRest } from '@tanstack/realtime'
+import { useRealtimeCollection } from './useRealtimeCollection.js'
 import type {
   Collection,
   CollectionStatus,
@@ -14,7 +13,6 @@ import type {
   CrdtFields,
   QueryKey,
   RealtimeChannelMessage,
-  RealtimeCollectionConfig,
   WithRestOptions,
 } from '@tanstack/realtime'
 
@@ -225,19 +223,8 @@ export function useRealtimeQuery<
 >(
   config: UseRealtimeQueryConfig<T, TKey, TSchema>,
 ): UseRealtimeQueryResult<T, TKey> {
-  const client = use(RealtimeContext)
-  if (!client) {
-    throw new Error(
-      '[realtime] useRealtimeQuery must be used inside <RealtimeProvider>.',
-    )
-  }
-
-  // Build the full RealtimeCollectionConfig — either from REST shorthand or
-  // manual callbacks.
-  const collectionConfig: Omit<
-    RealtimeCollectionConfig<T, TKey, TSchema>,
-    'client'
-  > = config.url
+  // Build the collection config — either from REST shorthand or manual callbacks.
+  const collectionConfig = config.url
     ? {
         ...withRest<T, TKey>({
           url: config.url,
@@ -276,50 +263,24 @@ export function useRealtimeQuery<
         onOptimisticError: config.onOptimisticError,
       }
 
-  // Create the collection once (stable across renders).
-  const collectionRef = useRef<Collection<T, TKey> | null>(null)
-  if (!collectionRef.current) {
-    collectionRef.current = createCollection(
-      realtimeCollectionOptions({ ...collectionConfig, client }) as never,
-    ) as unknown as Collection<T, TKey>
-  }
-
-  const [data, setData] = useState<Array<T>>([])
-  const [status, setStatus] = useState<CollectionStatus>(
-    collectionRef.current.status,
+  // Create a stable, lifecycle-managed collection via context.
+  const collection = useRealtimeCollection<T, TKey, TSchema>(
+    collectionConfig as Parameters<
+      typeof useRealtimeCollection<T, TKey, TSchema>
+    >[0],
   )
 
-  // Subscribe to data changes and status changes.
-  useEffect(() => {
-    const col = collectionRef.current!
-
-    // Seed with current data (may already be populated from a sync source).
-    setData(col.toArray)
-    setStatus(col.status)
-
-    // Re-render on every data change.
-    const dataSub = col.subscribeChanges(() => {
-      setData(col.toArray)
-    })
-
-    // Track status transitions (loading → ready, etc.)
-    const unsubStatus = col.on('status:change', (event) => {
-      setStatus(event.status)
-    })
-
-    return () => {
-      dataSub.unsubscribe()
-      unsubStatus()
-      void col.cleanup()
-      collectionRef.current = null
-    }
-  }, [])
+  // Reactive data via useLiveQuery — single subscription path, no duplication
+  // if the user also queries this collection elsewhere.
+  const { data, status, isLoading, isReady } = useLiveQuery((q) =>
+    q.from({ items: collection }),
+  )
 
   return {
-    data,
-    collection: collectionRef.current,
+    data: data as Array<T>,
+    collection,
     status,
-    isLoading: status === 'loading',
-    isReady: status === 'ready',
+    isLoading,
+    isReady,
   }
 }
