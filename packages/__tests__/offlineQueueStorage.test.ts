@@ -45,8 +45,9 @@ function createMockTransport(): RealtimeTransport & {
     subscribe() {
       return () => {}
     },
-    async publish(channel, data) {
+    publish(channel, data) {
       publishCalls.push({ channel, data })
+      return Promise.resolve()
     },
   }
 }
@@ -69,18 +70,20 @@ function createMemoryStorage(): OfflineQueueStorage & {
     saveCalls: 0,
     clearCalls: 0,
 
-    async load() {
-      return [...adapter.data]
+    load() {
+      return Promise.resolve([...adapter.data])
     },
 
-    async save(messages) {
+    save(messages) {
       adapter.saveCalls++
       adapter.data = [...messages]
+      return Promise.resolve()
     },
 
-    async clear() {
+    clear() {
       adapter.clearCalls++
       adapter.data = []
+      return Promise.resolve()
     },
   }
 
@@ -474,11 +477,9 @@ describe('createOfflineQueue with storage', () => {
 
   it('storage.load() failure falls back to memory-only', async () => {
     const failStorage: OfflineQueueStorage = {
-      load: async () => {
-        throw new Error('IndexedDB unavailable')
-      },
-      save: async () => {},
-      clear: async () => {},
+      load: () => Promise.reject(new Error('IndexedDB unavailable')),
+      save: () => Promise.resolve(),
+      clear: () => Promise.resolve(),
     }
 
     const inner = createMockTransport()

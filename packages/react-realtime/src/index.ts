@@ -18,6 +18,7 @@ export { usePresence } from './usePresence.js'
 export type { UsePresenceOptions, UsePresenceResult } from './usePresence.js'
 
 export { useSubscribe } from './useSubscribe.js'
+export type { UseSubscribeResult } from './useSubscribe.js'
 
 export { usePublish } from './usePublish.js'
 

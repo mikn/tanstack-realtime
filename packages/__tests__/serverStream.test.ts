@@ -29,8 +29,9 @@ describe('createServerStream', () => {
       channel: string | ReadonlyArray<unknown>
       data: unknown
     }> = []
-    const publish: PublishFn = async (channel, data) => {
+    const publish: PublishFn = (channel, data) => {
       calls.push({ channel: channel as string, data })
+      return Promise.resolve()
     }
 
     const stream = createServerStream({
@@ -54,8 +55,9 @@ describe('createServerStream', () => {
 
   it('done() sends STREAM_DONE sentinel', async () => {
     const calls: Array<{ data: unknown }> = []
-    const publish: PublishFn = async (_ch, data) => {
+    const publish: PublishFn = (_ch, data) => {
       calls.push({ data })
+      return Promise.resolve()
     }
 
     const stream = createServerStream({ publish, channel: 'ch' })
@@ -67,8 +69,9 @@ describe('createServerStream', () => {
 
   it('error() sends STREAM_ERROR sentinel with message', async () => {
     const calls: Array<{ data: unknown }> = []
-    const publish: PublishFn = async (_ch, data) => {
+    const publish: PublishFn = (_ch, data) => {
       calls.push({ data })
+      return Promise.resolve()
     }
 
     const stream = createServerStream({ publish, channel: 'ch' })
@@ -83,8 +86,9 @@ describe('createServerStream', () => {
 
   it('serializes QueryKey channels', async () => {
     const calls: Array<{ channel: string | ReadonlyArray<unknown> }> = []
-    const publish: PublishFn = async (channel, _data) => {
+    const publish: PublishFn = (channel, _data) => {
       calls.push({ channel: channel as string })
+      return Promise.resolve()
     }
 
     const stream = createServerStream({
@@ -146,8 +150,9 @@ describe('serverStreamCallbacks', () => {
 describe('createServerStream — HMAC signing', () => {
   it('adds _signature field when hmacKey is provided', async () => {
     const calls: Array<{ data: unknown }> = []
-    const publish: PublishFn = async (_ch, data) => {
+    const publish: PublishFn = (_ch, data) => {
       calls.push({ data })
+      return Promise.resolve()
     }
 
     const stream = createServerStream({
@@ -168,8 +173,9 @@ describe('createServerStream — HMAC signing', () => {
 
   it('strips existing _signature before signing to prevent pollution', async () => {
     const calls: Array<{ data: unknown }> = []
-    const publish: PublishFn = async (_ch, data) => {
+    const publish: PublishFn = (_ch, data) => {
       calls.push({ data })
+      return Promise.resolve()
     }
 
     const stream = createServerStream({
@@ -189,8 +195,9 @@ describe('createServerStream — HMAC signing', () => {
 
   it('sentinel events are also signed when hmacKey is provided', async () => {
     const calls: Array<{ data: unknown }> = []
-    const publish: PublishFn = async (_ch, data) => {
+    const publish: PublishFn = (_ch, data) => {
       calls.push({ data })
+      return Promise.resolve()
     }
 
     const stream = createServerStream({
@@ -210,8 +217,9 @@ describe('createServerStream — HMAC signing', () => {
 
   it('does NOT add _signature when hmacKey is omitted', async () => {
     const calls: Array<{ data: unknown }> = []
-    const publish: PublishFn = async (_ch, data) => {
+    const publish: PublishFn = (_ch, data) => {
       calls.push({ data })
+      return Promise.resolve()
     }
 
     const stream = createServerStream({ publish, channel: 'ch' })
@@ -230,8 +238,9 @@ describe('verifyEventSignature', () => {
   it('returns true for a valid signature', async () => {
     const calls: Array<{ data: unknown }> = []
     const hmacKey = 'my-verification-key'
-    const publish: PublishFn = async (_ch, data) => {
+    const publish: PublishFn = (_ch, data) => {
       calls.push({ data })
+      return Promise.resolve()
     }
 
     const stream = createServerStream({
@@ -256,8 +265,9 @@ describe('verifyEventSignature', () => {
   it('returns false for a tampered event', async () => {
     const calls: Array<{ data: unknown }> = []
     const hmacKey = 'my-verification-key'
-    const publish: PublishFn = async (_ch, data) => {
+    const publish: PublishFn = (_ch, data) => {
       calls.push({ data })
+      return Promise.resolve()
     }
 
     const stream = createServerStream({
@@ -292,8 +302,9 @@ describe('verifyEventSignature', () => {
 
   it('returns false for wrong key', async () => {
     const calls: Array<{ data: unknown }> = []
-    const publish: PublishFn = async (_ch, data) => {
+    const publish: PublishFn = (_ch, data) => {
       calls.push({ data })
+      return Promise.resolve()
     }
 
     const stream = createServerStream({
@@ -327,12 +338,13 @@ describe('createServerStream + streamChannelOptions integration', () => {
     // 1. Set up a mock publish that delivers to client subscribers
     const subscribers = new Map<string, Set<(data: unknown) => void>>()
 
-    const publish: PublishFn = async (channel, data) => {
+    const publish: PublishFn = (channel, data) => {
       const ch = typeof channel === 'string' ? channel : String(channel)
       const subs = subscribers.get(ch)
       if (subs) {
         for (const cb of subs) cb(data)
       }
+      return Promise.resolve()
     }
 
     // 2. Create a mock client that routes to our subscribers map

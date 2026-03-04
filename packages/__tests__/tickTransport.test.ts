@@ -39,15 +39,18 @@ function createMockTransport(): RealtimeTransport & {
   return {
     store,
     publishCalls,
-    async connect() {},
+    connect() {
+      return Promise.resolve()
+    },
     disconnect() {},
     subscribe(channel, onMessage) {
       if (!listeners.has(channel)) listeners.set(channel, new Set())
       listeners.get(channel)!.add(onMessage)
       return () => listeners.get(channel)?.delete(onMessage)
     },
-    async publish(channel, data) {
+    publish(channel, data) {
       publishCalls.push({ channel, data })
+      return Promise.resolve()
     },
     emit(channel, data) {
       const cbs = listeners.get(channel)
@@ -115,7 +118,7 @@ describe('tickTransport', () => {
     vi.useRealTimers()
   })
 
-  it('batches multiple setState calls into one publish per tick', async () => {
+  it('batches multiple setState calls into one publish per tick', () => {
     const inner = createMockTransport()
     const tick = tickTransport(inner, { tickMs: 16 })
 

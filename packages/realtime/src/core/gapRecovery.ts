@@ -167,6 +167,13 @@ export function withGapRecovery(
     async publish(channel, data) {
       return inner.publish(channel, data)
     },
+
+    onSubscribeError(callback) {
+      if (inner.onSubscribeError) {
+        return inner.onSubscribeError(callback)
+      }
+      return () => {}
+    },
   }
 
   // Presence methods are added via Object.assign (rather than on the object

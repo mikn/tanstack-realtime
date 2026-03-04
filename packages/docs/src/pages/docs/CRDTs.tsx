@@ -584,6 +584,149 @@ function TagEditor({ postId }: { postId: string }) {
   )
 }`}
       />
+
+      <h2 id="undo-redo">Undo / redo</h2>
+      <p>
+        CRDTs guarantee <strong>convergence</strong> &mdash; every client
+        reaches the same state regardless of message ordering. However,
+        convergence is not the same as undo. A CRDT merge doesn&rsquo;t track
+        &ldquo;who did what&rdquo; &mdash; it merges concurrent operations into
+        a single resolved state. This means there&rsquo;s no built-in way to say
+        &ldquo;undo Alice&rsquo;s last change without undoing
+        Bob&rsquo;s.&rdquo;
+      </p>
+
+      <h3 id="lww-undo">Lightweight undo with LWW fields</h3>
+      <p>
+        For LWW fields you can implement a local undo stack: before each
+        mutation, snapshot the current field value per-client and push it onto a
+        stack. On undo, pop the stack and write the previous value as a new LWW
+        operation.
+      </p>
+      <p>
+        <strong>Caveat:</strong> this &ldquo;undo&rdquo; is really &ldquo;set to
+        previous value.&rdquo; If Bob changed the field between your edit and
+        your undo, your undo overwrites Bob&rsquo;s change (last-writer-wins).
+      </p>
+      <p>
+        <strong>Note:</strong> Undo for <code>pn-counter</code> and{' '}
+        <code>or-set</code> is not covered here &mdash; those CRDTs would
+        require computing inverse operations (e.g. decrement to undo an
+        increment, re-add to undo a remove), which is application-specific.
+      </p>
+      <CodeBlock
+        title="Wrapping useSyncedValue with an undo stack"
+        code={`import { useCallback, useRef } from 'react'
+import { defineSyncedValue } from '@tanstack/realtime'
+import { useSyncedValue } from '@tanstack/react-realtime'
+
+const docTitle = defineSyncedValue<string>({
+  id: 'doc-title',
+  channel: (params: { docId: string }) => ['doc:title', params],
+})
+
+function EditableTitle({ docId }: { docId: string }) {
+  const { value, set } = useSyncedValue(docTitle, {
+    params: { docId },
+    initial: 'Untitled',
+  })
+
+  const undoStack = useRef<Array<string>>([])
+  const redoStack = useRef<Array<string>>([])
+
+  const editTitle = useCallback(
+    (newTitle: string) => {
+      undoStack.current.push(value)
+      redoStack.current = [] // clear redo on new edit
+      set(newTitle)
+    },
+    [value, set],
+  )
+
+  const undo = useCallback(() => {
+    const prev = undoStack.current.pop()
+    if (prev === undefined) return
+    redoStack.current.push(value)
+    // This is a NEW LWW write — if Bob edited in between,
+    // your undo will overwrite his change (last-writer-wins).
+    set(prev)
+  }, [value, set])
+
+  const redo = useCallback(() => {
+    const next = redoStack.current.pop()
+    if (next === undefined) return
+    undoStack.current.push(value)
+    set(next)
+  }, [value, set])
+
+  return (
+    <div>
+      <input value={value} onChange={(e) => editTitle(e.target.value)} />
+      <button onClick={undo} disabled={undoStack.current.length === 0}>
+        Undo
+      </button>
+      <button onClick={redo} disabled={redoStack.current.length === 0}>
+        Redo
+      </button>
+    </div>
+  )
+}`}
+      />
+
+      <h3 id="rich-text-undo">Rich text: use Y.js UndoManager</h3>
+      <p>
+        For character-level collaborative text editing, TanStack
+        Realtime&rsquo;s field-level CRDTs aren&rsquo;t the right tool. They
+        operate on whole-field granularity (replacing the entire value), not
+        individual characters or ranges.
+      </p>
+      <p>
+        Use a dedicated rich-text CRDT library such as <strong>Y.js</strong> or{' '}
+        <strong>Automerge</strong>, both of which provide a built-in{' '}
+        <code>UndoManager</code> that tracks operations per-client and can
+        reverse them without affecting other users&rsquo; concurrent edits.
+      </p>
+      <p>
+        See the <a href="#/docs/rich-text-crdts">Rich Text (Y.js) guide</a> for
+        a full walkthrough.
+      </p>
+
+      <div className="doc-callout">
+        <p>
+          <strong>Summary:</strong> Field-level CRDTs are designed for
+          structured data (forms, settings, counters, tag sets). For rich text
+          collaboration with proper undo, pair TanStack Realtime as the
+          transport with Y.js as the CRDT engine.
+        </p>
+      </div>
+
+      <h2 id="merge-diagram">How field-level merge works</h2>
+      <p>
+        Each field resolves independently based on its CRDT type. Concurrent
+        edits to <em>different</em> fields never conflict. Concurrent edits to
+        the <em>same</em> field merge according to the field&rsquo;s strategy:
+      </p>
+      <CodeBlock
+        code={`// Two clients edit the same todo concurrently:
+//
+//   Client A                          Client B
+//   ────────                          ────────
+//   title = "Buy milk"  (lww)         votes = increment()  (pn-counter)
+//   tags  = add("urgent") (or-set)    tags  = add("shop")  (or-set)
+//
+// Merged result:
+// ┌─────────┬───────────────────┬──────────────────────────────┐
+// │  Field  │  CRDT type        │  Merged value                │
+// ├─────────┼───────────────────┼──────────────────────────────┤
+// │  title  │  lww              │  "Buy milk" (latest wins)    │
+// │  votes  │  pn-counter       │  +1 (increments add up)      │
+// │  tags   │  or-set           │  {"urgent","shop"} (union)   │
+// └─────────┴───────────────────┴──────────────────────────────┘
+//
+// Key insight: each field is an independent CRDT.
+// Editing "title" on Client A never conflicts with
+// incrementing "votes" on Client B.`}
+      />
     </article>
   )
 }

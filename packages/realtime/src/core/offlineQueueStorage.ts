@@ -176,31 +176,33 @@ export function createLocalStorageAdapter(
   const key = options?.key ?? 'tanstack-realtime-queue'
 
   return {
-    async load(): Promise<Array<QueuedMessage>> {
+    load(): Promise<Array<QueuedMessage>> {
       try {
         const raw = localStorage.getItem(key)
-        if (!raw) return []
+        if (!raw) return Promise.resolve([])
         const parsed = JSON.parse(raw) as Array<QueuedMessage>
-        return parsed.sort((a, b) => a.id - b.id)
+        return Promise.resolve(parsed.sort((a, b) => a.id - b.id))
       } catch {
-        return []
+        return Promise.resolve([])
       }
     },
 
-    async save(messages: ReadonlyArray<QueuedMessage>): Promise<void> {
+    save(messages: ReadonlyArray<QueuedMessage>): Promise<void> {
       try {
         localStorage.setItem(key, JSON.stringify(messages))
       } catch {
         // Silently ignore — quota exceeded or unavailable.
       }
+      return Promise.resolve()
     },
 
-    async clear(): Promise<void> {
+    clear(): Promise<void> {
       try {
         localStorage.removeItem(key)
       } catch {
         // Silently ignore.
       }
+      return Promise.resolve()
     },
   }
 }

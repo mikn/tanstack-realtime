@@ -78,6 +78,7 @@ export type WorkerToTabMsg =
   | { type: 'message'; channel: string; data: unknown }
   | { type: 'publish:ack'; requestId: string; error?: string }
   | { type: 'presence'; channel: string; users: ReadonlyArray<PresenceUser> }
+  | { type: 'subscribeError'; channel: string; reason: string; code?: number }
 
 // ---------------------------------------------------------------------------
 // Worker-side server
@@ -185,6 +186,15 @@ export function createSharedWorkerCoordinator(
   inner.store.subscribe((status) => {
     broadcastStatus(status)
   })
+
+  // Relay subscribe errors from the inner transport to all active tabs.
+  if (inner.onSubscribeError) {
+    inner.onSubscribeError((channel, reason, code) => {
+      for (const port of activePorts) {
+        postToPort(port, { type: 'subscribeError', channel, reason, code })
+      }
+    })
+  }
 
   function ensureChannelSubscription(channel: string): void {
     if (channelUnsubs.has(channel)) return
@@ -532,6 +542,11 @@ export function createSharedWorkerTransport(
     return String(++listenerCounter)
   }
 
+  // Local subscribe error listeners registered via onSubscribeError().
+  const subscribeErrorListeners = new Set<
+    (channel: string, reason: string, code?: number) => void
+  >()
+
   port.onmessage = (event: MessageEvent<WorkerToTabMsg>) => {
     const msg = event.data
     switch (msg.type) {
@@ -568,6 +583,12 @@ export function createSharedWorkerTransport(
         }
         break
       }
+
+      case 'subscribeError':
+        for (const cb of subscribeErrorListeners) {
+          cb(msg.channel, msg.reason, msg.code)
+        }
+        break
     }
   }
 
@@ -686,6 +707,13 @@ export function createSharedWorkerTransport(
           channel,
           listenerId,
         } satisfies TabToWorkerMsg)
+      }
+    },
+
+    onSubscribeError(callback) {
+      subscribeErrorListeners.add(callback)
+      return () => {
+        subscribeErrorListeners.delete(callback)
       }
     },
   }

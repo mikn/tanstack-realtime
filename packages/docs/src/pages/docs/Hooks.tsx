@@ -12,6 +12,7 @@ export function Hooks() {
       <h2 id="useRealtime">useRealtime</h2>
       <p>Connection status and control.</p>
       <CodeBlock
+        title="ConnectionBadge.tsx"
         code={`import { useRealtime } from '@tanstack/react-realtime'
 
 function ConnectionBadge() {
@@ -24,11 +25,26 @@ function ConnectionBadge() {
   )
 }`}
       />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function useRealtime(): {
+  status: ConnectionStatus  // 'disconnected' | 'connecting' | 'connected' | 'reconnecting'
+  connect: () => Promise<void>
+  disconnect: () => void
+  client: RealtimeClient
+}`}
+      />
+      <p>
+        See also: <a href="#/docs/resilience">Resilience</a> for connection
+        recovery patterns.
+      </p>
 
       <h2 id="useSubscribe">useSubscribe</h2>
       <p>Subscribe to raw channel events for the component lifetime.</p>
       <CodeBlock
-        code={`import { useSubscribe } from '@tanstack/react-realtime'
+        title="TypingIndicator.tsx"
+        code={`import { useState } from 'react'
+import { useSubscribe } from '@tanstack/react-realtime'
 
 function TypingIndicator({ roomId }: { roomId: string }) {
   const [typing, setTyping] = useState<string[]>([])
@@ -40,10 +56,22 @@ function TypingIndicator({ roomId }: { roomId: string }) {
   return <span>{typing.join(', ')} typing...</span>
 }`}
       />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function useSubscribe<T = unknown>(
+  channel: QueryKey,          // e.g. ['chat:typing', { roomId }]
+  onMessage: (data: T) => void,
+): void`}
+      />
+      <p>
+        See also: <a href="#/docs/ephemeral">Ephemeral Channels</a> for
+        confetti, toasts, and fire-and-forget patterns.
+      </p>
 
       <h2 id="usePublish">usePublish</h2>
       <p>Stable publish function bound to a channel.</p>
       <CodeBlock
+        title="TypingBroadcast.tsx"
         code={`import { usePublish } from '@tanstack/react-realtime'
 
 function TypingBroadcast({ roomId }: { roomId: string }) {
@@ -57,11 +85,23 @@ function TypingBroadcast({ roomId }: { roomId: string }) {
   )
 }`}
       />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function usePublish<T = unknown>(
+  channel: QueryKey,
+): (data: T) => Promise<void>`}
+      />
+      <p>
+        See also: <a href="#/docs/channels">Channels</a> for validated
+        publishing with <code>createValidatedPublish</code>.
+      </p>
 
       <h2 id="useChannel">useChannel</h2>
       <p>Combined subscribe + publish for one channel.</p>
       <CodeBlock
-        code={`import { useChannel } from '@tanstack/react-realtime'
+        title="ChatRoom.tsx"
+        code={`import { useState } from 'react'
+import { useChannel } from '@tanstack/react-realtime'
 
 function ChatRoom({ roomId }: { roomId: string }) {
   const [messages, setMessages] = useState<Message[]>([])
@@ -82,10 +122,23 @@ function ChatRoom({ roomId }: { roomId: string }) {
   )
 }`}
       />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function useChannel<T = unknown>(
+  channel: QueryKey,
+  onMessage: (data: T) => void,
+): {
+  publish: (data: T) => Promise<void>
+}`}
+      />
+      <p>
+        See also: <a href="#/docs/channels">Channels &amp; Pub/Sub</a>.
+      </p>
 
       <h2 id="usePresence">usePresence</h2>
       <p>Join a presence channel. Returns others + update function.</p>
       <CodeBlock
+        title="DocumentPage.tsx"
         code={`import { usePresence } from '@tanstack/react-realtime'
 import { docPresence } from './channel'
 
@@ -106,12 +159,30 @@ function DocumentPage({ docId }: { docId: string }) {
   )
 }`}
       />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function usePresence<T>(
+  channelDef: PresenceChannel<T>,
+  options: {
+    params: Record<string, string>
+    initial: T
+  },
+): {
+  others: ReadonlyArray<PresenceUser<T>>
+  updatePresence: (delta: Partial<T>) => void
+}`}
+      />
+      <p>
+        See also: <a href="#/docs/presence">Presence</a> for contextual
+        presence, throttling guidance, and cursor sharing patterns.
+      </p>
 
       <h2 id="useStream">useStream</h2>
       <p>
         Subscribe to a reduce-based stream. Returns state, status, and error.
       </p>
       <CodeBlock
+        title="AIResponse.tsx"
         code={`import { useStream } from '@tanstack/react-realtime'
 import { aiResponseStream } from './stream'
 
@@ -131,6 +202,23 @@ function AIResponse({ requestId }: { requestId: string }) {
   )
 }`}
       />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function useStream<TState, TEvent = unknown>(
+  streamDef: StreamChannel<TState, TEvent>,
+  options: {
+    params: Record<string, string>
+  },
+): {
+  state: TState
+  status: 'idle' | 'pending' | 'streaming' | 'complete' | 'error' | 'stale'
+  error: string | null
+}`}
+      />
+      <p>
+        See also: <a href="#/docs/streaming">Streaming</a> for checkpointing,
+        HMAC signing, and <code>staleAfter</code>.
+      </p>
 
       <h2 id="useRealtimeCollection">useRealtimeCollection</h2>
       <p>
@@ -138,6 +226,7 @@ function AIResponse({ requestId }: { requestId: string }) {
         context.
       </p>
       <CodeBlock
+        title="TodoList.tsx"
         code={`import { useRealtimeCollection } from '@tanstack/react-realtime'
 import { useLiveQuery } from '@tanstack/react-db'
 
@@ -155,6 +244,22 @@ function TodoList({ projectId }: { projectId: string }) {
   return <ul>{data.map((t) => <li key={t.id}>{t.text}</li>)}</ul>
 }`}
       />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function useRealtimeCollection<T>(options: {
+  channel: QueryKey
+  getKey: (item: T) => string
+  queryFn?: () => Promise<T[]>
+  fields?: Record<string, 'lww' | 'pn-counter' | 'or-set'>
+  optimistic?: boolean
+  refetchOnReconnect?: boolean
+}): Collection<T>`}
+      />
+      <p>
+        See also: <a href="#/docs/collections">Collections</a> for the full
+        progressive spectrum and <a href="#/docs/crdts">CRDTs</a> for
+        field-level merge behavior.
+      </p>
 
       <h2 id="useLiveChannel">useLiveChannel</h2>
       <p>
@@ -162,6 +267,7 @@ function TodoList({ projectId }: { projectId: string }) {
         and feeds.
       </p>
       <CodeBlock
+        title="AuditLog.tsx"
         code={`import { useLiveChannel } from '@tanstack/react-realtime'
 
 function AuditLog({ resourceId }: { resourceId: string }) {
@@ -177,6 +283,20 @@ function AuditLog({ resourceId }: { resourceId: string }) {
   // ...
 }`}
       />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function useLiveChannel<T>(options: {
+  channel: QueryKey
+  getKey: (item: T) => string
+  initialData?: () => Promise<T[]>
+  onEvent: (raw: unknown) => T | null
+}): Collection<T>`}
+      />
+      <p>
+        See also: <a href="#/docs/channels">Channels &amp; Pub/Sub</a> for
+        append-only patterns and{' '}
+        <a href="#/docs/read-receipts">Read Receipts</a>.
+      </p>
 
       <h2 id="synced-hooks">Standalone CRDT hooks</h2>
       <p>
@@ -186,6 +306,7 @@ function AuditLog({ resourceId }: { resourceId: string }) {
 
       <h3>useSyncedCounter</h3>
       <CodeBlock
+        title="VoteButton.tsx"
         code={`const postVotes = defineSyncedCounter({
   id: 'post-votes',
   channel: (params: { postId: string }) => ['votes', params],
@@ -202,6 +323,7 @@ function VoteButton({ postId }: { postId: string }) {
 
       <h3>useSyncedValue</h3>
       <CodeBlock
+        title="EditableTitle.tsx"
         code={`const docTitle = defineSyncedValue({
   id: 'doc-title',
   channel: (params: { docId: string }) => ['doc:title', params],
@@ -218,6 +340,7 @@ function EditableTitle({ docId }: { docId: string }) {
 
       <h3>useSyncedSet</h3>
       <CodeBlock
+        title="TagEditor.tsx"
         code={`const postTags = defineSyncedSet({
   id: 'post-tags',
   channel: (params: { postId: string }) => ['tags', params],
@@ -238,6 +361,11 @@ function TagEditor({ postId }: { postId: string }) {
   )
 }`}
       />
+      <p>
+        See also: <a href="#/docs/crdts">CRDTs</a> for theory and merge
+        behavior, <a href="#/docs/ephemeral">Ephemeral Channels</a> for pairing
+        ephemeral animations with persistent CRDT counters.
+      </p>
     </article>
   )
 }

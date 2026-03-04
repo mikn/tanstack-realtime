@@ -209,7 +209,7 @@ export interface ServerStream<TEvent = unknown> {
 export interface CreateServerStreamOptions<TState = unknown, TEvent = unknown> {
   /**
    * The publish function from your transport/preset.
-   * In a TanStack Start context, this typically wraps `nodeServer.publish()`
+   * In a TanStack Start context, this typically wraps `sseHandler.broadcast()`
    * or calls an external pub/sub service.
    */
   publish: PublishFn
@@ -356,7 +356,7 @@ export async function verifyEventSignature(
  *
  * @example
  * const stream = createServerStream({
- *   publish: (ch, data) => nodeServer.publish(serializeKey(ch), data),
+ *   publish: (ch, data) => { sseHandler.broadcast(serializeKey(ch), data); return Promise.resolve() },
  *   channel: ['ai', { sessionId }],
  * })
  *

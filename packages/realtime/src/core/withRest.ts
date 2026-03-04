@@ -75,7 +75,7 @@ async function resolveHeaders(
  * standard REST/JSON API to `realtimeCollectionOptions`.
  *
  * Spread the result directly into `realtimeCollectionOptions` and add your
- * realtime config on top — no `nodeServer.publish()` calls needed anywhere,
+ * realtime config on top — no server-side `publish()` calls needed anywhere,
  * because `realtimeCollectionOptions` automatically broadcasts the value
  * returned by each callback to the channel.
  *

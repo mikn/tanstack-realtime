@@ -39,6 +39,7 @@ export type {
   PresenceUser,
   ParsedChannel,
   QueryKey,
+  SubscribeError,
   // Core transport interface (no presence required for custom implementations)
   RealtimeTransport,
   // Optional presence extension — implement alongside RealtimeTransport
@@ -216,6 +217,7 @@ export type {
 // can implement the same contract without an additional import path.
 export {
   createValidatedPublish,
+  normalizePermissions,
   PublishValidationError,
   createServerStream,
   verifyEventSignature,
@@ -226,6 +228,7 @@ export {
 export type {
   ChannelPermissions,
   AuthorizeFn,
+  LifecycleHooks,
   PublishFn,
   PublishValidation,
   PublishValidationResult,
@@ -238,3 +241,16 @@ export type {
   ExplicitCheckpointConfig,
   ChannelDefCheckpointConfig,
 } from './server/index.js'
+
+// Testing utilities
+export {
+  createMockTransport,
+  createMockPresenceTransport,
+} from './testing/index.js'
+export type {
+  MockTransport,
+  MockTransportOptions,
+  PublishRecord,
+  MockPresenceTransport,
+  MockPresenceTransportOptions,
+} from './testing/index.js'

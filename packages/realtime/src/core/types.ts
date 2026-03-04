@@ -36,6 +36,13 @@ export interface ParsedChannel {
   raw: string
 }
 
+/** Payload delivered when a subscribe attempt is rejected by the server. */
+export interface SubscribeError {
+  channel: string
+  reason: string
+  code?: number
+}
+
 /** Structured query key — same shape as TanStack Query. */
 export type QueryKey = ReadonlyArray<unknown>
 
@@ -91,6 +98,15 @@ export interface RealtimeTransport {
    * type via a generic parameter.
    */
   subscribe: (channel: string, onMessage: (data: unknown) => void) => () => void
+
+  /**
+   * Register a callback for subscribe errors (e.g. authorization denied).
+   * Called when the server rejects a subscription attempt.
+   * Returns an unsubscribe function.
+   */
+  onSubscribeError?: (
+    callback: (channel: string, reason: string, code?: number) => void,
+  ) => () => void
 
   /**
    * Publish `data` to `channel`.
@@ -325,5 +341,16 @@ export interface RealtimeClient {
   onPresenceChange: (
     channel: string,
     callback: (users: ReadonlyArray<PresenceUser>) => void,
+  ) => () => void
+
+  /**
+   * Register a callback that fires when the server rejects a subscription
+   * attempt. Returns an unsubscribe function.
+   *
+   * If the underlying transport does not implement `onSubscribeError`, the
+   * returned function is a no-op.
+   */
+  onSubscribeError: (
+    callback: (channel: string, reason: string, code?: number) => void,
   ) => () => void
 }

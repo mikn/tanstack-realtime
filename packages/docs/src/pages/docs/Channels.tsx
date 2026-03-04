@@ -122,7 +122,9 @@ export function Channels() {
 
       <h2 id="use-subscribe">useSubscribe &mdash; raw channel events</h2>
       <CodeBlock
-        code={`import { useSubscribe } from '@tanstack/react-realtime'
+        title="features/chat/TypingIndicator.tsx"
+        code={`import { useState } from 'react'
+import { useSubscribe } from '@tanstack/react-realtime'
 
 function TypingIndicator({ roomId }: { roomId: string }) {
   const [typing, setTyping] = useState<string[]>([])
@@ -139,6 +141,7 @@ function TypingIndicator({ roomId }: { roomId: string }) {
 
       <h2 id="use-publish">usePublish &mdash; publish to a channel</h2>
       <CodeBlock
+        title="features/chat/TypingBroadcast.tsx"
         code={`import { usePublish } from '@tanstack/react-realtime'
 
 function TypingBroadcast({ roomId }: { roomId: string }) {
@@ -155,7 +158,9 @@ function TypingBroadcast({ roomId }: { roomId: string }) {
 
       <h2 id="use-channel">useChannel &mdash; subscribe + publish</h2>
       <CodeBlock
-        code={`import { useChannel } from '@tanstack/react-realtime'
+        title="features/chat/ChatRoom.tsx"
+        code={`import { useState } from 'react'
+import { useChannel } from '@tanstack/react-realtime'
 
 function ChatRoom({ roomId }: { roomId: string }) {
   const [messages, setMessages] = useState<Message[]>([])
@@ -204,6 +209,128 @@ const chatOptions = (roomId: string) =>
   })`}
       />
 
+      <h2 id="use-live-channel">
+        useLiveChannel &mdash; managed collection hook
+      </h2>
+      <p>
+        <code>useLiveChannel</code> is a React hook that creates and manages the
+        lifecycle of an append-only live-channel collection. It wraps{' '}
+        <code>liveChannelOptions</code> and handles collection creation, cleanup
+        on unmount, and automatically sources the realtime client from{' '}
+        <code>&lt;RealtimeProvider&gt;</code>.
+      </p>
+      <CodeBlock
+        title="features/chat/ChatRoom.tsx"
+        code={`import { useLiveChannel } from '@tanstack/react-realtime'
+import { useLiveQuery } from '@tanstack/react-db'
+
+interface ChatMessage {
+  id: string
+  text: string
+  userId: string
+  timestamp: number
+}
+
+function ChatRoom({ roomId }: { roomId: string }) {
+  const messages = useLiveChannel<ChatMessage>({
+    id: \`chat-\${roomId}\`,
+    channel: ['chat', { roomId }],
+    getKey: (m) => m.id,
+
+    initialData: () =>
+      fetch(\`/api/rooms/\${roomId}/messages?limit=50\`).then(r => r.json()),
+
+    onEvent: (raw) => {
+      const e = raw as { type: string; message: ChatMessage }
+      return e.type === 'message' ? e.message : null
+    },
+  })
+
+  const { data } = useLiveQuery((q) =>
+    q.from({ messages }).orderBy(({ messages }) => messages.timestamp)
+  )
+
+  return <div>{data.map((m) => <p key={m.id}>{m.text}</p>)}</div>
+}`}
+      />
+      <div className="doc-callout">
+        <p>
+          The returned <code>Collection</code> object is <strong>stable</strong>{' '}
+          across renders. Pass it to <code>useLiveQuery</code> or{' '}
+          <code>useLiveSuspenseQuery</code> from <code>@tanstack/react-db</code>{' '}
+          to query the data reactively. The collection is cleaned up
+          automatically when the component unmounts.
+        </p>
+      </div>
+
+      <h2 id="validated-publish">
+        createValidatedPublish &mdash; server-side validation
+      </h2>
+      <p>
+        <code>createValidatedPublish</code> wraps a <code>PublishFn</code> with
+        server-side validation. Before every publish, the validate function runs
+        to check and optionally transform the payload. On validation failure, a{' '}
+        <code>PublishValidationError</code> is thrown.
+      </p>
+      <CodeBlock
+        title="server/realtime.ts"
+        code={`import { createValidatedPublish } from '@tanstack/realtime'
+import { sseHandler } from './realtime.server'
+import { todoSchema } from '../shared/schemas'
+
+const validatedPublish = createValidatedPublish({
+  publish: (channel, data) => {
+    const ch = typeof channel === 'string' ? channel : serializeKey(channel)
+    sseHandler.broadcast(ch, data)
+    return Promise.resolve()
+  },
+
+  validate: async ({ channel, data }) => {
+    if (channel.namespace === 'todos') {
+      const result = todoSchema.safeParse(data)
+      if (!result.success) {
+        return { accepted: false, reason: result.error.message }
+      }
+      return { accepted: true, data: result.data }
+    }
+    return { accepted: true }
+  },
+})`}
+      />
+      <p>
+        Use the validated publish function in your server functions or API
+        routes. The validation runs synchronously within the function&rsquo;s
+        lifecycle &mdash; no persistent server process required.
+      </p>
+      <CodeBlock
+        title="server/functions/todos.ts"
+        code={`import { validatedPublish } from '../realtime'
+
+export const updateTodo = createServerFn()(async ({ id, data }) => {
+  const updated = await db.todos.update(id, data)
+
+  // Publishes only if validation passes.
+  // Throws PublishValidationError on rejection.
+  await validatedPublish(['todos', { projectId }], {
+    action: 'update',
+    data: updated,
+  })
+
+  return updated
+})`}
+      />
+      <div className="doc-callout">
+        <p>
+          The validate function receives the parsed channel (with{' '}
+          <code>namespace</code> and <code>params</code>), the raw channel
+          string, and the data payload. Return{' '}
+          <code>
+            {'{'}accepted: true, data: transformed{'}'}
+          </code>{' '}
+          to modify the payload before it reaches subscribers.
+        </p>
+      </div>
+
       <h2 id="when-to-use">liveChannelOptions vs realtimeCollectionOptions</h2>
       <div className="doc-callout">
         <p>
@@ -216,6 +343,22 @@ const chatOptions = (roomId: string) =>
           which events to keep.
         </p>
       </div>
+
+      <h2 id="recipes">Recipes</h2>
+      <ul>
+        <li>
+          <a href="#/docs/read-receipts">Read Receipts</a> &mdash; track which
+          messages each user has seen using a per-user high-water mark
+        </li>
+        <li>
+          <a href="#/docs/ephemeral">Emoji Reactions</a> &mdash; ephemeral
+          flying-emoji animations paired with persistent PN-Counter totals
+        </li>
+        <li>
+          <a href="#/docs/ephemeral#toast-notifications">Toast Notifications</a>{' '}
+          &mdash; fire-and-forget server alerts via <code>useSubscribe</code>
+        </li>
+      </ul>
     </article>
   )
 }

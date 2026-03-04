@@ -197,7 +197,7 @@ export interface StartRealtimeHandler {
    * Each pushed event is wrapped with `_seq` and `_ts` metadata for
    * deduplication and stale detection on the client side.
    *
-   * Mirrors the API of `nodeServer.createStream()` from the Node preset.
+   * Mirrors the API of `createServerStream()` from the core package.
    * Clients consume via `streamChannelOptions` or the `useStream` hook.
    *
    * ```ts

@@ -14,6 +14,7 @@
 export type ServerEvent =
   | { type: 'connected'; connectionId: string }
   | { type: 'message'; channel: string; data: unknown }
+  | { type: 'subscribe:error'; channel: string; reason: string; code?: number }
   | { type: 'ping' }
 
 /** Actions the client POSTs to the server. */

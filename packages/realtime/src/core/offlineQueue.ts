@@ -240,6 +240,13 @@ export function createOfflineQueue(
         storage.clear().catch(() => {})
       }
     },
+
+    onSubscribeError(callback) {
+      if (inner.onSubscribeError) {
+        return inner.onSubscribeError(callback)
+      }
+      return () => {}
+    },
   }
 
   // Presence methods are added via Object.assign (rather than on the object

@@ -31,6 +31,15 @@ export interface LiveChannelConfig<
    * collection, or `null` / `undefined` to ignore the event.
    */
   onEvent: (event: unknown) => T | null | undefined
+
+  /**
+   * Called when the server rejects this channel's subscription (e.g.
+   * authorization denied).
+   *
+   * By default, subscribe errors are logged via `console.error`. Provide this
+   * callback for custom handling (toast notifications, redirects, etc.).
+   */
+  onSubscribeError?: (channel: string, reason: string, code?: number) => void
 }
 
 /**
@@ -63,7 +72,14 @@ export function liveChannelOptions<
 >(
   config: LiveChannelConfig<T, TKey, TSchema>,
 ): CollectionConfig<T, TKey, TSchema> {
-  const { client, channel, initialData, onEvent, ...collectionConfig } = config
+  const {
+    client,
+    channel,
+    initialData,
+    onEvent,
+    onSubscribeError: onSubscribeErrorCallback,
+    ...collectionConfig
+  } = config
 
   const serializedChannel =
     typeof channel === 'string' ? channel : serializeKey(channel)
@@ -86,6 +102,16 @@ export function liveChannelOptions<
       const MAX_PENDING = 10_000
       const pending: Array<unknown> = []
       let initialized = !initialData // true immediately when there is no history
+
+      // Surface subscribe auth errors for this channel.
+      const unsubErr = client.onSubscribeError((ch, reason, code) => {
+        if (ch === serializedChannel) {
+          console.error(
+            `[realtime] Subscribe rejected for "${ch}": ${reason}${code != null ? ` (${code})` : ''}`,
+          )
+          onSubscribeErrorCallback?.(ch, reason, code)
+        }
+      })
 
       // Subscribe to incoming channel events.
       const unsub = client.subscribe(serializedChannel, (raw) => {
@@ -145,6 +171,7 @@ export function liveChannelOptions<
       return () => {
         stopped = true
         unsub()
+        unsubErr()
       }
     },
   }

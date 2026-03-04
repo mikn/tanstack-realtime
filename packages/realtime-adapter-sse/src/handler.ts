@@ -1,5 +1,15 @@
-import { createServerStream, serializeKey } from '@tanstack/realtime'
-import type { QueryKey, ServerStream } from '@tanstack/realtime'
+import {
+  createServerStream,
+  normalizePermissions,
+  parseChannel,
+  serializeKey,
+} from '@tanstack/realtime'
+import type {
+  AuthorizeFn,
+  LifecycleHooks,
+  QueryKey,
+  ServerStream,
+} from '@tanstack/realtime'
 import type { ClientAction, ServerEvent } from './protocol.js'
 
 // ---------------------------------------------------------------------------
@@ -50,7 +60,20 @@ export interface SseHandler {
   }) => ServerStream<TEvent>
 }
 
-export interface SseHandlerOptions {
+/**
+ * Legacy per-action authorize signature accepted by the SSE handler for
+ * backward compatibility. Prefer `AuthorizeFn` from `@tanstack/realtime`.
+ *
+ * @deprecated Use `AuthorizeFn` instead for unified authorization that works
+ * across all presets (Node, SSE, Start, Centrifugo).
+ */
+export type LegacySseAuthorizeFn = (params: {
+  userId: string
+  action: 'subscribe' | 'publish'
+  channel: string
+}) => boolean | Promise<boolean>
+
+export interface SseHandlerOptions extends LifecycleHooks {
   /**
    * Interval in milliseconds for sending SSE keep-alive pings.
    * Set to `0` to disable pings.
@@ -104,10 +127,18 @@ export interface SseHandlerOptions {
     | Promise<{ userId: string } | null | undefined>
 
   /**
-   * Authorize a `subscribe` or `publish` action for an already-authenticated
-   * user.
+   * Authorize a channel action for an already-authenticated user.
    *
-   * Return `true` to allow, `false` to reject with **403 Forbidden**.
+   * Accepts two signatures:
+   *
+   * 1. **Unified `AuthorizeFn`** (recommended) — receives
+   *    `(userId, parsedChannel)` and returns
+   *    `ChannelPermissions | boolean`. The handler checks the relevant
+   *    permission (`subscribe` or `publish`) per action.
+   *
+   * 2. **Legacy per-action** — receives `{ userId, action, channel }` and
+   *    returns a boolean. Still supported for backward compatibility.
+   *
    * When omitted all authenticated users are permitted on all channels.
    *
    * Called **after** `getUser` succeeds, so `userId` is always set.
@@ -115,20 +146,22 @@ export interface SseHandlerOptions {
    * data and must succeed to avoid subscription leaks).
    *
    * @example
+   * // Unified authorize (same function works across all presets)
+   * authorize: async (userId, channel) => {
+   *   const member = await db.getProjectMember(userId, channel.params.projectId)
+   *   return member
+   *     ? { subscribe: true, publish: member.role === 'editor', presence: true }
+   *     : false
+   * }
+   *
+   * @example
+   * // Legacy per-action (still supported)
    * authorize: async ({ userId, action, channel }) => {
-   *   if (action === 'publish') {
-   *     // Only channel owners may publish
-   *     return db.isChannelOwner(userId, channel)
-   *   }
-   *   // All authenticated users may subscribe
+   *   if (action === 'publish') return db.isChannelOwner(userId, channel)
    *   return true
    * }
    */
-  authorize?: (params: {
-    userId: string
-    action: 'subscribe' | 'publish'
-    channel: string
-  }) => boolean | Promise<boolean>
+  authorize?: AuthorizeFn | LegacySseAuthorizeFn
 }
 
 // ---------------------------------------------------------------------------
@@ -189,7 +222,15 @@ export interface SseHandlerOptions {
  * })
  */
 export function createSseHandler(options: SseHandlerOptions = {}): SseHandler {
-  const { pingInterval = 30_000, getUser, authorize } = options
+  const {
+    pingInterval = 30_000,
+    getUser,
+    authorize,
+    onClientConnect,
+    onClientDisconnect,
+    onFirstSubscriber,
+    onChannelEmpty,
+  } = options
 
   const enc = new TextEncoder()
 
@@ -204,6 +245,14 @@ export function createSseHandler(options: SseHandlerOptions = {}): SseHandler {
 
   // connectionId → ping timer
   const pingTimers = new Map<string, ReturnType<typeof setInterval>>()
+
+  // connectionId → userId (for lifecycle hooks)
+  const connectionUserIds = new Map<string, string>()
+
+  // Detect whether the authorize callback uses the legacy per-action signature
+  // (single params object → fn.length ≤ 1) or the unified AuthorizeFn
+  // (two positional params → fn.length ≥ 2).
+  const isLegacyAuthorize = authorize != null && authorize.length <= 1
 
   // ---------------------------------------------------------------------------
   // Helpers
@@ -233,9 +282,30 @@ export function createSseHandler(options: SseHandlerOptions = {}): SseHandler {
       pingTimers.delete(connectionId)
     }
 
+    // Fire lifecycle: onClientDisconnect
+    const userId = connectionUserIds.get(connectionId)
+    connectionUserIds.delete(connectionId)
+    if (userId && onClientDisconnect) {
+      try {
+        onClientDisconnect({ connectionId, userId })
+      } catch (err) {
+        console.error('[realtime:sse] onClientDisconnect error', err)
+      }
+    }
+
     for (const [channel, subs] of channelSubs) {
       subs.delete(connectionId)
-      if (subs.size === 0) channelSubs.delete(channel)
+      if (subs.size === 0) {
+        channelSubs.delete(channel)
+        // Fire lifecycle: onChannelEmpty
+        if (onChannelEmpty) {
+          try {
+            onChannelEmpty(channel)
+          } catch (err) {
+            console.error('[realtime:sse] onChannelEmpty error', err)
+          }
+        }
+      }
     }
   }
 
@@ -253,7 +323,17 @@ export function createSseHandler(options: SseHandlerOptions = {}): SseHandler {
     channel: string,
   ): Promise<boolean> {
     if (!authorize) return true
-    return authorize({ userId, action, channel })
+
+    if (isLegacyAuthorize) {
+      // Legacy signature: (params: { userId, action, channel }) => boolean
+      return (authorize as LegacySseAuthorizeFn)({ userId, action, channel })
+    }
+
+    // Unified AuthorizeFn: (userId, parsedChannel) => ChannelPermissions | boolean
+    const parsed = parseChannel(channel)
+    const result = await (authorize as AuthorizeFn)(userId, parsed)
+    const perms = normalizePermissions(result)
+    return perms[action]
   }
 
   // ---------------------------------------------------------------------------
@@ -276,9 +356,19 @@ export function createSseHandler(options: SseHandlerOptions = {}): SseHandler {
       start(controller) {
         ctrl = controller
         controllers.set(connectionId, ctrl)
+        connectionUserIds.set(connectionId, user.userId)
 
         // Send the "connected" event so the client learns its connectionId.
         ctrl.enqueue(sseChunk({ type: 'connected', connectionId }))
+
+        // Fire lifecycle: onClientConnect
+        if (onClientConnect) {
+          try {
+            onClientConnect({ connectionId, userId: user.userId })
+          } catch (err) {
+            console.error('[realtime:sse] onClientConnect error', err)
+          }
+        }
 
         // Periodic pings to keep the connection alive through proxies.
         if (pingInterval > 0) {
@@ -332,8 +422,18 @@ export function createSseHandler(options: SseHandlerOptions = {}): SseHandler {
         if (!allowed) {
           return new Response('Forbidden', { status: 403 })
         }
+        const isFirst =
+          !channelSubs.has(channel) || channelSubs.get(channel)!.size === 0
         if (!channelSubs.has(channel)) channelSubs.set(channel, new Set())
         channelSubs.get(channel)!.add(connectionId)
+        // Fire lifecycle: onFirstSubscriber
+        if (isFirst && onFirstSubscriber) {
+          try {
+            onFirstSubscriber(channel)
+          } catch (err) {
+            console.error('[realtime:sse] onFirstSubscriber error', err)
+          }
+        }
         return new Response(null, { status: 204 })
       }
       case 'unsubscribe': {
@@ -341,7 +441,17 @@ export function createSseHandler(options: SseHandlerOptions = {}): SseHandler {
         // be used to exfiltrate data.
         const { connectionId, channel } = body
         channelSubs.get(channel)?.delete(connectionId)
-        if (channelSubs.get(channel)?.size === 0) channelSubs.delete(channel)
+        if (channelSubs.get(channel)?.size === 0) {
+          channelSubs.delete(channel)
+          // Fire lifecycle: onChannelEmpty
+          if (onChannelEmpty) {
+            try {
+              onChannelEmpty(channel)
+            } catch (err) {
+              console.error('[realtime:sse] onChannelEmpty error', err)
+            }
+          }
+        }
         return new Response(null, { status: 204 })
       }
       case 'publish': {
@@ -400,9 +510,10 @@ export function createSseHandler(options: SseHandlerOptions = {}): SseHandler {
     }): ServerStream<TEvent> {
       const handler = this
       return createServerStream<TEvent>({
-        publish: async (ch, data) => {
+        publish: (ch, data) => {
           const serialized = typeof ch === 'string' ? ch : serializeKey(ch)
           handler.broadcast(serialized, data)
+          return Promise.resolve()
         },
         channel: opts.channel,
         hmacKey: opts.hmacKey,

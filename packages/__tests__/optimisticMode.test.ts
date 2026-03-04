@@ -171,7 +171,7 @@ describe('realtimeCollectionOptions — optimistic mode', () => {
     expect(ops.length).toBe(opsBeforeEcho)
   })
 
-  it('applies messages from other clients (different _clientId)', async () => {
+  it('applies messages from other clients (different _clientId)', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
 
@@ -350,9 +350,9 @@ describe('realtimeCollectionOptions — optimistic mode', () => {
     // Override publish to fail after mutation succeeds
     const originalPublish = transport.publish.bind(transport)
     let publishCallCount = 0
-    transport.publish = async (_channel, _data) => {
+    transport.publish = (_channel, _data) => {
       publishCallCount++
-      throw new Error('Network error on publish')
+      return Promise.reject(new Error('Network error on publish'))
     }
 
     const client = createRealtimeClient({ transport })
@@ -411,8 +411,8 @@ describe('realtimeCollectionOptions — optimistic mode', () => {
     })
 
     // Make publish fail
-    transport.publish = async () => {
-      throw new Error('Publish failed')
+    transport.publish = () => {
+      return Promise.reject(new Error('Publish failed'))
     }
 
     await config.onUpdate!({
@@ -446,7 +446,7 @@ describe('realtimeCollectionOptions — optimistic mode', () => {
       channel: 'docs',
       getKey: (d) => d.id,
       optimistic: true,
-      onInsert: async () => {
+      onInsert: () => {
         insertCall++
         if (insertCall === 1) {
           return { id: '1', title: 'first' }

@@ -36,7 +36,9 @@ function createMockTransport(): RealtimeTransport & {
 
   return {
     store,
-    async connect() {},
+    connect() {
+      return Promise.resolve()
+    },
     disconnect() {},
     subscribe(channel, onMessage) {
       if (!listeners.has(channel)) listeners.set(channel, new Set())
@@ -45,7 +47,9 @@ function createMockTransport(): RealtimeTransport & {
         listeners.get(channel)?.delete(onMessage)
       }
     },
-    async publish() {},
+    publish() {
+      return Promise.resolve()
+    },
     emit(channel, data) {
       const cbs = listeners.get(channel)
       if (cbs) for (const cb of cbs) cb(data)
@@ -551,8 +555,9 @@ describe('createServerStream — heartbeat', () => {
 
   it('emits heartbeat events at the configured interval', async () => {
     const calls: Array<{ data: unknown }> = []
-    const publish: PublishFn = async (_ch, data) => {
+    const publish: PublishFn = (_ch, data) => {
       calls.push({ data })
+      return Promise.resolve()
     }
 
     createServerStream({
@@ -580,8 +585,9 @@ describe('createServerStream — heartbeat', () => {
 
   it('stops heartbeats on done()', async () => {
     const calls: Array<{ data: unknown }> = []
-    const publish: PublishFn = async (_ch, data) => {
+    const publish: PublishFn = (_ch, data) => {
       calls.push({ data })
+      return Promise.resolve()
     }
 
     const stream = createServerStream({
@@ -606,8 +612,9 @@ describe('createServerStream — heartbeat', () => {
 
   it('stops heartbeats on error()', async () => {
     const calls: Array<{ data: unknown }> = []
-    const publish: PublishFn = async (_ch, data) => {
+    const publish: PublishFn = (_ch, data) => {
       calls.push({ data })
+      return Promise.resolve()
     }
 
     const stream = createServerStream({
@@ -634,8 +641,9 @@ describe('createServerStream — heartbeat', () => {
 describe('createServerStream — sequence numbers', () => {
   it('assigns monotonically increasing _seq to every event', async () => {
     const calls: Array<{ data: unknown }> = []
-    const publish: PublishFn = async (_ch, data) => {
+    const publish: PublishFn = (_ch, data) => {
       calls.push({ data })
+      return Promise.resolve()
     }
 
     const stream = createServerStream({ publish, channel: 'seq-test' })
@@ -653,7 +661,7 @@ describe('createServerStream — sequence numbers', () => {
   })
 
   it('exposes current seq via readonly property', async () => {
-    const publish: PublishFn = async () => {}
+    const publish: PublishFn = () => Promise.resolve()
     const stream = createServerStream({ publish, channel: 'seq-prop' })
 
     expect(stream.seq).toBe(0)
@@ -670,7 +678,7 @@ describe('createServerStream — checkpoint', () => {
       seq: number
       state: { content: string }
     }> = []
-    const publish: PublishFn = async () => {}
+    const publish: PublishFn = () => Promise.resolve()
 
     const stream = createServerStream<{ delta: string }, { content: string }>({
       publish,
@@ -679,8 +687,9 @@ describe('createServerStream — checkpoint', () => {
         initial: { content: '' },
         reduce: (s, e) => ({ content: s.content + e.delta }),
         interval: { events: 3 },
-        handler: async (cp) => {
+        handler: (cp) => {
           checkpoints.push({ seq: cp.seq, state: cp.state })
+          return Promise.resolve()
         },
       },
     })
@@ -703,7 +712,7 @@ describe('createServerStream — checkpoint', () => {
 
   it('calls checkpoint handler on done() with final state', async () => {
     const checkpoints: Array<{ state: { content: string } }> = []
-    const publish: PublishFn = async () => {}
+    const publish: PublishFn = () => Promise.resolve()
 
     const stream = createServerStream<{ delta: string }, { content: string }>({
       publish,
@@ -712,8 +721,9 @@ describe('createServerStream — checkpoint', () => {
         initial: { content: '' },
         reduce: (s, e) => ({ content: s.content + e.delta }),
         interval: { events: 100 }, // High threshold — won't trigger from events
-        handler: async (cp) => {
+        handler: (cp) => {
           checkpoints.push({ state: cp.state })
+          return Promise.resolve()
         },
       },
     })
@@ -729,7 +739,7 @@ describe('createServerStream — checkpoint', () => {
 
   it('calls checkpoint handler on error() with last good state', async () => {
     const checkpoints: Array<{ state: { content: string } }> = []
-    const publish: PublishFn = async () => {}
+    const publish: PublishFn = () => Promise.resolve()
 
     const stream = createServerStream<{ delta: string }, { content: string }>({
       publish,
@@ -738,8 +748,9 @@ describe('createServerStream — checkpoint', () => {
         initial: { content: '' },
         reduce: (s, e) => ({ content: s.content + e.delta }),
         interval: { events: 100 },
-        handler: async (cp) => {
+        handler: (cp) => {
           checkpoints.push({ state: cp.state })
+          return Promise.resolve()
         },
       },
     })
@@ -755,7 +766,7 @@ describe('createServerStream — checkpoint', () => {
     vi.useFakeTimers()
 
     const checkpoints: Array<{ state: { n: number } }> = []
-    const publish: PublishFn = async () => {}
+    const publish: PublishFn = () => Promise.resolve()
 
     createServerStream<{ inc: number }, { n: number }>({
       publish,
@@ -764,8 +775,9 @@ describe('createServerStream — checkpoint', () => {
         initial: { n: 0 },
         reduce: (s, e) => ({ n: s.n + e.inc }),
         interval: { time: 1000 },
-        handler: async (cp) => {
+        handler: (cp) => {
           checkpoints.push({ state: cp.state })
+          return Promise.resolve()
         },
       },
     })
@@ -789,10 +801,11 @@ describe('end-to-end: resilient server stream → consumer', () => {
 
     // Wire up: server publishes → consumer receives
     const subscribers = new Map<string, Set<(data: unknown) => void>>()
-    const publish: PublishFn = async (channel, data) => {
+    const publish: PublishFn = (channel, data) => {
       const ch = typeof channel === 'string' ? channel : String(channel)
       const subs = subscribers.get(ch)
       if (subs) for (const cb of subs) cb(data)
+      return Promise.resolve()
     }
 
     const mockClient = {

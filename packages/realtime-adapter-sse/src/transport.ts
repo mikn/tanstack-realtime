@@ -69,6 +69,11 @@ export function sseTransport(options: SseTransportOptions): RealtimeTransport {
   // channel → Set of message callbacks
   const subscriptions = new Map<string, Set<(data: unknown) => void>>()
 
+  // subscribe error callbacks
+  const subscribeErrorListeners = new Set<
+    (channel: string, reason: string, code?: number) => void
+  >()
+
   let connectionId: string | null = null
   let abortCtrl: AbortController | null = null
   let reconnectAttempt = 0
@@ -244,6 +249,12 @@ export function sseTransport(options: SseTransportOptions): RealtimeTransport {
         }
         break
       }
+      case 'subscribe:error': {
+        for (const cb of subscribeErrorListeners) {
+          cb(event.channel, event.reason, event.code)
+        }
+        break
+      }
       case 'ping':
         // Keep-alive; no action needed.
         break
@@ -325,6 +336,13 @@ export function sseTransport(options: SseTransportOptions): RealtimeTransport {
 
     async publish(channel, data) {
       await postAction({ action: 'publish', channel, data })
+    },
+
+    onSubscribeError(callback) {
+      subscribeErrorListeners.add(callback)
+      return () => {
+        subscribeErrorListeners.delete(callback)
+      }
     },
   }
 

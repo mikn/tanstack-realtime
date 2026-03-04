@@ -25,8 +25,9 @@ describe('createValidatedPublish', () => {
       channel: string | ReadonlyArray<unknown>
       data: unknown
     }> = []
-    const publish: PublishFn = async (channel, data) => {
+    const publish: PublishFn = (channel, data) => {
       publishCalls.push({ channel: channel as string, data })
+      return Promise.resolve()
     }
 
     const validate: ValidatePublishFn = () => ({ accepted: true })
@@ -73,8 +74,9 @@ describe('createValidatedPublish', () => {
 
   it('publishes transformed data when validation returns data', async () => {
     const publishCalls: Array<{ data: unknown }> = []
-    const publish: PublishFn = async (_ch, data) => {
+    const publish: PublishFn = (_ch, data) => {
       publishCalls.push({ data })
+      return Promise.resolve()
     }
 
     const validate: ValidatePublishFn = ({ data }) => ({
@@ -89,7 +91,7 @@ describe('createValidatedPublish', () => {
   })
 
   it('passes parsed channel to the validate function', async () => {
-    const publish: PublishFn = async () => {}
+    const publish: PublishFn = () => Promise.resolve()
     const validateCalls: Array<{
       namespace: string
       params: Record<string, string>
@@ -112,7 +114,7 @@ describe('createValidatedPublish', () => {
   })
 
   it('supports async validate functions', async () => {
-    const publish: PublishFn = async () => {}
+    const publish: PublishFn = () => Promise.resolve()
     const validate: ValidatePublishFn = async ({ data }) => {
       // Simulate async validation (e.g., database lookup)
       await new Promise((r) => setTimeout(r, 1))
@@ -142,8 +144,9 @@ describe('createValidatedPublish', () => {
 
   it('publishes falsy data (null) when validation returns { data: null }', async () => {
     const publishCalls: Array<{ data: unknown }> = []
-    const publish: PublishFn = async (_ch, data) => {
+    const publish: PublishFn = (_ch, data) => {
       publishCalls.push({ data })
+      return Promise.resolve()
     }
 
     const validate: ValidatePublishFn = () => ({
@@ -160,8 +163,9 @@ describe('createValidatedPublish', () => {
 
   it('publishes falsy data (0) when validation returns { data: 0 }', async () => {
     const publishCalls: Array<{ data: unknown }> = []
-    const publish: PublishFn = async (_ch, data) => {
+    const publish: PublishFn = (_ch, data) => {
       publishCalls.push({ data })
+      return Promise.resolve()
     }
 
     const validate: ValidatePublishFn = () => ({

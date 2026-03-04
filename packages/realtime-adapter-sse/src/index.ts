@@ -12,6 +12,10 @@ export { sseTransport } from './transport.js'
 export type { SseTransportOptions } from './transport.js'
 
 export { createSseHandler } from './handler.js'
-export type { SseHandler, SseHandlerOptions } from './handler.js'
+export type {
+  SseHandler,
+  SseHandlerOptions,
+  LegacySseAuthorizeFn,
+} from './handler.js'
 
 export type { ServerEvent, ClientAction, SsePathOptions } from './protocol.js'

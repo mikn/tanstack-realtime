@@ -252,6 +252,15 @@ export interface RealtimeCollectionConfig<
   onUpdate?: UpdateMutationFn<T, TKey>
   /** Called after a local delete. Should persist to the server. */
   onDelete?: DeleteMutationFn<T, TKey>
+
+  /**
+   * Called when the server rejects a subscription for one of this collection's
+   * channels (e.g. authorization denied).
+   *
+   * By default, subscribe errors are logged via `console.error`. Provide this
+   * callback for custom handling (toast notifications, redirects, etc.).
+   */
+  onSubscribeError?: (channel: string, reason: string, code?: number) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -549,6 +558,7 @@ export function realtimeCollectionOptions<
     onUpdate,
     onDelete,
     onMessage,
+    onSubscribeError: onSubscribeErrorCallback,
     getKey,
     ...collectionConfig
   } = config
@@ -670,6 +680,18 @@ export function realtimeCollectionOptions<
           })
           unsubs.push(unsub)
         }
+
+        // Surface subscribe auth errors for all channels this collection uses.
+        const channelSet = new Set(allChannels)
+        const unsubErr = client.onSubscribeError((ch, reason, code) => {
+          if (channelSet.has(ch)) {
+            console.error(
+              `[realtime] Subscribe rejected for "${ch}": ${reason}${code != null ? ` (${code})` : ''}`,
+            )
+            onSubscribeErrorCallback?.(ch, reason, code)
+          }
+        })
+        unsubs.push(unsubErr)
       }
 
       if (queryFn) {

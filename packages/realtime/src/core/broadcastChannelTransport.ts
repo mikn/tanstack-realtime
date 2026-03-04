@@ -95,6 +95,8 @@ type BCMsg =
   | { type: 'leavePresence'; tabId: string; channel: string }
   | { type: 'presenceOn'; tabId: string; channel: string }
   | { type: 'presenceOff'; tabId: string; channel: string }
+  // Leader → all: subscribe error notification
+  | { type: 'subscribeError'; channel: string; reason: string; code?: number }
   // Follower → leader: re-registration after new leader elected
   | {
       type: 'register'
@@ -157,6 +159,7 @@ export function createBroadcastChannelTransport(
   let leaderTabId: string | null = null
   let inner: (RealtimeTransport & Partial<PresenceCapable>) | null = null
   let innerStatusUnsub: (() => void) | null = null
+  let innerSubscribeErrorUnsub: (() => void) | null = null
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null
   let leaderWatchTimer: ReturnType<typeof setInterval> | null = null
   let lastHeartbeat = 0
@@ -164,6 +167,9 @@ export function createBroadcastChannelTransport(
   let userCalledConnect = false
 
   // This tab's subscriptions
+  const subscribeErrorListeners = new Set<
+    (channel: string, reason: string, code?: number) => void
+  >()
   const localSubs = new Map<string, Set<(data: unknown) => void>>()
   const localPresenceSubs = new Map<
     string,
@@ -307,6 +313,16 @@ export function createBroadcastChannelTransport(
     })
     innerStatusUnsub = () => sub.unsubscribe()
 
+    // Mirror inner subscribe errors → local listeners + broadcast to followers
+    if (inner.onSubscribeError) {
+      innerSubscribeErrorUnsub = inner.onSubscribeError(
+        (channel, reason, code) => {
+          for (const cb of subscribeErrorListeners) cb(channel, reason, code)
+          post({ type: 'subscribeError', channel, reason, code })
+        },
+      )
+    }
+
     // Subscribe to this tab's own channels on the inner transport
     for (const channel of localSubs.keys()) subscribeInner(channel)
     for (const channel of localPresenceSubs.keys())
@@ -335,6 +351,10 @@ export function createBroadcastChannelTransport(
     if (innerStatusUnsub) {
       innerStatusUnsub()
       innerStatusUnsub = null
+    }
+    if (innerSubscribeErrorUnsub) {
+      innerSubscribeErrorUnsub()
+      innerSubscribeErrorUnsub = null
     }
 
     // Tear down all inner subscriptions
@@ -495,6 +515,14 @@ export function createBroadcastChannelTransport(
         if (!isLeader) {
           const cbs = localPresenceSubs.get(msg.channel)
           if (cbs) for (const cb of cbs) cb(msg.users)
+        }
+        break
+
+      case 'subscribeError':
+        if (!isLeader) {
+          for (const cb of subscribeErrorListeners) {
+            cb(msg.channel, msg.reason, msg.code)
+          }
         }
         break
 
@@ -723,6 +751,13 @@ export function createBroadcastChannelTransport(
             }
           }
         }
+      }
+    },
+
+    onSubscribeError(callback) {
+      subscribeErrorListeners.add(callback)
+      return () => {
+        subscribeErrorListeners.delete(callback)
       }
     },
   }
