@@ -1311,6 +1311,25 @@ export function ApiReference() {
         <tbody>
           <tr>
             <td>
+              <code>useRealtimeQuery</code>
+            </td>
+            <td>
+              <code>
+                (config: UseRealtimeQueryConfig) =&gt;
+                UseRealtimeQueryResult&lt;T, TKey&gt;
+              </code>
+            </td>
+            <td>
+              One-hook API for realtime-backed data. Creates a collection,
+              manages sync lifecycle, and returns a reactive <code>data</code>{' '}
+              array plus the underlying <code>collection</code> for mutations.
+              Accepts either a <code>url</code> (REST shorthand) or manual{' '}
+              <code>queryFn</code> + callbacks. Powered by{' '}
+              <code>useLiveQuery</code> internally.
+            </td>
+          </tr>
+          <tr>
+            <td>
               <code>useRealtimeCollection</code>
             </td>
             <td>
@@ -1642,15 +1661,73 @@ export function ApiReference() {
               <code>authorize</code>
             </td>
             <td>
+              <code>AuthorizeFn | LegacySseAuthorizeFn</code>
+            </td>
+            <td>—</td>
+            <td>
+              Per-channel access control. The unified <code>AuthorizeFn</code>{' '}
+              receives <code>(userId, parsedChannel)</code> and returns{' '}
+              <code>ChannelPermissions | boolean</code>. The legacy form{' '}
               <code>
-                (params: {'{'} userId, action, channel {'}'}) =&gt; boolean |
-                Promise&lt;boolean&gt;
+                ({'{'} userId, action, channel {'}'}) =&gt; boolean
+              </code>{' '}
+              is still supported for backward compatibility.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>onClientConnect</code>
+            </td>
+            <td>
+              <code>
+                (info: {'{'} connectionId, userId {'}'}) =&gt; void
               </code>
             </td>
             <td>—</td>
             <td>
-              Authorize a subscribe/publish action. Return <code>false</code> to
-              reject with 403.
+              Fires after <code>getUser</code> succeeds and the SSE stream is
+              established. Fire-and-forget — errors are logged, not propagated.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>onClientDisconnect</code>
+            </td>
+            <td>
+              <code>
+                (info: {'{'} connectionId, userId {'}'}) =&gt; void
+              </code>
+            </td>
+            <td>—</td>
+            <td>
+              Fires when the SSE stream closes (client disconnect or network
+              drop). Fire-and-forget.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>onFirstSubscriber</code>
+            </td>
+            <td>
+              <code>(channel: string) =&gt; void</code>
+            </td>
+            <td>—</td>
+            <td>
+              Fires when the first subscriber joins a previously-empty channel.
+              Useful for spinning up live queries or background tasks.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>onChannelEmpty</code>
+            </td>
+            <td>
+              <code>(channel: string) =&gt; void</code>
+            </td>
+            <td>—</td>
+            <td>
+              Fires when the last subscriber leaves a channel (count → 0).
+              Useful for tearing down resources.
             </td>
           </tr>
         </tbody>
