@@ -4,7 +4,7 @@
  * Verifies that:
  * - createSseHandler accepts the new AuthorizeFn (userId, parsedChannel) signature
  * - createSseHandler still accepts the legacy (params) => boolean signature
- * - createNodeServer accepts boolean returns from authorize
+ * - All presets accept boolean returns from authorize
  * - normalizePermissions maps booleans to all-or-nothing ChannelPermissions
  * - createStartHandler inherits unified authorize from SSE
  */

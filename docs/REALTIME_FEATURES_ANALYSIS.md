@@ -185,7 +185,7 @@ CRDTs converge state, but there's no operation log or undo stack that preserves 
 
 There's no lifecycle hook for server-side events like "last subscriber left channel", "client disconnected", or "channel became empty." These are critical for cleanup, analytics, and server-side state management.
 
-**Recommendation:** Add optional lifecycle callbacks to `createNodeServer` and the SSE handler: `onChannelEmpty`, `onClientDisconnect`, `onFirstSubscriber`.
+**Recommendation:** Add optional lifecycle callbacks to `createSseHandler` and `createStartHandler`: `onChannelEmpty`, `onClientDisconnect`, `onFirstSubscriber`.
 
 #### Gap F7: No DevTools Panel
 
@@ -253,13 +253,12 @@ The provider puts the client in context and calls `destroy()` on unmount, but do
 
 The authorize function shape differs across server presets:
 
-- `createNodeServer`: `authorize(userId, parsedChannel) → ChannelPermissions` (granular: `{ subscribe, publish, presence }`)
-- `createSseHandler`: `authorize({ userId, action, channel }) → boolean` (per-action)
+- `createSseHandler`: `authorize({ userId, action, channel }) → boolean` (per-action) or `authorize(userId, parsedChannel) → ChannelPermissions` (unified)
 - `createStartHandler`: inherits SSE handler shape
 
-A developer switching from Node to Start (or running both) must learn two different auth APIs.
+A developer switching between presets should not have to learn two different auth APIs.
 
-**Recommendation:** Unify around the more expressive `ChannelPermissions` return shape. Both the SSE and Start handlers should accept the same `authorize` signature as the Node server.
+**Recommendation:** Unify around the more expressive `ChannelPermissions` return shape. Both the SSE and Start handlers should accept the unified `AuthorizeFn` signature.
 
 #### Gap E5: Silent Subscription Authorization Failures
 
@@ -312,7 +311,7 @@ Auth is the first thing every developer needs after "hello world." There's no gu
 
 **Impact: High**
 
-The `PublishBackend` interface and Redis/Postgres examples live exclusively in `createStartHandler`'s JSDoc. A developer using Express, Hono, or Fastify with `createNodeServer` has no documented path to multi-process deployment.
+The `PublishBackend` interface and Redis/Postgres examples live exclusively in `createStartHandler`'s JSDoc. A developer using Express, Hono, or Fastify with `createSseHandler` has no documented path to multi-process deployment.
 
 **Recommendation:** Create a standalone "Scaling to Production" doc page covering:
 
@@ -321,7 +320,7 @@ The `PublishBackend` interface and Redis/Postgres examples live exclusively in `
 3. Redis PUBLISH/SUBSCRIBE implementation
 4. Postgres LISTEN/NOTIFY implementation
 5. Cloudflare Durable Objects approach
-6. How to pair with `createNodeServer` (not just TanStack Start)
+6. How to pair with `createSseHandler` (not just TanStack Start)
 
 #### Gap D3: No Error Reference
 

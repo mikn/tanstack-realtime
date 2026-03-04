@@ -107,7 +107,7 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 - [x] Example: Redis PUBLISH/SUBSCRIBE implementation
 - [x] Example: Postgres LISTEN/NOTIFY implementation
 - [x] Example: Cloudflare Durable Objects approach
-- [x] Show how to pair `PublishBackend` with `createNodeServer` (not just TanStack Start)
+- [x] Show how to pair `PublishBackend` with `createSseHandler` (not just TanStack Start)
 - [x] Show how to pair `PublishBackend` with `createSseHandler`
 - [x] Add "When you need this" decision criteria (> 1 server process, horizontal auto-scaling, etc.)
 
@@ -288,7 +288,6 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 > `onChannelEmpty`, `onClientDisconnect` for cleanup and analytics.
 
 - [ ] Design lifecycle callback interface: `onFirstSubscriber`, `onChannelEmpty`, `onClientConnect`, `onClientDisconnect`
-- [ ] Implement in `createNodeServer` (WebSocket server)
 - [ ] Implement in `createSseHandler`
 - [ ] Add test coverage for each lifecycle event
 - [x] Document in Scaling guide (Project 5) and/or a dedicated server events section

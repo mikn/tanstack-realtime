@@ -131,8 +131,8 @@ export interface SseHandlerOptions extends LifecycleHooks {
    *
    * Accepts two signatures:
    *
-   * 1. **Unified `AuthorizeFn`** (recommended) — the same function used by
-   *    `createNodeServer`. Receives `(userId, parsedChannel)` and returns
+   * 1. **Unified `AuthorizeFn`** (recommended) — receives
+   *    `(userId, parsedChannel)` and returns
    *    `ChannelPermissions | boolean`. The handler checks the relevant
    *    permission (`subscribe` or `publish`) per action.
    *
@@ -146,7 +146,7 @@ export interface SseHandlerOptions extends LifecycleHooks {
    * data and must succeed to avoid subscription leaks).
    *
    * @example
-   * // Unified authorize (same function works with createNodeServer)
+   * // Unified authorize (same function works across all presets)
    * authorize: async (userId, channel) => {
    *   const member = await db.getProjectMember(userId, channel.params.projectId)
    *   return member

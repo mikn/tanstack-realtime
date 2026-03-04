@@ -80,7 +80,7 @@ export function normalizePermissions(
 
 /**
  * Optional callbacks for observing connection and subscription lifecycle
- * events on the server. Pass these to `createNodeServer`, `createSseHandler`,
+ * events on the server. Pass these to `createSseHandler`
  * or `createStartHandler` to hook into key moments without modifying the
  * handler itself.
  *
@@ -88,11 +88,11 @@ export function normalizePermissions(
  * callbacks are logged to `console.error` but do not affect the handler.
  *
  * @example
- * createNodeServer({
+ * createSseHandler({
  *   getUser,
  *   authorize,
  *   onClientConnect: ({ connectionId, userId }) => {
- *     metrics.gauge('ws.connections', 1, { userId })
+ *     metrics.gauge('sse.connections', 1, { userId })
  *   },
  *   onChannelEmpty: (channel) => {
  *     // Tear down expensive resources when nobody is listening.
@@ -133,8 +133,8 @@ export interface LifecycleHooks {
  * Publish data to a channel from the server (e.g. from a server function or
  * background job). The preset routes the message to all subscribed clients.
  *
- * In the Node preset this fans out directly over the in-process WebSocket
- * server. In Centrifugo/Ably presets this calls the provider's HTTP publish API.
+ * In the SSE preset this fans out directly over in-process SSE connections.
+ * In Centrifugo/Ably presets this calls the provider's HTTP publish API.
  *
  * @example
  * // server/functions/ai.ts
@@ -235,12 +235,12 @@ export interface ValidatedPublishOptions {
  * @example
  * // server/realtime.ts
  * import { createValidatedPublish, PublishValidationError } from '@tanstack/realtime'
- * import { nodeServer } from './realtime.server'
+ * import { sseHandler } from './realtime.server'
  *
  * const validatedPublish = createValidatedPublish({
  *   publish: (channel, data) => {
  *     const ch = typeof channel === 'string' ? channel : serializeKey(channel)
- *     nodeServer.publish(ch, data)
+ *     sseHandler.broadcast(ch, data)
  *     return Promise.resolve()
  *   },
  *   validate: async ({ channel, data, userId }) => {

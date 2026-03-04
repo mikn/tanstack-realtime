@@ -140,7 +140,7 @@ import {
 const validatedPublish = createValidatedPublish({
   publish: async (channel, data) => {
     const ch = typeof channel === 'string' ? channel : serializeKey(channel)
-    nodeServer.publish(ch, data)
+    sseHandler.broadcast(ch, data)
   },
   validate: async ({ channel, data, userId }) => {
     if (channel.namespace === 'todos') {
