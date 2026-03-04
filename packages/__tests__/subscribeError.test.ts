@@ -312,7 +312,7 @@ describe('liveChannelOptions — subscribe error logging', () => {
       client,
       channel: 'chat',
       getKey: (item: any) => item.id,
-      onEvent: (event) => event as any,
+      onEvent: (event) => event,
     })
 
     const { stop } = driveSync(config)
@@ -336,7 +336,7 @@ describe('liveChannelOptions — subscribe error logging', () => {
       client,
       channel: 'chat',
       getKey: (item: any) => item.id,
-      onEvent: (event) => event as any,
+      onEvent: (event) => event,
     })
 
     const { stop } = driveSync(config)
@@ -356,7 +356,7 @@ describe('liveChannelOptions — subscribe error logging', () => {
       client,
       channel: 'chat',
       getKey: (item: any) => item.id,
-      onEvent: (event) => event as any,
+      onEvent: (event) => event,
     })
 
     const { stop } = driveSync(config)
