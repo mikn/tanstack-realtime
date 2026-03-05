@@ -1,6 +1,9 @@
 import { Store } from '@tanstack/store'
+import { createHookPipeline } from '@tanstack/realtime'
 import type {
   ConnectionStatus,
+  HookHandle,
+  HookRegistration,
   PresenceCapable,
   PresenceUser,
   RealtimeTransport,
@@ -205,6 +208,8 @@ export function centrifugoTransport(
     jitter = 0.25,
     WebSocket: WebSocketImpl = globalThis.WebSocket,
   } = options
+
+  const pipeline = createHookPipeline()
 
   const store = new Store<ConnectionStatus>('disconnected')
 
@@ -750,6 +755,10 @@ export function centrifugoTransport(
       return () => {
         subscribeErrorListeners.delete(callback)
       }
+    },
+
+    hook(registration: HookRegistration): HookHandle {
+      return pipeline.register(registration)
     },
   }
 
