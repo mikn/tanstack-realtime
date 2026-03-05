@@ -1145,8 +1145,16 @@ export function ApiReference() {
             <td>
               Context provider that makes a <code>RealtimeClient</code>{' '}
               available to all hooks. Wrap your application (or subtree) with
-              this component. Calls <code>client.connect()</code> on mount and{' '}
-              <code>client.destroy()</code> on unmount.
+              this component. By default (
+              <code>
+                autoConnect={'{'}true{'}'}
+              </code>
+              ), calls <code>client.connect()</code> on mount and{' '}
+              <code>client.destroy()</code> on unmount. Set{' '}
+              <code>
+                autoConnect={'{'}false{'}'}
+              </code>{' '}
+              to manage the connection lifecycle yourself.
             </td>
           </tr>
         </tbody>

@@ -147,32 +147,31 @@ describe('task collection', () => {
       <h2 id="testing-react">Testing React hooks</h2>
       <p>
         React hooks that consume realtime data need a{' '}
-        <code>RealtimeProvider</code> in the component tree. Create a small
-        wrapper factory that wires up the mock transport and returns the wrapper
-        alongside the transport and client for assertions.
+        <code>RealtimeProvider</code> in the component tree. Use{' '}
+        <code>createTestRealtimeProvider</code> from{' '}
+        <code>@tanstack/react-realtime</code> to get a pre-wired wrapper,
+        transport, and client in one call:
       </p>
       <CodeBlock
-        title="test/create-wrapper.tsx"
+        title="test/my-hook.test.tsx"
         code={`import { renderHook } from '@testing-library/react'
-import { RealtimeProvider } from '@tanstack/react-realtime'
-import { createRealtimeClient } from '@tanstack/realtime'
+import { createTestRealtimeProvider, useSubscribe } from '@tanstack/react-realtime'
 
-function createWrapper() {
-  const transport = createMockTransport()
-  const client = createRealtimeClient({ transport })
+it('receives messages', () => {
+  const { wrapper, transport } = createTestRealtimeProvider()
+  const messages: unknown[] = []
+  renderHook(() => useSubscribe('ch', (d) => messages.push(d)), { wrapper })
 
-  const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <RealtimeProvider client={client}>{children}</RealtimeProvider>
-  )
-
-  return { wrapper, transport, client }
-}`}
+  transport.simulateMessage('ch', { hello: 'world' })
+  expect(messages).toHaveLength(1)
+})`}
       />
       <p>
-        Use the returned <code>wrapper</code> with <code>renderHook</code> from
-        Testing Library. The <code>transport</code> reference lets you call{' '}
-        <code>transport.emit()</code> to push server events into the hook and
-        verify the rendered output.
+        The returned <code>transport</code> is a full <code>MockTransport</code>{' '}
+        &mdash; call <code>transport.simulateMessage()</code> to push server
+        events and inspect <code>transport.publishLog</code> for outgoing
+        messages. Pass your own <code>transport</code> or <code>client</code> to
+        customize.
       </p>
 
       <h2 id="testing-presence">Testing presence</h2>

@@ -110,23 +110,15 @@ function App() {
 
       <div className="doc-callout">
         <p>
-          <strong>Auto-connect:</strong> <code>RealtimeProvider</code> does not
-          call <code>client.connect()</code> automatically. Call it once during
-          app initialization (e.g. in your root layout or entry file):
+          <strong>Auto-connect:</strong> <code>RealtimeProvider</code> calls{' '}
+          <code>client.connect()</code> automatically on mount and tears down on
+          unmount. Pass{' '}
+          <code>
+            autoConnect={'{'}false{'}'}
+          </code>{' '}
+          to manage the connection lifecycle yourself.
         </p>
       </div>
-      <CodeBlock
-        title="app/entry-client.tsx"
-        code={`// app/entry-client.tsx
-import { realtimeClient } from './client/realtime'
-
-realtimeClient.connect()`}
-      />
-      <p>
-        If hooks detect a <code>disconnected</code> status for more than two
-        seconds, a dev-mode console warning will suggest calling{' '}
-        <code>client.connect()</code>.
-      </p>
 
       <h2 id="first-collection">Your first live collection</h2>
       <p>
