@@ -90,7 +90,12 @@ export type UseRealtimeQueryConfig<
   /**
    * Channel to subscribe to and publish back to.
    * Accepts a QueryKey array or a pre-serialized string.
-   * Omit for server-only mode (no peer sync).
+   *
+   * **Auto-derivation:** When omitted and `url` is provided, the channel
+   * is derived automatically from the URL. For example,
+   * `url: '/api/todos?projectId=123'` derives channel `'todos:projectId=123'`.
+   *
+   * Omit both `channel` and `url` for server-only mode (no peer sync).
    */
   channel?: QueryKey | string
 
@@ -179,12 +184,12 @@ export interface UseRealtimeQueryResult<
  * Must be used inside `<RealtimeProvider>`.
  *
  * @example
- * // REST shorthand — generates queryFn + CRUD automatically
+ * // REST shorthand — channel derived automatically from the URL
+ * // '/api/todos?projectId=123' → channel 'todos:projectId=123'
  * function TodoList({ projectId }: { projectId: string }) {
  *   const { data: todos, collection } = useRealtimeQuery({
  *     url: `/api/todos?projectId=${projectId}`,
  *     getKey: (t: Todo) => t.id,
- *     channel: ['todos', { projectId }],
  *   })
  *
  *   return (
@@ -196,10 +201,10 @@ export interface UseRealtimeQueryResult<
  *
  * @example
  * // Progressive enhancement — add features one key at a time
+ * // Channel is derived from the URL, no need to specify it separately
  * const { data, collection } = useRealtimeQuery({
  *   url: '/api/todos',
  *   getKey: (t: Todo) => t.id,
- *   channel: ['todos'],                         // ← realtime sync
  *   fields: { title: 'lww', tags: 'or-set' },   // ← CRDTs
  *   optimistic: true,                            // ← instant UI
  *   refetchOnReconnect: true,                    // ← gap recovery
@@ -224,6 +229,8 @@ export function useRealtimeQuery<
   config: UseRealtimeQueryConfig<T, TKey, TSchema>,
 ): UseRealtimeQueryResult<T, TKey> {
   // Build the collection config — either from REST shorthand or manual callbacks.
+  // When `url` is provided but `channel` is not, pass `url` through so that
+  // realtimeCollectionOptions can derive the channel name automatically.
   const collectionConfig = config.url
     ? {
         ...withRest<T, TKey>({
@@ -235,6 +242,7 @@ export function useRealtimeQuery<
         id: config.id,
         schema: config.schema,
         channel: config.channel,
+        url: config.channel ? undefined : config.url,
         channels: config.channels,
         fields: config.fields,
         optimistic: config.optimistic,

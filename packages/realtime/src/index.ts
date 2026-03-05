@@ -9,7 +9,11 @@
  */
 
 // Core primitives
-export { serializeKey, parseChannel } from './core/serializeKey.js'
+export {
+  serializeKey,
+  parseChannel,
+  deriveChannelFromUrl,
+} from './core/serializeKey.js'
 export { createRealtimeClient } from './core/client.js'
 export { hasPresence } from './core/types.js'
 

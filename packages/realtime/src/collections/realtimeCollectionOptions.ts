@@ -1,4 +1,4 @@
-import { serializeKey } from '../core/serializeKey.js'
+import { deriveChannelFromUrl, serializeKey } from '../core/serializeKey.js'
 import {
   advanceClock,
   compactOr,
@@ -89,12 +89,32 @@ export interface RealtimeCollectionConfig<
    * Accepts a QueryKey array (serialized to a flat channel string) or a
    * pre-serialized channel string.
    *
-   * When omitted (and `channels` is also omitted), the collection operates
-   * in server-only mode: `queryFn` loads data, mutations persist via
-   * `onInsert` / `onUpdate` / `onDelete`, and no peer sync occurs.
-   * Add a channel to enable realtime peer sync.
+   * **Auto-derivation:** When omitted and `url` is provided, a channel name
+   * is derived automatically from the URL:
+   *
+   * | URL                                 | Derived channel              |
+   * |-------------------------------------|------------------------------|
+   * | `/api/todos`                        | `todos`                      |
+   * | `/api/todos?projectId=123`          | `todos:projectId=123`        |
+   * | `/api/v2/projects/abc/tasks?s=open` | `tasks:s=open`               |
+   *
+   * When both `channel` and `url` are omitted (and `channels` is also
+   * omitted), the collection operates in server-only mode: `queryFn` loads
+   * data, mutations persist via `onInsert` / `onUpdate` / `onDelete`, and
+   * no peer sync occurs. Add a channel or a `url` to enable realtime sync.
    */
   channel?: QueryKey | string
+
+  /**
+   * REST endpoint URL used for automatic channel derivation.
+   *
+   * When `channel` is omitted, the channel name is derived from this URL
+   * via {@link deriveChannelFromUrl}. This is set automatically by
+   * `useRealtimeQuery` when using the REST shorthand (`url` config key).
+   *
+   * Has no effect when `channel` is explicitly provided.
+   */
+  url?: string
 
   /**
    * Additional read-only channels to subscribe to.
@@ -546,7 +566,8 @@ export function realtimeCollectionOptions<
 ): CollectionConfig<T, TKey, TSchema> {
   const {
     client,
-    channel,
+    channel: channelRaw,
+    url: configUrl,
     channels: additionalChannels,
     fields,
     queryFn,
@@ -562,6 +583,10 @@ export function realtimeCollectionOptions<
     getKey,
     ...collectionConfig
   } = config
+
+  // Derive channel from URL when not explicitly provided.
+  const channel =
+    channelRaw ?? (configUrl ? deriveChannelFromUrl(configUrl) : undefined)
 
   const hasRealtimeFeatures =
     channel != null ||
