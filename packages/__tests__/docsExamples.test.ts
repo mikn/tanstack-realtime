@@ -8,56 +8,22 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Store } from '@tanstack/store'
 import {
-  createOfflineQueue,
+  createMockTransport,
   createRealtimeClient,
   createStreamChannel,
   liveChannelOptions,
   realtimeCollectionOptions,
   streamChannelOptions,
-  withGapRecovery,
+  useGapRecovery,
+  useOfflineQueue,
   withRest,
 } from '@tanstack/realtime'
-import type { ConnectionStatus, RealtimeTransport } from '@tanstack/realtime'
 import type { CollectionConfig } from '@tanstack/db'
 
 // ---------------------------------------------------------------------------
-// Shared mock helpers (mirrors the patterns in spectrum.test.ts)
+// Shared mock helpers
 // ---------------------------------------------------------------------------
-
-function createMockTransport(): RealtimeTransport & {
-  emit: (channel: string, data: unknown) => void
-  publishCalls: Array<{ channel: string; data: unknown }>
-  setStatus: (s: ConnectionStatus) => void
-} {
-  const listeners = new Map<string, Set<(data: unknown) => void>>()
-  const store = new Store<ConnectionStatus>('connected')
-  const publishCalls: Array<{ channel: string; data: unknown }> = []
-
-  return {
-    store,
-    publishCalls,
-    setStatus(s: ConnectionStatus) {
-      store.setState(() => s)
-    },
-    async connect() {},
-    disconnect() {},
-    subscribe(channel, onMessage) {
-      if (!listeners.has(channel)) listeners.set(channel, new Set())
-      listeners.get(channel)!.add(onMessage)
-      return () => listeners.get(channel)?.delete(onMessage)
-    },
-    publish(channel, data) {
-      publishCalls.push({ channel, data })
-      return Promise.resolve()
-    },
-    emit(channel, data) {
-      const cbs = listeners.get(channel)
-      if (cbs) for (const cb of cbs) cb(data)
-    },
-  }
-}
 
 type WriteOp = { type: string; value?: unknown; key?: unknown }
 
@@ -280,9 +246,9 @@ describe('docs: auto-broadcast after onInsert / onUpdate', () => {
     } as any)
 
     // The library should have published exactly once — the returned row
-    expect(transport.publishCalls).toHaveLength(1)
-    expect((transport.publishCalls[0].data as any).action).toBe('insert')
-    expect((transport.publishCalls[0].data as any).data).toMatchObject({
+    expect(transport.publishLog).toHaveLength(1)
+    expect((transport.publishLog[0].data as any).action).toBe('insert')
+    expect((transport.publishLog[0].data as any).data).toMatchObject({
       id: '1',
       title: 'Created by server',
     })
@@ -309,8 +275,8 @@ describe('docs: auto-broadcast after onInsert / onUpdate', () => {
       },
     } as any)
 
-    expect(transport.publishCalls).toHaveLength(1)
-    expect((transport.publishCalls[0].data as any).action).toBe('update')
+    expect(transport.publishLog).toHaveLength(1)
+    expect((transport.publishLog[0].data as any).action).toBe('update')
   })
 
   it('does NOT publish when onInsert is absent (no channel noise)', () => {
@@ -326,9 +292,9 @@ describe('docs: auto-broadcast after onInsert / onUpdate', () => {
     driveSync(config)
 
     // Simulate an incoming insert from a peer — should not cause a re-publish
-    transport.emit('tasks', { action: 'insert', data: { id: '1' } })
+    transport.simulateMessage('tasks', { action: 'insert', data: { id: '1' } })
 
-    expect(transport.publishCalls).toHaveLength(0)
+    expect(transport.publishLog).toHaveLength(0)
   })
 })
 
@@ -373,7 +339,7 @@ describe('docs: liveChannelOptions', () => {
     })
 
     // Live event arrives before history resolves
-    transport.emit('chat:room-1', {
+    transport.simulateMessage('chat:room-1', {
       type: 'message',
       message: { id: 'live-1', text: 'Live!', type: 'message' },
     })
@@ -420,14 +386,14 @@ describe('docs: liveChannelOptions', () => {
     await vi.advanceTimersByTimeAsync(0)
 
     // A real message — should appear
-    transport.emit('chat:room-1', {
+    transport.simulateMessage('chat:room-1', {
       type: 'message',
       message: { id: 'm1', text: 'Hi', type: 'message' },
     })
     // A typing indicator — should be filtered out
-    transport.emit('chat:room-1', { type: 'typing' })
+    transport.simulateMessage('chat:room-1', { type: 'typing' })
     // Another real message
-    transport.emit('chat:room-1', {
+    transport.simulateMessage('chat:room-1', {
       type: 'message',
       message: { id: 'm2', text: 'Hey', type: 'message' },
     })
@@ -448,9 +414,6 @@ describe('docs: createStreamChannel + streamChannelOptions', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
 
-    // Mirrors the documented aiResponseStream pattern.
-    // streamChannelOptions takes { client, channel, initial, reduce, isDone, isError }
-    // directly.  createStreamChannel is a def object for React hooks (useStream).
     const updates: Array<{ state: { content: string }; status: string }> = []
 
     const config = streamChannelOptions({
@@ -482,7 +445,6 @@ describe('docs: createStreamChannel + streamChannelOptions', () => {
       collection: null as any,
     } as any)
 
-    // The channel is the serialized QueryKey
     const def = createStreamChannel({
       id: 'ai-test',
       channel: (params: { requestId: string }) => ['ai', params],
@@ -498,9 +460,9 @@ describe('docs: createStreamChannel + streamChannelOptions', () => {
     const channel = def.resolveChannel({ requestId: 'req-1' })
 
     // Emit token events — each should accumulate
-    transport.emit(channel, { type: 'token', token: 'Hello' })
-    transport.emit(channel, { type: 'token', token: ' world' })
-    transport.emit(channel, { type: 'done' })
+    transport.simulateMessage(channel, { type: 'token', token: 'Hello' })
+    transport.simulateMessage(channel, { type: 'token', token: ' world' })
+    transport.simulateMessage(channel, { type: 'done' })
 
     // After 'done', the final state should have the full content
     const last = updates[updates.length - 1]
@@ -561,8 +523,11 @@ describe('docs: createStreamChannel + streamChannelOptions', () => {
     })
     const channel = def.resolveChannel({ requestId: 'err-1' })
 
-    transport.emit(channel, { type: 'token', token: 'Partial' })
-    transport.emit(channel, { type: 'error', message: 'Rate limit exceeded' })
+    transport.simulateMessage(channel, { type: 'token', token: 'Partial' })
+    transport.simulateMessage(channel, {
+      type: 'error',
+      message: 'Rate limit exceeded',
+    })
 
     const last = updates[updates.length - 1]
     expect(last.status).toBe('error')
@@ -615,14 +580,14 @@ describe('docs: createStreamChannel + streamChannelOptions', () => {
     })
     const channel = def.resolveChannel({ serverId: 'srv-1' })
 
-    transport.emit(channel, { pct: 42 })
-    transport.emit(channel, { pct: 55 })
+    transport.simulateMessage(channel, { pct: 42 })
+    transport.simulateMessage(channel, { pct: 55 })
 
     expect(updates[updates.length - 1].pct).toBe(55)
     expect(updates[updates.length - 1].samples).toEqual([42, 55])
 
     stop() // component unmounts
-    transport.emit(channel, { pct: 99 })
+    transport.simulateMessage(channel, { pct: 99 })
     // After stop, the last state should still be 55
     expect(updates[updates.length - 1].pct).toBe(55)
   })
@@ -668,7 +633,7 @@ describe('docs: onMessage adapter — Supabase format', () => {
     const task = { id: '1', title: 'Ship it' }
 
     // Supabase-style INSERT
-    transport.emit('public:tasks', {
+    transport.simulateMessage('public:tasks', {
       eventType: 'INSERT',
       new: task,
       old: null,
@@ -678,7 +643,7 @@ describe('docs: onMessage adapter — Supabase format', () => {
 
     // Supabase-style UPDATE
     const updated = { id: '1', title: 'Ship it now' }
-    transport.emit('public:tasks', {
+    transport.simulateMessage('public:tasks', {
       eventType: 'UPDATE',
       new: updated,
       old: task,
@@ -687,7 +652,7 @@ describe('docs: onMessage adapter — Supabase format', () => {
     expect((ops[1].value as Task).title).toBe('Ship it now')
 
     // Supabase-style DELETE
-    transport.emit('public:tasks', {
+    transport.simulateMessage('public:tasks', {
       eventType: 'DELETE',
       new: null,
       old: updated,
@@ -695,7 +660,7 @@ describe('docs: onMessage adapter — Supabase format', () => {
     expect(ops[2].type).toBe('delete')
 
     // Unknown event type — discarded (no op added)
-    transport.emit('public:tasks', { eventType: 'SYSTEM' })
+    transport.simulateMessage('public:tasks', { eventType: 'SYSTEM' })
     expect(ops).toHaveLength(3)
   })
 })
@@ -740,52 +705,39 @@ describe('docs: onMessage adapter — CDC (Debezium) format', () => {
     const order = { id: 'o1', total: 100 }
     const updated = { id: 'o1', total: 150 }
 
-    transport.emit('orders', { op: 'c', after: order })
+    transport.simulateMessage('orders', { op: 'c', after: order })
     expect(ops[0].type).toBe('insert')
     expect((ops[0].value as Order).total).toBe(100)
 
-    transport.emit('orders', { op: 'u', after: updated, before: order })
+    transport.simulateMessage('orders', {
+      op: 'u',
+      after: updated,
+      before: order,
+    })
     expect(ops[1].type).toBe('update')
     expect((ops[1].value as Order).total).toBe(150)
 
-    transport.emit('orders', { op: 'd', before: updated })
+    transport.simulateMessage('orders', { op: 'd', before: updated })
     expect(ops[2].type).toBe('delete')
 
     // Unknown op — discarded
-    transport.emit('orders', { op: 'r', after: order }) // snapshot read
+    transport.simulateMessage('orders', { op: 'r', after: order }) // snapshot read
     expect(ops).toHaveLength(3)
   })
 })
 
 // ---------------------------------------------------------------------------
-// 7. createOfflineQueue — queues when disconnected, flushes on reconnect
+// 7. useOfflineQueue — queues when disconnected, flushes on reconnect
 //    (docs: Resilience section)
 // ---------------------------------------------------------------------------
 
-describe('docs: createOfflineQueue', () => {
+describe('docs: useOfflineQueue', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => vi.useRealTimers())
 
   it('buffers publishes while disconnected and flushes FIFO on reconnect', async () => {
-    const innerPublishCalls: Array<{ channel: string; data: unknown }> = []
-
-    // Create an inner transport that starts disconnected
-    const innerStore = new Store<ConnectionStatus>('disconnected')
-    const innerTransport: RealtimeTransport = {
-      store: innerStore,
-      async connect() {},
-      disconnect() {},
-      subscribe() {
-        return () => {}
-      },
-      publish(channel, data) {
-        innerPublishCalls.push({ channel, data })
-        return Promise.resolve()
-      },
-    }
-
-    const transport = createOfflineQueue(innerTransport, { maxSize: 500 })
-    const _client = createRealtimeClient({ transport })
+    const transport = createMockTransport({ initialStatus: 'disconnected' })
+    const queue = useOfflineQueue(transport, { maxSize: 500 })
 
     // Publish while disconnected — should be queued
     void transport.publish('ch', { msg: 1 })
@@ -793,72 +745,45 @@ describe('docs: createOfflineQueue', () => {
     void transport.publish('ch', { msg: 3 })
 
     // Nothing forwarded yet
-    expect(innerPublishCalls).toHaveLength(0)
+    expect(transport.publishLog).toHaveLength(0)
 
     // Verify queue store shows pending messages
-    expect(transport.queueStore.state.pending.length).toBe(3)
+    expect(queue.store.state.pending.length).toBe(3)
 
     // Reconnect — queue should flush
-    innerStore.setState(() => 'connected')
+    transport.simulateReconnect()
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(innerPublishCalls).toHaveLength(3)
+    expect(transport.publishLog).toHaveLength(3)
     // FIFO order
-    expect((innerPublishCalls[0].data as any).msg).toBe(1)
-    expect((innerPublishCalls[1].data as any).msg).toBe(2)
-    expect((innerPublishCalls[2].data as any).msg).toBe(3)
+    expect((transport.publishLog[0].data as any).msg).toBe(1)
+    expect((transport.publishLog[1].data as any).msg).toBe(2)
+    expect((transport.publishLog[2].data as any).msg).toBe(3)
 
     // Queue store should be empty after flush
-    expect(transport.queueStore.state.pending.length).toBe(0)
+    expect(queue.store.state.pending.length).toBe(0)
   })
 
   it('forwards publishes immediately when already connected', async () => {
-    const innerPublishCalls: Array<{ channel: string; data: unknown }> = []
-    const innerStore = new Store<ConnectionStatus>('connected')
-    const innerTransport: RealtimeTransport = {
-      store: innerStore,
-      async connect() {},
-      disconnect() {},
-      subscribe() {
-        return () => {}
-      },
-      publish(channel, data) {
-        innerPublishCalls.push({ channel, data })
-        return Promise.resolve()
-      },
-    }
-
-    const transport = createOfflineQueue(innerTransport)
+    const transport = createMockTransport() // starts connected
+    useOfflineQueue(transport)
 
     await transport.publish('ch', { msg: 'direct' })
-    expect(innerPublishCalls).toHaveLength(1)
-    expect(transport.queueStore.state.pending.length).toBe(0)
+    expect(transport.publishLog).toHaveLength(1)
   })
 })
 
 // ---------------------------------------------------------------------------
-// 8. withGapRecovery — onGap fired for active channels after reconnect
+// 8. useGapRecovery — onGap fired for active channels after reconnect
 //    (docs: Resilience section — Option B)
 // ---------------------------------------------------------------------------
 
-describe('docs: withGapRecovery', () => {
+describe('docs: useGapRecovery', () => {
   it('calls onGap for each active channel when transport reconnects', async () => {
-    const innerStore = new Store<ConnectionStatus>('connected')
-    const innerTransport: RealtimeTransport & {
-      setStatus: (s: ConnectionStatus) => void
-    } = {
-      store: innerStore,
-      setStatus: (s: ConnectionStatus) => innerStore.setState(() => s),
-      async connect() {},
-      disconnect() {},
-      subscribe() {
-        return () => {}
-      },
-      async publish() {},
-    }
+    const transport = createMockTransport()
 
     const gapCalls: Array<string> = []
-    const transport = withGapRecovery(innerTransport, {
+    useGapRecovery(transport, {
       onGap: (channel) => {
         gapCalls.push(channel)
       },
@@ -869,8 +794,8 @@ describe('docs: withGapRecovery', () => {
     const unsub2 = transport.subscribe('messages', () => {})
 
     // Simulate disconnect → reconnect (the gap)
-    innerTransport.setStatus('disconnected')
-    innerTransport.setStatus('connected')
+    transport.simulateDisconnect()
+    transport.simulateReconnect()
 
     await Promise.resolve() // flush microtasks
 
@@ -884,22 +809,10 @@ describe('docs: withGapRecovery', () => {
   })
 
   it('does NOT call onGap for channels that were unsubscribed before reconnect', async () => {
-    const innerStore = new Store<ConnectionStatus>('connected')
-    const innerTransport: RealtimeTransport & {
-      setStatus: (s: ConnectionStatus) => void
-    } = {
-      store: innerStore,
-      setStatus: (s: ConnectionStatus) => innerStore.setState(() => s),
-      async connect() {},
-      disconnect() {},
-      subscribe() {
-        return () => {}
-      },
-      async publish() {},
-    }
+    const transport = createMockTransport()
 
     const gapCalls: Array<string> = []
-    const transport = withGapRecovery(innerTransport, {
+    useGapRecovery(transport, {
       onGap: (channel) => {
         gapCalls.push(channel)
       },
@@ -911,8 +824,8 @@ describe('docs: withGapRecovery', () => {
     // Unsubscribe from 'tasks' before the gap
     unsub()
 
-    innerTransport.setStatus('disconnected')
-    innerTransport.setStatus('connected')
+    transport.simulateDisconnect()
+    transport.simulateReconnect()
     await Promise.resolve()
 
     // Only 'messages' should get a gap call
@@ -949,8 +862,8 @@ describe('docs: refetchOnReconnect in realtimeCollectionOptions', () => {
     expect(fetchCount).toBe(1)
 
     // Simulate a connection gap
-    transport.setStatus('disconnected')
-    transport.setStatus('connected')
+    transport.simulateDisconnect()
+    transport.simulateReconnect()
     await vi.advanceTimersByTimeAsync(0)
 
     expect(fetchCount).toBe(2)
@@ -984,7 +897,7 @@ describe('docs: CRDT local fields stripped before publishing', () => {
     driveSync(config)
 
     // Seed a row with a local draft field
-    transport.emit('tasks', {
+    transport.simulateMessage('tasks', {
       action: 'insert',
       data: { id: '1', title: 'Original', draft: true },
     })
@@ -995,7 +908,7 @@ describe('docs: CRDT local fields stripped before publishing', () => {
       },
     } as any)
 
-    const published = transport.publishCalls[0].data as any
+    const published = transport.publishLog[0].data as any
     // The 'draft' local field must NOT appear in the published message
     expect(published.data.draft).toBeUndefined()
     // The synced title field should still be there

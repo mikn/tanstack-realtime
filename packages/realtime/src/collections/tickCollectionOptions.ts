@@ -10,7 +10,7 @@ import { serializeKey } from '../core/serializeKey.js'
 import type { CollectionConfig, SyncConfig } from '@tanstack/db'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { QueryKey } from '../core/types.js'
-import type { TickFrame, TickTransport } from '../core/tickTransport.js'
+import type { TickFrame, TickHandle } from '../core/tickTransport.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -21,8 +21,8 @@ export interface TickCollectionConfig<
   TKey extends string | number,
   TSchema extends StandardSchemaV1 = never,
 > {
-  /** The tick transport to subscribe to. */
-  transport: TickTransport
+  /** The tick handle returned by `useTickBatching()`. */
+  transport: TickHandle
   /** Collection id — must be unique across all collections. */
   id?: string
   /** Zod / Standard Schema for type validation. */
@@ -50,13 +50,12 @@ export interface TickCollectionConfig<
   /**
    * Interpolation function. Given previous state, next state, and
    * alpha (0-1 progress between ticks), return interpolated state.
-   * Used for smooth rendering between server ticks.
    */
   interpolate?: (prev: T, next: T, alpha: number) => T
 
   /**
    * Extrapolation function. Given the last known state and time since
-   * last update (ms), predict the current state. Used when a tick is late.
+   * last update (ms), predict the current state.
    */
   extrapolate?: (last: T, deltaMs: number) => T
 }
@@ -72,8 +71,9 @@ export interface TickCollectionConfig<
  * begin/commit cycle for efficient rendering.
  *
  * @example
+ * const tick = useTickBatching(transport, { tickMs: 16 })
  * const playerCollection = createCollection(tickCollectionOptions({
- *   transport: tickTransport,
+ *   transport: tick,
  *   channel: 'game:room-1',
  *   getKey: (p) => p.id,
  *   keyToEntityId: (key) => key,
@@ -96,7 +96,6 @@ export function tickCollectionOptions<
       : serializeKey(config.channel)
 
   const currentState = new Map<TKey, T>()
-  // Reverse index: entityId → key for O(1) lookup per frame entity.
   const entityIdToKey = new Map<string, TKey>()
 
   const sync: SyncConfig<T, TKey> = {
@@ -114,7 +113,6 @@ export function tickCollectionOptions<
 
           begin({ immediate: true })
 
-          // Process entity updates
           for (const [entityId, state] of Object.entries(frame.entities)) {
             const existingKey = entityIdToKey.get(entityId)
             const existing =
@@ -133,7 +131,6 @@ export function tickCollectionOptions<
             entityIdToKey.set(entityId, key)
           }
 
-          // Process removals
           for (const entityId of frame.removed) {
             const key = entityIdToKey.get(entityId)
             if (key !== undefined) {

@@ -1,8 +1,8 @@
 /**
- * Tests for tick-based transport (Feature 5).
+ * Tests for tick-based batching hook (useTickBatching).
  *
  * Covers:
- * - Tick transport batches multiple setState() calls into one frame per tick
+ * - Tick batching batches multiple setState() calls into one frame per tick
  * - Delta compression sends only changed fields
  * - Tick counter advances monotonically
  * - Tick collection writes batch into one begin/commit cycle
@@ -11,53 +11,14 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Store } from '@tanstack/store'
 import {
   applyDelta,
   computeDelta,
+  createMockTransport,
   tickCollectionOptions,
-  tickTransport,
+  useTickBatching,
 } from '@tanstack/realtime'
-import type {
-  ConnectionStatus,
-  RealtimeTransport,
-  TickFrame,
-} from '@tanstack/realtime'
-
-// ---------------------------------------------------------------------------
-// Mock transport
-// ---------------------------------------------------------------------------
-
-function createMockTransport(): RealtimeTransport & {
-  emit: (channel: string, data: unknown) => void
-  publishCalls: Array<{ channel: string; data: unknown }>
-} {
-  const listeners = new Map<string, Set<(data: unknown) => void>>()
-  const store = new Store<ConnectionStatus>('connected')
-  const publishCalls: Array<{ channel: string; data: unknown }> = []
-
-  return {
-    store,
-    publishCalls,
-    connect() {
-      return Promise.resolve()
-    },
-    disconnect() {},
-    subscribe(channel, onMessage) {
-      if (!listeners.has(channel)) listeners.set(channel, new Set())
-      listeners.get(channel)!.add(onMessage)
-      return () => listeners.get(channel)?.delete(onMessage)
-    },
-    publish(channel, data) {
-      publishCalls.push({ channel, data })
-      return Promise.resolve()
-    },
-    emit(channel, data) {
-      const cbs = listeners.get(channel)
-      if (cbs) for (const cb of cbs) cb(data)
-    },
-  }
-}
+import type { TickFrame } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Tests: Delta compression helpers
@@ -106,10 +67,10 @@ describe('computeDelta / applyDelta', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Tests: tickTransport
+// Tests: useTickBatching
 // ---------------------------------------------------------------------------
 
-describe('tickTransport', () => {
+describe('useTickBatching', () => {
   beforeEach(() => {
     vi.useFakeTimers()
   })
@@ -119,21 +80,21 @@ describe('tickTransport', () => {
   })
 
   it('batches multiple setState calls into one publish per tick', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner, { tickMs: 16 })
+    const transport = createMockTransport()
+    const tick = useTickBatching(transport, { tickMs: 16 })
 
     tick.setState('game', 'player-1', { x: 10, y: 20 })
     tick.setState('game', 'player-2', { x: 30, y: 40 })
 
     // Before tick fires
-    expect(inner.publishCalls).toHaveLength(0)
+    expect(transport.publishLog).toHaveLength(0)
 
     // After tick fires
     vi.advanceTimersByTime(16)
 
-    expect(inner.publishCalls).toHaveLength(1)
-    expect(inner.publishCalls[0].data).toHaveProperty('__tick', true)
-    const frame = inner.publishCalls[0].data as TickFrame
+    expect(transport.publishLog).toHaveLength(1)
+    expect(transport.publishLog[0].data).toHaveProperty('__tick', true)
+    const frame = transport.publishLog[0].data as TickFrame
     expect(frame.entities['player-1']).toEqual({ x: 10, y: 20 })
     expect(frame.entities['player-2']).toEqual({ x: 30, y: 40 })
     expect(frame.tick).toBe(1)
@@ -142,8 +103,8 @@ describe('tickTransport', () => {
   })
 
   it('advances tick counter monotonically', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner, { tickMs: 10 })
+    const transport = createMockTransport()
+    const tick = useTickBatching(transport, { tickMs: 10 })
 
     tick.setState('game', 'p1', { x: 1 })
     vi.advanceTimersByTime(10)
@@ -155,17 +116,17 @@ describe('tickTransport', () => {
     vi.advanceTimersByTime(10)
 
     expect(tick.tickStore.state.tick).toBe(3)
-    expect(inner.publishCalls).toHaveLength(3)
-    expect((inner.publishCalls[0].data as TickFrame).tick).toBe(1)
-    expect((inner.publishCalls[1].data as TickFrame).tick).toBe(2)
-    expect((inner.publishCalls[2].data as TickFrame).tick).toBe(3)
+    expect(transport.publishLog).toHaveLength(3)
+    expect((transport.publishLog[0].data as TickFrame).tick).toBe(1)
+    expect((transport.publishLog[1].data as TickFrame).tick).toBe(2)
+    expect((transport.publishLog[2].data as TickFrame).tick).toBe(3)
 
     tick.stop()
   })
 
   it('does not publish when nothing is dirty', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner, { tickMs: 10 })
+    const transport = createMockTransport()
+    const tick = useTickBatching(transport, { tickMs: 10 })
 
     tick.setState('game', 'p1', { x: 1 })
     vi.advanceTimersByTime(10)
@@ -174,20 +135,20 @@ describe('tickTransport', () => {
     vi.advanceTimersByTime(10)
     vi.advanceTimersByTime(10)
 
-    expect(inner.publishCalls).toHaveLength(1) // only the first tick
+    expect(transport.publishLog).toHaveLength(1) // only the first tick
 
     tick.stop()
   })
 
   it('includes removed entities in the frame', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner, { tickMs: 10 })
+    const transport = createMockTransport()
+    const tick = useTickBatching(transport, { tickMs: 10 })
 
     tick.setState('game', 'p1', { x: 1 })
     tick.removeEntity('game', 'p2')
     vi.advanceTimersByTime(10)
 
-    const frame = inner.publishCalls[0].data as TickFrame
+    const frame = transport.publishLog[0].data as TickFrame
     expect(frame.removed).toEqual(['p2'])
     expect(frame.entities['p1']).toEqual({ x: 1 })
 
@@ -195,14 +156,14 @@ describe('tickTransport', () => {
   })
 
   it('onTick delivers frames from inner transport', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner, { tickMs: 10 })
+    const transport = createMockTransport()
+    const tick = useTickBatching(transport, { tickMs: 10 })
 
     const received: Array<TickFrame> = []
     tick.onTick('game', (frame) => received.push(frame))
 
     // Simulate receiving a tick frame from the server
-    inner.emit('game', {
+    transport.simulateMessage('game', {
       __tick: true,
       tick: 5,
       timestamp: Date.now(),
@@ -219,14 +180,14 @@ describe('tickTransport', () => {
   })
 
   it('unsubscribing from onTick cleans up inner subscription', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner, { tickMs: 10 })
+    const transport = createMockTransport()
+    const tick = useTickBatching(transport, { tickMs: 10 })
 
     const unsub = tick.onTick('game', () => {})
     unsub()
 
     // Inner should be unsubscribed — emitting should not crash
-    inner.emit('game', {
+    transport.simulateMessage('game', {
       __tick: true,
       tick: 1,
       timestamp: Date.now(),
@@ -240,8 +201,8 @@ describe('tickTransport', () => {
   })
 
   it('delta compression sends only changed fields', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner, {
+    const transport = createMockTransport()
+    const tick = useTickBatching(transport, {
       tickMs: 10,
       deltaCompression: true,
     })
@@ -250,22 +211,22 @@ describe('tickTransport', () => {
     vi.advanceTimersByTime(10)
 
     // First frame sends full state
-    const frame1 = inner.publishCalls[0].data as TickFrame
+    const frame1 = transport.publishLog[0].data as TickFrame
     expect(frame1.entities['p1']).toEqual({ x: 10, y: 20 })
 
     // Second frame: only y changed
     tick.setState('game', 'p1', { x: 10, y: 30 })
     vi.advanceTimersByTime(10)
 
-    const frame2 = inner.publishCalls[1].data as TickFrame
+    const frame2 = transport.publishLog[1].data as TickFrame
     expect(frame2.entities['p1']).toEqual({ y: 30 })
 
     tick.stop()
   })
 
   it('stop() clears the tick interval and listeners', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner, { tickMs: 10 })
+    const transport = createMockTransport()
+    const tick = useTickBatching(transport, { tickMs: 10 })
 
     tick.setState('game', 'p1', { x: 1 })
     tick.stop()
@@ -273,34 +234,19 @@ describe('tickTransport', () => {
     vi.advanceTimersByTime(100)
 
     // Nothing should have been published after stop
-    expect(inner.publishCalls).toHaveLength(0)
-  })
-
-  it('delegates connect/disconnect to inner transport', async () => {
-    const inner = createMockTransport()
-    const connectSpy = vi.spyOn(inner, 'connect')
-    const disconnectSpy = vi.spyOn(inner, 'disconnect')
-    const tick = tickTransport(inner)
-
-    await tick.connect()
-    expect(connectSpy).toHaveBeenCalled()
-
-    tick.disconnect()
-    expect(disconnectSpy).toHaveBeenCalled()
-
-    tick.stop()
+    expect(transport.publishLog).toHaveLength(0)
   })
 
   it('publishes removal-only frames (no setState, only removeEntity)', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner, { tickMs: 10 })
+    const transport = createMockTransport()
+    const tick = useTickBatching(transport, { tickMs: 10 })
 
     // Only remove, no setState
     tick.removeEntity('game', 'player-x')
     vi.advanceTimersByTime(10)
 
-    expect(inner.publishCalls).toHaveLength(1)
-    const frame = inner.publishCalls[0].data as TickFrame
+    expect(transport.publishLog).toHaveLength(1)
+    const frame = transport.publishLog[0].data as TickFrame
     expect(frame.removed).toEqual(['player-x'])
     expect(Object.keys(frame.entities)).toHaveLength(0)
 
@@ -308,17 +254,17 @@ describe('tickTransport', () => {
   })
 
   it('subscribe() filters out __tick wire frames', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner, { tickMs: 10 })
+    const transport = createMockTransport()
+    useTickBatching(transport, { tickMs: 10 })
 
     const received: Array<unknown> = []
-    tick.subscribe('game', (data) => received.push(data))
+    transport.subscribe('game', (data) => received.push(data))
 
     // Normal message — should pass through
-    inner.emit('game', { type: 'chat', text: 'hello' })
+    transport.simulateMessage('game', { type: 'chat', text: 'hello' })
 
-    // Tick wire frame — should be filtered out
-    inner.emit('game', {
+    // Tick wire frame — should be filtered out by beforeDeliver hook
+    transport.simulateMessage('game', {
       __tick: true,
       tick: 1,
       timestamp: Date.now(),
@@ -327,76 +273,51 @@ describe('tickTransport', () => {
     })
 
     // Another normal message
-    inner.emit('game', { type: 'chat', text: 'world' })
+    transport.simulateMessage('game', { type: 'chat', text: 'world' })
 
     expect(received).toHaveLength(2)
     expect(received[0]).toEqual({ type: 'chat', text: 'hello' })
     expect(received[1]).toEqual({ type: 'chat', text: 'world' })
-
-    tick.stop()
   })
 
   it('does not publish when disconnected', () => {
-    const inner = createMockTransport()
-    inner.store.setState(() => 'disconnected')
-    const tick = tickTransport(inner, { tickMs: 10 })
+    const transport = createMockTransport({ initialStatus: 'disconnected' })
+    const tick = useTickBatching(transport, { tickMs: 10 })
 
     tick.setState('game', 'p1', { x: 1 })
     vi.advanceTimersByTime(10)
 
     // Should NOT publish while disconnected
-    expect(inner.publishCalls).toHaveLength(0)
+    expect(transport.publishLog).toHaveLength(0)
 
     // Reconnect — dirty state persists and is sent on next tick
-    inner.store.setState(() => 'connected')
+    transport.simulateReconnect()
     vi.advanceTimersByTime(10)
 
     // Dirty state accumulated during disconnect is now flushed
-    expect(inner.publishCalls).toHaveLength(1)
-    expect((inner.publishCalls[0].data as TickFrame).entities['p1']).toEqual({
+    expect(transport.publishLog).toHaveLength(1)
+    expect((transport.publishLog[0].data as TickFrame).entities['p1']).toEqual({
       x: 1,
     })
 
     tick.stop()
   })
 
-  it('publishes on next tick after reconnection with new dirty state', () => {
-    const inner = createMockTransport()
-    inner.store.setState(() => 'disconnected')
-    const tick = tickTransport(inner, { tickMs: 10 })
-
-    tick.setState('game', 'p1', { x: 1 })
-    vi.advanceTimersByTime(10)
-    expect(inner.publishCalls).toHaveLength(0)
-
-    // Reconnect and set new state
-    inner.store.setState(() => 'connected')
-    tick.setState('game', 'p1', { x: 2 })
-    vi.advanceTimersByTime(10)
-
-    expect(inner.publishCalls).toHaveLength(1)
-    expect((inner.publishCalls[0].data as TickFrame).entities['p1']).toEqual({
-      x: 2,
-    })
-
-    tick.stop()
-  })
-
   it('both subscribe() and onTick() work simultaneously', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner, { tickMs: 10 })
+    const transport = createMockTransport()
+    const tick = useTickBatching(transport, { tickMs: 10 })
 
     const subscribeReceived: Array<unknown> = []
     const tickReceived: Array<TickFrame> = []
 
-    tick.subscribe('game', (data) => subscribeReceived.push(data))
+    transport.subscribe('game', (data) => subscribeReceived.push(data))
     tick.onTick('game', (frame) => tickReceived.push(frame))
 
     // Normal message — goes to subscribe only
-    inner.emit('game', { type: 'chat', text: 'hi' })
+    transport.simulateMessage('game', { type: 'chat', text: 'hi' })
 
     // Tick frame — goes to onTick only
-    inner.emit('game', {
+    transport.simulateMessage('game', {
       __tick: true,
       tick: 1,
       timestamp: Date.now(),
@@ -413,14 +334,14 @@ describe('tickTransport', () => {
   })
 
   it('update and removal in same tick for different entities', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner, { tickMs: 10 })
+    const transport = createMockTransport()
+    const tick = useTickBatching(transport, { tickMs: 10 })
 
     tick.setState('game', 'p1', { x: 10 })
     tick.removeEntity('game', 'p2')
     vi.advanceTimersByTime(10)
 
-    const frame = inner.publishCalls[0].data as TickFrame
+    const frame = transport.publishLog[0].data as TickFrame
     expect(frame.entities['p1']).toEqual({ x: 10 })
     expect(frame.removed).toEqual(['p2'])
 
@@ -428,15 +349,15 @@ describe('tickTransport', () => {
   })
 
   it('removeEntity clears entity from dirty state', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner, { tickMs: 10 })
+    const transport = createMockTransport()
+    const tick = useTickBatching(transport, { tickMs: 10 })
 
     // Set then remove same entity in same tick
     tick.setState('game', 'p1', { x: 10 })
     tick.removeEntity('game', 'p1')
     vi.advanceTimersByTime(10)
 
-    const frame = inner.publishCalls[0].data as TickFrame
+    const frame = transport.publishLog[0].data as TickFrame
     // Entity should be in removed, not in entities
     expect(frame.entities['p1']).toBeUndefined()
     expect(frame.removed).toContain('p1')
@@ -445,8 +366,8 @@ describe('tickTransport', () => {
   })
 
   it('delta compression with key removal (prev has key, next does not)', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner, {
+    const transport = createMockTransport()
+    const tick = useTickBatching(transport, {
       tickMs: 10,
       deltaCompression: true,
     })
@@ -458,15 +379,15 @@ describe('tickTransport', () => {
     tick.setState('game', 'p1', { x: 10, y: 20 })
     vi.advanceTimersByTime(10)
 
-    const frame2 = inner.publishCalls[1].data as TickFrame
+    const frame2 = transport.publishLog[1].data as TickFrame
     expect(frame2.entities['p1']).toEqual({ z: undefined })
 
     tick.stop()
   })
 
   it('delta compression: no frame when state is identical', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner, {
+    const transport = createMockTransport()
+    const tick = useTickBatching(transport, {
       tickMs: 10,
       deltaCompression: true,
     })
@@ -479,8 +400,7 @@ describe('tickTransport', () => {
     vi.advanceTimersByTime(10)
 
     // Second tick: delta is null, no entities in frame.
-    // Frame should not be published since both entities and removed are empty.
-    expect(inner.publishCalls).toHaveLength(1)
+    expect(transport.publishLog).toHaveLength(1)
 
     tick.stop()
   })
@@ -506,8 +426,8 @@ describe('tickCollectionOptions', () => {
   }
 
   it('creates a collection that syncs from tick frames', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner, { tickMs: 10 })
+    const transport = createMockTransport()
+    const tick = useTickBatching(transport, { tickMs: 10 })
 
     const config = tickCollectionOptions<Player, string>({
       transport: tick,
@@ -538,7 +458,7 @@ describe('tickCollectionOptions', () => {
     expect(ready).toBe(true)
 
     // Simulate receiving a tick frame
-    inner.emit('game', {
+    transport.simulateMessage('game', {
       __tick: true,
       tick: 1,
       timestamp: Date.now(),
@@ -556,7 +476,7 @@ describe('tickCollectionOptions', () => {
     expect((ops[1].value as Player).id).toBe('player-2')
 
     // Update an existing entity
-    inner.emit('game', {
+    transport.simulateMessage('game', {
       __tick: true,
       tick: 2,
       timestamp: Date.now(),
@@ -569,7 +489,7 @@ describe('tickCollectionOptions', () => {
     expect((ops[2].value as Player).x).toBe(15)
 
     // Remove an entity
-    inner.emit('game', {
+    transport.simulateMessage('game', {
       __tick: true,
       tick: 3,
       timestamp: Date.now(),

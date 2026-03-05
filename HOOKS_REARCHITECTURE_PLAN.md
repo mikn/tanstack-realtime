@@ -15,6 +15,7 @@ Today, every middleware wrapper (`withGapRecovery`, `createOfflineQueue`, `tickT
 3. **Return a new object** that masquerades as a `RealtimeTransport` — but isn't the original, breaking identity checks and requiring `as any` casts in tests
 
 This means:
+
 - Adding a new capability to `RealtimeTransport` requires updating **every wrapper**
 - Composition order matters but isn't enforced: `offlineQueue(gapRecovery(transport))` vs `gapRecovery(offlineQueue(transport))` behave differently with no guidance
 - Type safety degrades through the wrapping chain (presence types require runtime `Object.assign`)
@@ -55,20 +56,14 @@ export interface TransportHooks {
    * to continue, or `false` to suppress the publish entirely.
    * Use for: offline queueing (return false + enqueue), data transformation.
    */
-  beforePublish?: (
-    channel: string,
-    data: unknown,
-  ) => { data: unknown } | false
+  beforePublish?: (channel: string, data: unknown) => { data: unknown } | false
 
   /**
    * Intercept inbound messages after the transport receives them but before
    * they reach subscriber callbacks. Return the (possibly transformed) data
    * to continue, or `false` to suppress (dedup, echo filtering).
    */
-  beforeDeliver?: (
-    channel: string,
-    data: unknown,
-  ) => { data: unknown } | false
+  beforeDeliver?: (channel: string, data: unknown) => { data: unknown } | false
 
   /**
    * Called when a channel gains its first subscriber.
@@ -211,17 +206,21 @@ export function createHookPipeline() {
 ### Phase 1: Foundation (no breaking changes)
 
 #### 1.1 Create `packages/realtime/src/core/hooks.ts`
+
 - Export `TransportHooks`, `HookRegistration`, `HookHandle` types
 
 #### 1.2 Create `packages/realtime/src/core/hookPipeline.ts`
+
 - Export `createHookPipeline()` factory
 - Unit tests in `packages/__tests__/hookPipeline.test.ts`
 
 #### 1.3 Add `hook()` to `RealtimeTransport` interface
+
 - **Optional** method initially: `hook?: (reg: HookRegistration) => HookHandle`
 - This avoids breaking existing adapter implementations
 
 #### 1.4 Wire hooks into SSE transport (`packages/realtime-adapter-sse/src/transport.ts`)
+
 - Create a `hookPipeline` in `sseTransport()`
 - In `subscribe()`: wrap the `onMessage` callback to run `pipeline.runBeforeDeliver()` before dispatching
 - In `publish()`: run `pipeline.runBeforePublish()` before sending
@@ -230,9 +229,11 @@ export function createHookPipeline() {
 - Implement `hook()` method
 
 #### 1.5 Wire hooks into Centrifugo transport (`packages/realtime-adapter-centrifugo/src/transport.ts`)
+
 - Same pattern as SSE
 
 #### 1.6 Create `createHookableTransport()` wrapper
+
 - For adapters that don't natively implement `hook()`, provides a thin wrapper that adds the hook pipeline
 - This is the **transition bridge** — existing custom transports get hooks via wrapping
 - Unlike the current middleware pattern, this wrapper is generic and only needs to be written once
@@ -257,11 +258,13 @@ Each middleware becomes a **function that registers hooks** instead of wrapping 
 #### 2.1 Convert `withGapRecovery` to `useGapRecovery()`
 
 **Before** (middleware wrapper, 216 lines):
+
 ```ts
 const transport = withGapRecovery(inner, { onGap })
 ```
 
 **After** (hook registration, ~40 lines):
+
 ```ts
 const handle = useGapRecovery(transport, { onGap })
 // handle.activeChannels — still available
@@ -292,8 +295,12 @@ export function useGapRecovery(
           })
         }
       },
-      onChannelSubscribe(ch) { activeChannels.add(ch) },
-      onChannelUnsubscribe(ch) { activeChannels.delete(ch) },
+      onChannelSubscribe(ch) {
+        activeChannels.add(ch)
+      },
+      onChannelUnsubscribe(ch) {
+        activeChannels.delete(ch)
+      },
     },
   })
 
@@ -306,6 +313,7 @@ export function useGapRecovery(
 #### 2.2 Convert `createOfflineQueue` to `useOfflineQueue()`
 
 **Before** (middleware wrapper, 289 lines):
+
 ```ts
 const transport = createOfflineQueue(inner, { maxSize: 500 })
 // transport.queueStore — reactive store
@@ -313,6 +321,7 @@ const transport = createOfflineQueue(inner, { maxSize: 500 })
 ```
 
 **After** (hook registration, ~80 lines):
+
 ```ts
 const queue = useOfflineQueue(transport, { maxSize: 500 })
 // queue.store — same reactive store (renamed from queueStore)
@@ -364,6 +373,7 @@ export function useOfflineQueue(
 #### 2.3 Convert `tickTransport` to `useTickBatching()`
 
 **Before** (middleware wrapper, 398 lines):
+
 ```ts
 const tick = tickTransport(inner, { tickMs: 16 })
 // tick.setState('game:room-1', playerId, state)
@@ -371,6 +381,7 @@ const tick = tickTransport(inner, { tickMs: 16 })
 ```
 
 **After** (hook registration, ~150 lines):
+
 ```ts
 const tick = useTickBatching(transport, { tickMs: 16 })
 // tick.setState('game:room-1', playerId, state) — same
@@ -436,11 +447,13 @@ No new file needed — this is just a usage pattern documented in examples.
 ### Phase 3: Update Consumers
 
 #### 3.1 Update `createRealtimeClient` (`packages/realtime/src/core/client.ts`)
+
 - No changes to the client API
 - The client already just delegates to the transport
 - Hooks are registered on the transport before passing it to the client
 
 #### 3.2 Update React integration
+
 - No changes to `RealtimeProvider` or hooks — they consume `RealtimeClient`, not the transport directly
 - The `useOfflineQueue` React hook (if we add one) would be a thin React wrapper around `useOfflineQueue()`:
 
@@ -455,6 +468,7 @@ function useOfflineQueueReact(options: OfflineQueueOptions) {
 ```
 
 #### 3.3 Update multi-tab coordination
+
 - `createCoordinatedTransport` stays as-is — it's a transport factory, not middleware
 - `createBroadcastChannelTransport` stays as-is
 - `createSharedWorkerTransport` stays as-is
@@ -463,6 +477,7 @@ function useOfflineQueueReact(options: OfflineQueueOptions) {
 The coordinated transports should implement `hook()` by forwarding to the inner transport's pipeline (leader tab) or maintaining their own pipeline (all tabs). This ensures hooks registered on a coordinated transport work correctly.
 
 #### 3.4 Update tests
+
 - **Keep existing test files** — they validate the same behavior
 - Adapt assertions from `transport.activeChannels` to `handle.activeChannels`
 - Adapt assertions from `transport.queueStore` to `queue.store`
@@ -471,17 +486,20 @@ The coordinated transports should implement `hook()` by forwarding to the inner 
 ### Phase 4: Deprecation & Cleanup
 
 #### 4.1 Deprecate old APIs
+
 - Mark `withGapRecovery`, `createOfflineQueue` (as transport wrapper), `tickTransport` as `@deprecated`
 - Add deprecation comments pointing to the hook equivalents
 - Keep working for at least one major version
 
 #### 4.2 Update exports in `packages/realtime/src/index.ts`
+
 - Export new hook factories: `useGapRecovery`, `useOfflineQueue`, `useTickBatching`
 - Export hook types: `TransportHooks`, `HookRegistration`, `HookHandle`
 - Export `createHookableTransport` for custom transport authors
 - Keep deprecated exports
 
 #### 4.3 Remove old middleware (next major)
+
 - Delete `gapRecovery.ts` (replaced by `gapRecoveryHook.ts`)
 - Delete the wrapper version of `offlineQueue.ts` (replaced by `offlineQueueHook.ts`)
 - Delete `tickTransport.ts` (replaced by `tickBatchingHook.ts`)
@@ -493,56 +511,62 @@ The coordinated transports should implement `hook()` by forwarding to the inner 
 ## Impact Analysis
 
 ### Files Created (5)
-| File | Purpose |
-|------|---------|
-| `core/hooks.ts` | Hook type definitions |
-| `core/hookPipeline.ts` | Pipeline execution engine |
+
+| File                        | Purpose                                                  |
+| --------------------------- | -------------------------------------------------------- |
+| `core/hooks.ts`             | Hook type definitions                                    |
+| `core/hookPipeline.ts`      | Pipeline execution engine                                |
 | `core/hookableTransport.ts` | Wrapper for transports that don't natively support hooks |
-| `core/gapRecoveryHook.ts` | Gap recovery as hooks |
-| `core/offlineQueueHook.ts` | Offline queue as hooks |
-| `core/tickBatchingHook.ts` | Tick batching as hooks |
+| `core/gapRecoveryHook.ts`   | Gap recovery as hooks                                    |
+| `core/offlineQueueHook.ts`  | Offline queue as hooks                                   |
+| `core/tickBatchingHook.ts`  | Tick batching as hooks                                   |
 
 ### Files Modified (8)
-| File | Change |
-|------|--------|
-| `core/types.ts` | Add optional `hook()` to `RealtimeTransport` |
-| `core/client.ts` | Expose transport for hook registration (or pass-through `hook()`) |
-| `adapter-sse/src/transport.ts` | Native hook pipeline integration |
-| `adapter-centrifugo/src/transport.ts` | Native hook pipeline integration |
-| `broadcastChannelTransport.ts` | Forward `hook()` to inner/local pipeline |
-| `sharedWorkerTransport.ts` | Forward `hook()` |
-| `index.ts` | New exports, deprecation markers |
-| Test files (3-4) | Adapt to handle-based API |
+
+| File                                  | Change                                                            |
+| ------------------------------------- | ----------------------------------------------------------------- |
+| `core/types.ts`                       | Add optional `hook()` to `RealtimeTransport`                      |
+| `core/client.ts`                      | Expose transport for hook registration (or pass-through `hook()`) |
+| `adapter-sse/src/transport.ts`        | Native hook pipeline integration                                  |
+| `adapter-centrifugo/src/transport.ts` | Native hook pipeline integration                                  |
+| `broadcastChannelTransport.ts`        | Forward `hook()` to inner/local pipeline                          |
+| `sharedWorkerTransport.ts`            | Forward `hook()`                                                  |
+| `index.ts`                            | New exports, deprecation markers                                  |
+| Test files (3-4)                      | Adapt to handle-based API                                         |
 
 ### Files Eventually Deleted (3, next major)
-| File | Replaced By |
-|------|-------------|
-| `gapRecovery.ts` | `gapRecoveryHook.ts` |
+
+| File                              | Replaced By           |
+| --------------------------------- | --------------------- |
+| `gapRecovery.ts`                  | `gapRecoveryHook.ts`  |
 | `offlineQueue.ts` (wrapper parts) | `offlineQueueHook.ts` |
-| `tickTransport.ts` | `tickBatchingHook.ts` |
+| `tickTransport.ts`                | `tickBatchingHook.ts` |
 
 ### Lines of Code
-| Metric | Estimate |
-|--------|----------|
-| Presence forwarding removed | ~270 lines (90 per wrapper x 3) |
-| Proxy transport objects removed | ~150 lines |
-| Hook pipeline added | ~120 lines |
-| Hook factories added | ~270 lines (much simpler than wrappers) |
-| **Net change** | **~-30 lines**, dramatically simpler |
+
+| Metric                          | Estimate                                |
+| ------------------------------- | --------------------------------------- |
+| Presence forwarding removed     | ~270 lines (90 per wrapper x 3)         |
+| Proxy transport objects removed | ~150 lines                              |
+| Hook pipeline added             | ~120 lines                              |
+| Hook factories added            | ~270 lines (much simpler than wrappers) |
+| **Net change**                  | **~-30 lines**, dramatically simpler    |
 
 ### Breaking Changes (Phase 4 only)
-| Change | Migration |
-|--------|-----------|
-| `withGapRecovery` returns handle, not transport | `const h = useGapRecovery(t, opts)` — use `t` as transport, `h` for active channels |
-| `createOfflineQueue` returns handle, not transport | `const q = useOfflineQueue(t, opts)` — use `t` as transport, `q.store` for queue state |
-| `tickTransport` returns handle, not transport | `const tick = useTickBatching(t, opts)` — use `t` as transport, `tick` for setState/onTick |
-| `PresenceAwareTransport` type removed | No longer needed — transport identity preserved |
+
+| Change                                             | Migration                                                                                  |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `withGapRecovery` returns handle, not transport    | `const h = useGapRecovery(t, opts)` — use `t` as transport, `h` for active channels        |
+| `createOfflineQueue` returns handle, not transport | `const q = useOfflineQueue(t, opts)` — use `t` as transport, `q.store` for queue state     |
+| `tickTransport` returns handle, not transport      | `const tick = useTickBatching(t, opts)` — use `t` as transport, `tick` for setState/onTick |
+| `PresenceAwareTransport` type removed              | No longer needed — transport identity preserved                                            |
 
 ---
 
 ## User-Facing API Comparison
 
 ### Before (middleware stacking)
+
 ```ts
 import { sseTransport } from '@tanstack/realtime-adapter-sse'
 import {
@@ -565,6 +589,7 @@ const pending = queued.queueStore.state.pending.length
 ```
 
 ### After (hooks on one transport)
+
 ```ts
 import { sseTransport } from '@tanstack/realtime-adapter-sse'
 import {
@@ -607,13 +632,13 @@ const channels = recovery.activeChannels
 
 ## Risks & Mitigations
 
-| Risk | Mitigation |
-|------|------------|
-| Hook ordering bugs | Priority system + documented conventions. Offline queue = -10, dedup = 0, app hooks = 10+ |
-| Async hook errors crash pipeline | Each hook invocation is try/caught. Errors logged but don't block the pipeline |
-| Performance of pipeline iteration | Hooks are registered once, not per-message. The sorted array is cached and invalidated on register/unregister. For the common case (2-3 hooks), iteration is negligible |
-| Custom transports don't implement `hook()` | `createHookableTransport()` adds it generically. `hook()` is optional on the interface during transition |
-| Multi-tab: hooks registered on follower tabs | Coordinated transports maintain a local pipeline. `beforeDeliver` hooks run on the tab that receives the message (all tabs), not just the leader |
+| Risk                                         | Mitigation                                                                                                                                                              |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hook ordering bugs                           | Priority system + documented conventions. Offline queue = -10, dedup = 0, app hooks = 10+                                                                               |
+| Async hook errors crash pipeline             | Each hook invocation is try/caught. Errors logged but don't block the pipeline                                                                                          |
+| Performance of pipeline iteration            | Hooks are registered once, not per-message. The sorted array is cached and invalidated on register/unregister. For the common case (2-3 hooks), iteration is negligible |
+| Custom transports don't implement `hook()`   | `createHookableTransport()` adds it generically. `hook()` is optional on the interface during transition                                                                |
+| Multi-tab: hooks registered on follower tabs | Coordinated transports maintain a local pipeline. `beforeDeliver` hooks run on the tab that receives the message (all tabs), not just the leader                        |
 
 ---
 

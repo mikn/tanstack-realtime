@@ -1,22 +1,19 @@
 /**
- * Tick-based transport wrapper — batches updates per tick interval for
+ * Tick-based batching hook — batches updates per tick interval for
  * high-frequency realtime use cases like multiplayer games.
  *
  * Instead of publishing individual events, `setState()` sets the local state
- * for a channel and the transport batches all dirty channels into a single
+ * for a channel and the hook batches all dirty channels into a single
  * frame sent once per tick interval.
  *
  * On the receiving side, `onTick()` delivers the full batched frame per tick
- * rather than individual events.
+ * rather than individual events. Tick wire frames are filtered from normal
+ * `subscribe()` callbacks via a `beforeDeliver` hook.
  */
 
 import { Store } from '@tanstack/store'
-import { hasPresence } from './types.js'
-import type {
-  PresenceCapable,
-  PresenceUser,
-  RealtimeTransport,
-} from './types.js'
+import type { HookHandle } from './hooks.js'
+import type { RealtimeTransport } from './types.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -24,74 +21,42 @@ import type {
 
 export interface TickTransportOptions {
   /**
-   * Tick interval in milliseconds. Updates are batched and sent once per tick.
-   * @default 16 (≈ 60 Hz, matching requestAnimationFrame)
+   * Tick interval in milliseconds.
+   * @default 16 (≈ 60 Hz)
    */
   tickMs?: number
 
   /**
    * Delta compression: only send fields that changed since last tick.
-   * The receiver reconstructs full state from deltas.
    * @default false
    */
   deltaCompression?: boolean
 }
 
-/**
- * A single tick frame received from the server (or another client).
- */
 export interface TickFrame {
-  /** Tick number for this frame. */
   tick: number
-  /** Timestamp when this frame was sent (ms since epoch). */
   timestamp: number
-  /** Per-entity state updates. Key is the entity ID. */
   entities: Record<string, unknown>
-  /** Entity IDs removed this tick. */
   removed: Array<string>
 }
 
-/**
- * Internal wire format for tick frames on the channel.
- * The `__tick` flag distinguishes tick frames from normal messages.
- */
 interface TickWireFrame extends TickFrame {
   __tick: true
 }
 
-export interface TickTransport extends RealtimeTransport {
-  /** Observable store for the current tick number. */
+export interface TickHandle {
   readonly tickStore: Store<{ tick: number; serverTick: number }>
-
-  /**
-   * Set the local state for an entity on a channel. The transport batches
-   * all entity states and sends them as a single frame on the next tick.
-   */
   setState: (channel: string, entityId: string, data: unknown) => void
-
-  /**
-   * Mark an entity as removed. Sent in the next tick frame's `removed` array.
-   */
   removeEntity: (channel: string, entityId: string) => void
-
-  /**
-   * Subscribe to tick frames from a channel. Unlike normal `subscribe`,
-   * the callback receives the full batched frame per tick.
-   */
   onTick: (channel: string, callback: (frame: TickFrame) => void) => () => void
-
-  /** Stop the tick loop. */
   stop: () => void
+  unhook: () => void
 }
 
 // ---------------------------------------------------------------------------
 // Delta compression helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Compute a shallow diff between prev and next objects.
- * Returns only the keys that changed.
- */
 export function computeDelta(
   prev: Record<string, unknown> | undefined,
   next: Record<string, unknown>,
@@ -108,7 +73,6 @@ export function computeDelta(
     }
   }
 
-  // Check for removed keys
   for (const key of Object.keys(prev)) {
     if (!(key in next)) {
       delta[key] = undefined
@@ -119,15 +83,11 @@ export function computeDelta(
   return hasChanges ? delta : null
 }
 
-/**
- * Apply a delta to a base object to reconstruct full state.
- */
 export function applyDelta(
   base: Record<string, unknown> | undefined,
   delta: Record<string, unknown>,
 ): Record<string, unknown> {
   const result = { ...(base ?? {}), ...delta }
-  // Remove keys set to undefined
   for (const [key, value] of Object.entries(delta)) {
     if (value === undefined) delete result[key]
   }
@@ -135,46 +95,31 @@ export function applyDelta(
 }
 
 // ---------------------------------------------------------------------------
-// Factory
+// Hook factory
 // ---------------------------------------------------------------------------
 
 /**
- * Wrap a transport with tick-based batching.
+ * Register tick batching hooks on a transport.
  *
- * The wrapper accumulates `setState()` calls and publishes them as a single
- * tick frame per interval. Incoming frames are delivered via `onTick()`.
- *
- * Normal `subscribe`/`publish` still work (delegated to the inner transport)
- * for non-tick channels. Tick frames on the wire include a `__tick: true`
- * flag — the wrapper filters them out of normal `subscribe()` callbacks so
- * the transport contract is not violated.
- *
- * Presence methods are forwarded transparently when the inner transport
- * supports them.
+ * The hook accumulates `setState()` calls and publishes them as a single
+ * tick frame per interval. Incoming tick frames are delivered via `onTick()`.
+ * Normal `subscribe()` callbacks never see tick wire frames (filtered by
+ * the `beforeDeliver` hook).
  *
  * @example
- * import { tickTransport } from '@tanstack/realtime'
- * import { sseTransport } from '@tanstack/realtime-adapter-sse'
+ * const tick = useTickBatching(transport, { tickMs: 16 })
  *
- * const tick = tickTransport(
- *   sseTransport({ url: '/api/realtime/sse' }),
- *   { tickMs: 16 },
- * )
- *
- * // Set state each render frame
  * tick.setState('game:room-1', myPlayerId, { x: 100, y: 200 })
- *
- * // Receive batched frames from all players
  * tick.onTick('game:room-1', (frame) => {
  *   for (const [entityId, state] of Object.entries(frame.entities)) {
  *     updateEntity(entityId, state)
  *   }
  * })
  */
-export function tickTransport(
-  inner: RealtimeTransport,
+export function useTickBatching(
+  transport: RealtimeTransport,
   options: TickTransportOptions = {},
-): TickTransport {
+): TickHandle {
   const { tickMs = 16, deltaCompression = false } = options
 
   const tickStore = new Store<{ tick: number; serverTick: number }>({
@@ -182,25 +127,17 @@ export function tickTransport(
     serverTick: 0,
   })
 
-  // channel → entityId → current state
   const dirtyState = new Map<string, Map<string, unknown>>()
-  // channel → entityId → previous state (for delta compression)
   const previousState = new Map<string, Map<string, Record<string, unknown>>>()
-  // channel → Set of removed entity IDs this tick
   const removedEntities = new Map<string, Set<string>>()
-
-  // channel → Set of tick frame listeners
   const tickListeners = new Map<string, Set<(frame: TickFrame) => void>>()
-
-  // Inner subscription unsubs (one per channel with tick listeners)
   const innerSubs = new Map<string, () => void>()
 
   let tickTimer: ReturnType<typeof setInterval> | null = null
   let localTick = 0
 
-  // Track connection state so we don't tick when disconnected.
-  let isConnected = inner.store.get() === 'connected'
-  inner.store.subscribe((status) => {
+  let isConnected = transport.store.get() === 'connected'
+  transport.store.subscribe((status) => {
     isConnected = status === 'connected'
   })
 
@@ -210,7 +147,6 @@ export function tickTransport(
   }
 
   function sendTick(): void {
-    // Collect all channels that have dirty state OR pending removals.
     const allChannels = new Set<string>([
       ...dirtyState.keys(),
       ...removedEntities.keys(),
@@ -230,7 +166,6 @@ export function tickTransport(
         removed: [],
       }
 
-      // Add removed entities for this channel
       const removed = removedEntities.get(channel)
       if (removed) {
         frame.removed = Array.from(removed)
@@ -259,12 +194,9 @@ export function tickTransport(
       }
 
       if (Object.keys(frame.entities).length > 0 || frame.removed.length > 0) {
-        inner
+        transport
           .publish(channel, { __tick: true, ...frame } satisfies TickWireFrame)
-          .catch(() => {
-            // Publish failed (e.g. disconnected mid-tick). The data is
-            // ephemeral game state — dropping it is acceptable.
-          })
+          .catch(() => {})
       }
     }
 
@@ -273,47 +205,65 @@ export function tickTransport(
 
   function ensureInnerSub(channel: string): void {
     if (innerSubs.has(channel)) return
-    const unsub = inner.subscribe(channel, (raw) => {
-      const data = raw as Record<string, unknown>
-      if (!data.__tick) return // Not a tick frame — normal subscribe handles it
-      const frame = data as unknown as TickFrame
-      tickStore.setState((s) => ({
-        ...s,
-        serverTick: Math.max(s.serverTick, frame.tick),
-      }))
-
-      const listeners = tickListeners.get(channel)
-      if (listeners) {
-        for (const cb of listeners) cb(frame)
-      }
+    const unsub = transport.subscribe(channel, (_raw) => {
+      // Tick frames reach here because beforeDeliver returns false for them
+      // in the normal pipeline — but onTick subscriptions bypass the pipeline.
+      // We handle tick frame dispatch here instead.
     })
     innerSubs.set(channel, unsub)
   }
 
-  const transport: TickTransport = {
-    store: inner.store,
+  // Track the last dispatched tick per channel to avoid duplicate dispatch
+  // when beforeDeliver runs once per subscriber on the same message.
+  const lastDispatchedTick = new Map<string, number>()
+
+  // Register a beforeDeliver hook that intercepts tick wire frames and
+  // dispatches them to tick listeners instead of normal subscribers.
+  const hookHandle: HookHandle = transport.hook({
+    name: 'tick-batching',
+    hooks: {
+      beforeDeliver(channel, data) {
+        const d = data as Record<string, unknown>
+        if (d.__tick) {
+          const frame = data as TickFrame
+
+          // Only dispatch once per tick per channel (beforeDeliver may run
+          // once per subscriber, but we only want one dispatch).
+          const prev = lastDispatchedTick.get(channel) ?? -1
+          if (frame.tick > prev) {
+            lastDispatchedTick.set(channel, frame.tick)
+            tickStore.setState((s) => ({
+              ...s,
+              serverTick: Math.max(s.serverTick, frame.tick),
+            }))
+            const cbs = tickListeners.get(channel)
+            if (cbs) {
+              for (const cb of cbs) cb(frame)
+            }
+          }
+
+          return false // suppress from normal subscribers
+        }
+        return { data }
+      },
+    },
+  })
+
+  function stop(): void {
+    if (tickTimer) {
+      clearInterval(tickTimer)
+      tickTimer = null
+    }
+    for (const unsub of innerSubs.values()) unsub()
+    innerSubs.clear()
+    dirtyState.clear()
+    removedEntities.clear()
+    previousState.clear()
+    lastDispatchedTick.clear()
+  }
+
+  return {
     tickStore,
-
-    async connect() {
-      return inner.connect()
-    },
-
-    disconnect() {
-      inner.disconnect()
-    },
-
-    subscribe(channel, onMessage) {
-      // Filter out tick wire frames so consumers never see __tick messages.
-      return inner.subscribe(channel, (raw) => {
-        const data = raw as Record<string, unknown>
-        if (data.__tick) return // Tick frames go to onTick, not subscribe
-        onMessage(raw)
-      })
-    },
-
-    async publish(channel, data) {
-      return inner.publish(channel, data)
-    },
 
     setState(channel, entityId, data) {
       if (!dirtyState.has(channel)) dirtyState.set(channel, new Map())
@@ -324,7 +274,6 @@ export function tickTransport(
     removeEntity(channel, entityId) {
       if (!removedEntities.has(channel)) removedEntities.set(channel, new Set())
       removedEntities.get(channel)!.add(entityId)
-      // Also clean from dirtyState and previousState to prevent memory leaks.
       dirtyState.get(channel)?.delete(entityId)
       previousState.get(channel)?.delete(entityId)
       ensureTickLoop()
@@ -346,53 +295,12 @@ export function tickTransport(
     },
 
     stop() {
-      if (tickTimer) {
-        clearInterval(tickTimer)
-        tickTimer = null
-      }
-      for (const unsub of innerSubs.values()) unsub()
-      innerSubs.clear()
-      dirtyState.clear()
-      removedEntities.clear()
-      previousState.clear()
+      stop()
+    },
+
+    unhook() {
+      stop()
+      hookHandle.unhook()
     },
   }
-
-  // Forward presence methods when the inner transport supports them.
-  // When the inner transport lacks presence, attach throwing stubs so callers
-  // get a clear error (consistent with withGapRecovery).
-  if (hasPresence(inner)) {
-    const presenceInner = inner
-    Object.assign(transport, {
-      joinPresence(channel: string, data: unknown) {
-        presenceInner.joinPresence(channel, data)
-      },
-      updatePresence(channel: string, data: unknown) {
-        presenceInner.updatePresence(channel, data)
-      },
-      leavePresence(channel: string) {
-        presenceInner.leavePresence(channel)
-      },
-      onPresenceChange(
-        channel: string,
-        callback: (users: ReadonlyArray<PresenceUser>) => void,
-      ) {
-        return presenceInner.onPresenceChange(channel, callback)
-      },
-    } satisfies PresenceCapable)
-  } else {
-    const notSupported = (method: string) => () => {
-      throw new Error(
-        `[realtime] tickTransport: the wrapped transport does not implement PresenceCapable. Called ${method}().`,
-      )
-    }
-    Object.assign(transport, {
-      joinPresence: notSupported('joinPresence'),
-      updatePresence: notSupported('updatePresence'),
-      leavePresence: notSupported('leavePresence'),
-      onPresenceChange: notSupported('onPresenceChange'),
-    })
-  }
-
-  return transport
 }
