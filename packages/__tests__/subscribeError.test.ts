@@ -49,6 +49,9 @@ function createMockTransport(): RealtimeTransport & {
       }
     },
     async publish() {},
+    hook() {
+      return { unhook: () => {} }
+    },
     onSubscribeError(callback) {
       errorListeners.add(callback)
       return () => {
@@ -76,6 +79,9 @@ function createBaseTransport(): RealtimeTransport {
       return () => {}
     },
     async publish() {},
+    hook() {
+      return { unhook: () => {} }
+    },
   }
 }
 

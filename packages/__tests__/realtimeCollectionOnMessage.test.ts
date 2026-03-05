@@ -41,6 +41,9 @@ function createMockTransport(): RealtimeTransport & {
       }
     },
     async publish() {},
+    hook() {
+      return { unhook: () => {} }
+    },
     emit(channel, data) {
       const cbs = listeners.get(channel)
       if (cbs) for (const cb of cbs) cb(data)

@@ -142,6 +142,9 @@ function createMockInnerTransport(): (RealtimeTransport & PresenceCapable) & {
       publishCalls.push({ channel, data })
       return Promise.resolve()
     },
+    hook() {
+      return { unhook: () => {} }
+    },
     joinPresence() {},
     updatePresence() {},
     leavePresence() {},

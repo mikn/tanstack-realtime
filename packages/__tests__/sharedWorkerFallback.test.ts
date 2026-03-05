@@ -41,6 +41,9 @@ function createFallbackTransport(): RealtimeTransport & PresenceCapable {
       return () => {}
     },
     async publish() {},
+    hook() {
+      return { unhook: () => {} }
+    },
     joinPresence() {},
     updatePresence() {},
     leavePresence() {},

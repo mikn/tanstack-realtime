@@ -861,7 +861,7 @@ export function ApiReference() {
         <tbody>
           <tr>
             <td>
-              <code>createOfflineQueue</code>
+              <code>useOfflineQueue</code>
             </td>
             <td>
               <code>
@@ -941,7 +941,7 @@ export function ApiReference() {
         <tbody>
           <tr>
             <td>
-              <code>withGapRecovery</code>
+              <code>useGapRecovery</code>
             </td>
             <td>
               <code>

@@ -1,5 +1,10 @@
 # Hooks Rearchitecture Plan
 
+> **Status: COMPLETED** — The migration from middleware wrapping to hooks pipeline
+> was implemented in commits `be6c224` and `cdea202`. The old middleware APIs
+> (`withGapRecovery`, `createOfflineQueue`, `tickTransport`) have been replaced
+> with hook-based equivalents (`useGapRecovery`, `useOfflineQueue`, `useTickBatching`).
+
 ## Executive Summary
 
 Replace the middleware-wrapping pattern (where `withGapRecovery`, `createOfflineQueue`, and `tickTransport` each create a proxy transport with copy-pasted presence forwarding) with a **hooks-based pipeline** on the transport itself. Multi-tab coordination (`createCoordinatedTransport`, `createBroadcastChannelTransport`, `createSharedWorkerTransport`) stays as a transport factory since it genuinely replaces the transport rather than augmenting it.

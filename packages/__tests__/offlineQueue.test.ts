@@ -138,6 +138,82 @@ describe('useOfflineQueue', () => {
     expect(queue.store.state.flushed).toBe(2)
   })
 
+  it('tracks isFlushing state', async () => {
+    const inner = createMockTransport()
+    let resolvePublish: (() => void) | undefined
+    inner.publishImpl = () =>
+      new Promise<void>((resolve) => {
+        resolvePublish = resolve
+      })
+
+    const queue = useOfflineQueue(inner)
+    await inner.publish('ch', { msg: 1 })
+
+    // Trigger flush.
+    inner.setStatus('connected')
+    await vi.advanceTimersByTimeAsync(0)
+
+    // Should be flushing (publish is pending).
+    expect(queue.store.state.isFlushing).toBe(true)
+
+    // Complete the publish.
+    resolvePublish!()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(queue.store.state.isFlushing).toBe(false)
+    expect(queue.store.state.flushed).toBe(1)
+  })
+
+  it('calls onFlushError and retries when it returns true', async () => {
+    const inner = createMockTransport()
+    let callCount = 0
+    inner.publishImpl = () => {
+      callCount++
+      if (callCount === 1) return Promise.reject(new Error('network error'))
+      return Promise.resolve()
+    }
+
+    const onFlushError = vi.fn(() => true) // retry
+    const queue = useOfflineQueue(inner, { onFlushError })
+
+    await inner.publish('ch', { msg: 1 })
+
+    inner.setStatus('connected')
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(0)
+
+    // onFlushError was invoked with the queued message and the error.
+    expect(onFlushError).toHaveBeenCalledTimes(1)
+    expect((onFlushError.mock.calls[0] as Array<unknown>)[1]).toBeInstanceOf(
+      Error,
+    )
+    // The message was retried and eventually delivered.
+    expect(inner.publishCalls).toHaveLength(2)
+    expect(queue.store.state.flushed).toBeGreaterThanOrEqual(1)
+  })
+
+  it('calls onFlushError and discards when it returns false', async () => {
+    const inner = createMockTransport()
+    inner.publishImpl = () => {
+      return Promise.reject(new Error('fail'))
+    }
+
+    const onFlushError = vi.fn(() => false) // discard
+    const queue = useOfflineQueue(inner, { onFlushError })
+
+    await inner.publish('ch', { msg: 1 })
+
+    inner.setStatus('connected')
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(0)
+
+    // onFlushError was invoked.
+    expect(onFlushError).toHaveBeenCalled()
+    // The message was discarded — not in pending, not flushed.
+    expect(queue.store.state.pending).toHaveLength(0)
+    expect(queue.store.state.flushed).toBe(0)
+  })
+
   it('evicts oldest messages when maxSize is exceeded', async () => {
     const inner = createMockTransport()
     const queue = useOfflineQueue(inner, { maxSize: 2 })

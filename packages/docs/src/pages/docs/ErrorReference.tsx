@@ -261,10 +261,10 @@ const transport = sseTransport({
 
       <h3>How to handle</h3>
       <CodeBlock
-        code={`import { createOfflineQueue } from '@tanstack/realtime'
+        code={`import { useOfflineQueue } from '@tanstack/realtime'
 import { sseTransport } from '@tanstack/realtime-adapter-sse'
 
-const transport = createOfflineQueue(
+const transport = useOfflineQueue(
   sseTransport({ url: '/api/realtime' }),
   {
     maxSize: 500,
@@ -314,10 +314,10 @@ const transport = createOfflineQueue(
 
       <h3>How to handle</h3>
       <CodeBlock
-        code={`import { withGapRecovery } from '@tanstack/realtime'
+        code={`import { useGapRecovery } from '@tanstack/realtime'
 import { sseTransport } from '@tanstack/realtime-adapter-sse'
 
-const transport = withGapRecovery(
+const transport = useGapRecovery(
   sseTransport({ url: '/api/realtime' }),
   {
     onGap: async (channel) => {
