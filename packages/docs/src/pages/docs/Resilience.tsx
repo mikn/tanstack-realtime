@@ -25,19 +25,17 @@ export function Resilience() {
 import { sseTransport } from '@tanstack/realtime-adapter-sse'
 import { useStore } from '@tanstack/react-store'
 
-const transport = useOfflineQueue(
-  sseTransport({ url: '/api/realtime' }),
-  {
-    maxSize: 500,
-    storage: createLocalStorageAdapter(),
-  },
-)
+const transport = sseTransport({ url: '/api/realtime' })
+const queue = useOfflineQueue(transport, {
+  maxSize: 500,
+  storage: createLocalStorageAdapter(),
+})
 
 const client = createRealtimeClient({ transport })
 
 // Reactive pending-count badge
 function SyncStatus() {
-  const pending = useStore(transport.queueStore, (s) => s.pending.length)
+  const pending = useStore(queue.store, (s) => s.pending.length)
   return pending > 0
     ? <span>{pending} changes pending sync</span>
     : null
@@ -62,14 +60,12 @@ const tasksOptions = realtimeCollectionOptions({
 import { useGapRecovery } from '@tanstack/realtime'
 import { sseTransport } from '@tanstack/realtime-adapter-sse'
 
-const transport = useGapRecovery(
-  sseTransport({ url: '/api/realtime' }),
-  {
-    onGap: async (channel) => {
-      await refetchCollection(channel)
-    },
+const transport = sseTransport({ url: '/api/realtime' })
+useGapRecovery(transport, {
+  onGap: async (channel) => {
+    await refetchCollection(channel)
   },
-)`}
+})`}
       />
 
       <h2 id="multi-tab">Multi-tab coordination</h2>

@@ -264,11 +264,10 @@ const transport = sseTransport({
         code={`import { useOfflineQueue } from '@tanstack/realtime'
 import { sseTransport } from '@tanstack/realtime-adapter-sse'
 
-const transport = useOfflineQueue(
-  sseTransport({ url: '/api/realtime' }),
-  {
-    maxSize: 500,
-    onFlushError: (message, error) => {
+const transport = sseTransport({ url: '/api/realtime' })
+useOfflineQueue(transport, {
+  maxSize: 500,
+  onFlushError: (message, error) => {
       console.error(
         \`Failed to flush message \${message.id} on \${message.channel}:\`,
         error,
@@ -317,20 +316,18 @@ const transport = useOfflineQueue(
         code={`import { useGapRecovery } from '@tanstack/realtime'
 import { sseTransport } from '@tanstack/realtime-adapter-sse'
 
-const transport = useGapRecovery(
-  sseTransport({ url: '/api/realtime' }),
-  {
-    onGap: async (channel) => {
-      await refetchCollection(channel)
-    },
-    onGapError: (error, channel) => {
-      console.error(\`Gap recovery failed for \${channel}:\`, error)
-      Sentry.captureException(error)
-      // Fallback: force a full refetch or page reload
-      window.location.reload()
-    },
+const transport = sseTransport({ url: '/api/realtime' })
+useGapRecovery(transport, {
+  onGap: async (channel) => {
+    await refetchCollection(channel)
   },
-)`}
+  onGapError: (error, channel) => {
+    console.error(\`Gap recovery failed for \${channel}:\`, error)
+    Sentry.captureException(error)
+    // Fallback: force a full refetch or page reload
+    window.location.reload()
+  },
+})`}
       />
 
       {/* ------------------------------------------------------------------ */}

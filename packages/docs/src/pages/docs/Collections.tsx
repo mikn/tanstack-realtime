@@ -237,13 +237,13 @@ function SyncBanner() {
       <CodeBlock
         code={`import { useOfflineQueue, createLocalStorageAdapter } from '@tanstack/realtime'
 
-const transport = useOfflineQueue(baseTransport, {
+const queue = useOfflineQueue(baseTransport, {
   maxSize: 500,
   storage: createLocalStorageAdapter(),
 })
 
 // Collections using this transport automatically buffer offline mutations.
-const client = createRealtimeClient({ transport })`}
+const client = createRealtimeClient({ transport: baseTransport })`}
       />
       <p>
         See <a href="#/docs/resilience">Resilience</a> for full offline queue
