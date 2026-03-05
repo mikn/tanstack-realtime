@@ -10,11 +10,37 @@ export function Collections() {
         mutations through a channel, and resolve conflicts with CRDTs.
       </p>
 
-      <h2 id="with-rest">withRest &mdash; bring your own backend</h2>
+      <h2 id="react-shorthand">React: useRealtimeCollection with url</h2>
       <p>
-        Spread <code>withRest</code> into <code>realtimeCollectionOptions</code>{' '}
-        to wire <code>getKey</code>, <code>queryFn</code>, <code>onInsert</code>
-        , <code>onUpdate</code>, and <code>onDelete</code> to standard REST/JSON
+        In React, <code>useRealtimeCollection</code> accepts a <code>url</code>{' '}
+        prop that generates <code>queryFn</code> and CRUD callbacks
+        automatically. The channel is derived from the URL when omitted. Pair
+        with <code>useLiveQuery</code> for reactive rendering.
+      </p>
+      <CodeBlock
+        title="features/tasks/TaskList.tsx"
+        code={`import { useRealtimeCollection } from '@tanstack/react-realtime'
+import { useLiveQuery } from '@tanstack/react-db'
+
+function TaskList({ projectId }: { projectId: string }) {
+  const tasks = useRealtimeCollection<Task>({
+    url: \`/api/tasks?projectId=\${projectId}\`,
+    getKey: (t) => t.id,
+    fields: { title: 'lww', status: 'lww', assignees: 'or-set' },
+  })
+
+  const { data } = useLiveQuery((q) => q.from({ tasks }))
+
+  return <ul>{data.map((t) => <li key={t.id}>{t.title}</li>)}</ul>
+}`}
+      />
+
+      <h2 id="with-rest">withRest &mdash; framework-agnostic</h2>
+      <p>
+        Outside React (or when building reusable collection configs), spread{' '}
+        <code>withRest</code> into <code>realtimeCollectionOptions</code> to
+        wire <code>getKey</code>, <code>queryFn</code>, <code>onInsert</code>,{' '}
+        <code>onUpdate</code>, and <code>onDelete</code> to standard REST/JSON
         endpoints in one call. Your server routes stay as plain CRUD — no
         changes required.
       </p>

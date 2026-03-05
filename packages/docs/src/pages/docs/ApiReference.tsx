@@ -1350,6 +1350,9 @@ export function ApiReference() {
               Creates and manages a realtime-backed TanStack DB collection. The{' '}
               <code>Collection</code> reference is stable across renders. Pass
               to <code>useLiveQuery</code> from <code>@tanstack/react-db</code>.
+              Accepts a <code>url</code> for REST shorthand (generates{' '}
+              <code>queryFn</code> + CRUD callbacks automatically) or manual{' '}
+              <code>queryFn</code> + callbacks.
             </td>
           </tr>
           <tr>

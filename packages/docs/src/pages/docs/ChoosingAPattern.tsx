@@ -206,24 +206,63 @@ realtimeCollectionOptions({ ...withRest({ url: '/api/messages' }), ... })
 streamChannelOptions({ channel: ['stream', { sessionId }], ... })`}
       />
 
-      <h2 id="useRealtimeQuery">Start simple: useRealtimeQuery</h2>
+      <h2 id="start-simple">Start simple: useRealtimeCollection</h2>
       <p>
-        If you are building a React app and your data comes from a REST API,{' '}
-        <code>useRealtimeQuery</code> wraps{' '}
-        <code>realtimeCollectionOptions</code> in a single hook call. Start here
-        and drop down to the lower-level patterns only when you need them.
+        If you are building a React app, <code>useRealtimeCollection</code>{' '}
+        paired with <code>useLiveQuery</code> is the recommended pattern. Pass a{' '}
+        <code>url</code> to get REST CRUD automatically, or pass{' '}
+        <code>queryFn</code> for custom data sources.
       </p>
       <CodeBlock
-        code={`import { useRealtimeQuery } from '@tanstack/react-realtime'
+        code={`import { useRealtimeCollection } from '@tanstack/react-realtime'
+import { useLiveQuery } from '@tanstack/react-db'
 
 function TodoList() {
-  const { data: todos, collection } = useRealtimeQuery({
+  const todos = useRealtimeCollection<Todo>({
     url: '/api/todos',
-    channel: ['todos'],
     getKey: (t) => t.id,
   })
-  // ...
+
+  // Select all — re-renders on every change
+  const { data } = useLiveQuery((q) => q.from({ todos }))
+
+  // Mutations via the collection
+  await todos.insert({ id: uuid(), text: 'New todo' })
+  await todos.update(id, (draft) => { draft.done = true })
+  await todos.delete(id)
 }`}
+      />
+      <p>
+        The two-hook pattern is intentional: the collection manages sync, the
+        query manages rendering. When you need filtering, sorting, or joins,
+        change the query &mdash; not the collection:
+      </p>
+      <CodeBlock
+        code={`// Same collection, different views
+const { data: active } = useLiveQuery((q) =>
+  q.from({ todos }).where('done', '=', false)
+)
+
+const { data: sorted } = useLiveQuery((q) =>
+  q.from({ todos }).orderBy('createdAt', 'desc')
+)`}
+      />
+
+      <h3 id="tanstack-query-escape-hatch">Already using TanStack Query?</h3>
+      <p>
+        Pass <code>queryFn</code> that delegates to your existing query client.
+        No new API needed &mdash; you keep your cache, deduplication, and
+        devtools:
+      </p>
+      <CodeBlock
+        code={`const todos = useRealtimeCollection<Todo>({
+  channel: ['todos'],
+  getKey: (t) => t.id,
+  queryFn: () => queryClient.fetchQuery({
+    queryKey: ['todos'],
+    queryFn: () => fetch('/api/todos').then((r) => r.json()),
+  }),
+})`}
       />
 
       <h2 id="see-also">See also</h2>
