@@ -50,6 +50,77 @@ export function serializeKey(key: QueryKey): string {
  * parseChannel('todos')
  * // → { namespace: 'todos', params: {}, raw: 'todos' }
  */
+/**
+ * Derives a channel name from a REST URL by extracting the last meaningful
+ * path segment as the namespace and query parameters as channel params.
+ *
+ * This is used behind the scenes by `useRealtimeCollection` and
+ * `realtimeCollectionOptions` so that when a `url` is provided but `channel`
+ * is omitted, a sensible channel name is derived automatically.
+ *
+ * **Derivation rules:**
+ * - Leading `/api` or `/api/v1` (any version) path prefixes are stripped.
+ * - The last non-empty path segment becomes the namespace.
+ * - Query parameters become sorted channel params (same format as `serializeKey`).
+ *
+ * @example
+ * deriveChannelFromUrl('/api/todos?projectId=123')
+ * // → 'todos:projectId=123'
+ *
+ * deriveChannelFromUrl('/api/v2/projects/abc/tasks?status=active')
+ * // → 'tasks:status=active'
+ *
+ * deriveChannelFromUrl('https://example.com/api/todos')
+ * // → 'todos'
+ *
+ * deriveChannelFromUrl('/api/todos?status=active&projectId=123')
+ * // → 'todos:projectId=123,status=active'   (keys sorted)
+ */
+export function deriveChannelFromUrl(url: string): string {
+  // Strip origin (protocol + host) if present
+  let path: string
+  let search: string
+  try {
+    // Handle both absolute and relative URLs
+    const parsed = new URL(url, 'http://localhost')
+    path = parsed.pathname
+    search = parsed.search
+  } catch {
+    // Fallback: split on '?'
+    const qIdx = url.indexOf('?')
+    if (qIdx === -1) {
+      path = url
+      search = ''
+    } else {
+      path = url.slice(0, qIdx)
+      search = url.slice(qIdx)
+    }
+  }
+
+  // Strip leading /api or /api/v<N> prefix
+  path = path.replace(/^\/api(?:\/v\d+)?/, '')
+
+  // Extract last non-empty segment as namespace
+  const segments = path.split('/').filter(Boolean)
+  const namespace = segments[segments.length - 1] ?? 'unknown'
+
+  // Parse query params into sorted key=value pairs (same format as serializeKey)
+  if (!search || search === '?') return namespace
+
+  const params = new URLSearchParams(search)
+  const pairs: Array<string> = []
+  const sortedKeys = [...params.keys()].sort()
+  for (const key of sortedKeys) {
+    // Guard against prototype pollution
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      continue
+    }
+    pairs.push(`${key}=${encodeURIComponent(params.get(key)!)}`)
+  }
+
+  return pairs.length > 0 ? `${namespace}:${pairs.join(',')}` : namespace
+}
+
 export function parseChannel(channel: string): ParsedChannel {
   const colonIdx = channel.indexOf(':')
   if (colonIdx === -1) {

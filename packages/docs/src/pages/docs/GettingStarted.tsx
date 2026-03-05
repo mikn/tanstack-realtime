@@ -110,59 +110,55 @@ function App() {
 
       <div className="doc-callout">
         <p>
-          <strong>Auto-connect:</strong> <code>RealtimeProvider</code> does not
-          call <code>client.connect()</code> automatically. Call it once during
-          app initialization (e.g. in your root layout or entry file):
+          <strong>Auto-connect:</strong> <code>RealtimeProvider</code> calls{' '}
+          <code>client.connect()</code> automatically on mount and tears down on
+          unmount. Pass{' '}
+          <code>
+            autoConnect={'{'}false{'}'}
+          </code>{' '}
+          to manage the connection lifecycle yourself.
         </p>
       </div>
-      <CodeBlock
-        title="app/entry-client.tsx"
-        code={`// app/entry-client.tsx
-import { realtimeClient } from './client/realtime'
-
-realtimeClient.connect()`}
-      />
-      <p>
-        If hooks detect a <code>disconnected</code> status for more than two
-        seconds, a dev-mode console warning will suggest calling{' '}
-        <code>client.connect()</code>.
-      </p>
 
       <h2 id="first-collection">Your first live collection</h2>
       <p>
-        Use <code>withRest</code> to connect your existing REST endpoints to a
-        realtime collection. Each mutation is broadcast to the channel
-        automatically &mdash; no changes to your server routes required.
+        Use <code>useRealtimeCollection</code> with a <code>url</code> to
+        connect your existing REST endpoints to a realtime collection. The hook
+        generates <code>queryFn</code> and CRUD callbacks automatically, and
+        derives the channel name from the URL. Each mutation is broadcast to the
+        channel &mdash; no changes to your server routes required.
       </p>
       <CodeBlock
-        title="app/features/todos/collection.ts"
-        code={`import { realtimeCollectionOptions, withRest } from '@tanstack/realtime'
-import { realtimeClient } from '../../client/realtime'
-
-export const todosOptions = realtimeCollectionOptions({
-  ...withRest<Todo, string>({
-    url: '/api/todos',
-    getKey: (t) => t.id,
-  }),
-  client:  realtimeClient,
-  channel: ['todos'],
-})`}
-      />
-      <CodeBlock
         title="app/features/todos/TodoList.tsx"
-        code={`import { useCollection } from '@tanstack/react-db'
-import { todosOptions } from './collection'
+        code={`import { useRealtimeCollection } from '@tanstack/react-realtime'
+import { useLiveQuery } from '@tanstack/react-db'
 
 function TodoList() {
-  const todos = useCollection(todosOptions)
+  // url generates GET/POST/PATCH/DELETE handlers automatically
+  // channel derived from url: '/api/todos' → 'todos'
+  const todos = useRealtimeCollection<Todo>({
+    url: '/api/todos',
+    getKey: (t) => t.id,
+  })
+
+  // Reactive query — re-renders when data changes
+  const { data } = useLiveQuery((q) => q.from({ todos }))
+
   return (
     <ul>
-      {todos.map((t) => (
+      {data.map((t) => (
         <li key={t.id}>{t.title}</li>
       ))}
     </ul>
   )
 }`}
+      />
+      <p>Need filtering or sorting? Change the query, not the collection:</p>
+      <CodeBlock
+        code={`// Same collection, filtered view
+const { data: active } = useLiveQuery((q) =>
+  q.from({ todos }).where('done', '=', false)
+)`}
       />
 
       <h2 id="next-steps">Next steps</h2>

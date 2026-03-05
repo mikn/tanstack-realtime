@@ -4,6 +4,7 @@ const sections = [
     items: [
       { label: 'Getting Started', hash: '#/docs/getting-started' },
       { label: 'Collections', hash: '#/docs/collections' },
+      { label: 'Choosing a Pattern', hash: '#/docs/choosing-a-pattern' },
     ],
   },
   {
@@ -51,6 +52,7 @@ const sections = [
 const pageMap: Record<string, string> = {
   '#/docs/getting-started': 'GettingStarted.tsx',
   '#/docs/collections': 'Collections.tsx',
+  '#/docs/choosing-a-pattern': 'ChoosingAPattern.tsx',
   '#/docs/server-functions': 'ServerFunctions.tsx',
   '#/docs/authentication': 'Authentication.tsx',
   '#/docs/rich-text-crdts': 'RichTextCRDTs.tsx',

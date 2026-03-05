@@ -705,7 +705,7 @@ describe('createSseHandler — auth', () => {
     const handler = createSseHandler({
       pingInterval: 0,
       getUser: () => ({ userId: 'u1' }),
-      authorize: ({ action }) => action !== 'subscribe', // deny subscribe
+      authorize: () => ({ subscribe: false, publish: true, presence: true }),
     })
     const res = await handler.handle(
       new Request(SSE_URL, {
@@ -725,7 +725,7 @@ describe('createSseHandler — auth', () => {
     const handler = createSseHandler({
       pingInterval: 0,
       getUser: () => ({ userId: 'u1' }),
-      authorize: ({ action }) => action !== 'publish', // deny publish
+      authorize: () => ({ subscribe: true, publish: false, presence: true }),
     })
     const res = await handler.handle(
       new Request(SSE_URL, {
@@ -741,7 +741,7 @@ describe('createSseHandler — auth', () => {
     expect(res.status).toBe(403)
   })
 
-  it('authorize receives correct userId, action, and channel', async () => {
+  it('authorize receives correct userId and parsedChannel', async () => {
     const authorize = vi.fn().mockResolvedValue(true)
     const handler = createSseHandler({
       pingInterval: 0,
@@ -768,11 +768,14 @@ describe('createSseHandler — auth', () => {
       }),
     )
 
-    expect(authorize).toHaveBeenCalledWith({
-      userId: 'alice',
-      action: 'subscribe',
-      channel: 'orders',
-    })
+    expect(authorize).toHaveBeenCalledWith(
+      'alice',
+      expect.objectContaining({
+        namespace: 'orders',
+        params: {},
+        raw: 'orders',
+      }),
+    )
     await streamRes.body?.cancel()
   })
 

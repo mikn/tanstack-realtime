@@ -34,6 +34,13 @@ export type { UseRealtimeCollectionConfig } from './useRealtimeCollection.js'
 export { useLiveChannel } from './useLiveChannel.js'
 export type { UseLiveChannelConfig } from './useLiveChannel.js'
 
+// Testing utilities
+export { createTestRealtimeProvider } from './TestRealtimeProvider.js'
+export type {
+  TestRealtimeProviderProps,
+  TestRealtimeProviderResult,
+} from './TestRealtimeProvider.js'
+
 // CRDT standalone hooks
 export { useSyncedCounter } from './useSyncedCounter.js'
 export type {

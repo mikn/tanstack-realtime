@@ -1145,8 +1145,16 @@ export function ApiReference() {
             <td>
               Context provider that makes a <code>RealtimeClient</code>{' '}
               available to all hooks. Wrap your application (or subtree) with
-              this component. Calls <code>client.connect()</code> on mount and{' '}
-              <code>client.destroy()</code> on unmount.
+              this component. By default (
+              <code>
+                autoConnect={'{'}true{'}'}
+              </code>
+              ), calls <code>client.connect()</code> on mount and{' '}
+              <code>client.destroy()</code> on unmount. Set{' '}
+              <code>
+                autoConnect={'{'}false{'}'}
+              </code>{' '}
+              to manage the connection lifecycle yourself.
             </td>
           </tr>
         </tbody>
@@ -1323,6 +1331,9 @@ export function ApiReference() {
               Creates and manages a realtime-backed TanStack DB collection. The{' '}
               <code>Collection</code> reference is stable across renders. Pass
               to <code>useLiveQuery</code> from <code>@tanstack/react-db</code>.
+              Accepts a <code>url</code> for REST shorthand (generates{' '}
+              <code>queryFn</code> + CRUD callbacks automatically) or manual{' '}
+              <code>queryFn</code> + callbacks.
             </td>
           </tr>
           <tr>
@@ -1642,15 +1653,69 @@ export function ApiReference() {
               <code>authorize</code>
             </td>
             <td>
+              <code>AuthorizeFn</code>
+            </td>
+            <td>—</td>
+            <td>
+              Per-channel access control. Receives{' '}
+              <code>(userId, parsedChannel)</code> and returns{' '}
+              <code>ChannelPermissions | boolean</code>.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>onClientConnect</code>
+            </td>
+            <td>
               <code>
-                (params: {'{'} userId, action, channel {'}'}) =&gt; boolean |
-                Promise&lt;boolean&gt;
+                (info: {'{'} connectionId, userId {'}'}) =&gt; void
               </code>
             </td>
             <td>—</td>
             <td>
-              Authorize a subscribe/publish action. Return <code>false</code> to
-              reject with 403.
+              Fires after <code>getUser</code> succeeds and the SSE stream is
+              established. Fire-and-forget — errors are logged, not propagated.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>onClientDisconnect</code>
+            </td>
+            <td>
+              <code>
+                (info: {'{'} connectionId, userId {'}'}) =&gt; void
+              </code>
+            </td>
+            <td>—</td>
+            <td>
+              Fires when the SSE stream closes (client disconnect or network
+              drop). Fire-and-forget.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>onFirstSubscriber</code>
+            </td>
+            <td>
+              <code>(channel: string) =&gt; void</code>
+            </td>
+            <td>—</td>
+            <td>
+              Fires when the first subscriber joins a previously-empty channel.
+              Useful for spinning up live queries or background tasks.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>onChannelEmpty</code>
+            </td>
+            <td>
+              <code>(channel: string) =&gt; void</code>
+            </td>
+            <td>—</td>
+            <td>
+              Fires when the last subscriber leaves a channel (count → 0).
+              Useful for tearing down resources.
             </td>
           </tr>
         </tbody>

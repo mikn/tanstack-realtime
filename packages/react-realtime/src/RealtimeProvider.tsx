@@ -7,6 +7,16 @@ export interface RealtimeProviderProps {
   /** The realtime client created with `createRealtimeClient`. */
   client: RealtimeClient
   children: ReactNode
+  /**
+   * Automatically call `client.connect()` on mount.
+   *
+   * When `true` (the default), the provider connects on mount and
+   * disconnects + destroys on unmount. Set to `false` to manage
+   * the connection lifecycle yourself.
+   *
+   * @default true
+   */
+  autoConnect?: boolean
 }
 
 /**
@@ -14,20 +24,16 @@ export interface RealtimeProviderProps {
  * All hooks from `@tanstack/react-realtime` (`useRealtime`, `usePresence`,
  * `useSubscribe`, `usePublish`, `useStream`) must be descendants of this provider.
  *
- * **Lifecycle**: the provider calls `client.destroy()` on unmount to release
- * the internal status-store subscription. The client itself is **not**
- * disconnected on unmount — call `client.disconnect()` explicitly if you want
- * to close the underlying WebSocket when the provider leaves the tree.
+ * **Lifecycle**: by default (`autoConnect={true}`), the provider calls
+ * `client.connect()` on mount and `client.destroy()` on unmount.
+ * Set `autoConnect={false}` to manage the connection yourself.
  *
  * Calling `client.connect()` after `destroy()` automatically re-establishes
  * the subscription, so the same client instance is safe to reuse across
  * provider mount/unmount cycles (including React Strict Mode's double-invoke).
  *
- * Typical nesting order in a full TanStack application:
- *
  * @example
  * const realtimeClient = createRealtimeClient({ transport: sseTransport({ url: '/api/realtime/sse' }) })
- * await realtimeClient.connect()
  *
  * function Root() {
  *   return (
@@ -41,12 +47,19 @@ export interface RealtimeProviderProps {
  *   )
  * }
  */
-export function RealtimeProvider({ client, children }: RealtimeProviderProps) {
+export function RealtimeProvider({
+  client,
+  children,
+  autoConnect = true,
+}: RealtimeProviderProps) {
   useEffect(() => {
+    if (autoConnect) {
+      client.connect()
+    }
     return () => {
       client.destroy()
     }
-  }, [client])
+  }, [client, autoConnect])
 
   return (
     <RealtimeContext.Provider value={client}>

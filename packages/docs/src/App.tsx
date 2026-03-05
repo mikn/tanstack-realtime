@@ -24,6 +24,7 @@ import { ServerHooks } from './pages/docs/ServerHooks'
 import { ApiReference } from './pages/docs/ApiReference'
 import { WireProtocol } from './pages/docs/WireProtocol'
 import { Testing } from './pages/docs/Testing'
+import { ChoosingAPattern } from './pages/docs/ChoosingAPattern'
 
 // ---------------------------------------------------------------------------
 // Simple hash router
@@ -65,6 +66,7 @@ const docRoutes: Partial<Record<string, () => React.JSX.Element>> = {
   '#/docs/api-reference': ApiReference,
   '#/docs/wire-protocol': WireProtocol,
   '#/docs/testing': Testing,
+  '#/docs/choosing-a-pattern': ChoosingAPattern,
 }
 
 // ---------------------------------------------------------------------------
@@ -74,6 +76,7 @@ const docRoutes: Partial<Record<string, () => React.JSX.Element>> = {
 const docOrder = [
   { hash: '#/docs/getting-started', label: 'Getting Started' },
   { hash: '#/docs/collections', label: 'Collections' },
+  { hash: '#/docs/choosing-a-pattern', label: 'Choosing a Pattern' },
   { hash: '#/docs/server-functions', label: 'TanStack Start + Drizzle' },
   { hash: '#/docs/authentication', label: 'Authentication' },
   { hash: '#/docs/rich-text-crdts', label: 'Rich Text (Y.js)' },
