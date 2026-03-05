@@ -1319,25 +1319,6 @@ export function ApiReference() {
         <tbody>
           <tr>
             <td>
-              <code>useRealtimeQuery</code>
-            </td>
-            <td>
-              <code>
-                (config: UseRealtimeQueryConfig) =&gt;
-                UseRealtimeQueryResult&lt;T, TKey&gt;
-              </code>
-            </td>
-            <td>
-              One-hook API for realtime-backed data. Creates a collection,
-              manages sync lifecycle, and returns a reactive <code>data</code>{' '}
-              array plus the underlying <code>collection</code> for mutations.
-              Accepts either a <code>url</code> (REST shorthand) or manual{' '}
-              <code>queryFn</code> + callbacks. Powered by{' '}
-              <code>useLiveQuery</code> internally.
-            </td>
-          </tr>
-          <tr>
-            <td>
               <code>useRealtimeCollection</code>
             </td>
             <td>

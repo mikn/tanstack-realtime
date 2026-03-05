@@ -110,7 +110,7 @@ export interface RealtimeCollectionConfig<
    *
    * When `channel` is omitted, the channel name is derived from this URL
    * via {@link deriveChannelFromUrl}. This is set automatically by
-   * `useRealtimeQuery` when using the REST shorthand (`url` config key).
+   * `useRealtimeCollection` when using the REST shorthand (`url` config key).
    *
    * Has no effect when `channel` is explicitly provided.
    */

@@ -54,7 +54,7 @@ export function serializeKey(key: QueryKey): string {
  * Derives a channel name from a REST URL by extracting the last meaningful
  * path segment as the namespace and query parameters as channel params.
  *
- * This is used behind the scenes by `useRealtimeQuery` and
+ * This is used behind the scenes by `useRealtimeCollection` and
  * `realtimeCollectionOptions` so that when a `url` is provided but `channel`
  * is omitted, a sensible channel name is derived automatically.
  *

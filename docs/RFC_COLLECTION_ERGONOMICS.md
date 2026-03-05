@@ -1,5 +1,12 @@
 # RFC: Reducing Collection Verbosity for the Common Case
 
+> **Superseded:** The `useRealtimeQuery` hook proposed here was implemented,
+> then replaced by adding `url` support directly to `useRealtimeCollection`.
+> The two-hook pattern (`useRealtimeCollection` + `useLiveQuery`) is now the
+> recommended approach — it's equally concise and more composable (filtering,
+> sorting, joins all happen by changing the query, not the collection).
+> `useRealtimeQuery` has been removed.
+
 ## The Problem
 
 The current "common case" for a realtime collection requires developers to understand
