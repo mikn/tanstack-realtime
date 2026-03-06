@@ -307,7 +307,7 @@ export async function GET({ request }: { request: Request }) {
       </p>
       <CodeBlock
         title="app/server/realtime.ts — Zod validation"
-        code={`import { createValidatedPublish } from '@tanstack/realtime'
+        code={`import { createValidatedPublish, serializeKey } from '@tanstack/realtime'
 import { z } from 'zod'
 
 const todoSchema = z.object({
@@ -330,7 +330,7 @@ import { sseHandler } from './realtime.server'
 const validatedPublish = createValidatedPublish({
   publish: (channel, data) => {
     sseHandler.broadcast(
-      typeof channel === 'string' ? channel : JSON.stringify(channel),
+      typeof channel === 'string' ? channel : serializeKey(channel),
       data,
     )
     return Promise.resolve()

@@ -88,7 +88,7 @@ function TypingBroadcast({ roomId }: { roomId: string }) {
       <h3>Signature</h3>
       <CodeBlock
         code={`function usePublish<T = unknown>(
-  channel: QueryKey,
+  channel: QueryKey | string,
 ): (data: T) => Promise<void>`}
       />
       <p>
@@ -124,11 +124,11 @@ function ChatRoom({ roomId }: { roomId: string }) {
       />
       <h3>Signature</h3>
       <CodeBlock
-        code={`function useChannel<T = unknown>(
-  channel: QueryKey,
-  onMessage: (data: T) => void,
+        code={`function useChannel(
+  channel: QueryKey | string,
+  onMessage?: (data: unknown) => void,  // optional — omit for publish-only
 ): {
-  publish: (data: T) => Promise<void>
+  publish: (data: unknown) => Promise<void>
 }`}
       />
       <p>
@@ -212,7 +212,7 @@ function AIResponse({ requestId }: { requestId: string }) {
 ): {
   state: TState
   status: 'pending' | 'streaming' | 'done' | 'error' | 'stale'
-  error: string | null
+  error?: string
 }`}
       />
       <p>
