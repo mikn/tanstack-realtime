@@ -74,10 +74,12 @@ When a user opens your app in multiple browser tabs, each tab would normally ope
 ```ts
 // realtime.worker.ts — a separate file your bundler produces
 import { createSharedWorkerCoordinator } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
 
+// createSharedWorkerCoordinator requires a PresenceCapable transport.
+// The Centrifugo adapter implements PresenceCapable; sseTransport does not.
 const coordinator = createSharedWorkerCoordinator(
-  sseTransport({ url: '/api/realtime/sse' }),
+  centrifugoTransport({ url: 'wss://your-centrifugo.example.com/connection/websocket', token: () => fetchAuthToken() }),
 )
 
 self.addEventListener('connect', (e) => {
@@ -89,7 +91,7 @@ Then in your app code you point to it:
 
 ```ts
 const transport = createCoordinatedTransport({
-  transport: () => sseTransport({ url: '/api/realtime/sse' }),
+  transport: () => centrifugoTransport({ url: 'wss://your-centrifugo.example.com/connection/websocket', token: () => fetchAuthToken() }),
   workerUrl: new URL('./realtime.worker.ts', import.meta.url),
 })
 ```
