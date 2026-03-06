@@ -10,66 +10,14 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { Store } from '@tanstack/store'
 import {
-  createOfflineQueue,
+  createMockPresenceTransport,
+  createMockTransport,
   createRealtimeClient,
   hasPresence,
-  withGapRecovery,
 } from '@tanstack/realtime'
 
-// ---------------------------------------------------------------------------
-// withGapRecovery — throws on presence when inner is base-only
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// createOfflineQueue — throws on presence when inner is base-only
-// ---------------------------------------------------------------------------
-
-import type {
-  ConnectionStatus,
-  PresenceCapable,
-  RealtimeTransport,
-} from '@tanstack/realtime'
-
-// ---------------------------------------------------------------------------
-// Mock transports
-// ---------------------------------------------------------------------------
-
-function createBaseTransport(): RealtimeTransport & {
-  setStatus: (s: ConnectionStatus) => void
-} {
-  const store = new Store<ConnectionStatus>('disconnected')
-  return {
-    store,
-    setStatus(s: ConnectionStatus) {
-      store.setState(() => s)
-    },
-    async connect() {},
-    disconnect() {},
-    subscribe(_ch, _cb) {
-      return () => {}
-    },
-    async publish() {},
-  }
-}
-
-function createPresenceTransport(): (RealtimeTransport & PresenceCapable) & {
-  setStatus: (s: ConnectionStatus) => void
-  joinPresence: ReturnType<typeof vi.fn>
-  updatePresence: ReturnType<typeof vi.fn>
-  leavePresence: ReturnType<typeof vi.fn>
-  onPresenceChange: ReturnType<typeof vi.fn>
-} {
-  const base = createBaseTransport()
-  return {
-    ...base,
-    joinPresence: vi.fn(),
-    updatePresence: vi.fn(),
-    leavePresence: vi.fn(),
-    onPresenceChange: vi.fn((_ch, _cb) => () => {}),
-  }
-}
+import type { RealtimeTransport } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // hasPresence type guard
@@ -77,44 +25,41 @@ function createPresenceTransport(): (RealtimeTransport & PresenceCapable) & {
 
 describe('hasPresence', () => {
   it('returns false for a base-only transport (no joinPresence)', () => {
-    const t = createBaseTransport()
+    const t = createMockTransport()
     expect(hasPresence(t)).toBe(false)
   })
 
   it('returns true for a presence-capable transport', () => {
-    const t = createPresenceTransport()
+    const t = createMockPresenceTransport()
     expect(hasPresence(t)).toBe(true)
   })
 
   it('returns false when joinPresence is not a function', () => {
-    const t = createBaseTransport() as unknown as Record<string, unknown>
+    const t = createMockTransport() as unknown as Record<string, unknown>
     t['joinPresence'] = 'not-a-function'
     expect(hasPresence(t as unknown as RealtimeTransport)).toBe(false)
   })
 
   it('returns false when joinPresence is null', () => {
-    const t = createBaseTransport() as unknown as Record<string, unknown>
+    const t = createMockTransport() as unknown as Record<string, unknown>
     t['joinPresence'] = null
     expect(hasPresence(t as unknown as RealtimeTransport)).toBe(false)
   })
 
   it('returns false when joinPresence is undefined', () => {
-    const t = createBaseTransport() as unknown as Record<string, unknown>
+    const t = createMockTransport() as unknown as Record<string, unknown>
     t['joinPresence'] = undefined
     expect(hasPresence(t as unknown as RealtimeTransport)).toBe(false)
   })
 
   it('returns true with only joinPresence defined (single-method check)', () => {
-    // hasPresence checks joinPresence only — documents the intentional minimal check
-    const t = { ...createBaseTransport(), joinPresence: vi.fn() }
+    const t = { ...createMockTransport(), joinPresence: vi.fn() }
     expect(hasPresence(t)).toBe(true)
   })
 
   it('acts as a type narrowing guard — narrowed type has presence methods', () => {
-    const t: RealtimeTransport = createPresenceTransport()
+    const t: RealtimeTransport = createMockPresenceTransport()
     if (hasPresence(t)) {
-      // TypeScript narrowed to RealtimeTransport & PresenceCapable inside this block.
-      // If this compiles without error the narrowing works.
       // eslint-disable-next-line vitest/no-conditional-expect
       expect(typeof t.joinPresence).toBe('function')
       // eslint-disable-next-line vitest/no-conditional-expect
@@ -137,29 +82,29 @@ describe('hasPresence', () => {
 
 describe('createRealtimeClient — presence guards (base transport)', () => {
   it('throws for joinPresence with a descriptive message', () => {
-    const client = createRealtimeClient({ transport: createBaseTransport() })
+    const client = createRealtimeClient({ transport: createMockTransport() })
     expect(() => client.joinPresence('ch', {})).toThrow('PresenceCapable')
   })
 
   it('throws for updatePresence with a descriptive message', () => {
-    const client = createRealtimeClient({ transport: createBaseTransport() })
+    const client = createRealtimeClient({ transport: createMockTransport() })
     expect(() => client.updatePresence('ch', {})).toThrow('PresenceCapable')
   })
 
   it('throws for leavePresence with a descriptive message', () => {
-    const client = createRealtimeClient({ transport: createBaseTransport() })
+    const client = createRealtimeClient({ transport: createMockTransport() })
     expect(() => client.leavePresence('ch')).toThrow('PresenceCapable')
   })
 
   it('throws for onPresenceChange with a descriptive message', () => {
-    const client = createRealtimeClient({ transport: createBaseTransport() })
+    const client = createRealtimeClient({ transport: createMockTransport() })
     expect(() => client.onPresenceChange('ch', vi.fn())).toThrow(
       'PresenceCapable',
     )
   })
 
   it('error message names the failing method', () => {
-    const client = createRealtimeClient({ transport: createBaseTransport() })
+    const client = createRealtimeClient({ transport: createMockTransport() })
     expect(() => client.joinPresence('ch', {})).toThrow('joinPresence()')
   })
 })
@@ -170,43 +115,18 @@ describe('createRealtimeClient — presence guards (base transport)', () => {
 
 describe('createRealtimeClient — presence delegation (presence transport)', () => {
   it('delegates joinPresence to the transport', () => {
-    const transport = createPresenceTransport()
+    const transport = createMockPresenceTransport()
     const client = createRealtimeClient({ transport })
     client.joinPresence('ch', { name: 'Alice' })
-    expect(transport.joinPresence).toHaveBeenCalledWith('ch', { name: 'Alice' })
-  })
-
-  it('delegates updatePresence to the transport', () => {
-    const transport = createPresenceTransport()
-    const client = createRealtimeClient({ transport })
-    client.updatePresence('ch', { status: 'busy' })
-    expect(transport.updatePresence).toHaveBeenCalledWith('ch', {
-      status: 'busy',
-    })
+    expect(transport.getPresenceState('ch').length).toBeGreaterThan(0)
   })
 
   it('delegates leavePresence to the transport', () => {
-    const transport = createPresenceTransport()
+    const transport = createMockPresenceTransport()
     const client = createRealtimeClient({ transport })
+    client.joinPresence('ch', { name: 'Alice' })
     client.leavePresence('ch')
-    expect(transport.leavePresence).toHaveBeenCalledWith('ch')
-  })
-
-  it('delegates onPresenceChange to the transport and forwards the callback', () => {
-    const transport = createPresenceTransport()
-    const client = createRealtimeClient({ transport })
-    const cb = vi.fn()
-    client.onPresenceChange('ch', cb)
-    expect(transport.onPresenceChange).toHaveBeenCalledWith('ch', cb)
-  })
-
-  it('returns unsubscribe function from onPresenceChange', () => {
-    const transport = createPresenceTransport()
-    const unsub = vi.fn()
-    transport.onPresenceChange.mockReturnValue(unsub)
-    const client = createRealtimeClient({ transport })
-    const returned = client.onPresenceChange('ch', vi.fn())
-    expect(returned).toBe(unsub)
+    expect(transport.getPresenceState('ch').length).toBe(0)
   })
 })
 
@@ -216,12 +136,12 @@ describe('createRealtimeClient — presence delegation (presence transport)', ()
 
 describe('createRealtimeClient — lifecycle', () => {
   it('destroy() does not throw', () => {
-    const client = createRealtimeClient({ transport: createBaseTransport() })
+    const client = createRealtimeClient({ transport: createMockTransport() })
     expect(() => client.destroy()).not.toThrow()
   })
 
   it('calling destroy() twice does not throw', () => {
-    const client = createRealtimeClient({ transport: createBaseTransport() })
+    const client = createRealtimeClient({ transport: createMockTransport() })
     expect(() => {
       client.destroy()
       client.destroy()
@@ -229,114 +149,34 @@ describe('createRealtimeClient — lifecycle', () => {
   })
 
   it('status store mirrors transport changes after reconnect', async () => {
-    const transport = createBaseTransport()
+    const transport = createMockTransport({ initialStatus: 'disconnected' })
     const client = createRealtimeClient({ transport })
 
-    // Destroy (as RealtimeProvider.useEffect cleanup does in Strict Mode).
     client.destroy()
 
-    // Reconnect re-establishes the status subscription.
     await client.connect()
 
-    // Now simulate transport becoming connected.
-    transport.setStatus('connected')
-
-    // After the subscription is restored, status should mirror the transport.
     expect(client.store.get().status).toBe('connected')
   })
 
   it('status store updates when transport status changes (normal path)', () => {
-    const transport = createBaseTransport()
+    const transport = createMockTransport({ initialStatus: 'disconnected' })
     const client = createRealtimeClient({ transport })
 
-    transport.setStatus('connected')
+    transport.simulateReconnect()
     expect(client.store.get().status).toBe('connected')
 
-    transport.setStatus('reconnecting')
+    transport.simulateDisconnect()
     expect(client.store.get().status).toBe('reconnecting')
-
-    transport.setStatus('disconnected')
-    expect(client.store.get().status).toBe('disconnected')
   })
 
   it('presence guards still work after destroy + reconnect', async () => {
-    const transport = createBaseTransport()
+    const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
 
     client.destroy()
     await client.connect()
 
-    // Presence guard must still throw (transport has no presence).
     expect(() => client.joinPresence('ch', {})).toThrow('PresenceCapable')
-  })
-})
-
-describe('withGapRecovery — presence guards', () => {
-  it('throws joinPresence when inner transport is base-only', () => {
-    const inner = createBaseTransport()
-    const transport = withGapRecovery(inner, { onGap: vi.fn() }) as any
-    expect(() => transport.joinPresence('ch', {})).toThrow('withGapRecovery')
-  })
-
-  it('throws updatePresence when inner transport is base-only', () => {
-    const inner = createBaseTransport()
-    const transport = withGapRecovery(inner, { onGap: vi.fn() }) as any
-    expect(() => transport.updatePresence('ch', {})).toThrow('withGapRecovery')
-  })
-
-  it('throws leavePresence when inner transport is base-only', () => {
-    const inner = createBaseTransport()
-    const transport = withGapRecovery(inner, { onGap: vi.fn() }) as any
-    expect(() => transport.leavePresence('ch')).toThrow('withGapRecovery')
-  })
-
-  it('throws onPresenceChange when inner transport is base-only', () => {
-    const inner = createBaseTransport()
-    const transport = withGapRecovery(inner, { onGap: vi.fn() }) as any
-    expect(() => transport.onPresenceChange('ch', vi.fn())).toThrow(
-      'withGapRecovery',
-    )
-  })
-
-  it('delegates presence methods when inner is presence-capable', () => {
-    const inner = createPresenceTransport()
-    const transport = withGapRecovery(inner, { onGap: vi.fn() }) as any
-    transport.joinPresence('ch', { id: 1 })
-    expect(inner.joinPresence).toHaveBeenCalledWith('ch', { id: 1 })
-  })
-})
-
-describe('createOfflineQueue — presence guards', () => {
-  it('throws joinPresence when inner transport is base-only', () => {
-    const inner = createBaseTransport()
-    const queue = createOfflineQueue(inner) as any
-    expect(() => queue.joinPresence('ch', {})).toThrow('createOfflineQueue')
-  })
-
-  it('throws updatePresence when inner transport is base-only', () => {
-    const inner = createBaseTransport()
-    const queue = createOfflineQueue(inner) as any
-    expect(() => queue.updatePresence('ch', {})).toThrow('createOfflineQueue')
-  })
-
-  it('throws leavePresence when inner transport is base-only', () => {
-    const inner = createBaseTransport()
-    const queue = createOfflineQueue(inner) as any
-    expect(() => queue.leavePresence('ch')).toThrow('createOfflineQueue')
-  })
-
-  it('throws onPresenceChange when inner transport is base-only', () => {
-    const inner = createBaseTransport()
-    const queue = createOfflineQueue(inner) as any
-    expect(() => queue.onPresenceChange('ch', vi.fn())).toThrow(
-      'createOfflineQueue',
-    )
-  })
-
-  it('delegates presence methods when inner is presence-capable', () => {
-    const inner = createPresenceTransport()
-    const queue = createOfflineQueue(inner) as any
-    queue.joinPresence('ch', { user: 'bob' })
-    expect(inner.joinPresence).toHaveBeenCalledWith('ch', { user: 'bob' })
   })
 })

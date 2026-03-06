@@ -227,22 +227,23 @@ function SyncBanner() {
 
       <h2 id="offline-queue">Offline queue integration</h2>
       <p>
-        Wrap your transport with <code>createOfflineQueue</code> to buffer
-        publishes while the client is offline. Queued messages replay
-        automatically in FIFO order when the connection is restored. Pair with{' '}
-        <code>optimistic: true</code> on your collections so local writes appear
-        instantly while the queue waits to flush.
+        Register an offline queue on your transport with{' '}
+        <code>useOfflineQueue</code> to buffer publishes while the client is
+        offline. Queued messages replay automatically in FIFO order when the
+        connection is restored. Pair with <code>optimistic: true</code> on your
+        collections so local writes appear instantly while the queue waits to
+        flush.
       </p>
       <CodeBlock
-        code={`import { createOfflineQueue, createLocalStorageAdapter } from '@tanstack/realtime'
+        code={`import { useOfflineQueue, createLocalStorageAdapter } from '@tanstack/realtime'
 
-const transport = createOfflineQueue(baseTransport, {
+const queue = useOfflineQueue(baseTransport, {
   maxSize: 500,
   storage: createLocalStorageAdapter(),
 })
 
 // Collections using this transport automatically buffer offline mutations.
-const client = createRealtimeClient({ transport })`}
+const client = createRealtimeClient({ transport: baseTransport })`}
       />
       <p>
         See <a href="#/docs/resilience">Resilience</a> for full offline queue

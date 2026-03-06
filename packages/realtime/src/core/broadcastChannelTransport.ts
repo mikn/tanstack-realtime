@@ -29,7 +29,9 @@
  */
 
 import { Store } from '@tanstack/store'
+import { createHookPipeline } from './hookPipeline.js'
 import { hasPresence } from './types.js'
+import type { HookHandle, HookRegistration } from './hooks.js'
 import type {
   ConnectionStatus,
   PresenceCapable,
@@ -760,7 +762,13 @@ export function createBroadcastChannelTransport(
         subscribeErrorListeners.delete(callback)
       }
     },
+
+    hook(registration: HookRegistration): HookHandle {
+      return localPipeline.register(registration)
+    },
   }
+
+  const localPipeline = createHookPipeline()
 
   return transport
 }

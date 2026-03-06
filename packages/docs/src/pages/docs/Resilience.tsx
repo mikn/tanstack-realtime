@@ -11,32 +11,31 @@ export function Resilience() {
 
       <h2 id="offline-queue">Offline queue</h2>
       <p>
-        Wrap any transport with <code>createOfflineQueue</code>. Publishes
-        buffer and replay in FIFO order when the connection comes back. Plug in{' '}
-        <code>localStorage</code> or IndexedDB so messages survive page refresh.
+        Register an offline queue on any transport with{' '}
+        <code>useOfflineQueue</code>. Publishes buffer and replay in FIFO order
+        when the connection comes back. Plug in <code>localStorage</code> or
+        IndexedDB so messages survive page refresh.
       </p>
       <CodeBlock
         code={`import {
-  createOfflineQueue,
+  useOfflineQueue,
   createLocalStorageAdapter,
   createRealtimeClient,
 } from '@tanstack/realtime'
 import { sseTransport } from '@tanstack/realtime-adapter-sse'
 import { useStore } from '@tanstack/react-store'
 
-const transport = createOfflineQueue(
-  sseTransport({ url: '/api/realtime' }),
-  {
-    maxSize: 500,
-    storage: createLocalStorageAdapter(),
-  },
-)
+const transport = sseTransport({ url: '/api/realtime' })
+const queue = useOfflineQueue(transport, {
+  maxSize: 500,
+  storage: createLocalStorageAdapter(),
+})
 
 const client = createRealtimeClient({ transport })
 
 // Reactive pending-count badge
 function SyncStatus() {
-  const pending = useStore(transport.queueStore, (s) => s.pending.length)
+  const pending = useStore(queue.store, (s) => s.pending.length)
   return pending > 0
     ? <span>{pending} changes pending sync</span>
     : null
@@ -46,7 +45,7 @@ function SyncStatus() {
       <h2 id="gap-recovery">Gap recovery</h2>
       <p>
         Two paths: add <code>refetchOnReconnect: true</code> to any collection
-        that has a <code>queryFn</code>, or use <code>withGapRecovery</code> at
+        that has a <code>queryFn</code>, or use <code>useGapRecovery</code> at
         the transport level.
       </p>
       <CodeBlock
@@ -58,17 +57,15 @@ const tasksOptions = realtimeCollectionOptions({
 })
 
 // Option B — transport level
-import { withGapRecovery } from '@tanstack/realtime'
+import { useGapRecovery } from '@tanstack/realtime'
 import { sseTransport } from '@tanstack/realtime-adapter-sse'
 
-const transport = withGapRecovery(
-  sseTransport({ url: '/api/realtime' }),
-  {
-    onGap: async (channel) => {
-      await refetchCollection(channel)
-    },
+const transport = sseTransport({ url: '/api/realtime' })
+useGapRecovery(transport, {
+  onGap: async (channel) => {
+    await refetchCollection(channel)
   },
-)`}
+})`}
       />
 
       <h2 id="multi-tab">Multi-tab coordination</h2>

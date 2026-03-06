@@ -1,6 +1,9 @@
 import { Store } from '@tanstack/store'
+import { createHookPipeline } from '@tanstack/realtime'
 import type {
   ConnectionStatus,
+  HookHandle,
+  HookRegistration,
   PresenceCapable,
   PresenceUser,
   RealtimeTransport,
@@ -206,6 +209,8 @@ export function centrifugoTransport(
     WebSocket: WebSocketImpl = globalThis.WebSocket,
   } = options
 
+  const pipeline = createHookPipeline()
+
   const store = new Store<ConnectionStatus>('disconnected')
 
   // channel → Set of message callbacks
@@ -368,7 +373,10 @@ export function centrifugoTransport(
       // Regular publication — dispatch to data subscribers
       const listeners = subscriptions.get(channel)
       if (listeners) {
-        for (const cb of listeners) cb(data)
+        const result = pipeline.runBeforeDeliver(channel, data)
+        if (result !== false) {
+          for (const cb of listeners) cb(result.data)
+        }
       }
     }
   }
@@ -380,7 +388,9 @@ export function centrifugoTransport(
     const listeners = subscriptions.get(channel)
     if (!listeners || listeners.size === 0) return
     for (const pub of publications) {
-      for (const cb of listeners) cb(pub.data)
+      const result = pipeline.runBeforeDeliver(channel, pub.data)
+      if (result === false) continue
+      for (const cb of listeners) cb(result.data)
     }
   }
 
@@ -750,6 +760,10 @@ export function centrifugoTransport(
       return () => {
         subscribeErrorListeners.delete(callback)
       }
+    },
+
+    hook(registration: HookRegistration): HookHandle {
+      return pipeline.register(registration)
     },
   }
 

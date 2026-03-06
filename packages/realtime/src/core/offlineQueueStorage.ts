@@ -2,7 +2,7 @@
  * Pluggable storage adapters for the offline queue.
  *
  * By default the offline queue is memory-only — pending messages are lost on
- * page refresh. Import a storage adapter and pass it to `createOfflineQueue`
+ * page refresh. Import a storage adapter and pass it to `useOfflineQueue`
  * to persist messages across page reloads.
  *
  * Two built-in adapters are provided:
@@ -62,9 +62,9 @@ export interface IndexedDBStorageOptions {
  * is unavailable (returns empty arrays and no-ops on save/clear).
  *
  * @example
- * import { createOfflineQueue, createIndexedDBStorage } from '@tanstack/realtime'
+ * import { useOfflineQueue, createIndexedDBStorage } from '@tanstack/realtime'
  *
- * const transport = createOfflineQueue(inner, {
+ * const transport = useOfflineQueue(inner, {
  *   storage: createIndexedDBStorage(),
  * })
  */
@@ -164,9 +164,9 @@ export interface LocalStorageOptions {
  * For larger queues, use `createIndexedDBStorage`.
  *
  * @example
- * import { createOfflineQueue, createLocalStorageAdapter } from '@tanstack/realtime'
+ * import { useOfflineQueue, createLocalStorageAdapter } from '@tanstack/realtime'
  *
- * const transport = createOfflineQueue(inner, {
+ * const transport = useOfflineQueue(inner, {
  *   storage: createLocalStorageAdapter(),
  * })
  */

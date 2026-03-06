@@ -5,11 +5,8 @@ import type { MockTransport, MockTransportOptions } from './mockTransport.js'
 export interface MockPresenceTransportOptions extends MockTransportOptions {}
 
 export interface MockPresenceTransport extends MockTransport, PresenceCapable {
-  /** Simulate a user joining presence on a channel. */
   simulatePresenceJoin: (channel: string, user: PresenceUser) => void
-  /** Simulate a user leaving presence on a channel. */
   simulatePresenceLeave: (channel: string, connectionId: string) => void
-  /** Get the current presence data for a channel. */
   getPresenceState: (channel: string) => ReadonlyArray<PresenceUser>
 }
 
@@ -18,10 +15,7 @@ export function createMockPresenceTransport(
 ): MockPresenceTransport {
   const base = createMockTransport(options)
 
-  // Track presence state per channel
   const presenceState = new Map<string, Array<PresenceUser>>()
-  // Track the "self" connectionId per channel so updatePresence / leavePresence
-  // operate on the correct entry even when simulated peers are interspersed.
   const selfConnectionIds = new Map<string, string>()
   const presenceListeners = new Map<
     string,
@@ -39,7 +33,6 @@ export function createMockPresenceTransport(
   return {
     ...base,
 
-    // Re-define getters that were flattened by the spread operator
     get publishLog() {
       return base.publishLog
     },
@@ -98,8 +91,6 @@ export function createMockPresenceTransport(
         }
       }
     },
-
-    // --- Mock control methods ---
 
     simulatePresenceJoin(channel, user) {
       if (!presenceState.has(channel)) presenceState.set(channel, [])

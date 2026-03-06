@@ -1,4 +1,5 @@
 import type { Store } from '@tanstack/store'
+import type { HookHandle, HookRegistration } from './hooks.js'
 
 // ---------------------------------------------------------------------------
 // Shared types
@@ -120,6 +121,16 @@ export interface RealtimeTransport {
 
   /** TanStack Store holding the current connection status. */
   readonly store: Store<ConnectionStatus>
+
+  /**
+   * Register hooks into the transport's lifecycle pipeline.
+   * Returns a handle to remove the hooks.
+   *
+   * Hooks run in priority order (lower first). Multiple hooks of the
+   * same type form a pipeline — `beforeDeliver` hooks run sequentially,
+   * and if any returns `false`, the message is suppressed.
+   */
+  hook: (registration: HookRegistration) => HookHandle
 }
 
 /**
@@ -174,23 +185,6 @@ export interface PresenceCapable {
     callback: (users: ReadonlyArray<PresenceUser>) => void,
   ) => () => void
 }
-
-/**
- * Utility type for transport middleware that preserves the presence capability
- * of the inner transport. Use in place of `RealtimeTransport` when writing
- * middleware that conditionally forwards presence methods.
- *
- * @example
- * function myMiddleware<T extends RealtimeTransport>(
- *   inner: T,
- * ): PresenceAwareTransport<T> & { myCustomMethod: () => void } {
- *   // ...
- * }
- */
-export type PresenceAwareTransport<T extends RealtimeTransport> =
-  T extends PresenceCapable
-    ? RealtimeTransport & PresenceCapable
-    : RealtimeTransport
 
 /**
  * Type guard — returns `true` when `transport` implements {@link PresenceCapable}.
@@ -353,4 +347,10 @@ export interface RealtimeClient {
   onSubscribeError: (
     callback: (channel: string, reason: string, code?: number) => void,
   ) => () => void
+
+  /**
+   * Register hooks into the transport's lifecycle pipeline.
+   * Delegates to the underlying transport's `hook()` method.
+   */
+  hook: (registration: HookRegistration) => HookHandle
 }

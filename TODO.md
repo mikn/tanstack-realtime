@@ -33,7 +33,7 @@ Each section is a self-contained project. Tasks are ordered by dependency within
   - [ ] Show `others.filter(u => u.data.cursor)` pattern
   - [ ] README with setup instructions
 - [ ] **examples/offline-first** — offline queue + multi-tab coordination
-  - [ ] Client: React + `createOfflineQueue` + `createCoordinatedTransport`
+  - [ ] Client: React + `useOfflineQueue` + `createCoordinatedTransport`
   - [ ] Show IndexedDB persistence, pending-count badge from `queueStore`
   - [ ] Demonstrate going offline, queueing mutations, reconnecting
   - [ ] README with setup instructions

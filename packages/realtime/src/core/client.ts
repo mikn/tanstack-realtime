@@ -34,16 +34,10 @@ export function createRealtimeClient(
 ): RealtimeClient {
   const { transport } = options
 
-  // Mirror the transport's status into a typed store so React / Vue / Solid
-  // adapters can observe it via their respective `useStore` implementations.
   const store = new Store<{ status: ConnectionStatus }>({
     status: transport.store.get(),
   })
 
-  // The status subscription is lazily managed so that destroy() + connect()
-  // round-trips are safe — the client can be destroyed and reconnected without
-  // creating a second instance. This is important for React Strict Mode where
-  // provider effects fire twice (mount → unmount → remount).
   let statusSub: { unsubscribe: () => void } | null = null
 
   function ensureStatusSubscription(): void {
@@ -53,7 +47,6 @@ export function createRealtimeClient(
     })
   }
 
-  // Subscribe immediately so the store reflects transport state from the start.
   ensureStatusSubscription()
 
   const clientId = generateClientId()
@@ -63,7 +56,6 @@ export function createRealtimeClient(
     store,
 
     async connect() {
-      // Re-establish the status subscription if destroy() was called before.
       ensureStatusSubscription()
       return transport.connect()
     },
@@ -73,14 +65,8 @@ export function createRealtimeClient(
     },
 
     destroy() {
-      // Unsubscribe from the transport status store first, so that the
-      // subsequent disconnect does not propagate a 'disconnected' status
-      // through the client store (callers should no longer observe it).
       statusSub?.unsubscribe()
       statusSub = null
-      // Disconnect the transport so the WebSocket is closed and no further
-      // events are processed. This prevents leaking connections when the
-      // client is torn down (e.g. React provider unmount).
       transport.disconnect()
     },
 
@@ -120,8 +106,11 @@ export function createRealtimeClient(
       if (transport.onSubscribeError) {
         return transport.onSubscribeError(callback)
       }
-      // No-op for transports that don't support subscribe errors
       return () => {}
+    },
+
+    hook(registration) {
+      return transport.hook(registration)
     },
   }
 

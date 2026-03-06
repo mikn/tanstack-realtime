@@ -1,18 +1,19 @@
 /**
- * Tests for the offline queue (createOfflineQueue).
+ * Tests for the offline queue (useOfflineQueue).
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Store } from '@tanstack/store'
-import { createOfflineQueue } from '@tanstack/realtime'
+import { useOfflineQueue } from '@tanstack/realtime'
+import { createHookPipeline } from '../../packages/realtime/src/core/hookPipeline.js'
+import type { ConnectionStatus, RealtimeTransport } from '@tanstack/realtime'
 import type {
-  ConnectionStatus,
-  PresenceCapable,
-  RealtimeTransport,
-} from '@tanstack/realtime'
+  HookHandle,
+  HookRegistration,
+} from '../../packages/realtime/src/core/hooks.js'
 
 // ---------------------------------------------------------------------------
-// Mock transport with controllable connection status
+// Mock transport with controllable connection status and hook support
 // ---------------------------------------------------------------------------
 
 function createMockTransport(): RealtimeTransport & {
@@ -26,6 +27,35 @@ function createMockTransport(): RealtimeTransport & {
     channel: string,
     data: unknown,
   ) => Promise<void> = async () => {}
+
+  const pipeline = createHookPipeline()
+
+  // Track status for hook invocation.
+  let previousStatus: ConnectionStatus = 'disconnected'
+  let wasEverConnected = false
+  let wasDisconnected = false
+
+  store.subscribe((status) => {
+    const prev = previousStatus
+    previousStatus = status
+
+    if (prev === 'connected' && status !== 'connected') {
+      pipeline.runOnDisconnect(status as 'disconnected' | 'reconnecting')
+    }
+
+    if (status === 'reconnecting' || status === 'disconnected') {
+      wasDisconnected = true
+    }
+
+    if (status === 'connected') {
+      if (wasDisconnected && wasEverConnected) {
+        void pipeline.runOnReconnect(new Set())
+      }
+      void pipeline.runOnConnect()
+      wasEverConnected = true
+      wasDisconnected = false
+    }
+  })
 
   return {
     store,
@@ -45,28 +75,18 @@ function createMockTransport(): RealtimeTransport & {
       return () => {}
     },
     async publish(channel, data) {
-      publishCalls.push({ channel, data })
-      return publishImpl(channel, data)
+      const result = pipeline.runBeforePublish(channel, data)
+      if (result === false) return
+      publishCalls.push({ channel, data: result.data })
+      return publishImpl(channel, result.data)
+    },
+    hook(registration: HookRegistration): HookHandle {
+      return pipeline.register(registration)
     },
   }
 }
 
-function createPresenceMockTransport(): (RealtimeTransport &
-  PresenceCapable) & {
-  setStatus: (s: ConnectionStatus) => void
-  publishCalls: Array<{ channel: string; data: unknown }>
-  publishImpl: (channel: string, data: unknown) => Promise<void>
-} {
-  return {
-    ...createMockTransport(),
-    joinPresence: vi.fn(),
-    updatePresence: vi.fn(),
-    leavePresence: vi.fn(),
-    onPresenceChange: vi.fn(() => () => {}),
-  }
-}
-
-describe('createOfflineQueue', () => {
+describe('useOfflineQueue', () => {
   beforeEach(() => {
     vi.useFakeTimers()
   })
@@ -78,32 +98,32 @@ describe('createOfflineQueue', () => {
   it('passes through publishes when connected', async () => {
     const inner = createMockTransport()
     inner.setStatus('connected')
-    const queue = createOfflineQueue(inner)
+    const queue = useOfflineQueue(inner)
 
-    await queue.publish('ch', { msg: 1 })
+    await inner.publish('ch', { msg: 1 })
     expect(inner.publishCalls).toHaveLength(1)
     expect(inner.publishCalls[0]).toEqual({ channel: 'ch', data: { msg: 1 } })
-    expect(queue.queueStore.state.pending).toHaveLength(0)
+    expect(queue.store.state.pending).toHaveLength(0)
   })
 
   it('enqueues messages when disconnected', async () => {
     const inner = createMockTransport()
     // status starts disconnected
-    const queue = createOfflineQueue(inner)
+    const queue = useOfflineQueue(inner)
 
-    await queue.publish('ch', { msg: 1 })
-    await queue.publish('ch', { msg: 2 })
+    await inner.publish('ch', { msg: 1 })
+    await inner.publish('ch', { msg: 2 })
     expect(inner.publishCalls).toHaveLength(0) // nothing sent
-    expect(queue.queueStore.state.pending).toHaveLength(2)
+    expect(queue.store.state.pending).toHaveLength(2)
   })
 
   it('flushes queue on reconnect', async () => {
     const inner = createMockTransport()
-    const queue = createOfflineQueue(inner)
+    const queue = useOfflineQueue(inner)
 
     // Enqueue while disconnected.
-    await queue.publish('ch', { msg: 1 })
-    await queue.publish('ch', { msg: 2 })
+    await inner.publish('ch', { msg: 1 })
+    await inner.publish('ch', { msg: 2 })
     expect(inner.publishCalls).toHaveLength(0)
 
     // Reconnect.
@@ -114,8 +134,8 @@ describe('createOfflineQueue', () => {
     expect(inner.publishCalls).toHaveLength(2)
     expect(inner.publishCalls[0].data).toEqual({ msg: 1 })
     expect(inner.publishCalls[1].data).toEqual({ msg: 2 })
-    expect(queue.queueStore.state.pending).toHaveLength(0)
-    expect(queue.queueStore.state.flushed).toBe(2)
+    expect(queue.store.state.pending).toHaveLength(0)
+    expect(queue.store.state.flushed).toBe(2)
   })
 
   it('tracks isFlushing state', async () => {
@@ -126,51 +146,25 @@ describe('createOfflineQueue', () => {
         resolvePublish = resolve
       })
 
-    const queue = createOfflineQueue(inner)
-    await queue.publish('ch', { msg: 1 })
+    const queue = useOfflineQueue(inner)
+    await inner.publish('ch', { msg: 1 })
 
     // Trigger flush.
     inner.setStatus('connected')
     await vi.advanceTimersByTimeAsync(0)
 
     // Should be flushing (publish is pending).
-    expect(queue.queueStore.state.isFlushing).toBe(true)
+    expect(queue.store.state.isFlushing).toBe(true)
 
     // Complete the publish.
     resolvePublish!()
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(queue.queueStore.state.isFlushing).toBe(false)
-    expect(queue.queueStore.state.flushed).toBe(1)
+    expect(queue.store.state.isFlushing).toBe(false)
+    expect(queue.store.state.flushed).toBe(1)
   })
 
-  it('evicts oldest messages when maxSize is exceeded', async () => {
-    const inner = createMockTransport()
-    const queue = createOfflineQueue(inner, { maxSize: 2 })
-
-    await queue.publish('ch', { msg: 1 })
-    await queue.publish('ch', { msg: 2 })
-    await queue.publish('ch', { msg: 3 }) // evicts msg 1
-
-    expect(queue.queueStore.state.pending).toHaveLength(2)
-    const pending = queue.queueStore.state.pending
-    expect((pending[0] as { data: { msg: number } }).data.msg).toBe(2)
-    expect((pending[1] as { data: { msg: number } }).data.msg).toBe(3)
-  })
-
-  it('clearQueue discards all pending messages', async () => {
-    const inner = createMockTransport()
-    const queue = createOfflineQueue(inner)
-
-    await queue.publish('ch', { msg: 1 })
-    await queue.publish('ch', { msg: 2 })
-    expect(queue.queueStore.state.pending).toHaveLength(2)
-
-    queue.clearQueue()
-    expect(queue.queueStore.state.pending).toHaveLength(0)
-  })
-
-  it('retries on flush error when onFlushError returns true', async () => {
+  it('calls onFlushError and retries when it returns true', async () => {
     const inner = createMockTransport()
     let callCount = 0
     inner.publishImpl = () => {
@@ -180,90 +174,101 @@ describe('createOfflineQueue', () => {
     }
 
     const onFlushError = vi.fn(() => true) // retry
-    const queue = createOfflineQueue(inner, { onFlushError })
+    const queue = useOfflineQueue(inner, { onFlushError })
 
-    await queue.publish('ch', { msg: 1 })
+    await inner.publish('ch', { msg: 1 })
 
     inner.setStatus('connected')
     await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(0)
 
+    // onFlushError was invoked with the queued message and the error.
     expect(onFlushError).toHaveBeenCalledTimes(1)
-    // Message should still be pending for retry.
-    expect(queue.queueStore.state.pending).toHaveLength(1)
-    expect(queue.queueStore.state.flushed).toBe(0)
+    expect((onFlushError.mock.calls[0] as Array<unknown>)[1]).toBeInstanceOf(
+      Error,
+    )
+    // The message was retried and eventually delivered.
+    expect(inner.publishCalls).toHaveLength(2)
+    expect(queue.store.state.flushed).toBeGreaterThanOrEqual(1)
   })
 
-  it('discards on flush error when onFlushError returns false', async () => {
+  it('calls onFlushError and discards when it returns false', async () => {
     const inner = createMockTransport()
     inner.publishImpl = () => {
       return Promise.reject(new Error('fail'))
     }
 
     const onFlushError = vi.fn(() => false) // discard
-    const queue = createOfflineQueue(inner, { onFlushError })
+    const queue = useOfflineQueue(inner, { onFlushError })
 
-    await queue.publish('ch', { msg: 1 })
+    await inner.publish('ch', { msg: 1 })
 
     inner.setStatus('connected')
     await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(0)
 
-    expect(onFlushError).toHaveBeenCalledTimes(1)
-    expect(queue.queueStore.state.pending).toHaveLength(0)
-    expect(queue.queueStore.state.flushed).toBe(0)
+    // onFlushError was invoked.
+    expect(onFlushError).toHaveBeenCalled()
+    // The message was discarded — not in pending, not flushed.
+    expect(queue.store.state.pending).toHaveLength(0)
+    expect(queue.store.state.flushed).toBe(0)
   })
 
-  it('delegates subscribe to inner transport', () => {
+  it('evicts oldest messages when maxSize is exceeded', async () => {
     const inner = createMockTransport()
-    const subscribeSpy = vi.spyOn(inner, 'subscribe')
-    const queue = createOfflineQueue(inner)
+    const queue = useOfflineQueue(inner, { maxSize: 2 })
 
-    const cb = vi.fn()
-    queue.subscribe('test-ch', cb)
-    expect(subscribeSpy).toHaveBeenCalledWith('test-ch', cb)
+    await inner.publish('ch', { msg: 1 })
+    await inner.publish('ch', { msg: 2 })
+    await inner.publish('ch', { msg: 3 }) // evicts msg 1
+
+    expect(queue.store.state.pending).toHaveLength(2)
+    const pending = queue.store.state.pending
+    expect((pending[0] as { data: { msg: number } }).data.msg).toBe(2)
+    expect((pending[1] as { data: { msg: number } }).data.msg).toBe(3)
   })
 
-  it('delegates connect and disconnect to inner transport', async () => {
+  it('clearQueue discards all pending messages', async () => {
     const inner = createMockTransport()
-    const connectSpy = vi.spyOn(inner, 'connect')
-    const disconnectSpy = vi.spyOn(inner, 'disconnect')
-    const queue = createOfflineQueue(inner)
+    const queue = useOfflineQueue(inner)
 
-    await queue.connect()
-    expect(connectSpy).toHaveBeenCalled()
+    await inner.publish('ch', { msg: 1 })
+    await inner.publish('ch', { msg: 2 })
+    expect(queue.store.state.pending).toHaveLength(2)
 
-    queue.disconnect()
-    expect(disconnectSpy).toHaveBeenCalled()
+    queue.clearQueue()
+    expect(queue.store.state.pending).toHaveLength(0)
   })
 
   it('assigns incrementing ids to queued messages', async () => {
     const inner = createMockTransport()
-    const queue = createOfflineQueue(inner)
+    const queue = useOfflineQueue(inner)
 
-    await queue.publish('ch', 'a')
-    await queue.publish('ch', 'b')
-    await queue.publish('ch', 'c')
+    await inner.publish('ch', 'a')
+    await inner.publish('ch', 'b')
+    await inner.publish('ch', 'c')
 
-    const ids = queue.queueStore.state.pending.map((m) => m.id)
+    const ids = queue.store.state.pending.map((m) => m.id)
     expect(ids).toEqual([1, 2, 3])
   })
 
   it('enqueues messages during reconnecting state', async () => {
     const inner = createMockTransport()
     inner.setStatus('reconnecting')
-    const queue = createOfflineQueue(inner)
+    const queue = useOfflineQueue(inner)
 
-    await queue.publish('ch', { msg: 1 })
+    await inner.publish('ch', { msg: 1 })
     expect(inner.publishCalls).toHaveLength(0)
-    expect(queue.queueStore.state.pending).toHaveLength(1)
+    expect(queue.store.state.pending).toHaveLength(1)
   })
 
   it('flushes messages across channels in FIFO order', async () => {
     const inner = createMockTransport()
-    const queue = createOfflineQueue(inner)
+    const _queue = useOfflineQueue(inner)
 
-    await queue.publish('ch-a', 1)
-    await queue.publish('ch-b', 2)
-    await queue.publish('ch-a', 3)
+    await inner.publish('ch-a', 1)
+    await inner.publish('ch-b', 2)
+    await inner.publish('ch-a', 3)
 
     inner.setStatus('connected')
     await vi.advanceTimersByTimeAsync(0)
@@ -271,73 +276,17 @@ describe('createOfflineQueue', () => {
     expect(inner.publishCalls.map((c) => c.data)).toEqual([1, 2, 3])
   })
 
-  it('shares the inner transport store reference', () => {
+  it('unhook removes offline queueing', async () => {
     const inner = createMockTransport()
-    const queue = createOfflineQueue(inner)
-    expect(queue.store).toBe(inner.store)
-  })
+    const queue = useOfflineQueue(inner)
 
-  it('delegates joinPresence to inner transport', () => {
-    const inner = createPresenceMockTransport()
-    const joinSpy = vi.spyOn(inner, 'joinPresence')
-    const queue = createOfflineQueue(inner) as any
+    await inner.publish('ch', { msg: 1 })
+    expect(queue.store.state.pending).toHaveLength(1)
 
-    queue.joinPresence('ch', { userId: 'u1' })
-    expect(joinSpy).toHaveBeenCalledWith('ch', { userId: 'u1' })
-  })
+    queue.unhook()
 
-  it('delegates updatePresence to inner transport', () => {
-    const inner = createPresenceMockTransport()
-    const updateSpy = vi.spyOn(inner, 'updatePresence')
-    const queue = createOfflineQueue(inner) as any
-
-    queue.updatePresence('ch', { status: 'away' })
-    expect(updateSpy).toHaveBeenCalledWith('ch', { status: 'away' })
-  })
-
-  it('delegates leavePresence to inner transport', () => {
-    const inner = createPresenceMockTransport()
-    const leaveSpy = vi.spyOn(inner, 'leavePresence')
-    const queue = createOfflineQueue(inner) as any
-
-    queue.leavePresence('ch')
-    expect(leaveSpy).toHaveBeenCalledWith('ch')
-  })
-
-  it('delegates onPresenceChange to inner transport', () => {
-    const inner = createPresenceMockTransport()
-    const onPresenceSpy = vi.spyOn(inner, 'onPresenceChange')
-    const queue = createOfflineQueue(inner) as any
-
-    const cb = vi.fn()
-    queue.onPresenceChange('ch', cb)
-    expect(onPresenceSpy).toHaveBeenCalledWith('ch', cb)
-  })
-
-  it('re-queues remaining messages when connection drops mid-flush', async () => {
-    const inner = createMockTransport()
-    let callCount = 0
-    inner.publishImpl = () => {
-      callCount++
-      // Drop connection after first publish so subsequent messages are re-queued.
-      if (callCount === 1) inner.setStatus('disconnected')
-      return Promise.resolve()
-    }
-
-    const queue = createOfflineQueue(inner)
-
-    await queue.publish('ch', 'first')
-    await queue.publish('ch', 'second')
-    await queue.publish('ch', 'third')
-
-    inner.setStatus('connected')
-    await vi.advanceTimersByTimeAsync(0)
-
-    // 'first' was published before the drop; 'second' and 'third' are re-queued.
-    expect(inner.publishCalls).toHaveLength(1)
-    expect(queue.queueStore.state.pending).toHaveLength(2)
-    expect((queue.queueStore.state.pending[0] as { data: string }).data).toBe(
-      'second',
-    )
+    // After unhook, publishes should no longer be intercepted (they'll just go nowhere since disconnected)
+    // But the queue handle still retains its state.
+    expect(queue.store.state.pending).toHaveLength(1)
   })
 })

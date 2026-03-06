@@ -1,4 +1,6 @@
 import { Store } from '@tanstack/store'
+import { createHookPipeline } from '../core/hookPipeline.js'
+import type { HookHandle, HookRegistration } from '../core/hooks.js'
 import type { ConnectionStatus, RealtimeTransport } from '../core/types.js'
 
 export interface MockTransportOptions {
@@ -50,8 +52,45 @@ export function createMockTransport(
     (channel: string, reason: string, code?: number) => void
   >()
 
+  const pipeline = createHookPipeline()
+
+  // Track channel ref counts for hook lifecycle.
+  const channelRefCounts = new Map<string, number>()
+  const activeChannelsSet = new Set<string>()
+
+  // Track connection status for hook invocation.
+  let previousStatus: ConnectionStatus = initialStatus
+  let wasEverConnected = initialStatus === 'connected'
+  let wasDisconnected = false
+
+  store.subscribe((status) => {
+    const prev = previousStatus
+    previousStatus = status
+
+    if (prev === 'connected' && status !== 'connected') {
+      pipeline.runOnDisconnect(status as 'disconnected' | 'reconnecting')
+    }
+
+    if (status === 'reconnecting' || status === 'disconnected') {
+      wasDisconnected = true
+    }
+
+    if (status === 'connected') {
+      if (wasDisconnected && wasEverConnected) {
+        void pipeline.runOnReconnect(activeChannelsSet)
+      }
+      void pipeline.runOnConnect()
+      wasEverConnected = true
+      wasDisconnected = false
+    }
+  })
+
   return {
     store,
+
+    hook(registration: HookRegistration): HookHandle {
+      return pipeline.register(registration)
+    },
 
     connect() {
       store.setState(() => 'connecting')
@@ -67,19 +106,43 @@ export function createMockTransport(
       if (!listeners.has(channel)) {
         listeners.set(channel, new Set())
       }
-      listeners.get(channel)!.add(onMessage)
+
+      const count = channelRefCounts.get(channel) ?? 0
+      channelRefCounts.set(channel, count + 1)
+      if (count === 0) {
+        activeChannelsSet.add(channel)
+        pipeline.runOnChannelSubscribe(channel)
+      }
+
+      const wrappedCallback = (raw: unknown) => {
+        const result = pipeline.runBeforeDeliver(channel, raw)
+        if (result === false) return
+        onMessage(result.data)
+      }
+      listeners.get(channel)!.add(wrappedCallback)
 
       return () => {
         const set = listeners.get(channel)
         if (set) {
-          set.delete(onMessage)
+          set.delete(wrappedCallback)
           if (set.size === 0) listeners.delete(channel)
+        }
+
+        const newCount = (channelRefCounts.get(channel) ?? 1) - 1
+        if (newCount <= 0) {
+          channelRefCounts.delete(channel)
+          activeChannelsSet.delete(channel)
+          pipeline.runOnChannelUnsubscribe(channel)
+        } else {
+          channelRefCounts.set(channel, newCount)
         }
       }
     },
 
     publish(channel, data) {
-      publishLog.push({ channel, data, timestamp: Date.now() })
+      const result = pipeline.runBeforePublish(channel, data)
+      if (result === false) return Promise.resolve()
+      publishLog.push({ channel, data: result.data, timestamp: Date.now() })
       return Promise.resolve()
     },
 

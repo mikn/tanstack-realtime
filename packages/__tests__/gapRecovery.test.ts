@@ -1,89 +1,36 @@
 /**
- * Tests for gap recovery (withGapRecovery).
+ * Tests for gap recovery (useGapRecovery).
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { Store } from '@tanstack/store'
-import { withGapRecovery } from '@tanstack/realtime'
-import type {
-  ConnectionStatus,
-  PresenceCapable,
-  RealtimeTransport,
-} from '@tanstack/realtime'
+import { createMockTransport, useGapRecovery } from '@tanstack/realtime'
 
-// ---------------------------------------------------------------------------
-// Mock transport
-// ---------------------------------------------------------------------------
-
-function createMockTransport(): RealtimeTransport & {
-  setStatus: (s: ConnectionStatus) => void
-  subscriptions: Map<string, Set<(data: unknown) => void>>
-} {
-  const store = new Store<ConnectionStatus>('connected')
-  const subscriptions = new Map<string, Set<(data: unknown) => void>>()
-
-  return {
-    store,
-    subscriptions,
-    setStatus(s: ConnectionStatus) {
-      store.setState(() => s)
-    },
-    async connect() {},
-    disconnect() {},
-    subscribe(channel, onMessage) {
-      if (!subscriptions.has(channel)) subscriptions.set(channel, new Set())
-      subscriptions.get(channel)!.add(onMessage)
-      return () => {
-        subscriptions.get(channel)?.delete(onMessage)
-        if (subscriptions.get(channel)?.size === 0) {
-          subscriptions.delete(channel)
-        }
-      }
-    },
-    async publish() {},
-  }
-}
-
-function createPresenceMockTransport(): (RealtimeTransport &
-  PresenceCapable) & {
-  setStatus: (s: ConnectionStatus) => void
-  subscriptions: Map<string, Set<(data: unknown) => void>>
-} {
-  return {
-    ...createMockTransport(),
-    joinPresence: vi.fn(),
-    updatePresence: vi.fn(),
-    leavePresence: vi.fn(),
-    onPresenceChange: vi.fn(() => () => {}),
-  }
-}
-
-describe('withGapRecovery', () => {
-  it('tracks active channels', () => {
-    const inner = createMockTransport()
+describe('useGapRecovery', () => {
+  it('tracks active channels via hook', () => {
+    const transport = createMockTransport()
     const onGap = vi.fn()
-    const transport = withGapRecovery(inner, { onGap })
+    const recovery = useGapRecovery(transport, { onGap })
 
     const unsub1 = transport.subscribe('ch-1', () => {})
     transport.subscribe('ch-2', () => {})
 
-    expect(transport.activeChannels).toEqual(new Set(['ch-1', 'ch-2']))
+    expect(recovery.activeChannels).toEqual(new Set(['ch-1', 'ch-2']))
 
     unsub1()
-    expect(transport.activeChannels).toEqual(new Set(['ch-2']))
+    expect(recovery.activeChannels).toEqual(new Set(['ch-2']))
   })
 
   it('fires onGap for all active channels on reconnect', () => {
-    const inner = createMockTransport()
+    const transport = createMockTransport()
     const onGap = vi.fn()
-    const transport = withGapRecovery(inner, { onGap })
+    useGapRecovery(transport, { onGap })
 
     transport.subscribe('ch-a', () => {})
     transport.subscribe('ch-b', () => {})
 
     // Simulate disconnection and reconnection.
-    inner.setStatus('reconnecting')
-    inner.setStatus('connected')
+    transport.simulateDisconnect()
+    transport.simulateReconnect()
 
     expect(onGap).toHaveBeenCalledTimes(2)
     expect(onGap).toHaveBeenCalledWith('ch-a')
@@ -91,204 +38,121 @@ describe('withGapRecovery', () => {
   })
 
   it('does not fire onGap on initial connection', () => {
-    const inner = createMockTransport()
-    inner.setStatus('disconnected')
+    const transport = createMockTransport({ initialStatus: 'disconnected' })
     const onGap = vi.fn()
-    withGapRecovery(inner, { onGap })
+    useGapRecovery(transport, { onGap })
 
     // First connection — no gap.
-    inner.setStatus('connected')
+    transport.simulateReconnect()
     expect(onGap).not.toHaveBeenCalled()
   })
 
   it('fires onGap after disconnected → connected', () => {
-    const inner = createMockTransport()
+    const transport = createMockTransport()
     const onGap = vi.fn()
-    const transport = withGapRecovery(inner, { onGap })
+    useGapRecovery(transport, { onGap })
 
     transport.subscribe('ch', () => {})
 
     // Initial state is connected. Go through disconnect cycle.
-    inner.setStatus('disconnected')
-    inner.setStatus('connected')
+    transport.disconnect()
+    transport.simulateReconnect()
 
     expect(onGap).toHaveBeenCalledTimes(1)
     expect(onGap).toHaveBeenCalledWith('ch')
   })
 
   it('does not fire onGap for unsubscribed channels', () => {
-    const inner = createMockTransport()
+    const transport = createMockTransport()
     const onGap = vi.fn()
-    const transport = withGapRecovery(inner, { onGap })
+    useGapRecovery(transport, { onGap })
 
     const unsub = transport.subscribe('ch', () => {})
     unsub() // unsubscribe before reconnect
 
-    inner.setStatus('reconnecting')
-    inner.setStatus('connected')
+    transport.simulateDisconnect()
+    transport.simulateReconnect()
 
     expect(onGap).not.toHaveBeenCalled()
   })
 
   it('swallows errors from onGap', () => {
-    const inner = createMockTransport()
+    const transport = createMockTransport()
     const onGap = vi.fn(() => {
       throw new Error('gap handler error')
     })
-    const transport = withGapRecovery(inner, { onGap })
+    useGapRecovery(transport, { onGap })
 
     transport.subscribe('ch', () => {})
 
     // Should not throw.
-    inner.setStatus('reconnecting')
-    inner.setStatus('connected')
+    transport.simulateDisconnect()
+    transport.simulateReconnect()
 
     expect(onGap).toHaveBeenCalledTimes(1)
   })
 
   it('swallows errors from async onGap', () => {
-    const inner = createMockTransport()
+    const transport = createMockTransport()
     const onGap = vi.fn(() => {
       return Promise.reject(new Error('async gap handler error'))
     })
-    const transport = withGapRecovery(inner, { onGap })
+    useGapRecovery(transport, { onGap })
 
     transport.subscribe('ch', () => {})
 
     // Should not throw.
-    inner.setStatus('reconnecting')
-    inner.setStatus('connected')
+    transport.simulateDisconnect()
+    transport.simulateReconnect()
 
     expect(onGap).toHaveBeenCalledTimes(1)
   })
 
-  it('delegates subscribe messages to inner transport', () => {
-    const inner = createMockTransport()
-    const onGap = vi.fn()
-    const transport = withGapRecovery(inner, { onGap })
-
-    const cb = vi.fn()
-    transport.subscribe('ch', cb)
-
-    expect(inner.subscriptions.has('ch')).toBe(true)
-  })
-
-  it('delegates publish to inner transport', async () => {
-    const inner = createMockTransport()
-    const publishSpy = vi.spyOn(inner, 'publish')
-    const transport = withGapRecovery(inner, { onGap: vi.fn() })
-
-    await transport.publish('ch', { data: 1 })
-    expect(publishSpy).toHaveBeenCalledWith('ch', { data: 1 })
-  })
-
-  it('fires onGap on multiple reconnect cycles', () => {
-    const inner = createMockTransport()
-    const onGap = vi.fn()
-    const transport = withGapRecovery(inner, { onGap })
-
-    transport.subscribe('ch', () => {})
-
-    // First reconnect.
-    inner.setStatus('reconnecting')
-    inner.setStatus('connected')
-    expect(onGap).toHaveBeenCalledTimes(1)
-
-    // Second reconnect.
-    inner.setStatus('disconnected')
-    inner.setStatus('connected')
-    expect(onGap).toHaveBeenCalledTimes(2)
-  })
-
-  it('shares the inner transport store reference', () => {
-    const inner = createMockTransport()
-    const transport = withGapRecovery(inner, { onGap: vi.fn() })
-    expect(transport.store).toBe(inner.store)
-  })
-
-  it('delegates connect to inner transport', async () => {
-    const inner = createMockTransport()
-    const connectSpy = vi.spyOn(inner, 'connect')
-    const transport = withGapRecovery(inner, { onGap: vi.fn() })
-
-    await transport.connect()
-    expect(connectSpy).toHaveBeenCalled()
-  })
-
-  it('delegates disconnect to inner transport', () => {
-    const inner = createMockTransport()
-    const disconnectSpy = vi.spyOn(inner, 'disconnect')
-    const transport = withGapRecovery(inner, { onGap: vi.fn() })
-
-    transport.disconnect()
-    expect(disconnectSpy).toHaveBeenCalled()
-  })
-
-  it('delivers messages from inner transport through to subscriber', () => {
-    const inner = createMockTransport()
-    const transport = withGapRecovery(inner, { onGap: vi.fn() })
+  it('delivers messages through to subscriber', () => {
+    const transport = createMockTransport()
+    useGapRecovery(transport, { onGap: vi.fn() })
 
     const received: Array<unknown> = []
     transport.subscribe('ch', (msg) => received.push(msg))
 
-    // Emit directly through the inner transport's subscription set.
-    for (const cb of inner.subscriptions.get('ch') ?? []) cb({ data: 42 })
+    transport.simulateMessage('ch', { data: 42 })
 
     expect(received).toEqual([{ data: 42 }])
   })
 
-  it('delegates joinPresence to inner transport', () => {
-    const inner = createPresenceMockTransport()
-    const joinSpy = vi.spyOn(inner, 'joinPresence')
-    const transport: any = withGapRecovery(inner, { onGap: vi.fn() })
+  it('fires onGap on multiple reconnect cycles', () => {
+    const transport = createMockTransport()
+    const onGap = vi.fn()
+    useGapRecovery(transport, { onGap })
 
-    transport.joinPresence('ch', { userId: 'u1' })
-    expect(joinSpy).toHaveBeenCalledWith('ch', { userId: 'u1' })
-  })
+    transport.subscribe('ch', () => {})
 
-  it('delegates updatePresence to inner transport', () => {
-    const inner = createPresenceMockTransport()
-    const updateSpy = vi.spyOn(inner, 'updatePresence')
-    const transport: any = withGapRecovery(inner, { onGap: vi.fn() })
+    // First reconnect.
+    transport.simulateDisconnect()
+    transport.simulateReconnect()
+    expect(onGap).toHaveBeenCalledTimes(1)
 
-    transport.updatePresence('ch', { status: 'busy' })
-    expect(updateSpy).toHaveBeenCalledWith('ch', { status: 'busy' })
-  })
-
-  it('delegates leavePresence to inner transport', () => {
-    const inner = createPresenceMockTransport()
-    const leaveSpy = vi.spyOn(inner, 'leavePresence')
-    const transport: any = withGapRecovery(inner, { onGap: vi.fn() })
-
-    transport.leavePresence('ch')
-    expect(leaveSpy).toHaveBeenCalledWith('ch')
-  })
-
-  it('delegates onPresenceChange to inner transport', () => {
-    const inner = createPresenceMockTransport()
-    const onPresenceSpy = vi.spyOn(inner, 'onPresenceChange')
-    const transport: any = withGapRecovery(inner, { onGap: vi.fn() })
-
-    const cb = vi.fn()
-    transport.onPresenceChange('ch', cb)
-    expect(onPresenceSpy).toHaveBeenCalledWith('ch', cb)
+    // Second reconnect.
+    transport.disconnect()
+    transport.simulateReconnect()
+    expect(onGap).toHaveBeenCalledTimes(2)
   })
 
   // ── onGapError ────────────────────────────────────────────────────────────
 
   it('calls onGapError when onGap throws synchronously', async () => {
-    const inner = createMockTransport()
+    const transport = createMockTransport()
     const err = new Error('sync failure')
     const onGap = vi.fn(() => {
       throw err
     })
     const onGapError = vi.fn()
 
-    const transport = withGapRecovery(inner, { onGap, onGapError })
+    useGapRecovery(transport, { onGap, onGapError })
     transport.subscribe('ch', () => {})
 
-    inner.setStatus('reconnecting')
-    inner.setStatus('connected')
+    transport.simulateDisconnect()
+    transport.simulateReconnect()
 
     // Error handler is called asynchronously (via promise chain).
     await new Promise((r) => setTimeout(r, 0))
@@ -297,16 +161,16 @@ describe('withGapRecovery', () => {
   })
 
   it('calls onGapError when onGap returns a rejected promise', async () => {
-    const inner = createMockTransport()
+    const transport = createMockTransport()
     const err = new Error('async failure')
     const onGap = vi.fn(() => Promise.reject(err))
     const onGapError = vi.fn()
 
-    const transport = withGapRecovery(inner, { onGap, onGapError })
+    useGapRecovery(transport, { onGap, onGapError })
     transport.subscribe('ch', () => {})
 
-    inner.setStatus('disconnected')
-    inner.setStatus('connected')
+    transport.disconnect()
+    transport.simulateReconnect()
 
     await new Promise((r) => setTimeout(r, 0))
 
@@ -314,14 +178,14 @@ describe('withGapRecovery', () => {
   })
 
   it('silently swallows onGap errors when onGapError is not provided', async () => {
-    const inner = createMockTransport()
+    const transport = createMockTransport()
     const onGap = vi.fn(() => Promise.reject(new Error('silent')))
 
-    const transport = withGapRecovery(inner, { onGap })
+    useGapRecovery(transport, { onGap })
     transport.subscribe('ch', () => {})
 
-    inner.setStatus('reconnecting')
-    inner.setStatus('connected')
+    transport.simulateDisconnect()
+    transport.simulateReconnect()
 
     // Should not throw.
     await new Promise((r) => setTimeout(r, 0))
@@ -329,7 +193,7 @@ describe('withGapRecovery', () => {
   })
 
   it('calls onGapError for each failing channel independently', async () => {
-    const inner = createMockTransport()
+    const transport = createMockTransport()
     const errA = new Error('ch-a failed')
     const errB = new Error('ch-b failed')
     const onGap = vi.fn((ch: string) => {
@@ -338,17 +202,33 @@ describe('withGapRecovery', () => {
     })
     const onGapError = vi.fn()
 
-    const transport = withGapRecovery(inner, { onGap, onGapError })
+    useGapRecovery(transport, { onGap, onGapError })
     transport.subscribe('ch-a', () => {})
     transport.subscribe('ch-b', () => {})
 
-    inner.setStatus('reconnecting')
-    inner.setStatus('connected')
+    transport.simulateDisconnect()
+    transport.simulateReconnect()
 
     await new Promise((r) => setTimeout(r, 0))
 
     expect(onGapError).toHaveBeenCalledTimes(2)
     expect(onGapError).toHaveBeenCalledWith(errA, 'ch-a')
     expect(onGapError).toHaveBeenCalledWith(errB, 'ch-b')
+  })
+
+  it('unhook removes gap recovery', () => {
+    const transport = createMockTransport()
+    const onGap = vi.fn()
+    const recovery = useGapRecovery(transport, { onGap })
+
+    transport.subscribe('ch', () => {})
+
+    // Remove gap recovery.
+    recovery.unhook()
+
+    transport.simulateDisconnect()
+    transport.simulateReconnect()
+
+    expect(onGap).not.toHaveBeenCalled()
   })
 })

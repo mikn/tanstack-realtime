@@ -48,6 +48,8 @@
  */
 
 import { Store } from '@tanstack/store'
+import { createHookPipeline } from './hookPipeline.js'
+import type { HookHandle, HookRegistration } from './hooks.js'
 import type {
   ConnectionStatus,
   PresenceCapable,
@@ -716,7 +718,13 @@ export function createSharedWorkerTransport(
         subscribeErrorListeners.delete(callback)
       }
     },
+
+    hook(registration: HookRegistration): HookHandle {
+      return localPipeline.register(registration)
+    },
   }
+
+  const localPipeline = createHookPipeline()
 
   return transport
 }

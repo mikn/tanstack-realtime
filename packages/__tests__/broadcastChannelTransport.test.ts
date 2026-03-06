@@ -127,6 +127,9 @@ function createMockInner(): MockInnerTransport {
       }
     },
     async publish() {},
+    hook() {
+      return { unhook: () => {} }
+    },
     joinPresence() {},
     updatePresence() {},
     leavePresence() {},

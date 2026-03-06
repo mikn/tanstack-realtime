@@ -17,9 +17,17 @@ export {
 export { createRealtimeClient } from './core/client.js'
 export { hasPresence } from './core/types.js'
 
-// Stream processing primitives — shared between collection and hook consumers.
-// The envelope middleware composes at the handler level; the processor provides
-// the pure event fold.
+// Hook system
+export type {
+  TransportHooks,
+  HookRegistration,
+  HookHandle,
+} from './core/hooks.js'
+export { createHookPipeline } from './core/hookPipeline.js'
+export type { HookPipeline } from './core/hookPipeline.js'
+export { createHookableTransport } from './core/hookableTransport.js'
+
+// Stream processing primitives
 export {
   stripEnvelope,
   withEnvelopeStripping,
@@ -44,18 +52,13 @@ export type {
   ParsedChannel,
   QueryKey,
   SubscribeError,
-  // Core transport interface (no presence required for custom implementations)
   RealtimeTransport,
-  // Optional presence extension — implement alongside RealtimeTransport
   PresenceCapable,
-  // Utility type for middleware that preserves presence capability
-  PresenceAwareTransport,
   RealtimeClient,
   RealtimeClientOptions,
 } from './core/types.js'
 
-// CRDT primitives — field types, merge functions, and wire format types.
-// Import these when building custom integrations or transport adapters.
+// CRDT primitives
 export type {
   CrdtFieldType,
   CrdtFields,
@@ -129,16 +132,16 @@ export type {
   SyncedSetDef,
 } from './collections/index.js'
 
-// Tick-based transport — batches updates per tick interval for game state.
+// Tick-based batching hook
 export {
-  tickTransport,
+  useTickBatching,
   computeDelta,
   applyDelta,
 } from './core/tickTransport.js'
 export type {
   TickTransportOptions,
   TickFrame,
-  TickTransport,
+  TickHandle,
 } from './core/tickTransport.js'
 
 // DB composition helpers
@@ -154,12 +157,12 @@ export { ConflictError, isConflictError } from './core/conflictError.js'
 export { createDedup } from './core/dedup.js'
 export type { DedupOptions, DeduplicationFilter } from './core/dedup.js'
 
-export { createOfflineQueue } from './core/offlineQueue.js'
+export { useOfflineQueue } from './core/offlineQueue.js'
 export type {
   QueuedMessage,
   OfflineQueueState,
   OfflineQueueOptions,
-  OfflineQueueTransport,
+  OfflineQueueHandle,
 } from './core/offlineQueue.js'
 
 export {
@@ -182,28 +185,22 @@ export type {
   EphemeralMap,
 } from './core/ephemeral.js'
 
-export { withGapRecovery } from './core/gapRecovery.js'
+export { useGapRecovery } from './core/gapRecovery.js'
 export type {
   GapRecoveryOptions,
-  GapRecoveryTransport,
+  GapRecoveryHandle,
 } from './core/gapRecovery.js'
 
 // Multi-tab transport coordination.
-// createCoordinatedTransport() is the recommended entry point — it
-// automatically selects SharedWorker > BroadcastChannel > direct.
 export { createCoordinatedTransport } from './core/coordinatedTransport.js'
 export type { CoordinatedTransportOptions } from './core/coordinatedTransport.js'
 
-// BroadcastChannel-based multi-tab transport — leader election, no worker file.
 export {
   createBroadcastChannelTransport,
   isBroadcastChannelSupported,
 } from './core/broadcastChannelTransport.js'
 export type { BroadcastChannelTransportOptions } from './core/broadcastChannelTransport.js'
 
-// SharedWorker-based multi-tab transport — best performance, requires worker file.
-// Tab side: createSharedWorkerTransport(workerUrl)
-// Worker side: createSharedWorkerCoordinator(innerTransport) — call in the SharedWorker file.
 export {
   createSharedWorkerTransport,
   createSharedWorkerCoordinator,
@@ -217,8 +214,7 @@ export type {
   WorkerToTabMsg,
 } from './core/sharedWorkerTransport.js'
 
-// Server-side types — transport-agnostic, exported from core so any preset
-// can implement the same contract without an additional import path.
+// Server-side types
 export {
   createValidatedPublish,
   normalizePermissions,

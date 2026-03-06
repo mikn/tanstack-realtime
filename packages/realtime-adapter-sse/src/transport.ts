@@ -1,5 +1,11 @@
 import { Store } from '@tanstack/store'
-import type { ConnectionStatus, RealtimeTransport } from '@tanstack/realtime'
+import { createHookPipeline } from '@tanstack/realtime'
+import type {
+  ConnectionStatus,
+  HookHandle,
+  HookRegistration,
+  RealtimeTransport,
+} from '@tanstack/realtime'
 import type { ClientAction, ServerEvent } from './protocol.js'
 
 // ---------------------------------------------------------------------------
@@ -65,6 +71,7 @@ export function sseTransport(options: SseTransportOptions): RealtimeTransport {
   } = options
 
   const store = new Store<ConnectionStatus>('disconnected')
+  const pipeline = createHookPipeline()
 
   // channel → Set of message callbacks
   const subscriptions = new Map<string, Set<(data: unknown) => void>>()
@@ -245,7 +252,9 @@ export function sseTransport(options: SseTransportOptions): RealtimeTransport {
       case 'message': {
         const listeners = subscriptions.get(event.channel)
         if (listeners) {
-          for (const cb of listeners) cb(event.data)
+          const result = pipeline.runBeforeDeliver(event.channel, event.data)
+          if (result === false) break
+          for (const cb of listeners) cb(result.data)
         }
         break
       }
@@ -343,6 +352,10 @@ export function sseTransport(options: SseTransportOptions): RealtimeTransport {
       return () => {
         subscribeErrorListeners.delete(callback)
       }
+    },
+
+    hook(registration: HookRegistration): HookHandle {
+      return pipeline.register(registration)
     },
   }
 

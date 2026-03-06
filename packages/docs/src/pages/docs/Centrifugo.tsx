@@ -585,7 +585,7 @@ const todosOptions = realtimeCollectionOptions({
           <tr>
             <td>Gap recovery</td>
             <td>
-              <code>refetchOnReconnect</code> or <code>withGapRecovery</code>
+              <code>refetchOnReconnect</code> or <code>useGapRecovery</code>
             </td>
             <td>Built-in epoch/offset replay, no extra code</td>
           </tr>

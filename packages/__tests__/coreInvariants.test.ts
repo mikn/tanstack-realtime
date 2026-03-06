@@ -5,25 +5,23 @@
  * - S1 (HIGH): Wire protocol validation on server + client
  * - S2 (MEDIUM): parseChannel prototype pollution guard
  * - S3 (LOW): Token in URL documentation (verified via type check)
- * - B1 (HIGH): previousState memory leak in tickTransport
+ * - B1 (HIGH): previousState memory leak in useTickBatching
  * - B2 (HIGH): OR-Set compaction
  * - B3 (MEDIUM): Per-instance Lamport clock
  * - B4 (MEDIUM): Bounded event buffer in liveChannelOptions
  * - B5 (LOW): stop() clears previousState
  * - A1+A2 (MEDIUM): Complete destroy() lifecycle on client
- * - A4 (MEDIUM): Transport composition type utility
- * - A5 (LOW): Consistent presence error handling in tickTransport
  * - A6 (LOW): store.get() instead of store.state
  * - C1 (MEDIUM): /server subpath export
  * - C2+C3 (LOW): peerDependencies + versioning
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Store } from '@tanstack/store'
 import {
   advanceClock,
   compactOr,
   createClock,
+  createMockTransport,
   createRealtimeClient,
   mergeOr,
   orAdd,
@@ -33,66 +31,9 @@ import {
   resetClock,
   serializeKey,
   tickClock,
-  tickTransport,
+  useTickBatching,
 } from '@tanstack/realtime'
-import type {
-  ConnectionStatus,
-  LamportClock,
-  OrState,
-  PresenceAwareTransport,
-  PresenceCapable,
-  RealtimeTransport,
-} from '@tanstack/realtime'
-
-// ---------------------------------------------------------------------------
-// Mock transport
-// ---------------------------------------------------------------------------
-
-function createMockTransport(): RealtimeTransport & {
-  emit: (channel: string, data: unknown) => void
-  publishCalls: Array<{ channel: string; data: unknown }>
-} {
-  const listeners = new Map<string, Set<(data: unknown) => void>>()
-  const store = new Store<ConnectionStatus>('connected')
-  const publishCalls: Array<{ channel: string; data: unknown }> = []
-
-  return {
-    store,
-    publishCalls,
-    async connect() {},
-    disconnect() {
-      store.setState(() => 'disconnected')
-    },
-    subscribe(channel, onMessage) {
-      if (!listeners.has(channel)) listeners.set(channel, new Set())
-      listeners.get(channel)!.add(onMessage)
-      return () => listeners.get(channel)?.delete(onMessage)
-    },
-    publish(channel, data) {
-      publishCalls.push({ channel, data })
-      return Promise.resolve()
-    },
-    emit(channel, data) {
-      const cbs = listeners.get(channel)
-      if (cbs) for (const cb of cbs) cb(data)
-    },
-  }
-}
-
-function createMockTransportWithPresence(): RealtimeTransport &
-  PresenceCapable & {
-    emit: (channel: string, data: unknown) => void
-    publishCalls: Array<{ channel: string; data: unknown }>
-  } {
-  const base = createMockTransport()
-  return {
-    ...base,
-    joinPresence: vi.fn(),
-    updatePresence: vi.fn(),
-    leavePresence: vi.fn(),
-    onPresenceChange: vi.fn(() => () => {}),
-  }
-}
+import type { LamportClock, OrState } from '@tanstack/realtime'
 
 // ===========================================================================
 // S1: Wire protocol validation
@@ -233,16 +174,19 @@ describe('S2: parseChannel prototype pollution guard', () => {
 })
 
 // ===========================================================================
-// B1: previousState memory leak in tickTransport
+// B1: previousState memory leak in useTickBatching
 // ===========================================================================
 
-describe('B1: previousState memory leak in tickTransport', () => {
+describe('B1: previousState memory leak in useTickBatching', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => vi.useRealTimers())
 
   it('removeEntity cleans previousState to prevent memory leak', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner, { tickMs: 16, deltaCompression: true })
+    const transport = createMockTransport()
+    const tick = useTickBatching(transport, {
+      tickMs: 16,
+      deltaCompression: true,
+    })
 
     // Set state to populate previousState
     tick.setState('game', 'entity-1', { x: 1, y: 2 })
@@ -262,7 +206,7 @@ describe('B1: previousState memory leak in tickTransport', () => {
 
     // The last publish should contain full state (x: 10, y: 20),
     // not a delta from the old previous state
-    const lastPublish = inner.publishCalls[inner.publishCalls.length - 1]
+    const lastPublish = transport.publishLog[transport.publishLog.length - 1]
     const frame = lastPublish.data as Record<string, unknown>
     const entities = frame.entities as Record<string, unknown>
     expect(entities['entity-1']).toEqual({ x: 10, y: 20 })
@@ -448,13 +392,16 @@ describe('B4: Bounded event buffer in liveChannelOptions', () => {
 // B5: stop() clears previousState
 // ===========================================================================
 
-describe('B5: stop() clears previousState in tickTransport', () => {
+describe('B5: stop() clears previousState in useTickBatching', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => vi.useRealTimers())
 
   it('stop() clears all internal state including previousState', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner, { tickMs: 16, deltaCompression: true })
+    const transport = createMockTransport()
+    const tick = useTickBatching(transport, {
+      tickMs: 16,
+      deltaCompression: true,
+    })
 
     // Set state to populate dirtyState and previousState
     tick.setState('game', 'e1', { x: 1 })
@@ -470,7 +417,7 @@ describe('B5: stop() clears previousState in tickTransport', () => {
     tick.setState('game', 'e1', { x: 5, y: 10 })
     vi.advanceTimersByTime(20)
 
-    const lastPublish = inner.publishCalls[inner.publishCalls.length - 1]
+    const lastPublish = transport.publishLog[transport.publishLog.length - 1]
     const frame = lastPublish.data as Record<string, unknown>
     const entities = frame.entities as Record<string, unknown>
     // Should be full state, not delta from old previousState
@@ -486,20 +433,20 @@ describe('B5: stop() clears previousState in tickTransport', () => {
 
 describe('A1+A2: Client destroy() lifecycle', () => {
   it('destroy() disconnects the transport', () => {
-    const inner = createMockTransport()
-    const client = createRealtimeClient({ transport: inner })
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
 
     // Transport starts connected
-    expect(inner.store.get()).toBe('connected')
+    expect(transport.store.get()).toBe('connected')
 
     // Destroy should disconnect the transport
     client.destroy()
-    expect(inner.store.get()).toBe('disconnected')
+    expect(transport.store.get()).toBe('disconnected')
   })
 
   it('destroy() unsubscribes status listener before disconnecting', () => {
-    const inner = createMockTransport()
-    const client = createRealtimeClient({ transport: inner })
+    const transport = createMockTransport()
+    const client = createRealtimeClient({ transport })
 
     // Record updates on the client store
     const updates: Array<string> = []
@@ -514,18 +461,17 @@ describe('A1+A2: Client destroy() lifecycle', () => {
   })
 
   it('client is safe to reconnect after destroy', async () => {
-    const inner = createMockTransport()
-    inner.store.setState(() => 'disconnected')
+    const transport = createMockTransport({ initialStatus: 'disconnected' })
     const mockConnect = vi.fn(() => {
-      inner.store.setState(() => 'connected')
+      transport.store.setState(() => 'connected')
       return Promise.resolve()
     })
-    inner.connect = mockConnect
+    transport.connect = mockConnect
 
-    const client = createRealtimeClient({ transport: inner })
+    const client = createRealtimeClient({ transport })
 
     client.destroy()
-    expect(inner.store.get()).toBe('disconnected')
+    expect(transport.store.get()).toBe('disconnected')
 
     // Should be able to connect again
     await client.connect()
@@ -534,103 +480,32 @@ describe('A1+A2: Client destroy() lifecycle', () => {
 })
 
 // ===========================================================================
-// A4: Transport composition type utility
-// ===========================================================================
-
-describe('A4: PresenceAwareTransport type utility', () => {
-  it('PresenceAwareTransport is assignable from RealtimeTransport', () => {
-    // This is a type-level test — if it compiles, it passes.
-    const transport = createMockTransport()
-    const _typed: PresenceAwareTransport<RealtimeTransport> = transport
-    expect(_typed).toBe(transport)
-  })
-
-  it('PresenceAwareTransport preserves presence from presence-capable transport', () => {
-    const transport = createMockTransportWithPresence()
-    const _typed: PresenceAwareTransport<RealtimeTransport & PresenceCapable> =
-      transport
-    expect(typeof _typed.joinPresence).toBe('function')
-  })
-})
-
-// ===========================================================================
-// A5: Consistent presence error handling in tickTransport
-// ===========================================================================
-
-describe('A5: tickTransport presence error handling', () => {
-  it('throws descriptive error for joinPresence on non-presence transport', () => {
-    const inner = createMockTransport() // No presence
-    const tick = tickTransport(inner)
-
-    expect(() => {
-      ;(tick as unknown as PresenceCapable).joinPresence('ch', {})
-    }).toThrow(/PresenceCapable/)
-  })
-
-  it('throws descriptive error for updatePresence on non-presence transport', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner)
-
-    expect(() => {
-      ;(tick as unknown as PresenceCapable).updatePresence('ch', {})
-    }).toThrow(/PresenceCapable/)
-  })
-
-  it('throws descriptive error for leavePresence on non-presence transport', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner)
-
-    expect(() => {
-      ;(tick as unknown as PresenceCapable).leavePresence('ch')
-    }).toThrow(/PresenceCapable/)
-  })
-
-  it('throws descriptive error for onPresenceChange on non-presence transport', () => {
-    const inner = createMockTransport()
-    const tick = tickTransport(inner)
-
-    expect(() => {
-      ;(tick as unknown as PresenceCapable).onPresenceChange('ch', () => {})
-    }).toThrow(/PresenceCapable/)
-  })
-
-  it('forwards presence methods when inner transport supports them', () => {
-    const inner = createMockTransportWithPresence()
-    const tick = tickTransport(inner)
-
-    ;(tick as unknown as PresenceCapable).joinPresence('ch', { name: 'Alice' })
-    expect(inner.joinPresence).toHaveBeenCalledWith('ch', { name: 'Alice' })
-  })
-})
-
-// ===========================================================================
-// A6: store.get() instead of store.state
+// A6: store.get() usage
 // ===========================================================================
 
 describe('A6: store.get() usage', () => {
   it('client reads initial status via store.get()', () => {
-    const inner = createMockTransport()
-    inner.store.setState(() => 'connecting')
+    const transport = createMockTransport()
+    transport.store.setState(() => 'connecting')
 
-    const client = createRealtimeClient({ transport: inner })
+    const client = createRealtimeClient({ transport })
     // If client used store.state (deprecated), it might not read correctly
     // on all TanStack Store versions. store.get() is the canonical API.
     expect(client.store.get().status).toBe('connecting')
   })
 
-  it('tickTransport reads initial connection status via store.get()', () => {
+  it('useTickBatching reads initial connection status via store.get()', () => {
     vi.useFakeTimers()
-    const inner = createMockTransport()
-    inner.store.setState(() => 'disconnected')
+    const transport = createMockTransport({ initialStatus: 'disconnected' })
 
-    const tick = tickTransport(inner, { tickMs: 16 })
+    const tick = useTickBatching(transport, { tickMs: 16 })
 
     // Set state — should not be published because we're disconnected
     tick.setState('ch', 'e1', { x: 1 })
     vi.advanceTimersByTime(20)
 
     // No publish calls because transport is disconnected
-    expect(inner.publishCalls.length).toBe(0)
+    expect(transport.publishLog.length).toBe(0)
 
     tick.stop()
     vi.useRealTimers()

@@ -118,21 +118,21 @@ const client = createRealtimeClient({
 })`}
       />
 
-      <h2 id="tick">Tick-based transport</h2>
+      <h2 id="tick">Tick-based batching</h2>
       <p>
         High-frequency use cases &mdash; multiplayer games, collaborative
-        drawing, live simulations. Wraps any transport and sends one frame per
-        tick interval.
+        drawing, live simulations. Registers hooks on any transport to batch
+        state into one frame per tick interval.
       </p>
       <CodeBlock
         title="game/transport.ts"
-        code={`import { tickTransport } from '@tanstack/realtime'
+        code={`import { useTickBatching } from '@tanstack/realtime'
 import { sseTransport } from '@tanstack/realtime-adapter-sse'
 
-const tick = tickTransport(
-  sseTransport({ url: '/api/realtime/sse' }),
-  { tickMs: 16, deltaCompression: true },  // ~60 Hz
-)
+const transport = sseTransport({ url: '/api/realtime/sse' })
+const tick = useTickBatching(transport, {
+  tickMs: 16, deltaCompression: true,  // ~60 Hz
+})
 
 // Set state each frame — batched into one publish per tick
 tick.setState('game:room-1', myPlayerId, {

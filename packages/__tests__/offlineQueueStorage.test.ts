@@ -3,7 +3,7 @@
  *
  * Verifies that:
  * - `createLocalStorageAdapter` persists and loads messages correctly
- * - `createOfflineQueue` integrates with a storage adapter
+ * - `useOfflineQueue` integrates with a storage adapter
  * - Messages survive "simulated page refresh" (new queue, same storage)
  * - Queue IDs continue from persisted state
  * - `clearQueue()` also clears storage
@@ -11,46 +11,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Store } from '@tanstack/store'
 import {
   createLocalStorageAdapter,
-  createOfflineQueue,
+  createMockTransport,
+  useOfflineQueue,
 } from '@tanstack/realtime'
-import type {
-  ConnectionStatus,
-  OfflineQueueStorage,
-  QueuedMessage,
-  RealtimeTransport,
-} from '@tanstack/realtime'
-
-// ---------------------------------------------------------------------------
-// Mock transport
-// ---------------------------------------------------------------------------
-
-function createMockTransport(): RealtimeTransport & {
-  setStatus: (s: ConnectionStatus) => void
-  publishCalls: Array<{ channel: string; data: unknown }>
-} {
-  const store = new Store<ConnectionStatus>('disconnected')
-  const publishCalls: Array<{ channel: string; data: unknown }> = []
-
-  return {
-    store,
-    publishCalls,
-    setStatus(s: ConnectionStatus) {
-      store.setState(() => s)
-    },
-    async connect() {},
-    disconnect() {},
-    subscribe() {
-      return () => {}
-    },
-    publish(channel, data) {
-      publishCalls.push({ channel, data })
-      return Promise.resolve()
-    },
-  }
-}
+import type { OfflineQueueStorage, QueuedMessage } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // In-memory storage adapter (simulates persistence without real IndexedDB)
@@ -220,10 +186,10 @@ describe('createLocalStorageAdapter', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Tests: createOfflineQueue with storage adapter
+// Tests: useOfflineQueue with storage adapter
 // ---------------------------------------------------------------------------
 
-describe('createOfflineQueue with storage', () => {
+describe('useOfflineQueue with storage', () => {
   beforeEach(() => {
     vi.useFakeTimers()
   })
@@ -233,31 +199,31 @@ describe('createOfflineQueue with storage', () => {
   })
 
   it('calls storage.save after each enqueue', async () => {
-    const inner = createMockTransport()
+    const transport = createMockTransport({ initialStatus: 'disconnected' })
     const storage = createMemoryStorage()
-    const queue = createOfflineQueue(inner, { storage })
+    const _queue = useOfflineQueue(transport, { storage })
 
     // Wait for storage init
     await vi.advanceTimersByTimeAsync(0)
 
-    await queue.publish('ch', { msg: 1 })
-    await queue.publish('ch', { msg: 2 })
+    await transport.publish('ch', { msg: 1 })
+    await transport.publish('ch', { msg: 2 })
 
     expect(storage.saveCalls).toBe(2)
     expect(storage.data).toHaveLength(2)
   })
 
   it('calls storage.save after flush', async () => {
-    const inner = createMockTransport()
+    const transport = createMockTransport({ initialStatus: 'disconnected' })
     const storage = createMemoryStorage()
-    const queue = createOfflineQueue(inner, { storage })
+    useOfflineQueue(transport, { storage })
 
     await vi.advanceTimersByTimeAsync(0)
 
-    await queue.publish('ch', { msg: 1 })
+    await transport.publish('ch', { msg: 1 })
     const saveBefore = storage.saveCalls
 
-    inner.setStatus('connected')
+    transport.simulateReconnect()
     await vi.advanceTimersByTimeAsync(0)
 
     // Should have called save after flush (pending is now empty)
@@ -266,17 +232,17 @@ describe('createOfflineQueue with storage', () => {
   })
 
   it('calls storage.clear on clearQueue()', async () => {
-    const inner = createMockTransport()
+    const transport = createMockTransport({ initialStatus: 'disconnected' })
     const storage = createMemoryStorage()
-    const queue = createOfflineQueue(inner, { storage })
+    const queue = useOfflineQueue(transport, { storage })
 
     await vi.advanceTimersByTimeAsync(0)
 
-    await queue.publish('ch', { msg: 1 })
+    await transport.publish('ch', { msg: 1 })
     queue.clearQueue()
 
     expect(storage.clearCalls).toBe(1)
-    expect(queue.queueStore.state.pending).toHaveLength(0)
+    expect(queue.store.state.pending).toHaveLength(0)
   })
 
   it('restores messages from storage on creation (simulated page refresh)', async () => {
@@ -298,18 +264,18 @@ describe('createOfflineQueue with storage', () => {
       },
     ]
 
-    const inner = createMockTransport()
-    const queue = createOfflineQueue(inner, { storage })
+    const transport = createMockTransport({ initialStatus: 'disconnected' })
+    const queue = useOfflineQueue(transport, { storage })
 
     // Before storage.load() resolves
-    expect(queue.queueStore.state.pending).toHaveLength(0)
+    expect(queue.store.state.pending).toHaveLength(0)
 
     // After storage.load() resolves
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(queue.queueStore.state.pending).toHaveLength(2)
-    expect(queue.queueStore.state.pending[0].data).toBe('old-1')
-    expect(queue.queueStore.state.pending[1].data).toBe('old-2')
+    expect(queue.store.state.pending).toHaveLength(2)
+    expect(queue.store.state.pending[0].data).toBe('old-1')
+    expect(queue.store.state.pending[1].data).toBe('old-2')
   })
 
   it('continues IDs from persisted state (no ID collisions)', async () => {
@@ -323,14 +289,14 @@ describe('createOfflineQueue with storage', () => {
       },
     ]
 
-    const inner = createMockTransport()
-    const queue = createOfflineQueue(inner, { storage })
+    const transport = createMockTransport({ initialStatus: 'disconnected' })
+    const queue = useOfflineQueue(transport, { storage })
 
     await vi.advanceTimersByTimeAsync(0)
 
     // New enqueue should start from id > 10
-    await queue.publish('ch', 'new')
-    const ids = queue.queueStore.state.pending.map((m) => m.id)
+    await transport.publish('ch', 'new')
+    const ids = queue.store.state.pending.map((m) => m.id)
     expect(ids[0]).toBe(10) // persisted
     expect(ids[1]).toBeGreaterThan(10)
   })
@@ -346,12 +312,12 @@ describe('createOfflineQueue with storage', () => {
       clear: async () => {},
     }
 
-    const inner = createMockTransport()
-    const queue = createOfflineQueue(inner, { storage: slowStorage })
+    const transport = createMockTransport({ initialStatus: 'disconnected' })
+    const queue = useOfflineQueue(transport, { storage: slowStorage })
 
     // Enqueue before storage loads
-    await queue.publish('ch', 'fast')
-    expect(queue.queueStore.state.pending).toHaveLength(1)
+    await transport.publish('ch', 'fast')
+    expect(queue.store.state.pending).toHaveLength(1)
 
     // Storage loads with pre-existing messages
     resolveLoad([
@@ -365,23 +331,23 @@ describe('createOfflineQueue with storage', () => {
     await vi.advanceTimersByTimeAsync(0)
 
     // Should have both: persisted first, then the enqueued-during-init message
-    expect(queue.queueStore.state.pending).toHaveLength(2)
-    expect(queue.queueStore.state.pending[0].data).toBe('persisted')
-    expect(queue.queueStore.state.pending[1].data).toBe('fast')
+    expect(queue.store.state.pending).toHaveLength(2)
+    expect(queue.store.state.pending[0].data).toBe('persisted')
+    expect(queue.store.state.pending[1].data).toBe('fast')
   })
 
   it('memory-only behavior is preserved when storage is omitted', async () => {
-    const inner = createMockTransport()
-    const queue = createOfflineQueue(inner) // no storage
+    const transport = createMockTransport({ initialStatus: 'disconnected' })
+    const queue = useOfflineQueue(transport) // no storage
 
-    await queue.publish('ch', { msg: 1 })
-    expect(queue.queueStore.state.pending).toHaveLength(1)
+    await transport.publish('ch', { msg: 1 })
+    expect(queue.store.state.pending).toHaveLength(1)
 
-    inner.setStatus('connected')
+    transport.simulateReconnect()
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(queue.queueStore.state.pending).toHaveLength(0)
-    expect(queue.queueStore.state.flushed).toBe(1)
+    expect(queue.store.state.pending).toHaveLength(0)
+    expect(queue.store.state.flushed).toBe(1)
   })
 
   it('re-IDs messages enqueued during init to avoid ID collisions', async () => {
@@ -395,13 +361,13 @@ describe('createOfflineQueue with storage', () => {
       clear: async () => {},
     }
 
-    const inner = createMockTransport()
-    const queue = createOfflineQueue(inner, { storage: slowStorage })
+    const transport = createMockTransport({ initialStatus: 'disconnected' })
+    const queue = useOfflineQueue(transport, { storage: slowStorage })
 
     // Enqueue 3 messages while storage.load() is pending (IDs will be 1, 2, 3)
-    await queue.publish('ch', 'fast-1')
-    await queue.publish('ch', 'fast-2')
-    await queue.publish('ch', 'fast-3')
+    await transport.publish('ch', 'fast-1')
+    await transport.publish('ch', 'fast-2')
+    await transport.publish('ch', 'fast-3')
 
     // Storage resolves with messages that have IDs 100-102
     resolveLoad([
@@ -426,7 +392,7 @@ describe('createOfflineQueue with storage', () => {
     ])
     await vi.advanceTimersByTimeAsync(0)
 
-    const pending = queue.queueStore.state.pending
+    const pending = queue.store.state.pending
     // Should have all 6 messages: 3 persisted + 3 re-IDed
     expect(pending).toHaveLength(6)
 
@@ -461,13 +427,13 @@ describe('createOfflineQueue with storage', () => {
       enqueuedAt: '2024-01-01T00:00:00Z',
     }))
 
-    const inner = createMockTransport()
+    const transport = createMockTransport({ initialStatus: 'disconnected' })
     // maxSize = 5: only 5 total messages should survive
-    const queue = createOfflineQueue(inner, { storage, maxSize: 5 })
+    const queue = useOfflineQueue(transport, { storage, maxSize: 5 })
 
     await vi.advanceTimersByTimeAsync(0)
 
-    const pending = queue.queueStore.state.pending
+    const pending = queue.store.state.pending
     // Should keep last 5 from the merged 8
     expect(pending).toHaveLength(5)
     // Slice keeps the tail, so IDs 4-8
@@ -482,14 +448,14 @@ describe('createOfflineQueue with storage', () => {
       clear: () => Promise.resolve(),
     }
 
-    const inner = createMockTransport()
-    const queue = createOfflineQueue(inner, { storage: failStorage })
+    const transport = createMockTransport({ initialStatus: 'disconnected' })
+    const queue = useOfflineQueue(transport, { storage: failStorage })
 
     await vi.advanceTimersByTimeAsync(0)
 
     // Queue should still work (memory-only)
-    await queue.publish('ch', 'data')
-    expect(queue.queueStore.state.pending).toHaveLength(1)
+    await transport.publish('ch', 'data')
+    expect(queue.store.state.pending).toHaveLength(1)
   })
 
   it('new enqueues after init get IDs that continue from merged state', async () => {
@@ -503,16 +469,16 @@ describe('createOfflineQueue with storage', () => {
       },
     ]
 
-    const inner = createMockTransport()
-    const queue = createOfflineQueue(inner, { storage })
+    const transport = createMockTransport({ initialStatus: 'disconnected' })
+    const queue = useOfflineQueue(transport, { storage })
 
     await vi.advanceTimersByTimeAsync(0)
 
     // Enqueue after init — ID should be > 50
-    await queue.publish('ch', 'new-1')
-    await queue.publish('ch', 'new-2')
+    await transport.publish('ch', 'new-1')
+    await transport.publish('ch', 'new-2')
 
-    const ids = queue.queueStore.state.pending.map((m) => m.id)
+    const ids = queue.store.state.pending.map((m) => m.id)
     expect(ids[0]).toBe(50)
     expect(ids[1]).toBeGreaterThan(50)
     expect(ids[2]).toBeGreaterThan(ids[1])

@@ -13,7 +13,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { sseTransport } from '@tanstack/realtime-adapter-sse'
-import { tickCollectionOptions, tickTransport } from '@tanstack/realtime'
+import { tickCollectionOptions, useTickBatching } from '@tanstack/realtime'
 import { useCollectionSync } from '../useCollectionSync.js'
 
 interface GameEntity {
@@ -24,35 +24,39 @@ interface GameEntity {
 
 const TICK_CHANNEL = 'e2e-tick-game'
 
+// Alias to avoid react-hooks/rules-of-hooks false positive — useTickBatching
+// is a transport hook, not a React hook.
+const registerTickBatching = useTickBatching
+
 export function TickPanel() {
-  const tickTpRef = useRef<ReturnType<typeof tickTransport> | null>(null)
+  const tickRef = useRef<ReturnType<typeof useTickBatching> | null>(null)
   const [connected, setConnected] = useState(false)
 
   useEffect(() => {
-    const inner = sseTransport({
+    const transport = sseTransport({
       url: '/api/realtime',
       initialDelay: 50,
       maxDelay: 200,
       jitter: 0,
     })
-    const tp = tickTransport(inner, { tickMs: 100 })
-    tickTpRef.current = tp
+    const tick = registerTickBatching(transport, { tickMs: 100 })
+    tickRef.current = tick
 
-    void tp.connect().then(() => setConnected(true))
+    void transport.connect().then(() => setConnected(true))
 
     return () => {
-      tp.stop()
-      tp.disconnect()
+      tick.stop()
+      transport.disconnect()
     }
   }, [])
 
   const entities = useCollectionSync<GameEntity>(() => {
-    if (!tickTpRef.current) {
+    if (!tickRef.current) {
       return { sync: { sync: () => () => {} } } as any
     }
 
     return tickCollectionOptions<GameEntity, string>({
-      transport: tickTpRef.current,
+      transport: tickRef.current,
       id: 'e2e-tick-entities',
       channel: TICK_CHANNEL,
       getKey: (e) => e.id,
@@ -69,9 +73,9 @@ export function TickPanel() {
   })
 
   function moveEntity() {
-    const tp = tickTpRef.current
-    if (!tp) return
-    tp.setState(TICK_CHANNEL, 'entity1', {
+    const tick = tickRef.current
+    if (!tick) return
+    tick.setState(TICK_CHANNEL, 'entity1', {
       x: Math.floor(Math.random() * 200),
       y: Math.floor(Math.random() * 200),
     })

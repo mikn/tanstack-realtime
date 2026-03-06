@@ -74,27 +74,27 @@ All factories accept a single options/config object. Never use positional
 arguments beyond the first `inner` transport for middleware:
 
 ```typescript
-// Middleware: first arg is the wrapped transport, second is options
-export function createOfflineQueue(
-  inner: RealtimeTransport,
+// Hook factory: registers behavior on a transport via the hook pipeline
+export function useOfflineQueue(
+  transport: RealtimeTransport,
   options?: OfflineQueueOptions,
-): OfflineQueueTransport
+): OfflineQueueHandle
 
-// Non-middleware: single options object
+// Transport factory: single options object
 export function sseTransport(options: SseTransportOptions): RealtimeTransport
 ```
 
 ### Naming Conventions
 
-| Kind               | Pattern                                   | Example                                             |
-| ------------------ | ----------------------------------------- | --------------------------------------------------- |
-| Transport factory  | `*Transport`                              | `sseTransport`, `tickTransport`                     |
-| Middleware factory | `create*` or `with*`                      | `createOfflineQueue`, `withGapRecovery`             |
-| Collection factory | `*CollectionOptions` or `*ChannelOptions` | `realtimeCollectionOptions`, `streamChannelOptions` |
-| Server factory     | `create*`                                 | `createSseHandler`                                  |
-| Options type       | `*Options`                                | `SseTransportOptions`                               |
-| Config type        | `*Config`                                 | `RealtimeCollectionConfig`                          |
-| Type guard         | `has*` / `is*`                            | `hasPresence`                                       |
+| Kind               | Pattern                                   | Example                                                |
+| ------------------ | ----------------------------------------- | ------------------------------------------------------ |
+| Transport factory  | `*Transport`                              | `sseTransport`                                         |
+| Hook factory       | `use*`                                    | `useOfflineQueue`, `useGapRecovery`, `useTickBatching` |
+| Collection factory | `*CollectionOptions` or `*ChannelOptions` | `realtimeCollectionOptions`, `streamChannelOptions`    |
+| Server factory     | `create*`                                 | `createSseHandler`                                     |
+| Options type       | `*Options`                                | `SseTransportOptions`                                  |
+| Config type        | `*Config`                                 | `RealtimeCollectionConfig`                             |
+| Type guard         | `has*` / `is*`                            | `hasPresence`                                          |
 
 ### Subscription Pattern
 
@@ -115,16 +115,17 @@ readonly queueStore: Store<OfflineQueueState>
 readonly tickStore: Store<{ tick: number; serverTick: number }>
 ```
 
-### Transport Middleware Contract
+### Transport Hooks Contract
 
-Middleware must be **transparent** — it delegates all interface methods and
-preserves capabilities:
+Hook factories register behavior on a transport's hook pipeline. They
+do **not** wrap or replace the transport. Each hook can intercept lifecycle
+events and publish calls via priority-ordered callbacks:
 
-1. Forward all `RealtimeTransport` methods to the inner transport.
-2. Check `hasPresence(inner)` and forward presence methods when available.
-3. Do not multiplex unrelated data on the same channel without filtering.
+1. Call `transport.hook({ name, priority, hooks })` to register.
+2. Return an `{ unhook }` handle so consumers can remove the hook.
+3. Use `beforePublish` to intercept/buffer publishes, `onConnect`/`onDisconnect`/`onReconnect` for lifecycle.
 
-See `createOfflineQueue` and `withGapRecovery` for the canonical pattern.
+See `useOfflineQueue` and `useGapRecovery` for the canonical pattern.
 
 ### Wire Protocol
 
