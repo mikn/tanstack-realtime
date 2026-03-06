@@ -199,11 +199,12 @@ realtimeCollectionOptions({
       </p>
       <CodeBlock
         code={`// The transport logs subscribe rejections as console.warn messages.
-// To react programmatically, wrap the transport and intercept errors:
+// To react programmatically, observe the client's connection status:
 
-import { createRealtimeClient, wsTransport } from '@tanstack/realtime'
+import { createRealtimeClient } from '@tanstack/realtime'
+import { sseTransport } from '@tanstack/realtime-adapter-sse'
 
-const baseTransport = wsTransport({ url: 'ws://localhost:3001' })
+const baseTransport = sseTransport({ url: '/api/realtime' })
 
 // Listen for connection status changes
 const client = createRealtimeClient({ transport: baseTransport })

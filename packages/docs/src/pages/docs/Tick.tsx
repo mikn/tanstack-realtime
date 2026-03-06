@@ -27,9 +27,9 @@ export function Tick() {
       <CodeBlock
         title="realtime/tickSetup.ts"
         code={`import { useTickBatching } from '@tanstack/realtime'
-import { wsTransport } from '@tanstack/realtime'
+import { sseTransport } from '@tanstack/realtime-adapter-sse'
 
-const transport = wsTransport({ url: 'ws://localhost:3001' })
+const transport = sseTransport({ url: '/api/realtime' })
 
 // Register tick-batching hooks on the transport.
 const tick = useTickBatching(transport, {
@@ -175,9 +175,9 @@ function GameLoop({ myPlayerId }: { myPlayerId: string }) {
       <CodeBlock
         title="features/metrics/metricsSetup.ts"
         code={`import { useTickBatching } from '@tanstack/realtime'
-import { wsTransport } from '@tanstack/realtime'
+import { sseTransport } from '@tanstack/realtime-adapter-sse'
 
-const transport = wsTransport({ url: 'wss://metrics.example.com' })
+const transport = sseTransport({ url: '/api/realtime' })
 
 // 10 Hz is plenty for dashboard gauges.
 export const metricsTick = useTickBatching(transport, { tickMs: 100 })`}

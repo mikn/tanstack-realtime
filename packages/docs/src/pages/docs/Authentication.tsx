@@ -78,52 +78,12 @@ export const realtime = createStartHandler({
         permitted on all channels.
       </p>
       <p>
-        The SSE handler accepts two signatures &mdash; a legacy per-action form
-        (shown below) and a{' '}
-        <a href="#unified-authorize">
-          unified <code>AuthorizeFn</code>
-        </a>{' '}
-        that works across all presets.{' '}
-        <strong>New code should use the unified signature.</strong>
+        Pass the <code>AuthorizeFn</code> from <code>@tanstack/realtime</code>{' '}
+        &mdash; it works across <strong>all presets</strong> (
+        <code>createSseHandler</code> and <code>createStartHandler</code>). See
+        the <a href="#unified-authorize">unified AuthorizeFn</a> section below
+        for the full signature.
       </p>
-      <CodeBlock
-        title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
-import { getSession } from './auth'
-import { db } from './db'
-
-export const realtime = createStartHandler({
-  getUser: async (req) => {
-    const session = await getSession(req)
-    return session ? { userId: session.userId } : null
-  },
-
-  authorize: async ({ userId, action, channel }) => {
-    // Parse the channel to extract the namespace and params.
-    // Channel format: "todos:projectId=abc123"
-    const [namespace] = channel.split(':')
-
-    if (namespace === 'todos') {
-      // Check project membership before granting access
-      const projectId = channel.split('projectId=')[1]
-      const member = await db.query.projectMembers.findFirst({
-        where: (m, { and, eq }) =>
-          and(eq(m.userId, userId), eq(m.projectId, projectId)),
-      })
-      if (!member) return false
-
-      // Only project admins can publish
-      if (action === 'publish') return member.role === 'admin'
-
-      // All members can subscribe
-      return true
-    }
-
-    // Deny access to unknown channels
-    return false
-  },
-})`}
-      />
 
       <h2 id="unified-authorize">
         Unified <code>AuthorizeFn</code>
@@ -209,78 +169,6 @@ const startHandler = createStartHandler({ getUser, authorize })
 
 // Standalone SSE handler
 const sseHandler = createSseHandler({ getUser, authorize })`}
-      />
-
-      <h3 id="legacy-sse-authorize">
-        Legacy SSE <code>authorize</code> (backward compatible)
-      </h3>
-      <p>
-        The SSE handler (<code>createSseHandler</code> /{' '}
-        <code>createStartHandler</code>) still accepts the older per-action
-        signature for backward compatibility:
-      </p>
-      <CodeBlock
-        title="Legacy signature (still works)"
-        code={`authorize: async ({ userId, action, channel }) => {
-  if (action === 'publish') return userId === 'admin'
-  return true  // allow all subscribes
-}`}
-      />
-      <p>
-        The handler detects which signature you passed by checking the function
-        arity. New code should use the unified <code>AuthorizeFn</code> shown
-        above.
-      </p>
-
-      <h3 id="authorize-migration">Migration: per-action to unified</h3>
-      <p>
-        To migrate from the legacy per-action SSE authorize to the unified
-        signature:
-      </p>
-      <ol>
-        <li>
-          Replace <code>{`({ userId, action, channel })`}</code> with two
-          positional params <code>(userId, channel)</code>.
-        </li>
-        <li>
-          Instead of branching on <code>action</code>, return a{' '}
-          <code>ChannelPermissions</code> object with explicit{' '}
-          <code>subscribe</code>, <code>publish</code>, and{' '}
-          <code>presence</code> booleans.
-        </li>
-        <li>
-          Use <code>channel.namespace</code> and <code>channel.params</code>{' '}
-          instead of manually parsing the raw channel string.
-        </li>
-      </ol>
-      <CodeBlock
-        title="Before (legacy)"
-        code={`authorize: async ({ userId, action, channel }) => {
-  const [namespace] = channel.split(':')
-  if (namespace === 'todos') {
-    const projectId = channel.split('projectId=')[1]
-    const member = await db.getProjectMember(userId, projectId)
-    if (!member) return false
-    if (action === 'publish') return member.role === 'admin'
-    return true
-  }
-  return false
-}`}
-      />
-      <CodeBlock
-        title="After (unified)"
-        code={`authorize: async (userId, channel) => {
-  if (channel.namespace === 'todos') {
-    const member = await db.getProjectMember(userId, channel.params.projectId)
-    if (!member) return false
-    return {
-      subscribe: true,
-      publish: member.role === 'admin',
-      presence: true,
-    }
-  }
-  return false
-}`}
       />
 
       <h2 id="client-token">Client-side: token auth</h2>

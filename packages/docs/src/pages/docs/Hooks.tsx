@@ -58,10 +58,10 @@ function TypingIndicator({ roomId }: { roomId: string }) {
       />
       <h3>Signature</h3>
       <CodeBlock
-        code={`function useSubscribe<T = unknown>(
-  channel: QueryKey,          // e.g. ['chat:typing', { roomId }]
-  onMessage: (data: T) => void,
-): void`}
+        code={`function useSubscribe(
+  channel: QueryKey | string,   // e.g. ['chat:typing', { roomId }]
+  onMessage: (data: unknown) => void,
+): { subscribeError: SubscribeError | null }`}
       />
       <p>
         See also: <a href="#/docs/ephemeral">Ephemeral Channels</a> for
@@ -205,13 +205,13 @@ function AIResponse({ requestId }: { requestId: string }) {
       <h3>Signature</h3>
       <CodeBlock
         code={`function useStream<TState, TEvent = unknown>(
-  streamDef: StreamChannel<TState, TEvent>,
+  streamDef: StreamChannelDef<TState, TEvent>,
   options: {
     params: Record<string, string>
   },
 ): {
   state: TState
-  status: 'idle' | 'pending' | 'streaming' | 'complete' | 'error' | 'stale'
+  status: 'pending' | 'streaming' | 'done' | 'error' | 'stale'
   error: string | null
 }`}
       />

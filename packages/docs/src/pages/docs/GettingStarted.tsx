@@ -61,11 +61,11 @@ export function GettingStarted() {
         publishes.
       </p>
       <CodeBlock
-        title="app/routes/api/realtime.ts"
+        title="app/server/realtime.ts"
         code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
 import { getSession } from '../auth'
 
-const realtime = createStartHandler({
+export const realtime = createStartHandler({
   getUser: async (req) => {
     const session = await getSession(req)
     return session ? { userId: session.userId } : null
@@ -79,9 +79,18 @@ const realtime = createStartHandler({
 
 // For multi-instance fan-out, pass a PublishBackend in the config above:
 // import { createUpstashBackend } from '@tanstack/realtime-backend-upstash'
-// backend: createUpstashBackend({ url: env.UPSTASH_URL, token: env.UPSTASH_TOKEN }),
+// backend: createUpstashBackend({ url: env.UPSTASH_URL, token: env.UPSTASH_TOKEN }),`}
+      />
+      <CodeBlock
+        title="app/routes/api/realtime.ts"
+        code={`import { createAPIFileRoute } from '@tanstack/start/api'
+import { realtime } from '../../server/realtime'
 
-export const { GET } = realtime`}
+export const Route = createAPIFileRoute('/api/realtime')({
+  GET:     ({ request }) => realtime.handle(request),
+  POST:    ({ request }) => realtime.handle(request),
+  OPTIONS: ({ request }) => realtime.handle(request),
+})`}
       />
 
       <h2 id="client-setup">Client setup</h2>

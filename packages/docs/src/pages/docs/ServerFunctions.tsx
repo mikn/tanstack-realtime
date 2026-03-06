@@ -205,23 +205,28 @@ export const todosOptions = (projectId: string) =>
 
       <h2 id="component">6. Component</h2>
       <p>
-        Read the collection with <code>useCollection</code>. Trigger writes by
-        calling <code>collection.insert()</code>,{' '}
-        <code>collection.update()</code>, or <code>collection.delete()</code>{' '}
-        directly — TanStack DB creates a transaction, calls the{' '}
-        <code>onInsert</code> / <code>onUpdate</code> / <code>onDelete</code>{' '}
-        callback wired by <code>withServerFns</code>, and the auto-broadcast
-        propagates the confirmed row to every subscriber.
+        Create a collection with <code>createCollection</code> (memoized so it
+        is stable across renders), then read it reactively with{' '}
+        <code>useCollection</code>. Trigger writes by calling{' '}
+        <code>collection.insert()</code>, <code>collection.update()</code>, or{' '}
+        <code>collection.delete()</code> directly — TanStack DB creates a
+        transaction, calls the <code>onInsert</code> / <code>onUpdate</code> /{' '}
+        <code>onDelete</code> callback wired by <code>withServerFns</code>, and
+        the auto-broadcast propagates the confirmed row to every subscriber.
       </p>
       <CodeBlock
         title="app/features/todos/TodoList.tsx"
-        code={`import { useCollection } from '@tanstack/react-db'
+        code={`import { createCollection } from '@tanstack/db'
+import { useCollection } from '@tanstack/react-db'
+import { useMemo } from 'react'
 import { todosOptions } from './collection'
 
 export function TodoList({ projectId }: { projectId: string }) {
-  const options    = todosOptions(projectId)
-  const todos      = useCollection(options)
-  const collection = options.collection   // the underlying TanStack DB collection
+  const collection = useMemo(
+    () => createCollection(todosOptions(projectId)),
+    [projectId],
+  )
+  const todos = useCollection(collection)
 
   const addTodo = () =>
     collection.insert({
