@@ -61,7 +61,7 @@ await client.connect()
 
 ### Multi-Tab Coordination
 
-When a user opens your app in multiple browser tabs, each tab would normally open its own WebSocket — multiplying server load, bandwidth, and the potential for state conflicts. `createCoordinatedTransport` solves this by sharing a single connection across all tabs. It picks the best available strategy automatically:
+When a user opens your app in multiple browser tabs, each tab would normally open its own connection — multiplying server load, bandwidth, and the potential for state conflicts. `createCoordinatedTransport` solves this by sharing a single connection across all tabs. It picks the best available strategy automatically:
 
 | Strategy             | When used                                                                              | How it works                                                                                                                                                                                                                                                                       |
 | -------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

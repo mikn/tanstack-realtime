@@ -121,7 +121,7 @@ function Spectrum() {
               <span className="step-number">1</span>
               <div>
                 <h4>Server-only</h4>
-                <p>Just a queryFn. No WebSocket, no client.</p>
+                <p>Just a queryFn. No live connection, no client.</p>
               </div>
             </div>
             <CodeBlock

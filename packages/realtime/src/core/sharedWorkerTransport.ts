@@ -1,5 +1,5 @@
 /**
- * SharedWorker-based transport — shares a single WebSocket connection across
+ * SharedWorker-based transport — shares a single realtime connection across
  * all browser tabs via a SharedWorker.
  *
  * This module contains TWO exports:
