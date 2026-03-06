@@ -252,7 +252,9 @@ export function sseTransport(options: SseTransportOptions): RealtimeTransport {
       case 'message': {
         const listeners = subscriptions.get(event.channel)
         if (listeners) {
-          for (const cb of listeners) cb(event.data)
+          const result = pipeline.runBeforeDeliver(event.channel, event.data)
+          if (result === false) break
+          for (const cb of listeners) cb(result.data)
         }
         break
       }

@@ -373,7 +373,10 @@ export function centrifugoTransport(
       // Regular publication — dispatch to data subscribers
       const listeners = subscriptions.get(channel)
       if (listeners) {
-        for (const cb of listeners) cb(data)
+        const result = pipeline.runBeforeDeliver(channel, data)
+        if (result !== false) {
+          for (const cb of listeners) cb(result.data)
+        }
       }
     }
   }
@@ -385,7 +388,9 @@ export function centrifugoTransport(
     const listeners = subscriptions.get(channel)
     if (!listeners || listeners.size === 0) return
     for (const pub of publications) {
-      for (const cb of listeners) cb(pub.data)
+      const result = pipeline.runBeforeDeliver(channel, pub.data)
+      if (result === false) continue
+      for (const cb of listeners) cb(result.data)
     }
   }
 
