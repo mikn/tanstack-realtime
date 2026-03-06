@@ -159,10 +159,7 @@ function ChatInput({ roomId }: { roomId: string }) {
 // 4. Presence — track other connected users
 import { createPresenceChannel, usePresence } from '@tanstack/react-realtime'
 
-const editorPresence = createPresenceChannel<
-  { documentId: string },
-  { cursor: { x: number; y: number } | null; name: string }
->({
+const editorPresence = createPresenceChannel<{ documentId: string }>({
   id: 'editor',
   channel: ({ documentId }) => ['editor', { documentId }],
 })
@@ -281,9 +278,9 @@ const handler = createSseHandler({
     return userId ? { userId } : null
   },
 
-  // Authorize subscribe and publish actions per channel
-  async authorize({ userId, action, channel }) {
-    return true
+  // Authorize per-channel access (subscribe and publish permissions)
+  async authorize(userId, channel) {
+    return true // allow all authenticated users; add channel.namespace checks here
   },
 
   pingInterval: 30_000, // default; set to 0 to disable keepalive pings

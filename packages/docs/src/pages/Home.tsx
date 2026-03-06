@@ -51,7 +51,7 @@ function Features() {
   const features = [
     {
       title: 'Transport-agnostic',
-      desc: 'WebSocket, SSE, or Centrifugo. Swap transports without changing application code.',
+      desc: 'SSE or Centrifugo (WebSocket). Swap transports without changing application code.',
     },
     {
       title: 'Type-safe channels',
@@ -215,17 +215,20 @@ function App() {
             <div className="qs-number">3</div>
             <h3>Add a channel to any collection</h3>
             <CodeBlock
-              code={`import { realtimeCollectionOptions, withRest } from '@tanstack/realtime'
+              code={`import { createCollection } from '@tanstack/db'
+import { realtimeCollectionOptions, withRest } from '@tanstack/realtime'
 import { useCollection } from '@tanstack/react-db'
 
-const todosOptions = realtimeCollectionOptions({
-  ...withRest({ url: '/api/todos', getKey: (t: Todo) => t.id }),
-  client,
-  channel: ['todos'],
-})
+const todosCollection = createCollection(
+  realtimeCollectionOptions({
+    ...withRest({ url: '/api/todos', getKey: (t: Todo) => t.id }),
+    client,
+    channel: ['todos'],
+  })
+)
 
 function TodoList() {
-  const todos = useCollection(todosOptions)
+  const todos = useCollection(todosCollection)
   return <ul>{todos.map(t => <li key={t.id}>{t.title}</li>)}</ul>
 }`}
             />
