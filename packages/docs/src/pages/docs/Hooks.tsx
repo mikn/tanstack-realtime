@@ -162,7 +162,7 @@ function DocumentPage({ docId }: { docId: string }) {
       <h3>Signature</h3>
       <CodeBlock
         code={`function usePresence<T>(
-  channelDef: PresenceChannel<T>,
+  channelDef: PresenceChannelDef,
   options: {
     params: Record<string, string>
     initial: T

@@ -214,12 +214,13 @@ export class RealtimeYjsProvider {
       <CodeBlock
         title="app.ts"
         code={`import * as Y from 'yjs'
-import { createRealtimeClient, wsTransport } from '@tanstack/realtime'
+import { createRealtimeClient } from '@tanstack/realtime'
+import { sseTransport } from '@tanstack/realtime-adapter-sse'
 import { RealtimeYjsProvider } from './realtime-yjs-provider'
 
 // Create the TanStack Realtime client
 const client = createRealtimeClient({
-  transport: wsTransport({ url: 'ws://localhost:3000' }),
+  transport: sseTransport({ url: '/api/realtime' }),
 })
 
 // Create the Y.js document
