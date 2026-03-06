@@ -16,29 +16,29 @@ export function Tick() {
 
       <h2 id="how">How it works</h2>
       <p>
-        <code>tickTransport</code> wraps any base transport and adds a
-        fixed-interval tick loop. Instead of publishing individual events, you
-        call <code>setState()</code> to set the local state for an entity. The
-        transport batches all dirty entities into a single{' '}
+        <code>useTickBatching</code> registers tick-batching hooks on any
+        transport, adding a fixed-interval tick loop. Instead of publishing
+        individual events, you call <code>setState()</code> to set the local
+        state for an entity. The hook batches all dirty entities into a single{' '}
         <strong>tick frame</strong> sent once per interval. On the receiving
         side, <code>onTick()</code> delivers the full batched frame rather than
         individual events.
       </p>
       <CodeBlock
         title="realtime/tickSetup.ts"
-        code={`import { tickTransport, wsTransport } from '@tanstack/realtime'
+        code={`import { useTickBatching } from '@tanstack/realtime'
+import { wsTransport } from '@tanstack/realtime'
 
-// Wrap any transport with tick-based batching.
-const tick = tickTransport(
-  wsTransport({ url: 'ws://localhost:3001' }),
-  {
-    // 60 Hz tick rate (16 ms interval, matching requestAnimationFrame)
-    tickMs: 16,
+const transport = wsTransport({ url: 'ws://localhost:3001' })
 
-    // Only send fields that changed since the last tick.
-    deltaCompression: true,
-  },
-)
+// Register tick-batching hooks on the transport.
+const tick = useTickBatching(transport, {
+  // 60 Hz tick rate (16 ms interval, matching requestAnimationFrame)
+  tickMs: 16,
+
+  // Only send fields that changed since the last tick.
+  deltaCompression: true,
+})
 
 // Normal subscribe/publish still work for non-tick channels.
 // Tick frames are filtered out of regular subscribe() callbacks.`}
@@ -174,13 +174,13 @@ function GameLoop({ myPlayerId }: { myPlayerId: string }) {
       </p>
       <CodeBlock
         title="features/metrics/metricsSetup.ts"
-        code={`import { tickTransport, wsTransport } from '@tanstack/realtime'
+        code={`import { useTickBatching } from '@tanstack/realtime'
+import { wsTransport } from '@tanstack/realtime'
+
+const transport = wsTransport({ url: 'wss://metrics.example.com' })
 
 // 10 Hz is plenty for dashboard gauges.
-export const metricsTick = tickTransport(
-  wsTransport({ url: 'wss://metrics.example.com' }),
-  { tickMs: 100 },
-)`}
+export const metricsTick = useTickBatching(transport, { tickMs: 100 })`}
       />
       <CodeBlock
         title="features/metrics/serverMetrics.ts"

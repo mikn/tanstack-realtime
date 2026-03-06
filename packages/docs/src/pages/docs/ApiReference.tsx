@@ -183,7 +183,7 @@ export function ApiReference() {
             </td>
             <td>
               Game-tick collection for high-frequency state updates. Works with{' '}
-              <code>tickTransport</code> to batch mutations per tick.
+              <code>useTickBatching</code> to batch mutations per tick.
             </td>
           </tr>
         </tbody>
@@ -812,14 +812,18 @@ export function ApiReference() {
         <tbody>
           <tr>
             <td>
-              <code>tickTransport</code>
+              <code>useTickBatching</code>
             </td>
             <td>
-              <code>(options: TickTransportOptions) =&gt; TickTransport</code>
+              <code>
+                (transport: RealtimeTransport, options?: TickTransportOptions)
+                =&gt; TickHandle
+              </code>
             </td>
             <td>
-              Wraps a transport to batch outgoing publish calls at a fixed tick
-              interval — ideal for game state with high-frequency updates.
+              Registers tick-batching hooks on a transport to batch outgoing
+              publish calls at a fixed tick interval — ideal for game state with
+              high-frequency updates.
             </td>
           </tr>
           <tr>
