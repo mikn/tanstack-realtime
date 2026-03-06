@@ -21,16 +21,16 @@ export function Testing() {
 import type { RealtimeTransport, ConnectionStatus } from '@tanstack/realtime'
 
 function createMockTransport(): RealtimeTransport & {
-  emit: (channel: string, data: unknown) => void
-  publishCalls: Array<{ channel: string; data: unknown }>
+  simulateMessage: (channel: string, data: unknown) => void
+  publishLog: Array<{ channel: string; data: unknown }>
 } {
   const listeners = new Map<string, Set<(data: unknown) => void>>()
   const store = new Store<ConnectionStatus>('connected')
-  const publishCalls: Array<{ channel: string; data: unknown }> = []
+  const publishLog: Array<{ channel: string; data: unknown }> = []
 
   return {
     store,
-    publishCalls,
+    publishLog,
     async connect() {},
     disconnect() {},
     subscribe(channel, onMessage) {
@@ -39,9 +39,9 @@ function createMockTransport(): RealtimeTransport & {
       return () => { listeners.get(channel)?.delete(onMessage) }
     },
     async publish(channel, data) {
-      publishCalls.push({ channel, data })
+      publishLog.push({ channel, data })
     },
-    emit(channel, data) {
+    simulateMessage(channel, data) {
       const cbs = listeners.get(channel)
       if (cbs) for (const cb of cbs) cb(data)
     },
@@ -49,10 +49,10 @@ function createMockTransport(): RealtimeTransport & {
 }`}
       />
       <p>
-        Two helpers make assertions easy: <code>emit()</code> triggers events
-        synchronously so your test can assert on the result immediately, and{' '}
-        <code>publishCalls</code> records every outgoing publish so you can
-        verify what the client sent without a real server.
+        Two helpers make assertions easy: <code>simulateMessage()</code>{' '}
+        triggers events synchronously so your test can assert on the result
+        immediately, and <code>publishLog</code> records every outgoing publish
+        so you can verify what the client sent without a real server.
       </p>
 
       <h2 id="presence-mock">Add presence support</h2>
@@ -67,9 +67,9 @@ function createMockTransport(): RealtimeTransport & {
         code={`import type { PresenceCapable, PresenceUser } from '@tanstack/realtime'
 
 function createMockTransportWithPresence(): RealtimeTransport & PresenceCapable & {
-  emit: (channel: string, data: unknown) => void
+  simulateMessage: (channel: string, data: unknown) => void
   triggerPresence: (channel: string, users: ReadonlyArray<PresenceUser>) => void
-  publishCalls: Array<{ channel: string; data: unknown }>
+  publishLog: Array<{ channel: string; data: unknown }>
 } {
   const base = createMockTransport()
   const presenceListeners = new Map<string, Set<(users: ReadonlyArray<PresenceUser>) => void>>()
@@ -127,7 +127,7 @@ describe('task collection', () => {
     })
 
     // Simulate a server event
-    transport.emit('tasks', {
+    transport.simulateMessage('tasks', {
       action: 'insert',
       data: { id: '1', title: 'Buy milk' },
     })
@@ -266,24 +266,24 @@ it('shows disconnected state', () => {
         When a client publishes an optimistic update, the collection applies it
         immediately and waits for the server echo to confirm it. In tests, you
         control both sides: call the mutation to apply the optimistic update,
-        then call <code>transport.emit()</code> to simulate the server echo.
-        Because <code>publishCalls</code> records every outgoing publish, you
-        can assert that the client sent the correct payload and that the echo
-        was properly deduplicated (the collection should not apply the same
-        change twice).
+        then call <code>transport.simulateMessage()</code> to simulate the
+        server echo. Because <code>publishLog</code> records every outgoing
+        publish, you can assert that the client sent the correct payload and
+        that the echo was properly deduplicated (the collection should not apply
+        the same change twice).
       </p>
       <CodeBlock
         title="test/optimistic.test.ts"
         code={`// 1. Apply optimistic update via client
-// 2. Check publishCalls for the outgoing message
-expect(transport.publishCalls).toHaveLength(1)
-expect(transport.publishCalls[0]).toMatchObject({
+// 2. Check publishLog for the outgoing message
+expect(transport.publishLog).toHaveLength(1)
+expect(transport.publishLog[0]).toMatchObject({
   channel: 'tasks',
   data: expect.objectContaining({ action: 'update' }),
 })
 
 // 3. Echo the same event back from the "server"
-transport.emit('tasks', transport.publishCalls[0]!.data)
+transport.simulateMessage('tasks', transport.publishLog[0]!.data)
 
 // 4. Assert the collection did not duplicate the update`}
       />

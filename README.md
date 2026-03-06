@@ -79,7 +79,10 @@ import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
 // createSharedWorkerCoordinator requires a PresenceCapable transport.
 // The Centrifugo adapter implements PresenceCapable; sseTransport does not.
 const coordinator = createSharedWorkerCoordinator(
-  centrifugoTransport({ url: 'wss://your-centrifugo.example.com/connection/websocket', token: () => fetchAuthToken() }),
+  centrifugoTransport({
+    url: 'wss://your-centrifugo.example.com/connection/websocket',
+    token: () => fetchAuthToken(),
+  }),
 )
 
 self.addEventListener('connect', (e) => {
@@ -91,7 +94,11 @@ Then in your app code you point to it:
 
 ```ts
 const transport = createCoordinatedTransport({
-  transport: () => centrifugoTransport({ url: 'wss://your-centrifugo.example.com/connection/websocket', token: () => fetchAuthToken() }),
+  transport: () =>
+    centrifugoTransport({
+      url: 'wss://your-centrifugo.example.com/connection/websocket',
+      token: () => fetchAuthToken(),
+    }),
   workerUrl: new URL('./realtime.worker.ts', import.meta.url),
 })
 ```

@@ -231,8 +231,8 @@ export interface PresenceUser<T = unknown> {
       <h3>Server to client (pushes)</h3>
       <p>
         Server-initiated messages have no <code>id</code> field. They arrive
-        with a top-level <code>push</code> key containing the channel and one
-        of several event fields:
+        with a top-level <code>push</code> key containing the channel and one of
+        several event fields:
       </p>
       <CodeBlock
         code={`interface CentrifugoPush {

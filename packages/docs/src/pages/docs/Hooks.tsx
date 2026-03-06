@@ -347,7 +347,7 @@ function EditableTitle({ docId }: { docId: string }) {
 })
 
 function TagEditor({ postId }: { postId: string }) {
-  const { values: tags, add, remove } = useSyncedSet(postTags, {
+  const { values: tags, add, remove, has } = useSyncedSet(postTags, {
     params: { postId },
     initial: [],
   })
@@ -356,7 +356,12 @@ function TagEditor({ postId }: { postId: string }) {
       {tags.map(tag => (
         <span key={tag}>{tag} <button onClick={() => remove(tag)}>x</button></span>
       ))}
-      <button onClick={() => add('important')}>+ important</button>
+      <button
+        onClick={() => add('important')}
+        disabled={has('important')}
+      >
+        + important
+      </button>
     </>
   )
 }`}

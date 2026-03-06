@@ -35,7 +35,9 @@ export function Transports() {
             <td>Presence support</td>
             <td>No</td>
             <td>Yes</td>
-            <td>Yes (implement <code>PresenceCapable</code>)</td>
+            <td>
+              Yes (implement <code>PresenceCapable</code>)
+            </td>
           </tr>
           <tr>
             <td>Corporate proxy&#8209;friendly</td>
