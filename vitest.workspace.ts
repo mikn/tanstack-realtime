@@ -73,6 +73,7 @@ export default defineWorkspace([
         'packages/__tests__/unifiedAuthorize.test.ts',
         'packages/__tests__/lifecycleHooks.test.ts',
         'packages/__tests__/deriveChannelFromUrl.test.ts',
+        'packages/__tests__/reactHooks.test.ts',
       ],
       pool: 'forks',
       poolOptions: { forks: { singleFork: true } },

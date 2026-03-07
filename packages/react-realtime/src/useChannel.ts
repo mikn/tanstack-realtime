@@ -1,7 +1,7 @@
-import { use, useCallback, useEffect, useRef } from 'react'
+import { use, useCallback, useEffect, useRef, useState } from 'react'
 import { serializeKey } from '@tanstack/realtime'
 import { RealtimeContext } from './context.js'
-import type { QueryKey } from '@tanstack/realtime'
+import type { QueryKey, SubscribeError } from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -14,6 +14,12 @@ export interface UseChannelResult {
    * message — `await` it for backpressure or optimistic UI confirmation.
    */
   publish: (data: unknown) => Promise<void>
+  /**
+   * The most recent subscribe error for this channel, or `null` if the
+   * subscription is healthy. Resets to `null` when `channel` changes.
+   * Only populated when `onMessage` is provided (subscribe-mode).
+   */
+  subscribeError: SubscribeError | null
 }
 
 // ---------------------------------------------------------------------------
@@ -71,17 +77,37 @@ export function useChannel(
   const serializedChannel =
     typeof channel === 'string' ? channel : serializeKey(channel)
 
+  const [subscribeError, setSubscribeError] = useState<SubscribeError | null>(
+    null,
+  )
+
   // Keep the latest callback in a ref so the subscription is not torn down
   // and re-established on every render when the caller does not memoize it.
   const onMessageRef = useRef(onMessage)
   onMessageRef.current = onMessage
 
   useEffect(() => {
+    setSubscribeError(null)
+
     if (!onMessageRef.current) return
-    return client.subscribe(serializedChannel, (data) =>
+
+    const unsubMessage = client.subscribe(serializedChannel, (data) =>
       onMessageRef.current?.(data),
     )
+
+    const unsubError = client.onSubscribeError((ch, reason, code) => {
+      if (ch === serializedChannel) {
+        setSubscribeError({ channel: ch, reason, code })
+      }
+    })
+
+    return () => {
+      unsubMessage()
+      unsubError()
+    }
     // Re-subscribe only when the channel string or client instance changes.
+    // Boolean(onMessage) ensures the subscription is set up/torn down when
+    // onMessage transitions between provided and omitted.
   }, [client, serializedChannel, Boolean(onMessage)]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const publish = useCallback(
@@ -89,5 +115,5 @@ export function useChannel(
     [client, serializedChannel],
   )
 
-  return { publish }
+  return { publish, subscribeError }
 }

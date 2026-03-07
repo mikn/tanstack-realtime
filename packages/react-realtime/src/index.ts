@@ -14,6 +14,8 @@ export type { RealtimeProviderProps } from './RealtimeProvider.js'
 export { useRealtime } from './useRealtime.js'
 export type { UseRealtimeResult } from './useRealtime.js'
 
+export { useConnectionStatus } from './useConnectionStatus.js'
+
 export { usePresence } from './usePresence.js'
 export type { UsePresenceOptions, UsePresenceResult } from './usePresence.js'
 
@@ -35,10 +37,14 @@ export { useLiveChannel } from './useLiveChannel.js'
 export type { UseLiveChannelConfig } from './useLiveChannel.js'
 
 // Testing utilities
-export { createTestRealtimeProvider } from './TestRealtimeProvider.js'
+export {
+  createTestRealtimeProvider,
+  createTestRealtimeProviderWithPresence,
+} from './TestRealtimeProvider.js'
 export type {
   TestRealtimeProviderProps,
   TestRealtimeProviderResult,
+  TestRealtimeProviderWithPresenceResult,
 } from './TestRealtimeProvider.js'
 
 // CRDT standalone hooks
