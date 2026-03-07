@@ -170,6 +170,7 @@ export function Presence() {
         code={`import { createPresenceChannel } from '@tanstack/realtime'
 
 export const docPresence = createPresenceChannel({
+  id: 'doc-presence',
   channel: (params: { docId: string }) => ['doc:presence', params],
 })`}
       />

@@ -23,6 +23,10 @@ export function WireProtocol() {
   subscribe: (channel: string, onMessage: (data: unknown) => void) => () => void
   publish: (channel: string, data: unknown) => Promise<void>
   readonly store: Store<ConnectionStatus>
+  /** Register lifecycle hooks (offline queue, gap recovery, dedup, etc.). */
+  hook: (registration: HookRegistration) => HookHandle
+  /** Optional: called when the server rejects a subscription attempt. */
+  onSubscribeError?: (callback: (channel: string, reason: string, code?: number) => void) => () => void
 }
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'`}
@@ -76,50 +80,53 @@ export interface PresenceUser<T = unknown> {
         the transport falls back to <code>disconnected</code>.
       </p>
 
-      <h2 id="websocket-messages">WebSocket transport messages</h2>
+      <h2 id="custom-websocket">Custom WebSocket transport</h2>
       <p>
-        The built-in WebSocket transport (<code>wsTransport</code>) communicates
-        using JSON messages over a single WebSocket connection.
-      </p>
-
-      <h3>Client to server</h3>
-      <CodeBlock
-        code={`type ClientMsg =
-  | { type: 'subscribe'; channel: string }
-  | { type: 'unsubscribe'; channel: string }
-  | { type: 'publish'; channel: string; data: unknown }
-  | { type: 'presence:join'; channel: string; data: unknown }
-  | { type: 'presence:update'; channel: string; data: unknown }
-  | { type: 'presence:leave'; channel: string }`}
-      />
-
-      <h3>Server to client</h3>
-      <CodeBlock
-        code={`type ServerMsg =
-  | { type: 'connected'; connectionId: string }
-  | { type: 'subscribe:ok'; channel: string }
-  | { type: 'subscribe:error'; channel: string; code: number; reason: string }
-  | { type: 'message'; channel: string; data: unknown }
-  | { type: 'presence:update'; channel: string; users: ReadonlyArray<PresenceUser> }`}
-      />
-
-      <h3>Message flow</h3>
-      <p>
-        The typical sequence is: the client opens a WebSocket connection and
-        receives a <code>connected</code> message containing its unique{' '}
-        <code>connectionId</code>. The client then sends <code>subscribe</code>{' '}
-        messages for each channel it needs. The server responds with{' '}
-        <code>subscribe:ok</code> on success or <code>subscribe:error</code> if
-        authorization fails. Once subscribed, the client receives{' '}
-        <code>message</code> events whenever data is published to the channel.
+        TanStack Realtime does not ship a generic WebSocket transport. If you
+        want to connect over a plain WebSocket (without Centrifugo), implement
+        the <code>RealtimeTransport</code> interface yourself. The interface is
+        intentionally small — you only need to wire up the five core methods
+        plus, optionally, presence and hook support.
       </p>
       <p>
-        For presence, the client sends <code>presence:join</code> when entering
-        a channel, <code>presence:update</code> when local presence data
-        changes, and <code>presence:leave</code> when exiting. The server
-        responds with <code>presence:update</code> messages containing the list
-        of all other users in the channel &mdash; the sender is excluded from
-        the <code>users</code> array.
+        You are free to choose any wire format for your custom transport. The
+        example below shows a simple JSON message protocol that you can use as a
+        starting point. Your server must speak the same format on the other end.
+      </p>
+
+      <h3>Example client-to-server messages</h3>
+      <CodeBlock
+        code={`// Subscribe to a channel
+{ type: 'subscribe'; channel: string }
+// Unsubscribe from a channel
+{ type: 'unsubscribe'; channel: string }
+// Publish data to a channel
+{ type: 'publish'; channel: string; data: unknown }
+// Presence — join, update, or leave (requires PresenceCapable implementation)
+{ type: 'presence:join'; channel: string; data: unknown }
+{ type: 'presence:update'; channel: string; data: unknown }
+{ type: 'presence:leave'; channel: string }`}
+      />
+
+      <h3>Example server-to-client messages</h3>
+      <CodeBlock
+        code={`// Sent once after the WebSocket opens
+{ type: 'connected'; connectionId: string }
+// Sent when a subscription is accepted
+{ type: 'subscribe:ok'; channel: string }
+// Sent when a subscription is rejected (e.g. auth failure)
+{ type: 'subscribe:error'; channel: string; code: number; reason: string }
+// Sent when data is published to a subscribed channel
+{ type: 'message'; channel: string; data: unknown }
+// Sent when presence changes (requires PresenceCapable implementation)
+{ type: 'presence:update'; channel: string; users: ReadonlyArray<PresenceUser> }`}
+      />
+
+      <p>
+        For presence support your transport must also implement the{' '}
+        <code>PresenceCapable</code> interface shown above. The built-in
+        Centrifugo adapter implements both and can serve as a reference
+        implementation.
       </p>
 
       <h2 id="sse-messages">SSE transport messages</h2>
@@ -137,6 +144,7 @@ export interface PresenceUser<T = unknown> {
         code={`type ServerEvent =
   | { type: 'connected'; connectionId: string }
   | { type: 'message'; channel: string; data: unknown }
+  | { type: 'subscribe:error'; channel: string; reason: string; code?: number }
   | { type: 'ping' }`}
       />
 
@@ -156,7 +164,8 @@ export interface PresenceUser<T = unknown> {
           The SSE transport does <strong>not</strong> support presence. Presence
           requires bidirectional messaging for real-time join/leave/update
           events, and SSE is inherently unidirectional. If you need presence,
-          use the WebSocket or Centrifugo transport instead.
+          use the Centrifugo transport or build a custom WebSocket transport
+          instead.
         </p>
       </div>
       <p>
@@ -189,22 +198,29 @@ export interface PresenceUser<T = unknown> {
       <h3>Server to client (replies)</h3>
       <p>
         Replies include the <code>id</code> from the original command so the
-        client can match them:
+        client can match them. Each reply has at most one of{' '}
+        <code>connect</code>, <code>subscribe</code>, <code>publish</code>, or{' '}
+        <code>unsubscribe</code> set (corresponding to the command type), plus
+        an optional <code>error</code> field on failure:
       </p>
       <CodeBlock
         code={`interface CentrifugoReply {
   id: number
-  result?: {
-    // connect reply
-    client?: string       // connection ID
-    version?: string
-    // subscribe reply
+  connect?: {
+    client: string      // assigned connection ID
+    version: string
+    data?: unknown
+    subs?: unknown
+  }
+  subscribe?: {
     recoverable?: boolean
     epoch?: string
     offset?: number
     publications?: Array<{ data: unknown; offset?: number }>
-    // publish reply — empty result on success
+    data?: unknown
   }
+  publish?: Record<string, never>    // empty on success
+  unsubscribe?: Record<string, never>
   error?: {
     code: number
     message: string
@@ -214,24 +230,26 @@ export interface PresenceUser<T = unknown> {
 
       <h3>Server to client (pushes)</h3>
       <p>
-        Server-initiated messages have no <code>id</code> field. They are
-        delivered as push events:
+        Server-initiated messages have no <code>id</code> field. They arrive
+        with a top-level <code>push</code> key containing the channel and one of
+        several event fields:
       </p>
       <CodeBlock
-        code={`// Publication push — new data on a subscribed channel
-{ result: { channel: string; data: { data: unknown; offset?: number } } }
-
-// Join push — a user joined the channel
-{ result: { channel: string; data: { info: { client: string; user: string } } }; type: 'join' }
-
-// Leave push — a user left the channel
-{ result: { channel: string; data: { info: { client: string; user: string } } }; type: 'leave' }
-
-// Unsubscribe push — server forcibly unsubscribed the client
-{ result: { channel: string }; type: 'unsub' }
-
-// Disconnect push — server is closing the connection
-{ result: { code: number; reason: string }; type: 'disconnect' }`}
+        code={`interface CentrifugoPush {
+  push: {
+    channel: string
+    // Publication — new data on a subscribed channel
+    pub?: { data: unknown; offset?: number; tags?: Record<string, string> }
+    // Join — a client joined the channel (requires joinLeave on the namespace)
+    join?: { info: { user: string; client: string; conn_info?: unknown; chan_info?: unknown } }
+    // Leave — a client left the channel
+    leave?: { info: { user: string; client: string; conn_info?: unknown; chan_info?: unknown } }
+    // Unsubscribe — server forcibly unsubscribed this client
+    unsubscribe?: { resubscribe?: boolean }
+    // Disconnect — server is closing the connection
+    disconnect?: { code: number; reason: string; reconnect?: boolean }
+  }
+}`}
       />
 
       <h3>Sidecar presence pattern</h3>
@@ -245,9 +263,9 @@ export interface PresenceUser<T = unknown> {
       <CodeBlock
         code={`// Messages published to the sidecar presence channel
 type PresenceSidecarMsg =
-  | { type: 'prs:join'; connectionId: string; data: unknown }
-  | { type: 'prs:update'; connectionId: string; data: unknown }
-  | { type: 'prs:leave'; connectionId: string }`}
+  | { type: 'prs:join'; clientId: string; data: unknown }
+  | { type: 'prs:update'; clientId: string; data: unknown }
+  | { type: 'prs:leave'; clientId: string }`}
       />
       <p>
         The <code>$prs</code> namespace must have{' '}

@@ -19,49 +19,52 @@ export function Transports() {
         <thead>
           <tr>
             <th scope="col">Criterion</th>
-            <th scope="col">WebSocket</th>
             <th scope="col">SSE</th>
             <th scope="col">Centrifugo</th>
+            <th scope="col">Custom WebSocket</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td>Direction</td>
-            <td>Bidirectional</td>
             <td>Server&rarr;Client (publish via HTTP&nbsp;POST)</td>
+            <td>Bidirectional</td>
             <td>Bidirectional</td>
           </tr>
           <tr>
             <td>Presence support</td>
-            <td>Yes</td>
             <td>No</td>
             <td>Yes</td>
+            <td>
+              Yes (implement <code>PresenceCapable</code>)
+            </td>
           </tr>
           <tr>
             <td>Corporate proxy&#8209;friendly</td>
-            <td>Sometimes blocked</td>
             <td>Always works (standard HTTP)</td>
+            <td>Sometimes blocked</td>
             <td>Sometimes blocked</td>
           </tr>
           <tr>
             <td>Multi&#8209;process scaling</td>
-            <td>External pub/sub needed</td>
             <td>Need PublishBackend</td>
             <td>Built&#8209;in (Centrifugo cluster)</td>
+            <td>External pub/sub needed</td>
           </tr>
           <tr>
             <td>Infrastructure required</td>
-            <td>Node.js server</td>
             <td>Any HTTP server</td>
             <td>Centrifugo binary</td>
+            <td>Node.js server + custom implementation</td>
           </tr>
           <tr>
             <td>Best for</td>
-            <td>
-              Full&#8209;featured apps needing presence&nbsp;+&nbsp;pub/sub
-            </td>
             <td>Simple live data, SSR, edge functions</td>
             <td>High&#8209;scale production, existing Centrifugo infra</td>
+            <td>
+              Full&#8209;featured apps needing presence&nbsp;+&nbsp;pub/sub with
+              a custom server protocol
+            </td>
           </tr>
         </tbody>
       </table>
@@ -75,18 +78,22 @@ export function Transports() {
         <code>@tanstack/realtime-preset-start</code>) uses SSE under the hood.
       </p>
       <p>
-        <strong>Use WebSocket</strong> when you need presence, typing
-        indicators, or client&rarr;server pub/sub. WebSocket connections are
-        natively bidirectional, so the client can publish directly over the open
-        connection without a separate HTTP round-trip. The coordinated and
-        shared-worker transports in <code>@tanstack/realtime</code> also build
-        on WebSocket semantics.
+        <strong>Use Centrifugo</strong> when you need presence, typing
+        indicators, or client&rarr;server pub/sub at production scale.
+        Centrifugo handles multi-node fan-out, epoch/offset gap recovery,
+        token-based auth, and presence out of the box &mdash; no{' '}
+        <code>PublishBackend</code> wiring required. The{' '}
+        <code>centrifugoTransport</code> adapter is the only built-in
+        bidirectional transport.
       </p>
       <p>
-        <strong>Use Centrifugo</strong> when you need production-scale
-        clustering or already run Centrifugo infrastructure. Centrifugo handles
-        multi-node fan-out, epoch/offset gap recovery, and token-based auth out
-        of the box &mdash; no <code>PublishBackend</code> wiring required.
+        <strong>Build a custom WebSocket transport</strong> when you already run
+        a WebSocket server with your own protocol and want to keep it. Implement
+        the <code>RealtimeTransport</code> interface (and optionally{' '}
+        <code>PresenceCapable</code>) to plug your server directly into the
+        TanStack Realtime client. See the{' '}
+        <a href="#/docs/wire-protocol">Wire Protocol</a> page for a reference
+        message format.
       </p>
 
       <h2 id="centrifugo">Centrifugo</h2>

@@ -6,11 +6,11 @@ import type { HookHandle, HookRegistration } from './hooks.js'
 // ---------------------------------------------------------------------------
 
 /**
- * The current state of the transport's WebSocket connection.
+ * The current state of the transport's connection.
  *
  * - `'disconnected'` — no connection; `connect()` has not been called or
  *   `disconnect()` was called explicitly.
- * - `'connecting'` — a WebSocket handshake is in progress.
+ * - `'connecting'` — a connection attempt is in progress.
  * - `'connected'` — the connection is open and ready to send/receive.
  * - `'reconnecting'` — the connection was lost unexpectedly; the transport
  *   is waiting to retry with exponential back-off.
@@ -22,7 +22,7 @@ export type ConnectionStatus =
   | 'reconnecting'
 
 export interface PresenceUser<T = unknown> {
-  /** Opaque server-assigned identifier, unique per WebSocket connection. */
+  /** Opaque server-assigned identifier, unique per client connection. */
   connectionId: string
   /** Application data published by this user (cursor position, display name, etc.). */
   data: T

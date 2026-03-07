@@ -9,7 +9,7 @@ export interface UseRealtimeResult {
    * value changes (e.g. `'connecting'` → `'connected'`).
    */
   status: ConnectionStatus
-  /** Open the WebSocket connection. Resolves once `status` is `'connected'`. */
+  /** Open the connection. Resolves once `status` is `'connected'`. */
   connect: () => Promise<void>
   /**
    * Close the connection immediately. No reconnect will occur.

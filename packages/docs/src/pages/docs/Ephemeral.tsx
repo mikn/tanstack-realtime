@@ -1056,9 +1056,9 @@ await broadcastNotification({
         <div className="doc-grid-card">
           <h3>useSubscribe</h3>
           <p>
-            Raw channel listener &mdash; runs a callback on every event. Returns
-            nothing; purely side-effect-based. Use for confetti, toasts, sound
-            effects, and analytics pings.
+            Raw channel listener &mdash; runs a callback on every event. Returns{' '}
+            <code>{'{ subscribeError }'}</code> for error handling. Use for
+            confetti, toasts, sound effects, and analytics pings.
           </p>
         </div>
         <div className="doc-grid-card">

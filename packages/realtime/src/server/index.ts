@@ -108,7 +108,7 @@ export interface LifecycleHooks {
   onClientConnect?: (info: { connectionId: string; userId: string }) => void
 
   /**
-   * Called when a client disconnects (WebSocket close or SSE stream cancel).
+   * Called when a client disconnects (SSE stream close or transport disconnect).
    */
   onClientDisconnect?: (info: { connectionId: string; userId: string }) => void
 
@@ -134,7 +134,7 @@ export interface LifecycleHooks {
  * background job). The preset routes the message to all subscribed clients.
  *
  * In the SSE preset this fans out directly over in-process SSE connections.
- * In Centrifugo/Ably presets this calls the provider's HTTP publish API.
+ * In the Centrifugo adapter this calls the Centrifugo HTTP publish API.
  *
  * @example
  * // server/functions/ai.ts

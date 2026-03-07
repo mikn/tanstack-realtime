@@ -154,11 +154,9 @@ realtimeCollectionOptions({
       return null
     }
   },
-  authorize: async ({ userId, action, channel }) => {
-    if (action === 'subscribe') {
-      return db.canAccess(userId, channel)
-    }
-    return true
+  authorize: async (userId, channel) => {
+    const canAccess = await db.canAccess(userId, channel.raw)
+    return { subscribe: canAccess, publish: canAccess, presence: canAccess }
   },
 })`}
       />
@@ -214,13 +212,13 @@ const transport = sseTransport({
       </p>
       <CodeBlock
         code={`const sse = createSseHandler({
-  authorize: async ({ userId, action, channel }) => {
-    if (action === 'publish') {
-      // Only channel owners may publish
-      return db.isChannelOwner(userId, channel)
+  authorize: async (userId, channel) => {
+    const isOwner = await db.isChannelOwner(userId, channel.raw)
+    return {
+      subscribe: true,           // all authenticated users may subscribe
+      publish:   isOwner,        // only channel owners may publish
+      presence:  true,
     }
-    // All authenticated users may subscribe
-    return true
   },
 })`}
       />

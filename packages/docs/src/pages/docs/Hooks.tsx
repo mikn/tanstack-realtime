@@ -58,10 +58,10 @@ function TypingIndicator({ roomId }: { roomId: string }) {
       />
       <h3>Signature</h3>
       <CodeBlock
-        code={`function useSubscribe<T = unknown>(
-  channel: QueryKey,          // e.g. ['chat:typing', { roomId }]
-  onMessage: (data: T) => void,
-): void`}
+        code={`function useSubscribe(
+  channel: QueryKey | string,   // e.g. ['chat:typing', { roomId }]
+  onMessage: (data: unknown) => void,
+): { subscribeError: SubscribeError | null }`}
       />
       <p>
         See also: <a href="#/docs/ephemeral">Ephemeral Channels</a> for
@@ -88,7 +88,7 @@ function TypingBroadcast({ roomId }: { roomId: string }) {
       <h3>Signature</h3>
       <CodeBlock
         code={`function usePublish<T = unknown>(
-  channel: QueryKey,
+  channel: QueryKey | string,
 ): (data: T) => Promise<void>`}
       />
       <p>
@@ -124,11 +124,11 @@ function ChatRoom({ roomId }: { roomId: string }) {
       />
       <h3>Signature</h3>
       <CodeBlock
-        code={`function useChannel<T = unknown>(
-  channel: QueryKey,
-  onMessage: (data: T) => void,
+        code={`function useChannel(
+  channel: QueryKey | string,
+  onMessage?: (data: unknown) => void,  // optional — omit for publish-only
 ): {
-  publish: (data: T) => Promise<void>
+  publish: (data: unknown) => Promise<void>
 }`}
       />
       <p>
@@ -162,7 +162,7 @@ function DocumentPage({ docId }: { docId: string }) {
       <h3>Signature</h3>
       <CodeBlock
         code={`function usePresence<T>(
-  channelDef: PresenceChannel<T>,
+  channelDef: PresenceChannelDef,
   options: {
     params: Record<string, string>
     initial: T
@@ -205,14 +205,14 @@ function AIResponse({ requestId }: { requestId: string }) {
       <h3>Signature</h3>
       <CodeBlock
         code={`function useStream<TState, TEvent = unknown>(
-  streamDef: StreamChannel<TState, TEvent>,
+  streamDef: StreamChannelDef<TState, TEvent>,
   options: {
     params: Record<string, string>
   },
 ): {
   state: TState
-  status: 'idle' | 'pending' | 'streaming' | 'complete' | 'error' | 'stale'
-  error: string | null
+  status: 'pending' | 'streaming' | 'done' | 'error' | 'stale'
+  error?: string
 }`}
       />
       <p>
@@ -347,7 +347,7 @@ function EditableTitle({ docId }: { docId: string }) {
 })
 
 function TagEditor({ postId }: { postId: string }) {
-  const { values: tags, add, remove } = useSyncedSet(postTags, {
+  const { values: tags, add, remove, has } = useSyncedSet(postTags, {
     params: { postId },
     initial: [],
   })
@@ -356,7 +356,12 @@ function TagEditor({ postId }: { postId: string }) {
       {tags.map(tag => (
         <span key={tag}>{tag} <button onClick={() => remove(tag)}>x</button></span>
       ))}
-      <button onClick={() => add('important')}>+ important</button>
+      <button
+        onClick={() => add('important')}
+        disabled={has('important')}
+      >
+        + important
+      </button>
     </>
   )
 }`}

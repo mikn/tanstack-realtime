@@ -190,12 +190,14 @@ function AIResponse({ requestId }: { requestId: string }) {
       <h2 id="server-side">Server-side streaming</h2>
       <CodeBlock
         title="server/routes/chat.ts"
-        code={`import { sseHandler } from '../realtime'
+        code={`import { createServerStream } from '@tanstack/realtime'
+import { sseHandler } from '../realtime'
 
 app.post('/api/chat', async (req) => {
   const { requestId, prompt } = req.body
 
-  const stream = sseHandler.createStream({
+  const stream = createServerStream({
+    publish: (ch, data) => { sseHandler.broadcast(ch as string, data); return Promise.resolve() },
     channel: ['ai', { requestId }],
     hmacKey: process.env.STREAM_HMAC_KEY,
     checkpoint: {
@@ -317,10 +319,12 @@ function AIResponse({ requestId }: { requestId: string }) {
       </p>
       <CodeBlock
         title="server/routes/ai-stream.ts"
-        code={`import { sseHandler } from '../realtime'
+        code={`import { createServerStream } from '@tanstack/realtime'
+import { sseHandler } from '../realtime'
 import { db } from '../db'
 
-const stream = sseHandler.createStream({
+const stream = createServerStream({
+  publish: (ch, data) => { sseHandler.broadcast(ch as string, data); return Promise.resolve() },
   channel: ['ai', { requestId }],
   // Persist checkpoint to database after every N events
   checkpoint: {

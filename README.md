@@ -61,7 +61,7 @@ await client.connect()
 
 ### Multi-Tab Coordination
 
-When a user opens your app in multiple browser tabs, each tab would normally open its own WebSocket — multiplying server load, bandwidth, and the potential for state conflicts. `createCoordinatedTransport` solves this by sharing a single connection across all tabs. It picks the best available strategy automatically:
+When a user opens your app in multiple browser tabs, each tab would normally open its own connection — multiplying server load, bandwidth, and the potential for state conflicts. `createCoordinatedTransport` solves this by sharing a single connection across all tabs. It picks the best available strategy automatically:
 
 | Strategy             | When used                                                                              | How it works                                                                                                                                                                                                                                                                       |
 | -------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -74,10 +74,15 @@ When a user opens your app in multiple browser tabs, each tab would normally ope
 ```ts
 // realtime.worker.ts — a separate file your bundler produces
 import { createSharedWorkerCoordinator } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
 
+// createSharedWorkerCoordinator requires a PresenceCapable transport.
+// The Centrifugo adapter implements PresenceCapable; sseTransport does not.
 const coordinator = createSharedWorkerCoordinator(
-  sseTransport({ url: '/api/realtime/sse' }),
+  centrifugoTransport({
+    url: 'wss://your-centrifugo.example.com/connection/websocket',
+    token: () => fetchAuthToken(),
+  }),
 )
 
 self.addEventListener('connect', (e) => {
@@ -89,7 +94,11 @@ Then in your app code you point to it:
 
 ```ts
 const transport = createCoordinatedTransport({
-  transport: () => sseTransport({ url: '/api/realtime/sse' }),
+  transport: () =>
+    centrifugoTransport({
+      url: 'wss://your-centrifugo.example.com/connection/websocket',
+      token: () => fetchAuthToken(),
+    }),
   workerUrl: new URL('./realtime.worker.ts', import.meta.url),
 })
 ```
@@ -159,10 +168,7 @@ function ChatInput({ roomId }: { roomId: string }) {
 // 4. Presence — track other connected users
 import { createPresenceChannel, usePresence } from '@tanstack/react-realtime'
 
-const editorPresence = createPresenceChannel<
-  { documentId: string },
-  { cursor: { x: number; y: number } | null; name: string }
->({
+const editorPresence = createPresenceChannel<{ documentId: string }>({
   id: 'editor',
   channel: ({ documentId }) => ['editor', { documentId }],
 })
@@ -281,9 +287,9 @@ const handler = createSseHandler({
     return userId ? { userId } : null
   },
 
-  // Authorize subscribe and publish actions per channel
-  async authorize({ userId, action, channel }) {
-    return true
+  // Authorize per-channel access (subscribe and publish permissions)
+  async authorize(userId, channel) {
+    return true // allow all authenticated users; add channel.namespace checks here
   },
 
   pingInterval: 30_000, // default; set to 0 to disable keepalive pings
