@@ -79,7 +79,7 @@ export interface TestRealtimeProviderWithPresenceResult {
 export function createTestRealtimeProvider(
   props: Omit<TestRealtimeProviderProps, 'children'> = {},
 ): TestRealtimeProviderResult {
-  const transport = (props.transport ?? createMockTransport()) as MockTransport
+  const transport = props.transport ?? createMockTransport()
   const client = props.client ?? createRealtimeClient({ transport })
 
   const wrapper = ({ children }: { children: ReactNode }) => (

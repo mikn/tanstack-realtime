@@ -47,6 +47,24 @@ export type {
   TestRealtimeProviderWithPresenceResult,
 } from './TestRealtimeProvider.js'
 
+// Convenience hooks for common real-time UI patterns
+export { useIsConnected } from './useIsConnected.js'
+
+export { useLatestMessage } from './useLatestMessage.js'
+export type { UseLatestMessageResult } from './useLatestMessage.js'
+
+export { useChannelHistory } from './useChannelHistory.js'
+export type {
+  UseChannelHistoryOptions,
+  UseChannelHistoryResult,
+} from './useChannelHistory.js'
+
+export { useTypingIndicator } from './useTypingIndicator.js'
+export type {
+  UseTypingIndicatorOptions,
+  UseTypingIndicatorResult,
+} from './useTypingIndicator.js'
+
 // CRDT standalone hooks
 export { useSyncedCounter } from './useSyncedCounter.js'
 export type {
