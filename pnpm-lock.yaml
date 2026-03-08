@@ -214,6 +214,22 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0
 
+  packages/react-realtime-devtools:
+    dependencies:
+      '@tanstack/react-realtime':
+        specifier: workspace:*
+        version: link:../react-realtime
+      '@tanstack/realtime':
+        specifier: workspace:*
+        version: link:../realtime
+      react:
+        specifier: '>=18.0.0'
+        version: 19.2.4
+    devDependencies:
+      '@tanstack/react-store':
+        specifier: '*'
+        version: 0.9.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+
   packages/realtime:
     devDependencies:
       '@standard-schema/spec':

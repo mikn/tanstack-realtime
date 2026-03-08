@@ -24,6 +24,10 @@ const sourceAliases = {
     repoRoot,
     'packages/realtime-preset-start/src/index.ts',
   ),
+  '@tanstack/react-realtime-devtools': resolve(
+    repoRoot,
+    'packages/react-realtime-devtools/src/index.ts',
+  ),
 }
 
 const realtime = createStartHandler({ pingInterval: 0 })
