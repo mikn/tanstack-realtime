@@ -81,8 +81,7 @@ export interface TestRealtimeProviderWithPresenceResult {
 export function createTestRealtimeProvider(
   props: TestRealtimeProviderProps = {},
 ): TestRealtimeProviderResult {
-  const transport =
-    (props.transport as MockTransport | undefined) ?? createMockTransport()
+  const transport = props.transport ?? createMockTransport()
   const client = props.client ?? createRealtimeClient({ transport })
 
   const wrapper: ParentComponent = (wrapperProps) => (
