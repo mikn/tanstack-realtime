@@ -80,7 +80,7 @@ export function PresencePanel() {
         data-testid="value-input"
         type="text"
         placeholder="Type a shared value…"
-        value={sharedText() ?? ''}
+        value={sharedText()}
         onInput={(e) => setSharedText(e.currentTarget.value)}
       />
       <div

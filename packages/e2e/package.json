@@ -15,6 +15,7 @@
     "@tanstack/react-store": "^0.9.1",
     "@tanstack/realtime": "workspace:*",
     "@tanstack/realtime-adapter-sse": "workspace:*",
+    "@tanstack/solid-realtime": "workspace:*",
     "@tanstack/realtime-preset-start": "workspace:*",
     "@tanstack/router-plugin": "^1.163.3",
     "@tanstack/store": "^0.9.1",
