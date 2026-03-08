@@ -43,6 +43,9 @@ importers:
       '@tanstack/realtime-preset-start':
         specifier: workspace:*
         version: link:packages/realtime-preset-start
+      '@tanstack/solid-realtime':
+        specifier: workspace:*
+        version: link:packages/solid-realtime
       '@tanstack/store':
         specifier: ^0.9.1
         version: 0.9.1
@@ -243,6 +246,22 @@ importers:
       '@tanstack/realtime-adapter-sse':
         specifier: workspace:*
         version: link:../realtime-adapter-sse
+
+  packages/solid-realtime:
+    dependencies:
+      '@tanstack/db':
+        specifier: '*'
+        version: 0.5.29(typescript@5.9.3)
+      '@tanstack/realtime':
+        specifier: workspace:*
+        version: link:../realtime
+      solid-js:
+        specifier: '>=1.0.0'
+        version: 1.9.11
+    devDependencies:
+      '@standard-schema/spec':
+        specifier: ^1.1.0
+        version: 1.1.0
 
 packages:
   '@babel/code-frame@7.29.0':
@@ -4734,6 +4753,12 @@ packages:
       }
     engines: { node: '>= 18' }
 
+  solid-js@1.9.11:
+    resolution:
+      {
+        integrity: sha512-WEJtcc5mkh/BnHA6Yrg4whlF8g6QwpmXXRg4P2ztPmcKeHHlH4+djYecBLhSpecZY2RRECXYUwIc/C2r3yzQ4Q==,
+      }
+
   sorted-btree@1.8.1:
     resolution:
       {
@@ -7937,6 +7962,12 @@ snapshots:
   slash@3.0.0: {}
 
   smol-toml@1.6.0: {}
+
+  solid-js@1.9.11:
+    dependencies:
+      csstype: 3.2.3
+      seroval: 1.5.0
+      seroval-plugins: 1.5.0(seroval@1.5.0)
 
   sorted-btree@1.8.1: {}
 
