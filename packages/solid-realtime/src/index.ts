@@ -65,6 +65,11 @@ export type {
   UseTypingIndicatorResult,
 } from './useTypingIndicator.js'
 
+export { useChannelStats } from './useChannelStats.js'
+export type { UseChannelStatsResult } from './useChannelStats.js'
+
+export { useOnReconnect } from './useOnReconnect.js'
+
 // CRDT standalone primitives
 export { useSyncedCounter } from './useSyncedCounter.js'
 export type {
