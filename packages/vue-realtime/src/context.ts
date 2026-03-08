@@ -1,13 +1,9 @@
-import { inject, provide } from 'vue'
+import { inject } from 'vue'
 import type { InjectionKey } from 'vue'
 import type { RealtimeClient } from '@tanstack/realtime'
 
 export const REALTIME_CONTEXT_KEY: InjectionKey<RealtimeClient> =
   Symbol('RealtimeClient')
-
-export function provideRealtimeClient(client: RealtimeClient): void {
-  provide(REALTIME_CONTEXT_KEY, client)
-}
 
 /**
  * Internal helper — retrieves the `RealtimeClient` from context or throws a
