@@ -1,11 +1,11 @@
 /**
- * @tanstack/react-realtime-devtools
+ * @tanstack/solid-realtime-devtools
  *
  * Developer tools panel for inspecting TanStack Realtime client state,
- * channels, messages, and connection lifecycle.
+ * channels, messages, presence, offline queue, and connection lifecycle.
  *
  * @example
- * import { RealtimeDevtools } from '@tanstack/react-realtime-devtools'
+ * import { RealtimeDevtools } from '@tanstack/solid-realtime-devtools'
  *
  * function App() {
  *   return (

@@ -157,7 +157,6 @@ export function createDevtoolsStore(
   // -- Presence tracking ----------------------------------------------------
 
   function startPresenceTracking(channel: string) {
-    // Only if transport supports presence and tracking is enabled.
     if (!trackPresence) return
     try {
       const unsub = client.onPresenceChange(
@@ -211,7 +210,6 @@ export function createDevtoolsStore(
 
   // -- Hook registration ----------------------------------------------------
 
-  // Register a low-priority hook so we observe after all user hooks.
   const hookHandle: HookHandle = client.hook({
     name: 'devtools',
     priority: 999,
@@ -235,7 +233,6 @@ export function createDevtoolsStore(
           data,
           timestamp: Date.now(),
         })
-        // Always pass through — devtools never suppresses.
         return { data }
       },
       beforeDeliver(channel, data) {

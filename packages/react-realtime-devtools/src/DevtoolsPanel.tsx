@@ -2,17 +2,22 @@
  * DevtoolsPanel — the main panel content rendered inside the floating devtools.
  *
  * Tabs:
- *  - Overview:  Client info + connection status
- *  - Channels:  Active channel list with message counts
- *  - Messages:  Rolling message log (inbound/outbound)
- *  - Events:    Connection lifecycle events
+ *  - Overview:  Client info + connection status + queue summary
+ *  - Channels:  Active channel list with message counts + presence
+ *  - Messages:  Rolling message log with expandable payloads
+ *  - Events:    Connection lifecycle events (including presence + queue)
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStore } from '@tanstack/react-store'
 import { useConnectionStatus, useRealtime } from '@tanstack/react-realtime'
 import { styles } from './styles.js'
-import type { DevtoolsMessage, DevtoolsStoreHandle } from './devtoolsStore.js'
+import type {
+  ChannelInfo,
+  DevtoolsMessage,
+  DevtoolsStoreHandle,
+  OfflineQueueSnapshot,
+} from './devtoolsStore.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -36,7 +41,15 @@ function formatDuration(ms: number): string {
   return `${m}m ${s % 60}s`
 }
 
-function truncateJson(data: unknown, maxLen = 300): string {
+function formatJson(data: unknown): string {
+  try {
+    return JSON.stringify(data, null, 2)
+  } catch {
+    return String(data)
+  }
+}
+
+function truncateJson(data: unknown, maxLen = 120): string {
   try {
     const json = JSON.stringify(data)
     if (json.length <= maxLen) return json
@@ -66,6 +79,10 @@ export function DevtoolsPanel({ devtoolsStore, onClose }: DevtoolsPanelProps) {
 
   const channelCount = state.channels.size
   const messageCount = state.messages.length
+  const totalPresence = Array.from(state.channels.values()).reduce(
+    (sum, ch) => sum + ch.presenceUsers.length,
+    0,
+  )
 
   return (
     <div style={styles.panel} data-testid="realtime-devtools-panel">
@@ -77,6 +94,13 @@ export function DevtoolsPanel({ devtoolsStore, onClose }: DevtoolsPanelProps) {
             <span style={styles.statusDot(status)} />
             {status}
           </span>
+          {state.offlineQueue && state.offlineQueue.pending > 0 && (
+            <span style={styles.queueFlushingBadge}>
+              {state.offlineQueue.isFlushing
+                ? 'flushing'
+                : `${state.offlineQueue.pending} queued`}
+            </span>
+          )}
         </div>
         <div style={styles.headerRight}>
           <button
@@ -118,7 +142,13 @@ export function DevtoolsPanel({ devtoolsStore, onClose }: DevtoolsPanelProps) {
       {/* Content */}
       <div style={styles.content}>
         {activeTab === 'overview' && (
-          <OverviewTab clientId={client.clientId} status={status} />
+          <OverviewTab
+            clientId={client.clientId}
+            status={status}
+            offlineQueue={state.offlineQueue}
+            channelCount={channelCount}
+            totalPresence={totalPresence}
+          />
         )}
         {activeTab === 'channels' && <ChannelsTab state={state} />}
         {activeTab === 'messages' && <MessagesTab messages={state.messages} />}
@@ -135,9 +165,15 @@ export function DevtoolsPanel({ devtoolsStore, onClose }: DevtoolsPanelProps) {
 function OverviewTab({
   clientId,
   status,
+  offlineQueue,
+  channelCount,
+  totalPresence,
 }: {
   clientId: string
   status: string
+  offlineQueue: OfflineQueueSnapshot | null
+  channelCount: number
+  totalPresence: number
 }) {
   return (
     <div style={styles.infoGrid}>
@@ -145,6 +181,21 @@ function OverviewTab({
       <span style={styles.infoValue}>{clientId}</span>
       <span style={styles.infoLabel}>Status</span>
       <span style={styles.infoValue}>{status}</span>
+      <span style={styles.infoLabel}>Channels</span>
+      <span style={styles.infoValue}>{channelCount}</span>
+      <span style={styles.infoLabel}>Presence</span>
+      <span style={styles.infoValue}>
+        {totalPresence} user{totalPresence === 1 ? '' : 's'} online
+      </span>
+      {offlineQueue && (
+        <>
+          <span style={styles.infoLabel}>Queue</span>
+          <span style={styles.infoValue}>
+            {offlineQueue.pending} pending · {offlineQueue.flushed} flushed
+            {offlineQueue.isFlushing ? ' · flushing…' : ''}
+          </span>
+        </>
+      )}
     </div>
   )
 }
@@ -157,18 +208,11 @@ function ChannelsTab({
   state,
 }: {
   state: {
-    channels: ReadonlyMap<
-      string,
-      {
-        channel: string
-        subscribedAt: number
-        messageCount: number
-        lastMessageAt: number | null
-      }
-    >
+    channels: ReadonlyMap<string, ChannelInfo>
   }
 }) {
   const channels = Array.from(state.channels.values())
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   if (channels.length === 0) {
     return <div style={styles.empty}>No active channels</div>
@@ -176,19 +220,57 @@ function ChannelsTab({
 
   const now = Date.now()
 
+  const toggleExpand = (channel: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(channel)) next.delete(channel)
+      else next.add(channel)
+      return next
+    })
+  }
+
   return (
     <div>
       {channels.map((ch) => (
-        <div key={ch.channel} style={styles.channelRow}>
-          <span style={styles.channelName} title={ch.channel}>
-            {ch.channel}
-          </span>
-          <div style={styles.channelMeta}>
-            <span>
-              {ch.messageCount} msg{ch.messageCount === 1 ? '' : 's'}
+        <div key={ch.channel}>
+          <div
+            style={{ ...styles.channelRow, cursor: 'pointer' }}
+            onClick={() => toggleExpand(ch.channel)}
+          >
+            <span style={styles.channelName} title={ch.channel}>
+              {expanded.has(ch.channel) ? '▾ ' : '▸ '}
+              {ch.channel}
             </span>
-            <span>up {formatDuration(now - ch.subscribedAt)}</span>
+            <div style={styles.channelMeta}>
+              {ch.presenceUsers.length > 0 && (
+                <span style={styles.presenceCount}>
+                  {ch.presenceUsers.length} online
+                </span>
+              )}
+              <span>
+                {ch.messageCount} msg{ch.messageCount === 1 ? '' : 's'}
+              </span>
+              <span>up {formatDuration(now - ch.subscribedAt)}</span>
+            </div>
           </div>
+          {expanded.has(ch.channel) && ch.presenceUsers.length > 0 && (
+            <div style={styles.presenceSection}>
+              {ch.presenceUsers.map((user) => (
+                <div key={user.connectionId} style={styles.presenceUserRow}>
+                  <span style={styles.presenceDot} />
+                  <span
+                    style={styles.presenceConnectionId}
+                    title={user.connectionId}
+                  >
+                    {user.connectionId}
+                  </span>
+                  <span style={styles.presenceData}>
+                    {truncateJson(user.data)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -207,6 +289,7 @@ function MessagesTab({
   const bottomRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     if (autoScroll && bottomRef.current) {
@@ -217,9 +300,17 @@ function MessagesTab({
   const handleScroll = useCallback(() => {
     const el = containerRef.current
     if (!el) return
-    // If user scrolled away from bottom, disable auto-scroll
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40
     setAutoScroll(atBottom)
+  }, [])
+
+  const toggleExpand = useCallback((id: number) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }, [])
 
   if (messages.length === 0) {
@@ -232,18 +323,31 @@ function MessagesTab({
       onScroll={handleScroll}
       style={{ height: '100%', overflow: 'auto' }}
     >
-      {messages.map((msg) => (
-        <div key={msg.id} style={styles.messageRow(msg.direction)}>
-          <span style={styles.messageDirection(msg.direction)}>
-            {msg.direction === 'inbound' ? 'IN' : 'OUT'}
-          </span>
-          <span style={styles.messageChannel} title={msg.channel}>
-            {msg.channel}
-          </span>
-          <span style={styles.messageData}>{truncateJson(msg.data)}</span>
-          <span style={styles.messageTime}>{formatTime(msg.timestamp)}</span>
-        </div>
-      ))}
+      {messages.map((msg) => {
+        const isExpanded = expandedIds.has(msg.id)
+        return (
+          <div key={msg.id} style={styles.messageRow(msg.direction)}>
+            <span style={styles.messageDirection(msg.direction)}>
+              {msg.direction === 'inbound' ? 'IN' : 'OUT'}
+            </span>
+            <span style={styles.messageChannel} title={msg.channel}>
+              {msg.channel}
+            </span>
+            <span
+              style={
+                isExpanded
+                  ? styles.messageDataExpanded
+                  : styles.messageDataExpandable
+              }
+              onClick={() => toggleExpand(msg.id)}
+              title={isExpanded ? 'Click to collapse' : 'Click to expand'}
+            >
+              {isExpanded ? formatJson(msg.data) : truncateJson(msg.data)}
+            </span>
+            <span style={styles.messageTime}>{formatTime(msg.timestamp)}</span>
+          </div>
+        )
+      })}
       <div ref={bottomRef} />
     </div>
   )

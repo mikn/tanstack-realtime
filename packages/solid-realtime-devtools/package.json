@@ -1,0 +1,33 @@
+{
+  "name": "@tanstack/solid-realtime-devtools",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Developer tools panel for @tanstack/solid-realtime",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup"
+  },
+  "dependencies": {
+    "@tanstack/realtime": "workspace:*",
+    "@tanstack/solid-realtime": "workspace:*"
+  },
+  "peerDependencies": {
+    "solid-js": ">=1.0.0"
+  }
+}

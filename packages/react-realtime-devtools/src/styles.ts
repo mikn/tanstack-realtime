@@ -25,6 +25,7 @@ const colors = {
   yellow: '#f9e2af',
   blue: '#89b4fa',
   red: '#f38ba8',
+  purple: '#cba6f7',
   border: '#45475a',
   overlay: 'rgba(0, 0, 0, 0.5)',
 } as const
@@ -262,6 +263,31 @@ export const styles = {
     lineHeight: '1.4',
   } satisfies CSSProperties,
 
+  messageDataExpandable: {
+    flex: 1,
+    color: colors.text,
+    fontSize: '11px',
+    lineHeight: '1.4',
+    cursor: 'pointer',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  } satisfies CSSProperties,
+
+  messageDataExpanded: {
+    flex: 1,
+    color: colors.text,
+    fontSize: '11px',
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-all',
+    lineHeight: '1.4',
+    background: colors.bgAlt,
+    padding: '4px 6px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontFamily: fontMono,
+  } satisfies CSSProperties,
+
   messageTime: {
     flexShrink: 0,
     fontSize: '10px',
@@ -281,7 +307,11 @@ export const styles = {
         ? colors.green
         : type === 'disconnect'
           ? colors.red
-          : colors.blue
+          : type === 'presence'
+            ? colors.purple
+            : type === 'queue'
+              ? colors.yellow
+              : colors.blue
     }`,
   }),
 
@@ -351,5 +381,97 @@ export const styles = {
   infoValue: {
     color: colors.text,
     fontFamily: fontMono,
+  } satisfies CSSProperties,
+
+  // Presence styles
+  presenceSection: {
+    marginTop: '4px',
+    padding: '4px 8px',
+    borderLeft: `2px solid ${colors.purple}`,
+    marginLeft: '8px',
+  } satisfies CSSProperties,
+
+  presenceUserRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '2px 0',
+    fontSize: '11px',
+  } satisfies CSSProperties,
+
+  presenceDot: {
+    width: '6px',
+    height: '6px',
+    borderRadius: '50%',
+    background: colors.purple,
+    flexShrink: 0,
+  } satisfies CSSProperties,
+
+  presenceConnectionId: {
+    color: colors.textMuted,
+    fontFamily: fontMono,
+    fontSize: '10px',
+    maxWidth: '120px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  } satisfies CSSProperties,
+
+  presenceData: {
+    flex: 1,
+    color: colors.textDim,
+    fontFamily: fontMono,
+    fontSize: '10px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  } satisfies CSSProperties,
+
+  presenceCount: {
+    fontSize: '10px',
+    color: colors.purple,
+    fontWeight: 600,
+  } satisfies CSSProperties,
+
+  // Queue styles
+  queueContainer: {
+    padding: '8px',
+  } satisfies CSSProperties,
+
+  queueStat: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '8px 12px',
+    background: colors.bgAlt,
+    borderRadius: '6px',
+    marginBottom: '4px',
+  } satisfies CSSProperties,
+
+  queueStatLabel: {
+    color: colors.textMuted,
+    fontFamily: fontSans,
+    fontWeight: 600,
+    fontSize: '12px',
+  } satisfies CSSProperties,
+
+  queueStatValue: {
+    fontFamily: fontMono,
+    fontSize: '14px',
+    fontWeight: 700,
+    color: colors.text,
+  } satisfies CSSProperties,
+
+  queueFlushingBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px',
+    padding: '2px 8px',
+    borderRadius: '9999px',
+    fontSize: '10px',
+    fontWeight: 600,
+    fontFamily: fontSans,
+    background: 'rgba(249, 226, 175, 0.15)',
+    color: colors.yellow,
   } satisfies CSSProperties,
 } as const
