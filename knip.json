@@ -32,6 +32,9 @@
         "app-solid/vite.config.ts",
         "app-solid/src/main.tsx",
         "app-solid/src/**/*.{ts,tsx}",
+        "app-vue/vite.config.ts",
+        "app-vue/src/main.ts",
+        "app-vue/src/**/*.{ts,vue}",
         "tests/**/*.spec.ts"
       ]
     }
