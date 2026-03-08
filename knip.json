@@ -27,6 +27,9 @@
         "app/app/router.tsx",
         "app/app/routeTree.gen.ts",
         "app/app/routes/**/*.{ts,tsx}",
+        "app-solid/vite.config.ts",
+        "app-solid/src/main.tsx",
+        "app-solid/src/**/*.{ts,tsx}",
         "tests/**/*.spec.ts"
       ]
     }

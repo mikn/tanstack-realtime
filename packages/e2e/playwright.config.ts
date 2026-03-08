@@ -30,23 +30,27 @@ function resolveChromiumExecutable(): string | undefined {
 
 const executablePath = resolveChromiumExecutable()
 
+const viteBin = join(import.meta.dirname, 'node_modules/.bin/vite')
+const launchOpts = executablePath ? { launchOptions: { executablePath } } : {}
+
 export default defineConfig({
-  // No globalSetup/Teardown — Centrifugo not needed.
-  // vinxi dev (TanStack Start) provides the SSE backend via webServer below.
-
-  webServer: {
-    command: `${join(import.meta.dirname, 'node_modules/.bin/vite')}`,
-    cwd: join(import.meta.dirname, 'app'),
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env['CI'],
-    timeout: 60_000,
-  },
-
-  use: {
-    baseURL: 'http://localhost:3000',
-    actionTimeout: 10_000,
-    ...(executablePath ? { launchOptions: { executablePath } } : {}),
-  },
+  // React app (port 3000) + Solid app (port 3001) run as separate Vite servers.
+  webServer: [
+    {
+      command: viteBin,
+      cwd: join(import.meta.dirname, 'app'),
+      url: 'http://localhost:3000',
+      reuseExistingServer: !process.env['CI'],
+      timeout: 60_000,
+    },
+    {
+      command: `${viteBin} --config vite.config.ts`,
+      cwd: join(import.meta.dirname, 'app-solid'),
+      url: 'http://localhost:3001',
+      reuseExistingServer: !process.env['CI'],
+      timeout: 60_000,
+    },
+  ],
 
   workers: 1,
   timeout: 30_000,
@@ -54,7 +58,23 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      testMatch: '**/multi-user.spec.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: 'http://localhost:3000',
+        actionTimeout: 10_000,
+        ...launchOpts,
+      },
+    },
+    {
+      name: 'solid-chromium',
+      testMatch: '**/solid-multi-user.spec.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: 'http://localhost:3001',
+        actionTimeout: 10_000,
+        ...launchOpts,
+      },
     },
   ],
 

@@ -1,11 +1,11 @@
 /**
- * @tanstack/react-realtime
+ * @tanstack/solid-realtime
  *
- * React provider and hooks for @tanstack/realtime.
+ * Solid provider and primitives for @tanstack/realtime.
  */
 
 // Re-export everything from the framework-agnostic core so consumers only
-// need a single import: `import { createRealtimeClient, useRealtime } from '@tanstack/react-realtime'`
+// need a single import: `import { createRealtimeClient, useRealtime } from '@tanstack/solid-realtime'`
 export * from '@tanstack/realtime'
 
 export { RealtimeProvider } from './RealtimeProvider.js'
@@ -47,7 +47,7 @@ export type {
   TestRealtimeProviderWithPresenceResult,
 } from './TestRealtimeProvider.js'
 
-// Convenience hooks for common real-time UI patterns
+// Convenience primitives for common real-time UI patterns
 export { useIsConnected } from './useIsConnected.js'
 
 export { useLatestMessage } from './useLatestMessage.js'
@@ -70,7 +70,7 @@ export type { UseChannelStatsResult } from './useChannelStats.js'
 
 export { useOnReconnect } from './useOnReconnect.js'
 
-// CRDT standalone hooks
+// CRDT standalone primitives
 export { useSyncedCounter } from './useSyncedCounter.js'
 export type {
   UseSyncedCounterOptions,

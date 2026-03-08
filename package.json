@@ -71,6 +71,16 @@
         "@tanstack/store",
         "@tanstack/react-store"
       ]
+    },
+    {
+      "name": "@tanstack/solid-realtime",
+      "path": "packages/solid-realtime/dist/index.js",
+      "limit": "20 kB",
+      "ignore": [
+        "@tanstack/realtime",
+        "@tanstack/db",
+        "solid-js"
+      ]
     }
   ]
 }

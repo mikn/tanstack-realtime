@@ -10,11 +10,12 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
-    "@tanstack/react-router": "^1.163.3",
     "@tanstack/react-realtime": "workspace:*",
+    "@tanstack/react-router": "^1.163.3",
     "@tanstack/react-store": "^0.9.1",
     "@tanstack/realtime": "workspace:*",
     "@tanstack/realtime-adapter-sse": "workspace:*",
+    "@tanstack/solid-realtime": "workspace:*",
     "@tanstack/realtime-preset-start": "workspace:*",
     "@tanstack/router-plugin": "^1.163.3",
     "@tanstack/store": "^0.9.1",
@@ -24,7 +25,9 @@
     "@vitejs/plugin-react": "^4.3.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "solid-js": "^1.9.11",
     "typescript": "^5.9.3",
-    "vite": "^7.0.0"
+    "vite": "^7.0.0",
+    "vite-plugin-solid": "^2.11.10"
   }
 }
