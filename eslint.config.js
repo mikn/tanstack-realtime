@@ -76,6 +76,16 @@ export default [
     },
   },
   {
+    // Vue's defineComponent uses a `setup()` function — the react-hooks rule
+    // does not understand this pattern and reports false positives for Vue
+    // composables called inside setup(). Disable it for Vue devtools tsx files.
+    name: 'tanstack/realtime/vue-devtools',
+    files: ['packages/vue-realtime-devtools/**/*.tsx'],
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+    },
+  },
+  {
     name: 'tanstack/realtime/tests',
     files: ['**/*.test.ts', '**/*.spec.ts'],
     plugins: { vitest },

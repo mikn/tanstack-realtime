@@ -37,6 +37,10 @@ const sourceAliases = [
     find: /^@tanstack\/vue-realtime$/,
     replacement: resolve(root, 'packages/vue-realtime/src/index.ts'),
   },
+  {
+    find: /^@tanstack\/vue-realtime-devtools$/,
+    replacement: resolve(root, 'packages/vue-realtime-devtools/src/index.ts'),
+  },
 ]
 
 export default defineWorkspace([

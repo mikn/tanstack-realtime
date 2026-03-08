@@ -223,6 +223,22 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0
 
+  packages/react-realtime-devtools:
+    dependencies:
+      '@tanstack/react-realtime':
+        specifier: workspace:*
+        version: link:../react-realtime
+      '@tanstack/realtime':
+        specifier: workspace:*
+        version: link:../realtime
+      react:
+        specifier: '>=18.0.0'
+        version: 19.2.4
+    devDependencies:
+      '@tanstack/react-store':
+        specifier: '*'
+        version: 0.9.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+
   packages/realtime:
     devDependencies:
       '@standard-schema/spec':
@@ -278,6 +294,18 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0
 
+  packages/solid-realtime-devtools:
+    dependencies:
+      '@tanstack/realtime':
+        specifier: workspace:*
+        version: link:../realtime
+      '@tanstack/solid-realtime':
+        specifier: workspace:*
+        version: link:../solid-realtime
+      solid-js:
+        specifier: '>=1.0.0'
+        version: 1.9.11
+
   packages/vue-realtime:
     dependencies:
       '@tanstack/db':
@@ -293,6 +321,18 @@ importers:
       '@standard-schema/spec':
         specifier: ^1.1.0
         version: 1.1.0
+
+  packages/vue-realtime-devtools:
+    dependencies:
+      '@tanstack/realtime':
+        specifier: workspace:*
+        version: link:../realtime
+      '@tanstack/vue-realtime':
+        specifier: workspace:*
+        version: link:../vue-realtime
+      vue:
+        specifier: '>=3.0.0'
+        version: 3.5.29(typescript@5.9.3)
 
 packages:
   '@babel/code-frame@7.29.0':
