@@ -33,6 +33,10 @@ const sourceAliases = [
     find: /^@tanstack\/react-realtime-devtools$/,
     replacement: resolve(root, 'packages/react-realtime-devtools/src/index.ts'),
   },
+  {
+    find: /^@tanstack\/vue-realtime$/,
+    replacement: resolve(root, 'packages/vue-realtime/src/index.ts'),
+  },
 ]
 
 export default defineWorkspace([
@@ -79,6 +83,7 @@ export default defineWorkspace([
         'packages/__tests__/deriveChannelFromUrl.test.ts',
         'packages/__tests__/reactHooks.test.ts',
         'packages/__tests__/solidPrimitives.test.ts',
+        'packages/__tests__/vuePrimitives.test.ts',
       ],
       pool: 'forks',
       poolOptions: { forks: { singleFork: true } },

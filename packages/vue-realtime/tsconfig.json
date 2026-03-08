@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@tanstack/realtime": ["../realtime/src/index.ts"],
+      "@tanstack/db": ["../node_modules/@tanstack/db/dist/index.d.ts"]
+    }
+  },
+  "include": ["src"]
+}
