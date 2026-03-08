@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useStore } from '@tanstack/react-store'
 import { RealtimeContext } from './context.js'
 import type { ReactNode } from 'react'
 import type { RealtimeClient } from '@tanstack/realtime'
@@ -60,6 +61,25 @@ export function RealtimeProvider({
       client.destroy()
     }
   }, [client, autoConnect])
+
+  // Dev-mode warning: if the client remains disconnected for more than 2 seconds
+  // after mount and autoConnect is false, surface a helpful message.
+  const status = useStore(client.store, (s) => s.status)
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') return
+    if (autoConnect) return
+    if (status !== 'disconnected') return
+
+    const timer = setTimeout(() => {
+      console.warn(
+        '[realtime] RealtimeProvider: the client has been disconnected for > 2 seconds ' +
+          'and autoConnect is false. Call client.connect() or useRealtime().connect() ' +
+          'to establish the connection, or set autoConnect={true} on <RealtimeProvider>.',
+      )
+    }, 2000)
+
+    return () => clearTimeout(timer)
+  }, [autoConnect, status])
 
   return (
     <RealtimeContext.Provider value={client}>

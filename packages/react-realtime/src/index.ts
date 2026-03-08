@@ -14,6 +14,8 @@ export type { RealtimeProviderProps } from './RealtimeProvider.js'
 export { useRealtime } from './useRealtime.js'
 export type { UseRealtimeResult } from './useRealtime.js'
 
+export { useConnectionStatus } from './useConnectionStatus.js'
+
 export { usePresence } from './usePresence.js'
 export type { UsePresenceOptions, UsePresenceResult } from './usePresence.js'
 
@@ -35,11 +37,33 @@ export { useLiveChannel } from './useLiveChannel.js'
 export type { UseLiveChannelConfig } from './useLiveChannel.js'
 
 // Testing utilities
-export { createTestRealtimeProvider } from './TestRealtimeProvider.js'
+export {
+  createTestRealtimeProvider,
+  createTestRealtimeProviderWithPresence,
+} from './TestRealtimeProvider.js'
 export type {
   TestRealtimeProviderProps,
   TestRealtimeProviderResult,
+  TestRealtimeProviderWithPresenceResult,
 } from './TestRealtimeProvider.js'
+
+// Convenience hooks for common real-time UI patterns
+export { useIsConnected } from './useIsConnected.js'
+
+export { useLatestMessage } from './useLatestMessage.js'
+export type { UseLatestMessageResult } from './useLatestMessage.js'
+
+export { useChannelHistory } from './useChannelHistory.js'
+export type {
+  UseChannelHistoryOptions,
+  UseChannelHistoryResult,
+} from './useChannelHistory.js'
+
+export { useTypingIndicator } from './useTypingIndicator.js'
+export type {
+  UseTypingIndicatorOptions,
+  UseTypingIndicatorResult,
+} from './useTypingIndicator.js'
 
 // CRDT standalone hooks
 export { useSyncedCounter } from './useSyncedCounter.js'

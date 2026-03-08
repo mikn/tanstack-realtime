@@ -26,6 +26,13 @@ export interface UsePresenceResult<
    */
   others: ReadonlyArray<PresenceUser<TData>>
   /**
+   * The current user's presence data as last sent to the server.
+   * Initialized to the `initial` value passed to the hook and updated
+   * immediately on each `updatePresence` call (optimistic local state).
+   * Useful for rendering the current user's own avatar or cursor alongside peers.
+   */
+  self: TData
+  /**
    * Broadcast a presence delta for the current user.
    * Only the provided fields are merged into the server-stored state;
    * all other fields remain unchanged.
@@ -46,13 +53,21 @@ export interface UsePresenceResult<
  * Must be used inside `<RealtimeProvider>`.
  *
  * @example
- * const { others, updatePresence } = usePresence(editorPresence, {
+ * const { others, self, updatePresence } = usePresence(editorPresence, {
  *   params: { documentId },
  *   initial: { cursor: null, name: userName },
  * })
  *
  * // Broadcast cursor position on mouse move
  * updatePresence({ cursor: { x: e.clientX, y: e.clientY } })
+ *
+ * // Render own cursor alongside peers
+ * return (
+ *   <>
+ *     <Cursor position={self.cursor} isSelf />
+ *     {others.map((u) => <Cursor key={u.connectionId} position={u.data.cursor} />)}
+ *   </>
+ * )
  */
 export function usePresence<
   TData extends object = Record<string, unknown>,
@@ -72,18 +87,25 @@ export function usePresence<
   const channel = channelDef.resolveChannel(params)
 
   const [others, setOthers] = useState<ReadonlyArray<PresenceUser<TData>>>([])
+  // Track the current user's own presence data for local optimistic display.
+  const [self, setSelf] = useState<TData>(initial)
 
-  // Keep the current channel in a ref so `updatePresence` always targets the
-  // latest channel without needing to be recreated when the channel changes.
+  // Keep the current channel and self in refs so callbacks always reference
+  // the latest values without needing to be recreated on every render.
   const channelRef = useRef(channel)
   channelRef.current = channel
+  const selfRef = useRef<TData>(initial)
 
   useEffect(() => {
+    // Reset self to the new channel's initial data when the channel changes.
+    setSelf(options.initial)
+    selfRef.current = options.initial
+
     // Subscribe to the channel first so the server authorizes this connection
     // before we attempt to join presence. The server drops presence:join
     // messages for channels that haven't been authorized via subscribe.
     const unsubChannel = client.subscribe(channel, () => {})
-    client.joinPresence(channel, initial)
+    client.joinPresence(channel, options.initial)
 
     const unsubPresence = client.onPresenceChange(channel, (users) => {
       setOthers(users as ReadonlyArray<PresenceUser<TData>>)
@@ -101,10 +123,14 @@ export function usePresence<
 
   const updatePresence = useCallback(
     (delta: Partial<TData>) => {
+      // Merge delta into local self state optimistically.
+      const next = { ...selfRef.current, ...delta }
+      selfRef.current = next
+      setSelf(next)
       client.updatePresence(channelRef.current, delta)
     },
     [client],
   )
 
-  return { others, updatePresence }
+  return { others, self, updatePresence }
 }
