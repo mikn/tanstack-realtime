@@ -1,14 +1,19 @@
 /**
- * Tests for the @tanstack/react-realtime hook behavior.
+ * Tests for the @tanstack/solid-realtime primitive behavior.
  *
- * These tests verify the underlying logic that each React hook encapsulates
+ * These tests verify the underlying logic that each Solid primitive encapsulates
  * using the core framework-agnostic API directly. They serve as a contract
- * specification for how each hook must behave, and can be run in a plain
- * Node.js environment without a DOM or React renderer.
+ * specification for how each primitive must behave, and can be run in a plain
+ * Node.js environment without a DOM or Solid renderer.
  *
- * For full React rendering tests (including Strict Mode double-invoke,
- * unmount/cleanup, and re-render behavior), see the companion
- * react-hooks-dom.test.tsx file which requires @testing-library/react.
+ * Solid primitives return reactive `Accessor<T>` values instead of plain `T`,
+ * but the subscription logic, state transitions, and pub/sub contracts they
+ * rely on are identical to those of the React hooks — this suite documents
+ * those contracts from the Solid package's perspective.
+ *
+ * For tests that require Solid's reactive owner context (createRoot / render),
+ * a companion DOM suite would be needed. This file focuses on the pure
+ * client-logic contracts that every Solid primitive depends on.
  */
 
 import { describe, expect, it, vi } from 'vitest'
@@ -197,7 +202,6 @@ describe('useChannel contract (combined subscribe + publish)', () => {
     client.onSubscribeError((ch) => errors.push(ch))
     transport.simulateSubscribeError('room:roomId=1', 'denied')
 
-    // Can still publish even when subscribe is denied
     void client.publish('room:roomId=1', { attempt: true })
 
     expect(errors).toContain('room:roomId=1')
@@ -217,7 +221,6 @@ describe('usePresence contract', () => {
     client.subscribe(channel, () => {})
     client.joinPresence(channel, { name: 'Alice', cursor: null })
 
-    // Local self is tracked via the transport mock
     const state = transport.getPresenceState(channel)
     expect(state).toHaveLength(1)
     expect(state[0].data).toEqual({ name: 'Alice', cursor: null })
@@ -264,7 +267,6 @@ describe('usePresence contract', () => {
     client.joinPresence(channel, { name: 'Alice' })
     client.leavePresence(channel)
 
-    // After leave the channel should be empty
     expect(received[received.length - 1]).toHaveLength(0)
   })
 
@@ -279,10 +281,7 @@ describe('usePresence contract', () => {
     )
     client.joinPresence(channel, { name: 'Alice' })
 
-    // After joining, others should not include self
-    // (joinPresence fires presence change; self is excluded by the transport)
     const lastState = received[received.length - 1]
-    // MockPresenceTransport's self is stored separately and not in others
     expect(lastState.every((u) => typeof u.data.name === 'string')).toBe(true)
   })
 
@@ -421,7 +420,6 @@ describe('useSyncedValue (LWW-Register CRDT) contract', () => {
   it('higher clock wins', () => {
     const old = { clock: 1, clientId: 'c1' }
     const newer = { clock: 2, clientId: 'c2' }
-    // lwwWins(current, incoming) returns true if incoming beats current
     expect(lwwWins(old, newer)).toBe(true)
     expect(lwwWins(newer, old)).toBe(false)
   })
@@ -429,7 +427,7 @@ describe('useSyncedValue (LWW-Register CRDT) contract', () => {
   it('same clock: higher clientId wins for deterministic tiebreak', () => {
     const a = { clock: 5, clientId: 'aaa' }
     const b = { clock: 5, clientId: 'bbb' }
-    expect(lwwWins(a, b)).toBe(true) // b > a lexicographically
+    expect(lwwWins(a, b)).toBe(true)
     expect(lwwWins(b, a)).toBe(false)
   })
 
@@ -469,13 +467,11 @@ describe('useSyncedSet (OR-Set CRDT) contract', () => {
   })
 
   it('concurrent add wins over concurrent remove (OR-Set semantics)', () => {
-    // Client A adds 'react', client B removes 'react' concurrently
     const base = orAdd({ entries: [] }, 'react')
-    const clientA = { ...base } // keeps add
-    const clientB = orRemove(base, 'react') // concurrent remove
+    const clientA = { ...base }
+    const clientB = orRemove(base, 'react')
 
     const merged = mergeOr(clientA, clientB)
-    // Add always wins over concurrent remove in OR-Set
     expect(orValues(merged)).toContain('react')
   })
 
@@ -849,10 +845,63 @@ describe('useOnReconnect contract', () => {
 })
 
 // ---------------------------------------------------------------------------
+// createStoreSignal — @tanstack/store → Solid signal bridge contract
+//
+// createStoreSignal is an @internal utility that bridges a @tanstack/store
+// Store to a Solid reactive signal. Full reactivity tests (automatic updates
+// when the store changes) require a Solid reactive owner (createRoot) and
+// are best covered in a DOM-enabled test suite. The tests below verify the
+// store-side contract: that the correct initial value is returned and that
+// the store's subscribe mechanism fires correctly so the signal can update.
+// ---------------------------------------------------------------------------
+
+describe('createStoreSignal — underlying store contract', () => {
+  it('store.state reflects the initial value used to initialise the signal', () => {
+    const { client } = makeClient()
+    // createStoreSignal initialises the signal with selector(store.state)
+    expect(client.store.state.status).toBe('connected')
+  })
+
+  it('store.subscribe fires with new state on status change', () => {
+    const { transport, client } = makeClient()
+    const received: Array<string> = []
+
+    client.store.subscribe((state) => received.push(state.status))
+
+    transport.simulateDisconnect()
+    transport.simulateReconnect()
+
+    expect(received).toContain('reconnecting')
+    expect(received).toContain('connected')
+  })
+
+  it('subscription is unsubscribable (unsubscribe stops updates)', () => {
+    const { transport, client } = makeClient()
+    const received: Array<string> = []
+
+    const sub = client.store.subscribe((state) => received.push(state.status))
+    transport.simulateDisconnect()
+    sub.unsubscribe()
+    transport.simulateReconnect()
+
+    // Only the disconnect event should have been captured.
+    expect(received).toContain('reconnecting')
+    expect(received).not.toContain('connected')
+  })
+
+  it('selector is applied to project a sub-slice of store state', () => {
+    const { client } = makeClient()
+    // createStoreSignal uses selector(store.state) for the initial value
+    const status = ((s: { status: string }) => s.status)(client.store.state)
+    expect(status).toBe('connected')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // createTestRealtimeProvider — testing utility contract
 // ---------------------------------------------------------------------------
 
-describe('createTestRealtimeProvider (testing utility)', () => {
+describe('createMockTransport (testing utility)', () => {
   it('creates a client in connected state', () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
@@ -907,10 +956,10 @@ describe('createTestRealtimeProvider (testing utility)', () => {
 })
 
 // ---------------------------------------------------------------------------
-// createTestRealtimeProviderWithPresence — presence testing contract
+// createMockPresenceTransport — presence testing utility contract
 // ---------------------------------------------------------------------------
 
-describe('createTestRealtimeProviderWithPresence (testing utility)', () => {
+describe('createMockPresenceTransport (testing utility)', () => {
   it('simulatePresenceJoin adds user to channel', () => {
     const { transport } = makePresenceClient()
     const handler = vi.fn()
