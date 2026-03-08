@@ -29,6 +29,10 @@ const sourceAliases = [
     find: /^@tanstack\/realtime-preset-start$/,
     replacement: resolve(root, 'packages/realtime-preset-start/src/index.ts'),
   },
+  {
+    find: /^@tanstack\/react-realtime-devtools$/,
+    replacement: resolve(root, 'packages/react-realtime-devtools/src/index.ts'),
+  },
 ]
 
 export default defineWorkspace([

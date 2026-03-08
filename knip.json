@@ -6,6 +6,7 @@
         "@tanstack/react-query",
         "@tanstack/react-db",
         "@tanstack/react-realtime",
+        "@tanstack/react-realtime-devtools",
         "@tanstack/react-store",
         "react"
       ],
@@ -13,6 +14,7 @@
     },
     "packages/realtime": {},
     "packages/react-realtime": {},
+    "packages/react-realtime-devtools": {},
     "packages/realtime-adapter-centrifugo": {},
     "packages/realtime-adapter-sse": {},
     "packages/__tests__": {

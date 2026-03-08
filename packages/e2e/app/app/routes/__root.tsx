@@ -4,6 +4,7 @@
  */
 import { Outlet, createRootRoute } from '@tanstack/react-router'
 import { RealtimeProvider } from '@tanstack/react-realtime'
+import { RealtimeDevtools } from '@tanstack/react-realtime-devtools'
 import { client } from '../transport.js'
 
 export const Route = createRootRoute({
@@ -14,6 +15,7 @@ function RootComponent() {
   return (
     <RealtimeProvider client={client}>
       <Outlet />
+      <RealtimeDevtools />
     </RealtimeProvider>
   )
 }
