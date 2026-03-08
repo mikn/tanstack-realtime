@@ -1,4 +1,4 @@
-import { defineComponent, h, onMounted, onUnmounted, provide, watch } from 'vue'
+import { defineComponent, onMounted, onUnmounted, provide, watch } from 'vue'
 import { REALTIME_CONTEXT_KEY } from './context.js'
 import { useStoreRef } from './useStoreRef.js'
 import type { PropType } from 'vue'
@@ -96,6 +96,6 @@ export const RealtimeProvider = defineComponent({
       })
     }
 
-    return () => h('template', {}, slots.default?.())
+    return () => slots.default?.()
   },
 })
