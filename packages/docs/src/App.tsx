@@ -25,6 +25,9 @@ import { ApiReference } from './pages/docs/ApiReference'
 import { WireProtocol } from './pages/docs/WireProtocol'
 import { Testing } from './pages/docs/Testing'
 import { ChoosingAPattern } from './pages/docs/ChoosingAPattern'
+import { SolidPrimitives } from './pages/docs/SolidPrimitives'
+import { VueComposables } from './pages/docs/VueComposables'
+import { Devtools } from './pages/docs/Devtools'
 
 // ---------------------------------------------------------------------------
 // Simple hash router
@@ -67,6 +70,9 @@ const docRoutes: Partial<Record<string, () => React.JSX.Element>> = {
   '#/docs/wire-protocol': WireProtocol,
   '#/docs/testing': Testing,
   '#/docs/choosing-a-pattern': ChoosingAPattern,
+  '#/docs/solid-primitives': SolidPrimitives,
+  '#/docs/vue-composables': VueComposables,
+  '#/docs/devtools': Devtools,
 }
 
 // ---------------------------------------------------------------------------
@@ -94,6 +100,9 @@ const docOrder = [
   { hash: '#/docs/scaling', label: 'Scaling to Production' },
   { hash: '#/docs/server-hooks', label: 'Server Hooks' },
   { hash: '#/docs/hooks', label: 'React Hooks' },
+  { hash: '#/docs/solid-primitives', label: 'Solid Primitives' },
+  { hash: '#/docs/vue-composables', label: 'Vue Composables' },
+  { hash: '#/docs/devtools', label: 'DevTools' },
   { hash: '#/docs/api-reference', label: 'API Reference' },
   { hash: '#/docs/error-reference', label: 'Error Reference' },
   { hash: '#/docs/wire-protocol', label: 'Wire Protocol' },

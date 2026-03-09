@@ -41,6 +41,10 @@ function Hero() {
         </div>
         <div className="hero-install">
           <code>npm i @tanstack/realtime @tanstack/react-realtime</code>
+          <p className="hero-install-alt">
+            Also available for <a href="#/docs/solid-primitives">Solid</a> and{' '}
+            <a href="#/docs/vue-composables">Vue</a>
+          </p>
         </div>
       </div>
     </section>
@@ -80,6 +84,14 @@ function Features() {
     {
       title: 'Offline & multi-tab',
       desc: 'Offline queue buffers mutations. Coordinated transport shares one connection across tabs.',
+    },
+    {
+      title: 'React, Solid & Vue',
+      desc: 'First-class adapters for React, Solid, and Vue. Same hooks/composables, same signatures, framework-native internals.',
+    },
+    {
+      title: 'DevTools',
+      desc: 'Inspect active channels, message logs, connection state, presence, and offline queue in a floating panel.',
     },
     {
       title: 'TanStack ecosystem',

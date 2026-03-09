@@ -10,8 +10,14 @@ This is a pnpm workspace monorepo with [Nx](https://nx.dev/) for task orchestrat
 | -------------------------------------- | ------------------------------------------------------------------------ |
 | `packages/realtime`                    | `@tanstack/realtime` — core client, collection helpers, CRDTs, and types |
 | `packages/react-realtime`              | `@tanstack/react-realtime` — React hooks and provider                    |
+| `packages/solid-realtime`              | `@tanstack/solid-realtime` — Solid primitives and provider               |
+| `packages/vue-realtime`                | `@tanstack/vue-realtime` — Vue composables and provider                  |
 | `packages/realtime-adapter-centrifugo` | `@tanstack/realtime-adapter-centrifugo` — Centrifugo transport adapter   |
 | `packages/realtime-adapter-sse`        | `@tanstack/realtime-adapter-sse` — Server-Sent Events transport adapter  |
+| `packages/realtime-preset-start`       | `@tanstack/realtime-preset-start` — TanStack Start preset                |
+| `packages/react-realtime-devtools`     | `@tanstack/react-realtime-devtools` — React developer tools panel        |
+| `packages/solid-realtime-devtools`     | `@tanstack/solid-realtime-devtools` — Solid developer tools panel        |
+| `packages/vue-realtime-devtools`       | `@tanstack/vue-realtime-devtools` — Vue developer tools panel            |
 | `packages/docs`                        | Documentation site (not published)                                       |
 | `packages/__tests__`                   | Integration test suite (not published)                                   |
 
