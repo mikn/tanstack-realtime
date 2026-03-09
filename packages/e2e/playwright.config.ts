@@ -34,7 +34,7 @@ const viteBin = join(import.meta.dirname, 'node_modules/.bin/vite')
 const launchOpts = executablePath ? { launchOptions: { executablePath } } : {}
 
 export default defineConfig({
-  // React app (port 3000) + Solid app (port 3001) run as separate Vite servers.
+  // React app (port 3000) + Solid app (port 3001) + Vue app (port 3002) run as separate Vite servers.
   webServer: [
     {
       command: viteBin,
@@ -47,6 +47,13 @@ export default defineConfig({
       command: `${viteBin} --config vite.config.ts`,
       cwd: join(import.meta.dirname, 'app-solid'),
       url: 'http://localhost:3001',
+      reuseExistingServer: !process.env['CI'],
+      timeout: 60_000,
+    },
+    {
+      command: `${viteBin} --config vite.config.ts`,
+      cwd: join(import.meta.dirname, 'app-vue'),
+      url: 'http://localhost:3002',
       reuseExistingServer: !process.env['CI'],
       timeout: 60_000,
     },
@@ -72,6 +79,16 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         baseURL: 'http://localhost:3001',
+        actionTimeout: 10_000,
+        ...launchOpts,
+      },
+    },
+    {
+      name: 'vue-chromium',
+      testMatch: '**/vue-multi-user.spec.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: 'http://localhost:3002',
         actionTimeout: 10_000,
         ...launchOpts,
       },
