@@ -1017,6 +1017,98 @@ export function ApiReference() {
         </tbody>
       </table>
 
+      <h4>Hook Pipeline</h4>
+      <table className="api-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Signature</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <code>createHookPipeline</code>
+            </td>
+            <td>
+              <code>() =&gt; HookPipeline</code>
+            </td>
+            <td>
+              Creates a hook pipeline that executes registered hooks in priority
+              order. The engine behind the transport&rsquo;s <code>hook()</code>{' '}
+              method. Exposes typed methods for each hook point:{' '}
+              <code>onConnect</code>, <code>onDisconnect</code>,{' '}
+              <code>onReconnect</code>, <code>beforePublish</code>,{' '}
+              <code>beforeDeliver</code>, <code>onChannelSubscribe</code>, and{' '}
+              <code>onChannelUnsubscribe</code>.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>createHookableTransport</code>
+            </td>
+            <td>
+              <code>(inner: RealtimeTransport) =&gt; RealtimeTransport</code>
+            </td>
+            <td>
+              Wraps any transport that doesn&rsquo;t natively implement the hook
+              pipeline, adding hook functionality. Tracks active channels for
+              reconnect hooks and connection status transitions. Use this to add
+              hooks to custom or third-party transports.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h4>Channel Utilities</h4>
+      <table className="api-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Signature</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <code>deriveChannelFromUrl</code>
+            </td>
+            <td>
+              <code>(url: string) =&gt; string</code>
+            </td>
+            <td>
+              Derives a channel name from a REST URL by extracting the last path
+              segment as the namespace and query parameters as channel params.
+              Strips <code>/api</code> or{' '}
+              <code>
+                /api/v{'<'}N{'>'}
+              </code>{' '}
+              prefixes. Auto-used by <code>useRealtimeCollection</code> when a{' '}
+              <code>url</code> is provided without an explicit{' '}
+              <code>channel</code>.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>normalizePermissions</code>
+            </td>
+            <td>
+              <code>
+                (result: ChannelPermissions | boolean) =&gt; ChannelPermissions
+              </code>
+            </td>
+            <td>
+              Normalizes a boolean or <code>ChannelPermissions</code> object
+              into a full <code>ChannelPermissions</code> shape. Boolean{' '}
+              <code>true</code> maps to all permissions granted;{' '}
+              <code>false</code> maps to all denied.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
       <h4>Multi-Tab Coordination</h4>
       <table className="api-table">
         <thead>

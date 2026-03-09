@@ -1,4 +1,5 @@
 import { CodeBlock } from '../../components/CodeBlock'
+import { FrameworkTabs } from '../../components/FrameworkTabs'
 
 export function GettingStarted() {
   return (
@@ -38,9 +39,19 @@ export function GettingStarted() {
       </div>
 
       <h2 id="installation">Installation</h2>
-      <CodeBlock
-        code={`npm i @tanstack/realtime @tanstack/react-realtime \\
-      @tanstack/realtime-preset-start @tanstack/realtime-adapter-sse`}
+      <FrameworkTabs
+        react={{
+          code: `npm i @tanstack/realtime @tanstack/react-realtime \\
+      @tanstack/realtime-preset-start @tanstack/realtime-adapter-sse`,
+        }}
+        solid={{
+          code: `npm i @tanstack/realtime @tanstack/solid-realtime \\
+      @tanstack/realtime-preset-start @tanstack/realtime-adapter-sse`,
+        }}
+        vue={{
+          code: `npm i @tanstack/realtime @tanstack/vue-realtime \\
+      @tanstack/realtime-preset-start @tanstack/realtime-adapter-sse`,
+        }}
       />
 
       <div className="doc-callout">
@@ -103,9 +114,10 @@ export const realtimeClient = createRealtimeClient({
   transport: sseTransport({ url: '/api/realtime' }),
 })`}
       />
-      <CodeBlock
-        title="app/root.tsx"
-        code={`import { RealtimeProvider } from '@tanstack/react-realtime'
+      <FrameworkTabs
+        react={{
+          title: 'app/root.tsx',
+          code: `import { RealtimeProvider } from '@tanstack/react-realtime'
 import { realtimeClient } from './client/realtime'
 
 function App() {
@@ -114,7 +126,34 @@ function App() {
       <RouterProvider router={router} />
     </RealtimeProvider>
   )
-}`}
+}`,
+        }}
+        solid={{
+          title: 'app/root.tsx',
+          code: `import { RealtimeProvider } from '@tanstack/solid-realtime'
+import { realtimeClient } from './client/realtime'
+
+function App() {
+  return (
+    <RealtimeProvider client={realtimeClient}>
+      <RouterProvider router={router} />
+    </RealtimeProvider>
+  )
+}`,
+        }}
+        vue={{
+          title: 'app/App.vue',
+          code: `<script setup>
+import { provideRealtimeClient } from '@tanstack/vue-realtime'
+import { realtimeClient } from './client/realtime'
+
+provideRealtimeClient(realtimeClient)
+</script>
+
+<template>
+  <RouterView />
+</template>`,
+        }}
       />
 
       <div className="doc-callout">
