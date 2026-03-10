@@ -7,27 +7,22 @@ function Hero() {
       <div className="container">
         <span className="badge">v0.1 &middot; Alpha</span>
         <h1>
-          Add realtime to{' '}
-          <span className="gradient-text">your existing app</span>
+          Your app, but <span className="gradient-text">live</span>
         </h1>
         <p className="hero-sub">
-          Keep your server, your database, your deploy target. Add a{' '}
-          <code>channel</code> to any collection and it goes live &mdash; with
-          type-safe CRDTs, presence, pub/sub, and offline support. Not a
-          platform, just a library.
+          Live dashboards, multiplayer cursors, collaborative lists, typing
+          indicators &mdash; without ripping out your stack. Add a{' '}
+          <code>channel</code> and your existing collections update in realtime.
+          No new database. No vendor lock-in.
         </p>
 
         <div className="hero-code">
           <CodeBlock
-            code={`const todosOptions = realtimeCollectionOptions({
-  ...withRest({
-    url: '/api/todos',
-    getKey: (t) => t.id,
-  }),
-  client: realtimeClient,
-  channel: ['todos'],
-  fields: { title: 'lww', votes: 'pn-counter' },
-})`}
+            code={`// Before — polling
+const todos = useQuery({ queryKey: ['todos'], queryFn: fetchTodos, refetchInterval: 5000 })
+
+// After — live
+const todos = useCollection(todosCollection)  // updates the instant any client mutates`}
           />
         </div>
 
@@ -51,80 +46,15 @@ function Hero() {
   )
 }
 
-function Features() {
-  const features = [
-    {
-      title: 'Transport-agnostic',
-      desc: 'SSE or Centrifugo (WebSocket). Swap transports without changing application code.',
-    },
-    {
-      title: 'Type-safe channels',
-      desc: 'Full TypeScript from channel keys to CRDT field definitions to presence data shapes.',
-    },
-    {
-      title: 'Conflict-free data types',
-      desc: 'LWW registers, PN-counters, and OR-sets. Concurrent edits merge automatically.',
-    },
-    {
-      title: 'Presence & pub/sub',
-      desc: "Track who's online, share cursor positions, and broadcast messages across subscribers.",
-    },
-    {
-      title: 'Ephemeral channels',
-      desc: 'Auto-expiring events like typing indicators, emoji reactions, and toasts that disappear after a configurable TTL.',
-    },
-    {
-      title: 'AI streaming',
-      desc: 'Ordered, resumable streams with reduce-based state and HMAC-signed checkpoints.',
-    },
-    {
-      title: 'Tick-based sync',
-      desc: 'Delta-compressed 60 Hz updates for game state, simulations, and high-frequency data.',
-    },
-    {
-      title: 'Offline & multi-tab',
-      desc: 'Offline queue buffers mutations. Coordinated transport shares one connection across tabs.',
-    },
-    {
-      title: 'React, Solid & Vue',
-      desc: 'First-class adapters for React, Solid, and Vue. Same hooks/composables, same signatures, framework-native internals.',
-    },
-    {
-      title: 'DevTools',
-      desc: 'Inspect active channels, message logs, connection state, presence, and offline queue in a floating panel.',
-    },
-    {
-      title: 'TanStack ecosystem',
-      desc: 'Built on TanStack DB and Store. Works alongside TanStack Query for non-realtime data.',
-    },
-  ]
-
-  return (
-    <section id="features" className="section">
-      <div className="container">
-        <h2>What you get</h2>
-        <div className="features-grid">
-          {features.map((f) => (
-            <div key={f.title} className="feature-card">
-              <h3>{f.title}</h3>
-              <p>{f.desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
-
 function Spectrum() {
   return (
     <section id="spectrum" className="section section-alt">
       <div className="container">
-        <h2>One config key at a time</h2>
+        <h2>Adopt one config key at a time</h2>
         <p className="section-sub">
           Start with a plain <code>queryFn</code>. Add <code>channel</code> when
           you&rsquo;re ready for live updates. Add <code>fields</code> when you
-          need conflict resolution. Stop at any point.
+          need conflict resolution. Stop at any point &mdash; no rewrites.
         </p>
 
         <div className="spectrum-steps">
@@ -186,9 +116,217 @@ function Spectrum() {
   )
 }
 
+function WhatYouCanBuild() {
+  const useCases = [
+    {
+      title: 'Live collections',
+      desc: 'Todos, kanban boards, inventory — any list that should update the instant someone adds, edits, or removes an item.',
+      code: `const todosCollection = createCollection(
+  realtimeCollectionOptions({
+    ...withRest({ url: '/api/todos', getKey: (t) => t.id }),
+    client,
+    channel: ['todos'],
+  })
+)`,
+    },
+    {
+      title: 'Chat & activity feeds',
+      desc: 'Append-only event streams with history replay. Messages arrive in order across all connected clients.',
+      code: `const chatOptions = liveChannelOptions({
+  client,
+  channel: ['chat', { roomId }],
+  history: 50,
+})`,
+    },
+    {
+      title: 'Presence & cursors',
+      desc: "Show who's online, share cursor positions, and display live user status.",
+      code: `const presenceOptions = presenceChannelOptions({
+  client,
+  channel: ['room', { roomId }],
+  initialData: { cursor: { x: 0, y: 0 }, name: userName },
+})`,
+    },
+    {
+      title: 'AI token streaming',
+      desc: 'Stream AI-generated content token-by-token with reduce-based state and resumable checkpoints.',
+      code: `const streamOptions = streamChannelOptions({
+  client,
+  channel: ['ai', { promptId }],
+  reduce: (state, token) => state + token,
+  initial: '',
+})`,
+    },
+  ]
+
+  return (
+    <section id="use-cases" className="section">
+      <div className="container">
+        <h2>What you can build</h2>
+        <p className="section-sub">
+          Concrete patterns, each a few lines of config.
+        </p>
+        <div className="use-cases-grid">
+          {useCases.map((uc) => (
+            <div key={uc.title} className="use-case-card">
+              <h3>{uc.title}</h3>
+              <p>{uc.desc}</p>
+              <CodeBlock code={uc.code} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function Positioning() {
+  return (
+    <section id="when-to-use" className="section section-alt">
+      <div className="container">
+        <h2>When to use</h2>
+        <p className="section-sub">
+          For teams that already have a backend they like and want realtime
+          without vendor lock-in. Not a database, CDC pipeline, or rich-text
+          editing engine.
+        </p>
+
+        <div className="positioning-grid">
+          <div className="positioning-card positioning-good">
+            <h3>Good fit</h3>
+            <ul>
+              <li>Live updates without polling</li>
+              <li>
+                Reactive collections that update when any client mutates data
+              </li>
+              <li>Presence and lightweight pub/sub messaging</li>
+              <li>
+                Concurrent edits on simple fields &mdash; counters, tag sets,
+                scalar values
+              </li>
+              <li>Swappable transports without code changes</li>
+            </ul>
+          </div>
+
+          <div className="positioning-card positioning-bad">
+            <h3>Look elsewhere</h3>
+            <ul>
+              <li>
+                <strong>Postgres sync</strong> &mdash; ElectricSQL and PowerSync
+                sync Postgres directly to client collections
+              </li>
+              <li>
+                <strong>Rich text editing</strong> &mdash; Yjs/Hocuspocus or
+                Automerge are purpose-built; see our{' '}
+                <a href="#/docs/rich-text-crdts">Y.js integration guide</a> for
+                pairing with TanStack Realtime as the transport
+              </li>
+              <li>
+                <strong>Polling is enough</strong> &mdash; TanStack Query with a{' '}
+                <code>refetchInterval</code> is simpler when sub-second latency
+                is not required
+              </li>
+              <li>
+                <strong>Managed services</strong> &mdash; Ably, Pusher, and
+                Liveblocks handle infrastructure for you; TanStack Realtime is
+                for teams that want to own the transport layer
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function Features() {
+  const groups = [
+    {
+      label: 'Core',
+      features: [
+        {
+          title: 'Live collections',
+          desc: 'Server-managed rows with insert/update/delete semantics that sync across all connected clients.',
+        },
+        {
+          title: 'Presence & pub/sub',
+          desc: "Track who's online, share cursor positions, and broadcast messages across subscribers.",
+        },
+        {
+          title: 'Conflict-free data types',
+          desc: 'LWW registers, PN-counters, and OR-sets. Concurrent edits merge automatically.',
+        },
+      ],
+    },
+    {
+      label: 'Advanced',
+      features: [
+        {
+          title: 'AI streaming',
+          desc: 'Ordered, resumable streams with reduce-based state and HMAC-signed checkpoints.',
+        },
+        {
+          title: 'Tick-based sync',
+          desc: 'Delta-compressed 60 Hz updates for game state, simulations, and high-frequency data.',
+        },
+        {
+          title: 'Ephemeral channels',
+          desc: 'Auto-expiring events like typing indicators, emoji reactions, and toasts with configurable TTL.',
+        },
+      ],
+    },
+    {
+      label: 'Developer experience',
+      features: [
+        {
+          title: 'Transport-agnostic',
+          desc: 'SSE or Centrifugo (WebSocket). Swap transports without changing application code.',
+        },
+        {
+          title: 'Type-safe channels',
+          desc: 'Full TypeScript from channel keys to CRDT field definitions to presence data shapes.',
+        },
+        {
+          title: 'Offline & multi-tab',
+          desc: 'Offline queue buffers mutations. Coordinated transport shares one connection across tabs.',
+        },
+        {
+          title: 'DevTools',
+          desc: 'Inspect active channels, message logs, connection state, presence, and offline queue in a floating panel.',
+        },
+        {
+          title: 'React, Solid & Vue',
+          desc: 'First-class adapters with framework-native internals. Same hooks/composables, same signatures.',
+        },
+      ],
+    },
+  ]
+
+  return (
+    <section id="features" className="section">
+      <div className="container">
+        <h2>Features</h2>
+        {groups.map((group) => (
+          <div key={group.label} className="feature-group">
+            <h3 className="feature-group-label">{group.label}</h3>
+            <div className="features-grid">
+              {group.features.map((f) => (
+                <div key={f.title} className="feature-card">
+                  <h3>{f.title}</h3>
+                  <p>{f.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 function QuickStart() {
   return (
-    <section id="quickstart" className="section">
+    <section id="quickstart" className="section section-alt">
       <div className="container">
         <h2>Quick start</h2>
 
@@ -253,7 +391,7 @@ function TodoList() {
 
 function Ecosystem() {
   return (
-    <section className="section section-alt">
+    <section className="section">
       <div className="container ecosystem-section">
         <h2>Fits right in</h2>
         <p className="section-sub">
@@ -287,65 +425,6 @@ function Ecosystem() {
               Deep integration via <code>withServerFns</code>: server functions
               become collection callbacks with full type safety end-to-end.
             </p>
-          </div>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function Positioning() {
-  return (
-    <section id="when-to-use" className="section">
-      <div className="container">
-        <h2>When to use</h2>
-        <p className="section-sub">
-          For teams that already have a backend they like and want realtime
-          without vendor lock-in. Not a database, CDC pipeline, or rich-text
-          editing engine.
-        </p>
-
-        <div className="positioning-grid">
-          <div className="positioning-card positioning-good">
-            <h3>Good fit</h3>
-            <ul>
-              <li>Live updates without polling</li>
-              <li>
-                Reactive collections that update when any client mutates data
-              </li>
-              <li>Presence and lightweight pub/sub messaging</li>
-              <li>
-                Concurrent edits on simple fields &mdash; counters, tag sets,
-                scalar values
-              </li>
-              <li>Swappable transports without code changes</li>
-            </ul>
-          </div>
-
-          <div className="positioning-card positioning-bad">
-            <h3>Look elsewhere</h3>
-            <ul>
-              <li>
-                <strong>Postgres sync</strong> &mdash; ElectricSQL and PowerSync
-                sync Postgres directly to client collections
-              </li>
-              <li>
-                <strong>Rich text editing</strong> &mdash; Yjs/Hocuspocus or
-                Automerge are purpose-built; see our{' '}
-                <a href="#/docs/rich-text-crdts">Y.js integration guide</a> for
-                pairing with TanStack Realtime as the transport
-              </li>
-              <li>
-                <strong>Polling is enough</strong> &mdash; TanStack Query with a{' '}
-                <code>refetchInterval</code> is simpler when sub-second latency
-                is not required
-              </li>
-              <li>
-                <strong>Managed services</strong> &mdash; Ably, Pusher, and
-                Liveblocks handle infrastructure for you; TanStack Realtime is
-                for teams that want to own the transport layer
-              </li>
-            </ul>
           </div>
         </div>
       </div>
@@ -448,11 +527,12 @@ export function Home() {
   return (
     <>
       <Hero />
-      <Features />
       <Spectrum />
+      <WhatYouCanBuild />
+      <Positioning />
+      <Features />
       <QuickStart />
       <Ecosystem />
-      <Positioning />
       <Community />
       <Footer />
     </>

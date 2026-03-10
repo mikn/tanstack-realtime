@@ -375,6 +375,50 @@ code {
   line-height: 1.55;
 }
 
+.feature-group {
+  margin-bottom: 2rem;
+}
+
+.feature-group-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+/* ---------------------------------------------------------------------------
+   What you can build
+   --------------------------------------------------------------------------- */
+
+.use-cases-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.use-case-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.25rem;
+}
+
+.use-case-card h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.use-case-card p {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.55;
+  margin-bottom: 0.75rem;
+}
+
 /* ---------------------------------------------------------------------------
    Progressive Spectrum
    --------------------------------------------------------------------------- */
@@ -752,7 +796,8 @@ code {
   }
 
   .features-grid,
-  .positioning-grid {
+  .positioning-grid,
+  .use-cases-grid {
     grid-template-columns: 1fr;
   }
 
