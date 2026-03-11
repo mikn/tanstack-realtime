@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import './styles.css'
 import { Sidebar } from './components/Sidebar'
+import { SearchDialog } from './components/SearchDialog'
 import { Home } from './pages/Home'
 import { GettingStarted } from './pages/docs/GettingStarted'
 import { Collections } from './pages/docs/Collections'
@@ -25,6 +26,10 @@ import { ApiReference } from './pages/docs/ApiReference'
 import { WireProtocol } from './pages/docs/WireProtocol'
 import { Testing } from './pages/docs/Testing'
 import { ChoosingAPattern } from './pages/docs/ChoosingAPattern'
+import { SolidPrimitives } from './pages/docs/SolidPrimitives'
+import { VueComposables } from './pages/docs/VueComposables'
+import { Devtools } from './pages/docs/Devtools'
+import { Examples } from './pages/docs/Examples'
 
 // ---------------------------------------------------------------------------
 // Simple hash router
@@ -67,6 +72,10 @@ const docRoutes: Partial<Record<string, () => React.JSX.Element>> = {
   '#/docs/wire-protocol': WireProtocol,
   '#/docs/testing': Testing,
   '#/docs/choosing-a-pattern': ChoosingAPattern,
+  '#/docs/solid-primitives': SolidPrimitives,
+  '#/docs/vue-composables': VueComposables,
+  '#/docs/devtools': Devtools,
+  '#/docs/examples': Examples,
 }
 
 // ---------------------------------------------------------------------------
@@ -94,6 +103,10 @@ const docOrder = [
   { hash: '#/docs/scaling', label: 'Scaling to Production' },
   { hash: '#/docs/server-hooks', label: 'Server Hooks' },
   { hash: '#/docs/hooks', label: 'React Hooks' },
+  { hash: '#/docs/solid-primitives', label: 'Solid Primitives' },
+  { hash: '#/docs/vue-composables', label: 'Vue Composables' },
+  { hash: '#/docs/devtools', label: 'DevTools' },
+  { hash: '#/docs/examples', label: 'Examples' },
   { hash: '#/docs/api-reference', label: 'API Reference' },
   { hash: '#/docs/error-reference', label: 'Error Reference' },
   { hash: '#/docs/wire-protocol', label: 'Wire Protocol' },
@@ -146,7 +159,13 @@ function DisclaimerBar() {
   )
 }
 
-function DocsNav({ hash }: { hash: string }) {
+function DocsNav({
+  hash,
+  onSearchOpen,
+}: {
+  hash: string
+  onSearchOpen: () => void
+}) {
   const isHome = !hash.startsWith('#/docs')
   return (
     <nav className="nav">
@@ -162,7 +181,11 @@ function DocsNav({ hash }: { hash: string }) {
               <a href="#quickstart">Quick Start</a>
               <a href="#when-to-use">When to use</a>
             </>
-          ) : null}
+          ) : (
+            <button className="search-trigger" onClick={onSearchOpen}>
+              Search <kbd>Ctrl+K</kbd>
+            </button>
+          )}
           <a
             href="#/docs/getting-started"
             className={!isHome ? 'nav-active' : ''}
@@ -191,11 +214,27 @@ export function App() {
   const hash = useHash()
   const isDocsPage = hash.startsWith('#/docs')
   const DocPage = docRoutes[hash]
+  const [searchOpen, setSearchOpen] = useState(false)
+
+  const openSearch = useCallback(() => setSearchOpen(true), [])
+  const closeSearch = useCallback(() => setSearchOpen(false), [])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setSearchOpen((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   return (
     <>
       <DisclaimerBar />
-      <DocsNav hash={hash} />
+      <DocsNav hash={hash} onSearchOpen={openSearch} />
+      <SearchDialog open={searchOpen} onClose={closeSearch} />
       {isDocsPage ? (
         <div className="docs-layout">
           <Sidebar currentHash={hash} />

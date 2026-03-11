@@ -25,8 +25,14 @@
 | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | [`@tanstack/realtime`](#tanstackrealtime)                                       | Core client, collection helpers, CRDT primitives, and type definitions |
 | [`@tanstack/react-realtime`](#tanstackreact-realtime)                           | React hooks and provider                                               |
+| [`@tanstack/solid-realtime`](#tanstacksolid-realtime)                           | Solid primitives and provider                                          |
+| [`@tanstack/vue-realtime`](#tanstackvue-realtime)                               | Vue composables and provider                                           |
 | [`@tanstack/realtime-adapter-centrifugo`](#tanstackrealtime-adapter-centrifugo) | Transport adapter for [Centrifugo](https://centrifugal.dev)            |
 | [`@tanstack/realtime-adapter-sse`](#tanstackrealtime-adapter-sse)               | Server-Sent Events transport adapter                                   |
+| [`@tanstack/realtime-preset-start`](#tanstackrealtime-preset-start)             | TanStack Start preset with SSE handler and publish backend             |
+| [`@tanstack/react-realtime-devtools`](#devtools)                                | React developer tools panel                                            |
+| [`@tanstack/solid-realtime-devtools`](#devtools)                                | Solid developer tools panel                                            |
+| [`@tanstack/vue-realtime-devtools`](#devtools)                                  | Vue developer tools panel                                              |
 
 ---
 
@@ -211,16 +217,98 @@ function StatusBar() {
 
 ### Hooks
 
-| Hook                               | Description                                                            |
-| ---------------------------------- | ---------------------------------------------------------------------- |
-| `useSubscribe(channel, onMessage)` | Subscribe to raw channel messages for the component lifetime           |
-| `usePublish(channel)`              | Returns a stable publish function for a channel                        |
-| `useChannel(channel, onMessage?)`  | Combined subscribe + publish; returns `{ publish }`                    |
-| `usePresence(channelDef, options)` | Join a presence channel; returns `{ others, updatePresence }`          |
-| `useStream(channelDef, options)`   | Subscribe to a reduce-based stream; returns `{ state, status, error }` |
-| `useRealtimeCollection(config)`    | Returns a TanStack DB `Collection` backed by a realtime channel        |
-| `useLiveChannel(config)`           | Returns a TanStack DB `Collection` for append-only event streams       |
-| `useRealtime()`                    | Returns `{ status, connect, disconnect, client }`                      |
+| Hook                                | Description                                                                      |
+| ----------------------------------- | -------------------------------------------------------------------------------- |
+| `useRealtime()`                     | Returns `{ status, connect, disconnect, client }`                                |
+| `useSubscribe(channel, onMessage)`  | Subscribe to raw channel messages for the component lifetime                     |
+| `usePublish(channel)`               | Returns a stable publish function for a channel                                  |
+| `useChannel(channel, onMessage?)`   | Combined subscribe + publish; returns `{ publish }`                              |
+| `usePresence(channelDef, options)`  | Join a presence channel; returns `{ others, updatePresence }`                    |
+| `useStream(channelDef, options)`    | Subscribe to a reduce-based stream; returns `{ state, status, error }`           |
+| `useRealtimeCollection(config)`     | Returns a TanStack DB `Collection` backed by a realtime channel                  |
+| `useLiveChannel(config)`            | Returns a TanStack DB `Collection` for append-only event streams                 |
+| `useConnectionStatus()`             | Returns reactive `ConnectionStatus` value                                        |
+| `useIsConnected()`                  | Returns `boolean` — `true` when connected                                        |
+| `useLatestMessage(channel)`         | Returns the most recent message on a channel                                     |
+| `useChannelHistory(channel, opts)`  | Accumulates channel messages into an array with configurable max length          |
+| `useTypingIndicator(channel, opts)` | Typing indicator with auto-expire; returns `{ typing, startTyping, stopTyping }` |
+| `useChannelStats(channel)`          | Returns `{ messageCount, lastMessageAt }` for a channel                          |
+| `useOnReconnect(callback)`          | Fires a callback whenever the client reconnects                                  |
+| `useSyncedCounter(def, options)`    | Standalone CRDT counter; returns `{ value, increment, decrement }`               |
+| `useSyncedValue(def, options)`      | Standalone CRDT LWW value; returns `{ value, set }`                              |
+| `useSyncedSet(def, options)`        | Standalone CRDT OR-set; returns `{ values, add, remove, has }`                   |
+
+> **Solid and Vue** — `@tanstack/solid-realtime` and `@tanstack/vue-realtime` export the same hooks/composables with identical signatures. Replace `useX` → `useX` in Solid (signals-based) or Vue (composables with `ref`/`computed`).
+
+---
+
+## `@tanstack/solid-realtime`
+
+Solid adapter. Exports the same primitives as the React adapter, backed by Solid signals and `createEffect`.
+
+### Installation
+
+```bash
+npm install @tanstack/realtime @tanstack/solid-realtime
+```
+
+### Quick start
+
+```tsx
+import {
+  RealtimeProvider,
+  useRealtime,
+  useSubscribe,
+} from '@tanstack/solid-realtime'
+import { client } from './client'
+
+function App() {
+  return (
+    <RealtimeProvider client={client}>
+      <MyApp />
+    </RealtimeProvider>
+  )
+}
+```
+
+All hooks from the React adapter are available: `useSubscribe`, `usePublish`, `useChannel`, `usePresence`, `useStream`, `useRealtimeCollection`, `useLiveChannel`, `useConnectionStatus`, `useIsConnected`, `useLatestMessage`, `useChannelHistory`, `useTypingIndicator`, `useChannelStats`, `useOnReconnect`, `useSyncedCounter`, `useSyncedValue`, `useSyncedSet`.
+
+Testing utilities (`createTestRealtimeProvider`, `createTestRealtimeProviderWithPresence`) are also exported.
+
+---
+
+## `@tanstack/vue-realtime`
+
+Vue adapter. Exports composables that return Vue `ref`/`computed` values.
+
+### Installation
+
+```bash
+npm install @tanstack/realtime @tanstack/vue-realtime
+```
+
+### Quick start
+
+```vue
+<script setup lang="ts">
+import {
+  RealtimeProvider,
+  useRealtime,
+  useSubscribe,
+} from '@tanstack/vue-realtime'
+import { client } from './client'
+</script>
+
+<template>
+  <RealtimeProvider :client="client">
+    <MyApp />
+  </RealtimeProvider>
+</template>
+```
+
+All hooks from the React adapter are available as Vue composables with the same names and signatures.
+
+Testing utilities (`createTestRealtimeProvider`, `createTestRealtimeProviderWithPresence`) are also exported.
 
 ---
 
@@ -302,6 +390,30 @@ app.all('/_realtime', (req) => handler.handle(req))
 
 // Server-side broadcast
 handler.broadcast('todos:teamId=123', { type: 'created', todo })
+
+// Server-side streaming (e.g. AI token generation)
+const stream = handler.createStream({ channel: ['ai', { sessionId }] })
+for await (const chunk of llmResponse) {
+  await stream.push({ type: 'token', content: chunk })
+}
+await stream.done()
+```
+
+The handler also supports **lifecycle hooks** for observing connections and subscriptions:
+
+```ts
+const handler = createSseHandler({
+  getUser,
+  authorize,
+  onClientConnect: ({ connectionId, userId }) => {
+    console.log(`${userId} connected`)
+  },
+  onClientDisconnect: ({ connectionId, userId }) => {
+    console.log(`${userId} disconnected`)
+  },
+  onFirstSubscriber: (channel) => startLiveQuery(channel),
+  onChannelEmpty: (channel) => stopLiveQuery(channel),
+})
 ```
 
 ### Client transport
@@ -317,6 +429,84 @@ export const client = createRealtimeClient({
   }),
 })
 ```
+
+---
+
+## `@tanstack/realtime-preset-start`
+
+TanStack Start preset. Provides an SSE-based request handler for TanStack Router API routes and a pluggable `PublishBackend` interface for horizontal scaling.
+
+### Installation
+
+```bash
+npm install @tanstack/realtime @tanstack/realtime-preset-start
+```
+
+### Usage
+
+```ts
+// app/server/realtime.ts
+import { createStartHandler } from '@tanstack/realtime-preset-start'
+
+export const realtime = createStartHandler({
+  getUser: async (req) => {
+    const session = await getSession(req)
+    return session ? { userId: session.userId } : null
+  },
+})
+
+export const realtimePublish = realtime.publish
+```
+
+```ts
+// app/routes/api/realtime.ts
+import { createAPIFileRoute } from '@tanstack/start/api'
+import { realtime } from '../../server/realtime'
+
+export const Route = createAPIFileRoute('/api/realtime')({
+  GET: ({ request }) => realtime.handle(request),
+  POST: ({ request }) => realtime.handle(request),
+  OPTIONS: ({ request }) => realtime.handle(request),
+})
+```
+
+For the client side, pair with `sseTransport` from `@tanstack/realtime-adapter-sse`.
+
+---
+
+## DevTools
+
+Developer tools panels for inspecting channels, messages, presence, connection state, and the offline queue. Available for all three frameworks.
+
+### Installation
+
+```bash
+# React
+npm install @tanstack/react-realtime-devtools
+
+# Solid
+npm install @tanstack/solid-realtime-devtools
+
+# Vue
+npm install @tanstack/vue-realtime-devtools
+```
+
+### Usage (React)
+
+```tsx
+import { RealtimeDevtools } from '@tanstack/react-realtime-devtools'
+
+function App() {
+  return (
+    <RealtimeProvider client={client}>
+      <MyApp />
+      <RealtimeDevtools />
+    </RealtimeProvider>
+  )
+}
+```
+
+The `RealtimeDevtools` component renders a floating panel (toggleable) that shows active subscriptions, a message log, connection state timeline, and offline queue status. Solid and Vue versions use the same `<RealtimeDevtools />` component from their respective packages.
 
 ---
 

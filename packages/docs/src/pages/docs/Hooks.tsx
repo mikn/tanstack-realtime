@@ -8,6 +8,12 @@ export function Hooks() {
         All hooks are exported from <code>@tanstack/react-realtime</code>. The
         client is sourced from <code>RealtimeProvider</code> context.
       </p>
+      <p>
+        These same hooks are available for{' '}
+        <a href="#/docs/solid-primitives">Solid</a> and{' '}
+        <a href="#/docs/vue-composables">Vue</a> with identical names and
+        signatures.
+      </p>
 
       <h2 id="useRealtime">useRealtime</h2>
       <p>Connection status and control.</p>
@@ -297,6 +303,211 @@ function AuditLog({ resourceId }: { resourceId: string }) {
         append-only patterns and{' '}
         <a href="#/docs/read-receipts">Read Receipts</a>.
       </p>
+
+      <h2 id="useConnectionStatus">useConnectionStatus</h2>
+      <p>
+        Returns the reactive <code>ConnectionStatus</code> value. Lightweight
+        alternative to <code>useRealtime()</code> for status-only components.
+      </p>
+      <CodeBlock
+        title="ConnectionBanner.tsx"
+        code={`import { useConnectionStatus } from '@tanstack/react-realtime'
+
+function ConnectionBanner() {
+  const status = useConnectionStatus()
+
+  if (status === 'connected') return null
+  if (status === 'reconnecting') return <p>Reconnecting…</p>
+  return <p>Offline — changes will sync when back online</p>
+}`}
+      />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function useConnectionStatus(): ConnectionStatus
+// ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'`}
+      />
+
+      <h2 id="useIsConnected">useIsConnected</h2>
+      <p>
+        Returns <code>true</code> when connected, <code>false</code> otherwise.
+        Convenience wrapper over <code>useConnectionStatus()</code>.
+      </p>
+      <CodeBlock
+        title="SendButton.tsx"
+        code={`import { useIsConnected } from '@tanstack/react-realtime'
+
+function SendButton({ onClick }: { onClick: () => void }) {
+  const connected = useIsConnected()
+  return (
+    <button onClick={onClick} disabled={!connected}>
+      {connected ? 'Send' : 'Connecting…'}
+    </button>
+  )
+}`}
+      />
+      <h3>Signature</h3>
+      <CodeBlock code={`function useIsConnected(): boolean`} />
+
+      <h2 id="useLatestMessage">useLatestMessage</h2>
+      <p>
+        Subscribes to a channel and returns only the most recently received
+        message. Ideal for notification banners, status updates, and live score
+        tickers.
+      </p>
+      <CodeBlock
+        title="LiveScore.tsx"
+        code={`import { useLatestMessage } from '@tanstack/react-realtime'
+
+function LiveScore({ matchId }: { matchId: string }) {
+  const { message: score, messageCount } = useLatestMessage<ScoreUpdate>(
+    ['scores', { matchId }],
+  )
+  return <p>{score ? \`\${score.home} - \${score.away}\` : 'Waiting…'}</p>
+}`}
+      />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function useLatestMessage<T = unknown>(
+  channel: QueryKey | string,
+): {
+  message: T | undefined
+  messageCount: number    // incremented on every message
+}`}
+      />
+
+      <h2 id="useChannelHistory">useChannelHistory</h2>
+      <p>
+        Subscribes to a channel and buffers the last <code>maxMessages</code>{' '}
+        messages in order (ring buffer). Useful for chat UIs and activity feeds
+        without a full database collection.
+      </p>
+      <CodeBlock
+        title="ChatRoom.tsx"
+        code={`import { useChannelHistory } from '@tanstack/react-realtime'
+
+function ChatRoom({ roomId }: { roomId: string }) {
+  const { messages, clear } = useChannelHistory<Message>(
+    ['chat', { roomId }],
+    { maxMessages: 100 },
+  )
+
+  return (
+    <ul>
+      {messages.map((m) => (
+        <li key={m.id}>{m.author}: {m.text}</li>
+      ))}
+    </ul>
+  )
+}`}
+      />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function useChannelHistory<T = unknown>(
+  channel: QueryKey | string,
+  options?: {
+    maxMessages?: number  // default: 50
+  },
+): {
+  messages: ReadonlyArray<T>
+  clear: () => void
+}`}
+      />
+
+      <h2 id="useTypingIndicator">useTypingIndicator</h2>
+      <p>
+        Tracks who is typing in a channel. Publishes <code>typing:start</code> /{' '}
+        <code>typing:stop</code> events and auto-expires users after a
+        configurable timeout.
+      </p>
+      <CodeBlock
+        title="TypingStatus.tsx"
+        code={`import { useTypingIndicator } from '@tanstack/react-realtime'
+
+function ChatInput({ roomId }: { roomId: string }) {
+  const { typingUsers, startTyping, stopTyping } = useTypingIndicator(
+    ['typing', { roomId }],
+    { selfId: currentUser.id },
+  )
+
+  return (
+    <>
+      <input
+        onChange={(e) => { setValue(e.target.value); startTyping() }}
+        onBlur={stopTyping}
+      />
+      {typingUsers.length > 0 && (
+        <p>{typingUsers.join(', ')} typing…</p>
+      )}
+    </>
+  )
+}`}
+      />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function useTypingIndicator(
+  channel: QueryKey | string,
+  options: {
+    selfId: string         // exclude yourself from typingUsers
+    timeout?: number       // auto-expire after ms (default: 3000)
+  },
+): {
+  typingUsers: ReadonlyArray<string>
+  startTyping: () => void
+  stopTyping: () => void
+}`}
+      />
+
+      <h2 id="useChannelStats">useChannelStats</h2>
+      <p>
+        Tracks per-channel statistics without consuming message payloads. Useful
+        for debug overlays and admin dashboards.
+      </p>
+      <CodeBlock
+        title="ChannelDebug.tsx"
+        code={`import { useChannelStats } from '@tanstack/react-realtime'
+
+function ChannelDebugBadge({ channel }: { channel: string }) {
+  const { messageCount, lastMessageAt } = useChannelStats(channel)
+  return (
+    <span>
+      {messageCount} msgs
+      {lastMessageAt && \` · last \${new Date(lastMessageAt).toLocaleTimeString()}\`}
+    </span>
+  )
+}`}
+      />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function useChannelStats(
+  channel: QueryKey | string,
+): {
+  messageCount: number
+  lastMessageAt: number | null
+}`}
+      />
+
+      <h2 id="useOnReconnect">useOnReconnect</h2>
+      <p>
+        Fires a callback each time the realtime connection is restored after
+        being disconnected. Useful for refetching server state or showing
+        notifications.
+      </p>
+      <CodeBlock
+        title="DataGrid.tsx"
+        code={`import { useOnReconnect } from '@tanstack/react-realtime'
+
+function DataGrid() {
+  const { refetch } = useQuery(...)
+
+  useOnReconnect(() => {
+    refetch()
+  })
+
+  return <table>...</table>
+}`}
+      />
+      <h3>Signature</h3>
+      <CodeBlock code={`function useOnReconnect(callback: () => void): void`} />
 
       <h2 id="synced-hooks">Standalone CRDT hooks</h2>
       <p>
