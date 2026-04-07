@@ -59,9 +59,11 @@ export {
   extractEqualityConditions,
   ReactivePredicateParseError,
 } from './compile-predicate.js'
-export { createSubscriptionManager } from './subscription-manager.js'
-export type {
+export {
+  createSubscriptionManager,
   SubscriptionManager,
+} from './subscription-manager.js'
+export type {
   QueryPredicate,
   SubscriptionEntry,
 } from './subscription-manager.js'

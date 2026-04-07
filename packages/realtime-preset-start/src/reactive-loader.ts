@@ -1,6 +1,10 @@
 import { serializeKey } from '@tanstack/realtime'
 import { runInReactiveContext } from './reactive-db.js'
-import { compilePredicate, deriveChannelKey } from './compile-predicate.js'
+import {
+  ReactivePredicateParseError,
+  compilePredicate,
+  deriveChannelKey,
+} from './compile-predicate.js'
 import type { ColumnMap } from './reactive-db.js'
 import type { QueryKey } from '@tanstack/realtime'
 import type { SubscriptionManager } from './subscription-manager.js'
@@ -47,7 +51,24 @@ export function createReactiveLoader<TResult>(
       if (ctx.reads[0]) {
         // Auto path: predicate extracted from reactive context
         const read = ctx.reads[0]
-        const compiled = compilePredicate(read.sql, read.params, read.columns)
+        let compiled: (row: Record<string, unknown>) => boolean
+        let autoChannel: string | undefined
+
+        try {
+          compiled = compilePredicate(read.sql, read.params, read.columns)
+        } catch (err) {
+          if (
+            err instanceof ReactivePredicateParseError &&
+            err.message.includes('No WHERE clause')
+          ) {
+            // Table-level subscription: query has no WHERE clause
+            compiled = () => true
+            autoChannel = serializeKey([read.table])
+          } else {
+            throw err
+          }
+        }
+
         queryPredicate = {
           table: read.table,
           sql: read.sql,
@@ -60,7 +81,8 @@ export function createReactiveLoader<TResult>(
             ? typeof options.channel === 'string'
               ? options.channel
               : serializeKey(options.channel)
-            : deriveChannelKey(read.table, read.sql, read.params, read.columns)
+            : (autoChannel ??
+              deriveChannelKey(read.table, read.sql, read.params, read.columns))
       } else if (options.predicate && 'where' in options.predicate) {
         // Explicit where path
         const pred = options.predicate

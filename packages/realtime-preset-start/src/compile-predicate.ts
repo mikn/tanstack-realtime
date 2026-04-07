@@ -169,27 +169,35 @@ function buildMatcher(
   if (node.type === 'binary') {
     const { op, left, right } = node
     switch (op) {
-      case 'AND':
-        return (row) =>
-          buildMatcher(left, params, dbToJs)(row) &&
-          buildMatcher(right, params, dbToJs)(row)
-      case 'OR':
-        return (row) =>
-          buildMatcher(left, params, dbToJs)(row) ||
-          buildMatcher(right, params, dbToJs)(row)
+      case 'AND': {
+        const leftFn = buildMatcher(left, params, dbToJs)
+        const rightFn = buildMatcher(right, params, dbToJs)
+        return (row) => leftFn(row) && rightFn(row)
+      }
+      case 'OR': {
+        const leftFn = buildMatcher(left, params, dbToJs)
+        const rightFn = buildMatcher(right, params, dbToJs)
+        return (row) => leftFn(row) || rightFn(row)
+      }
       case '=':
         validateValueNode(left)
         validateValueNode(right)
-        return (row) =>
-          resolveValue(left, row, dbToJs, params) ===
-          resolveValue(right, row, dbToJs, params)
+        return (row) => {
+          const l = resolveValue(left, row, dbToJs, params)
+          const r = resolveValue(right, row, dbToJs, params)
+          if (l === null || r === null) return false
+          return l === r
+        }
       case '<>':
       case '!=':
         validateValueNode(left)
         validateValueNode(right)
-        return (row) =>
-          resolveValue(left, row, dbToJs, params) !==
-          resolveValue(right, row, dbToJs, params)
+        return (row) => {
+          const l = resolveValue(left, row, dbToJs, params)
+          const r = resolveValue(right, row, dbToJs, params)
+          if (l === null || r === null) return false
+          return l !== r
+        }
       case '>':
         validateValueNode(left)
         validateValueNode(right)
@@ -253,8 +261,10 @@ function buildMatcher(
         return (row) => resolveValue(operand, row, dbToJs, params) == null
       case 'IS NOT NULL':
         return (row) => resolveValue(operand, row, dbToJs, params) != null
-      case 'NOT':
-        return (row) => !buildMatcher(operand, params, dbToJs)(row)
+      case 'NOT': {
+        const fn = buildMatcher(operand, params, dbToJs)
+        return (row) => !fn(row)
+      }
       default:
         throw new ReactivePredicateParseError(
           `Unsupported unary operator "${op}". ` +

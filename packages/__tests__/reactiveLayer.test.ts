@@ -187,6 +187,56 @@ describe('compilePredicate', () => {
       compilePredicate('"todos"."team_id" LIKE $1', ['A%'], columns),
     ).toThrow(ReactivePredicateParseError)
   })
+
+  it('!= operator: matches different value, rejects equal (same as <>)', () => {
+    const pred = compilePredicate('"todos"."team_id" != $1', ['A'], columns)
+    expect(pred({ teamId: 'B' })).toBe(true)
+    expect(pred({ teamId: 'A' })).toBe(false)
+  })
+
+  it('falsy param value 0: col = $1 with params [0] correctly matches row where col === 0', () => {
+    const pred = compilePredicate('"todos"."count" = $1', [0], columns)
+    expect(pred({ count: 0 })).toBe(true)
+    expect(pred({ count: 1 })).toBe(false)
+    expect(pred({ count: false })).toBe(false)
+  })
+
+  it('falsy param value false: col = $1 with params [false] correctly matches row where col === false', () => {
+    const pred = compilePredicate('"todos"."done" = $1', [false], columns)
+    expect(pred({ done: false })).toBe(true)
+    expect(pred({ done: true })).toBe(false)
+    expect(pred({ done: 0 })).toBe(false)
+  })
+
+  it('falsy param value empty string: col = $1 with params [""] correctly matches row where col === ""', () => {
+    const pred = compilePredicate('"todos"."team_id" = $1', [''], columns)
+    expect(pred({ teamId: '' })).toBe(true)
+    expect(pred({ teamId: 'A' })).toBe(false)
+    expect(pred({ teamId: null })).toBe(false)
+  })
+
+  it('full SELECT SQL statement: compilePredicate parses WHERE from full SQL correctly', () => {
+    const pred = compilePredicate(
+      'SELECT * FROM "todos" WHERE "todos"."team_id" = $1',
+      ['A'],
+      columns,
+    )
+    expect(pred({ teamId: 'A' })).toBe(true)
+    expect(pred({ teamId: 'B' })).toBe(false)
+  })
+
+  it('NULL param equality: col = $1 with params [null] returns false even when col === null (SQL NULL semantics)', () => {
+    const pred = compilePredicate('"todos"."team_id" = $1', [null], columns)
+    expect(pred({ teamId: null })).toBe(false)
+    expect(pred({ teamId: 'A' })).toBe(false)
+  })
+
+  it('IS NULL: correctly matches null rows (proper SQL way to test for NULL)', () => {
+    const pred = compilePredicate('"todos"."team_id" IS NULL', [], columns)
+    expect(pred({ teamId: null })).toBe(true)
+    expect(pred({ teamId: undefined })).toBe(true)
+    expect(pred({ teamId: 'A' })).toBe(false)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -273,7 +323,7 @@ describe('wrapReactiveDb', () => {
     const wrappedDb = wrapReactiveDb(rawDb)
 
     const { ctx } = await runInReactiveContext(async () => {
-      return await (wrappedDb.insert(fakeTable) as any).values({ teamId: 'A' })
+      return await wrappedDb.insert(fakeTable).values({ teamId: 'A' })
     })
 
     expect(ctx.writes).toHaveLength(1)
@@ -303,7 +353,8 @@ describe('wrapReactiveDb', () => {
     const wrappedDb = wrapReactiveDb(rawDb)
 
     const { ctx } = await runInReactiveContext(async () => {
-      return await (wrappedDb.insert(fakeTable) as any)
+      return await wrappedDb
+        .insert(fakeTable)
         .values({ teamId: 'A' })
         .returning()
     })
@@ -624,6 +675,93 @@ describe('createReactiveLoader', () => {
     expect(registered.channel).toBe('explicit-ch')
   })
 
+  it('predicate.where escape hatch: uses toSQL() to build predicate without wrappedDb', async () => {
+    const mockMgr = makeMockMgr()
+
+    const fakeWhere = {
+      toSQL: () => ({
+        sql: '"todos"."team_id" = $1',
+        params: ['team-42'] as Array<unknown>,
+      }),
+    }
+
+    const loader = createReactiveLoader({
+      subscriptionManager: mockMgr,
+      channel: 'explicit-where-ch',
+      query: async () => [{ id: 1 }],
+      predicate: {
+        table: 'todos',
+        where: fakeWhere,
+        columns: todosColumns,
+      },
+    })
+
+    const result = await loader.load()
+    expect(result).toEqual([{ id: 1 }])
+    expect(mockMgr.register).toHaveBeenCalledTimes(1)
+    const registered = mockMgr.register.mock.calls[0][0]
+    expect(registered.channel).toBe('explicit-where-ch')
+    expect(registered.predicate.table).toBe('todos')
+    // Compiled predicate should work correctly based on the toSQL output
+    expect(registered.predicate.compiled({ teamId: 'team-42' })).toBe(true)
+    expect(registered.predicate.compiled({ teamId: 'other' })).toBe(false)
+  })
+
+  it('predicate.where escape hatch: auto-derives channel from WHERE equality conditions', async () => {
+    const mockMgr = makeMockMgr()
+
+    const fakeWhere = {
+      toSQL: () => ({
+        sql: '"todos"."team_id" = $1',
+        params: ['team-42'] as Array<unknown>,
+      }),
+    }
+
+    const loader = createReactiveLoader({
+      subscriptionManager: mockMgr,
+      query: async () => [{ id: 1 }],
+      predicate: {
+        table: 'todos',
+        where: fakeWhere,
+        columns: todosColumns,
+      },
+    })
+
+    await loader.load()
+
+    const registered = mockMgr.register.mock.calls[0][0]
+    expect(registered.channel).toBe(
+      serializeKey(['todos', { teamId: 'team-42' }]),
+    )
+  })
+
+  it('no-WHERE auto path: query without .where() registers table-level subscription with match-all predicate', async () => {
+    const mockMgr = makeMockMgr()
+    const fakeResult = [{ id: 1 }]
+    // Builder with no WHERE clause in SQL
+    const fakeBuilder = makeFakeBuilder('SELECT * FROM "todos"', [], fakeResult)
+
+    const rawDb: any = { select: () => ({ from: (_t: any) => fakeBuilder }) }
+    const wrappedDb = wrapReactiveDb(rawDb)
+
+    const loader = createReactiveLoader({
+      subscriptionManager: mockMgr,
+      query: async () => await wrappedDb.select().from(fakeTable),
+    })
+
+    const result = await loader.load()
+
+    expect(result).toEqual(fakeResult)
+    expect(mockMgr.register).toHaveBeenCalledTimes(1)
+    const registered = mockMgr.register.mock.calls[0][0]
+    expect(registered.predicate.table).toBe('todos')
+    // channel should be table-level
+    expect(registered.channel).toBe(serializeKey(['todos']))
+    // predicate should match any row (match-all)
+    expect(registered.predicate.compiled({ teamId: 'anything' })).toBe(true)
+    expect(registered.predicate.compiled({})).toBe(true)
+  })
+
   it('throws when no predicate available and query does not use reactive proxy', async () => {
     const mockMgr = makeMockMgr()
 
@@ -694,7 +832,8 @@ describe('createReactiveMutation', () => {
     const mutation = createReactiveMutation({
       subscriptionManager: mockMgr,
       mutation: async (_input: void) => {
-        return await (wrappedDb.insert(fakeTable) as any)
+        return await wrappedDb
+          .insert(fakeTable)
           .values({ teamId: 'A' })
           .returning()
       },
@@ -777,9 +916,7 @@ describe('createStartHandler — reactive integration', () => {
 
     await realtime.mutate(
       async () =>
-        await (wrappedDb.insert(fakeTable) as any)
-          .values({ teamId: 'A' })
-          .returning(),
+        await wrappedDb.insert(fakeTable).values({ teamId: 'A' }).returning(),
     )
 
     expect(invalidateSpy).toHaveBeenCalledTimes(1)
@@ -828,5 +965,29 @@ describe('createStartHandler — reactive integration', () => {
     expect(typeof realtime.subscriptionManager.unregister).toBe('function')
     expect(typeof realtime.subscriptionManager.invalidate).toBe('function')
     expect(typeof realtime.subscriptionManager.activeChannels).toBe('function')
+  })
+
+  it('query without .where() registers table-level subscription and does not throw', async () => {
+    const realtime = createStartHandler({})
+    const fakeResult = [{ id: 1 }]
+    const fakeBuilder = makeFakeBuilder('SELECT * FROM "todos"', [], fakeResult)
+
+    const rawDb: any = {
+      select: () => ({
+        from: (_t: any) => fakeBuilder,
+      }),
+    }
+    const wrappedDb = wrapReactiveDb(rawDb)
+
+    // Should not throw even though there is no WHERE clause
+    const result = await realtime.query(
+      async () => await wrappedDb.select().from(fakeTable),
+    )
+
+    expect(result).toEqual(fakeResult)
+    const expectedChannel = serializeKey(['todos'])
+    expect(
+      realtime.subscriptionManager.activeChannels().has(expectedChannel),
+    ).toBe(true)
   })
 })
