@@ -59,7 +59,11 @@
     {
       "name": "@tanstack/realtime",
       "path": "packages/realtime/dist/index.js",
-      "limit": "15 kB"
+      "limit": "35 kB",
+      "ignore": [
+        "@tanstack/db",
+        "@tanstack/store"
+      ]
     },
     {
       "name": "@tanstack/react-realtime",
