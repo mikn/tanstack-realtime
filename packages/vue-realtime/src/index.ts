@@ -73,11 +73,15 @@ export { useOnReconnect } from './useOnReconnect.js'
 export { useReactiveQuery } from './useReactiveQuery.js'
 export type {
   UseReactiveQueryOptions,
+  UseReactiveQueryResult,
   ReactiveQueryResult,
 } from './useReactiveQuery.js'
 
 export { useReactiveMutation } from './useReactiveMutation.js'
-export type { UseReactiveMutationOptions } from './useReactiveMutation.js'
+export type {
+  UseReactiveMutationOptions,
+  UseReactiveMutationResult,
+} from './useReactiveMutation.js'
 
 // CRDT standalone composables
 export { useSyncedCounter } from './useSyncedCounter.js'
