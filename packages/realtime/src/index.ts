@@ -244,6 +244,7 @@ export type {
 
 // Query collection registry — shared cache for useReactiveQuery
 export {
+  clearRegistry,
   deriveCacheKey,
   getOrCreateQueryCollection,
 } from './queryCollectionRegistry.js'

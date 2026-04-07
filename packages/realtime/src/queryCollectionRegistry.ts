@@ -39,6 +39,11 @@ type RegistryEntry = {
 /** Module-level singleton registry keyed by cache key string. */
 const registry = new Map<string, RegistryEntry>()
 
+/** Clears all entries from the registry. Used in tests only. */
+export function clearRegistry(): void {
+  registry.clear()
+}
+
 /** WeakMap to assign stable string identifiers to server function references. */
 const fnIds = new WeakMap<Function, string>()
 let counter = 0
@@ -78,8 +83,7 @@ export function getOrCreateQueryCollection<T>(
   const existing = registry.get(key)
   if (existing != null) {
     // Re-use only if the collection has not been cleaned up
-    const status = (existing.collection as unknown as { status: string }).status
-    if (status !== 'cleaned-up') return existing
+    if (existing.collection.status !== 'cleaned-up') return existing
   }
 
   // `triggerRefetch` is set inside the sync callback once the collection is
@@ -102,10 +106,11 @@ export function getOrCreateQueryCollection<T>(
       sync({ begin, write, commit, markReady }) {
         let stopped = false
         let channelUnsub: (() => void) | null = null
+        let hasCalledMarkReady = false
 
         // Write an initial placeholder row immediately so consumers always
         // have an entry to read (value === undefined indicates pending).
-        begin()
+        begin({ immediate: true })
         write({
           type: 'insert',
           value: { _key: 'result', value: undefined, error: null },
@@ -124,7 +129,10 @@ export function getOrCreateQueryCollection<T>(
                 value: { _key: 'result', value: data, error: null },
               })
               commit()
-              markReady()
+              if (!hasCalledMarkReady) {
+                markReady()
+                hasCalledMarkReady = true
+              }
 
               // Subscribe to the channel for live updates.
               channelUnsub?.()
@@ -146,7 +154,10 @@ export function getOrCreateQueryCollection<T>(
                 value: { _key: 'result', value: undefined, error: e },
               })
               commit()
-              markReady()
+              if (!hasCalledMarkReady) {
+                markReady()
+                hasCalledMarkReady = true
+              }
             })
         }
 
@@ -157,6 +168,7 @@ export function getOrCreateQueryCollection<T>(
           stopped = true
           channelUnsub?.()
           triggerRefetch = null
+          registry.delete(key)
         }
       },
     },
