@@ -1,4 +1,4 @@
-import { use, useCallback, useMemo, useRef, useState } from 'react'
+import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from '@tanstack/react-db'
 import { deriveCacheKey, getOrCreateQueryCollection } from '@tanstack/realtime'
 import { RealtimeContext } from './context.js'
@@ -26,7 +26,7 @@ export interface UseReactiveQueryOptions {
  * the initial data and a channel name to subscribe to for live updates.
  *
  * **Note on `enabled`:** When `enabled` is `false`, no collection is created
- * and no fetch is performed. The hook returns a pending state.
+ * and no fetch is performed. The hook returns `isPending: false` and no data.
  *
  * @example
  * const { data, isPending, error, refetch } = useReactiveQuery(
@@ -94,33 +94,42 @@ export function useReactiveQuery<TResult, TArgs = void>(
   const [isFetching, setIsFetching] = useState(false)
   const [isOptimistic, setIsOptimistic] = useState(false)
   const snapshotRef = useRef<TResult | undefined>(undefined)
+  const optimisticValueRef = useRef<TResult | undefined>(undefined)
 
-  // Clear optimistic flag when the server value changes.
-  const prevValueRef = useRef<TResult | undefined>(undefined)
-  const currentValue = (entry as QueryEntry<TResult> | undefined)?.value
-  if (prevValueRef.current !== currentValue && isOptimistic) {
-    setIsOptimistic(false)
-  }
-  prevValueRef.current = currentValue
+  const typedEntry = entry as QueryEntry<TResult> | undefined
+  const entryValue = typedEntry?.value
+
+  // Clear optimistic flag only when the server pushes a value different from
+  // what we set optimistically (not on the optimistic write itself).
+  useEffect(() => {
+    if (!isOptimistic) return
+    if (entryValue !== optimisticValueRef.current) {
+      setIsOptimistic(false)
+      optimisticValueRef.current = undefined
+    }
+  }, [entryValue, isOptimistic])
 
   // Clear fetching flag once data arrives.
-  const prevEntryRef = useRef<QueryEntry<TResult> | undefined>(undefined)
-  if (
-    isFetching &&
-    prevEntryRef.current !== (entry as QueryEntry<TResult> | undefined) &&
-    (entry as QueryEntry<TResult> | undefined)?.value !== undefined
-  ) {
-    setIsFetching(false)
-  }
-  prevEntryRef.current = entry as QueryEntry<TResult> | undefined
+  const prevEntryValueRef = useRef<TResult | undefined>(undefined)
+  useEffect(() => {
+    if (
+      isFetching &&
+      entryValue !== undefined &&
+      entryValue !== prevEntryValueRef.current
+    ) {
+      setIsFetching(false)
+    }
+    prevEntryValueRef.current = entryValue
+  }, [entryValue, isFetching])
 
   const optimisticUpdate = useCallback(
     (transform: (prev: TResult | undefined) => TResult) => {
       if (collection == null) return () => undefined
 
       snapshotRef.current = (entry as QueryEntry<TResult> | undefined)?.value
-      setIsOptimistic(true)
       const newValue = transform(snapshotRef.current)
+      optimisticValueRef.current = newValue
+      setIsOptimistic(true)
 
       collection.update('result', (draft) => {
         ;(draft as QueryEntry<TResult>).value = newValue
@@ -128,14 +137,14 @@ export function useReactiveQuery<TResult, TArgs = void>(
 
       return () => {
         setIsOptimistic(false)
+        optimisticValueRef.current = undefined
         const snapshot = snapshotRef.current
         collection.update('result', (draft) => {
           ;(draft as QueryEntry<TResult>).value = snapshot
         })
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [collection, (entry as QueryEntry<TResult> | undefined)?.value],
+    [collection, entry],
   )
 
   const refetch = useCallback(() => {
@@ -146,8 +155,6 @@ export function useReactiveQuery<TResult, TArgs = void>(
   useOnReconnect(() => {
     if (refetchOnReconnect) refetch()
   })
-
-  const typedEntry = entry as QueryEntry<TResult> | undefined
 
   return {
     data: typedEntry?.value,

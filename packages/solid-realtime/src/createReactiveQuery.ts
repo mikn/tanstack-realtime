@@ -44,6 +44,9 @@ export function createReactiveQuery<TResult, TArgs>(
   // Per-hook local state
   const [isFetching, setIsFetching] = createSignal(false)
   const [isOptimistic, setIsOptimistic] = createSignal(false)
+  const [optimisticValue, setOptimisticValue] = createSignal<
+    TResult | undefined
+  >(undefined)
 
   // Reactive signal that holds the current QueryEntry read from the collection.
   // We update it manually by subscribing to collection changes.
@@ -94,17 +97,25 @@ export function createReactiveQuery<TResult, TArgs>(
     setEntry(current)
 
     // Listen for future changes.
-    const sub = col.subscribeChanges(() => {
-      setEntry(col.get('result'))
+    const sub = col.subscribeChanges((changes) => {
+      // Find the 'result' row change, if any
+      const resultChange = changes.find((c) => c.key === 'result')
+      if (resultChange === undefined) return
+
+      const incoming =
+        resultChange.type === 'delete' ? undefined : resultChange.value
+
       // Clear fetching flag once data arrives.
-      if (col.get('result')?.value !== undefined) {
+      if (incoming?.value !== undefined) {
         setIsFetching(false)
       }
-      // Clear optimistic flag when server value changes (a new sync write
-      // arrived, meaning the server confirmed or replaced the optimistic value).
-      if (isOptimistic()) {
+      // Only clear optimistic flag when the server pushes a value different
+      // from what we set optimistically (not on the optimistic write itself).
+      if (isOptimistic() && incoming?.value !== optimisticValue()) {
         setIsOptimistic(false)
+        setOptimisticValue(undefined)
       }
+      setEntry(incoming)
     })
 
     onCleanup(() => {
@@ -144,8 +155,9 @@ export function createReactiveQuery<TResult, TArgs>(
     if (col == null) return () => undefined
 
     const snapshot = col.get('result')?.value
-    setIsOptimistic(true)
     const newValue = transform(snapshot)
+    setOptimisticValue(() => newValue)
+    setIsOptimistic(true)
 
     col.update('result', (draft) => {
       ;(draft as QueryEntry<TResult>).value = newValue
@@ -153,6 +165,7 @@ export function createReactiveQuery<TResult, TArgs>(
 
     return () => {
       setIsOptimistic(false)
+      setOptimisticValue(undefined)
       col.update('result', (draft) => {
         ;(draft as QueryEntry<TResult>).value = snapshot
       })

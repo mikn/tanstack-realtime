@@ -61,6 +61,7 @@ export function useReactiveQuery<TResult, TArgs>(
   const isFetching = ref(false)
   const isOptimistic = ref(false)
   const snapshotRef: { current: TResult | undefined } = { current: undefined }
+  const optimisticValueRef = ref<TResult | undefined>(undefined)
 
   // Reactive entry read from the shared collection
   // shallowRef avoids Vue's deep UnwrapRef transformation on generic types
@@ -110,28 +111,37 @@ export function useReactiveQuery<TResult, TArgs>(
     collectionRef = registryEntry.collection
     registryRefetch = registryEntry.refetch
 
-    // Read initial value synchronously
     const typedCollection = collectionRef as unknown as Collection<
       QueryEntry<TResult>,
       string
     >
-    entry.value = typedCollection.get('result')
 
-    // Subscribe to changes for reactivity
+    // Subscribe to changes for reactivity (get() always returns undefined here
+    // before sync starts, so we rely solely on subscribeChanges for initial value)
     const sub = typedCollection.subscribeChanges((changes) => {
       for (const change of changes) {
         if (change.key === 'result') {
           if (change.type === 'delete') {
             entry.value = undefined
-          } else {
-            entry.value = change.value
-            // Clear fetching flag once data arrives
-            if (isFetching.value && change.value.value !== undefined) {
-              isFetching.value = false
-            }
-            // Clear optimistic flag when server value changes
             if (isOptimistic.value) {
               isOptimistic.value = false
+              optimisticValueRef.value = undefined
+            }
+          } else {
+            const incoming = change.value
+            entry.value = incoming
+            // Clear fetching flag once data arrives
+            if (isFetching.value && incoming.value !== undefined) {
+              isFetching.value = false
+            }
+            // Only clear optimistic flag when the server pushes a value
+            // different from what we set optimistically
+            if (
+              isOptimistic.value &&
+              incoming.value !== optimisticValueRef.value
+            ) {
+              isOptimistic.value = false
+              optimisticValueRef.value = undefined
             }
           }
         }
@@ -164,8 +174,9 @@ export function useReactiveQuery<TResult, TArgs>(
     >
 
     snapshotRef.current = entry.value?.value
-    isOptimistic.value = true
     const newValue = transform(snapshotRef.current)
+    optimisticValueRef.value = newValue
+    isOptimistic.value = true
 
     typedCollection.update('result', (draft) => {
       ;(draft as QueryEntry<TResult>).value = newValue
@@ -173,6 +184,7 @@ export function useReactiveQuery<TResult, TArgs>(
 
     return () => {
       isOptimistic.value = false
+      optimisticValueRef.value = undefined
       const snapshot = snapshotRef.current
       typedCollection.update('result', (draft) => {
         ;(draft as QueryEntry<TResult>).value = snapshot

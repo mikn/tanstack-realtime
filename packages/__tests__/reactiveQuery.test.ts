@@ -14,13 +14,14 @@
  * and create a companion `reactiveQuery.dom.test.tsx` to cover those paths.
  */
 
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createStartHandler,
   createSubscriptionManager,
   wrapReactiveDb,
 } from '@tanstack/realtime-preset-start'
 import {
+  clearRegistry,
   deriveCacheKey,
   getOrCreateQueryCollection,
   serializeKey,
@@ -1740,6 +1741,10 @@ function makeMockClient() {
 // ---------------------------------------------------------------------------
 
 describe('shared cache — deduplication (deriveCacheKey & getOrCreateQueryCollection)', () => {
+  beforeEach(() => {
+    clearRegistry()
+  })
+
   // 18.1
   it('deriveCacheKey: same (fn, args) → same key', () => {
     const fn = vi.fn()
@@ -1839,6 +1844,10 @@ describe('shared cache — deduplication (deriveCacheKey & getOrCreateQueryColle
 // ---------------------------------------------------------------------------
 
 describe('shared cache — optimistic propagation via collection', () => {
+  beforeEach(() => {
+    clearRegistry()
+  })
+
   // 19.1
   it('collection.update() mutates the row — next read sees updated value', async () => {
     const serverFn = vi
@@ -1867,7 +1876,7 @@ describe('shared cache — optimistic propagation via collection', () => {
   })
 
   // 19.2
-  it('two references to the same collection both see the mutation', async () => {
+  it('two subscribeChanges callbacks on same collection both receive the mutation', async () => {
     const serverFn = vi
       .fn()
       .mockResolvedValue({ data: { count: 0 }, channel: 'ch-19-2' })
@@ -1892,14 +1901,32 @@ describe('shared cache — optimistic propagation via collection', () => {
 
     await (entry1.collection as any).stateWhenReady()
 
+    // Register two separate subscribeChanges callbacks
+    const received1: Array<unknown> = []
+    const received2: Array<unknown> = []
+
+    const sub1 = (entry1.collection as any).subscribeChanges(
+      (changes: unknown) => received1.push(changes),
+    )
+    const sub2 = (entry2.collection as any).subscribeChanges(
+      (changes: unknown) => received2.push(changes),
+    )
+
     // Mutate via entry1
     entry1.collection.update('result', (draft: any) => {
       draft.value = { count: 99 }
     })
 
+    // Both callbacks should have fired
+    expect(received1.length).toBeGreaterThan(0)
+    expect(received2.length).toBeGreaterThan(0)
+
     // Read via entry2 — should see the same mutation
     const state = (entry2.collection as any).state as Map<string, any>
     expect(state.get('result')?.value).toEqual({ count: 99 })
+
+    sub1.unsubscribe()
+    sub2.unsubscribe()
   })
 
   // 19.3
