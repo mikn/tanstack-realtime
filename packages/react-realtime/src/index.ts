@@ -76,6 +76,12 @@ export type {
   ReactiveQueryResult,
 } from './useReactiveQuery.js'
 
+export { useReactivePaginatedQuery } from './useReactivePaginatedQuery.js'
+export type {
+  UseReactivePaginatedQueryOptions,
+  PaginatedPage,
+} from './useReactivePaginatedQuery.js'
+
 export { useReactiveMutation } from './useReactiveMutation.js'
 export type { UseReactiveMutationOptions } from './useReactiveMutation.js'
 

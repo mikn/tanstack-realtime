@@ -9,6 +9,7 @@ export type ReactiveQueryResult<T> = {
 
 export interface UseReactiveQueryOptions {
   enabled?: MaybeRef<boolean>
+  refetchOnReconnect?: MaybeRef<boolean>
 }
 
 export interface UseReactiveQueryResult<TResult> {
@@ -22,6 +23,12 @@ export interface UseReactiveQueryResult<TResult> {
   error: Ref<unknown>
   /** Manually trigger a re-fetch with the current args. */
   refetch: () => void
+  /** Apply an optimistic update. Returns a rollback function. */
+  optimisticUpdate: (
+    transform: (prev: TResult | undefined) => TResult,
+  ) => () => void
+  /** `true` while an optimistic update is in effect and has not yet been confirmed by the server. */
+  isOptimistic: Ref<boolean>
 }
 
 /**
@@ -52,6 +59,11 @@ export function useReactiveQuery<TResult, TArgs>(
   const isFetching: Ref<boolean> = ref(false)
   const error: Ref<unknown> = ref(null)
 
+  const optimisticBase = ref<TResult | undefined>(undefined) as Ref<
+    TResult | undefined
+  >
+  const isOptimistic = ref(false)
+
   const isPending: ComputedRef<boolean> = computed(
     () => data.value === undefined && isFetching.value,
   )
@@ -67,10 +79,28 @@ export function useReactiveQuery<TResult, TArgs>(
       const result = await serverFn(toValue(args))
       data.value = result.data
       channel.value = result.channel
+      optimisticBase.value = undefined
+      isOptimistic.value = false
     } catch (e) {
       error.value = e
     } finally {
       isFetching.value = false
+    }
+  }
+
+  function optimisticUpdate(
+    transform: (prev: TResult | undefined) => TResult,
+  ): () => void {
+    optimisticBase.value = isOptimistic.value
+      ? optimisticBase.value
+      : data.value
+    isOptimistic.value = true
+    data.value = transform(data.value) as TResult | undefined
+
+    return () => {
+      data.value = optimisticBase.value
+      optimisticBase.value = undefined
+      isOptimistic.value = false
     }
   }
 
@@ -104,6 +134,8 @@ export function useReactiveQuery<TResult, TArgs>(
 
     unsubMessage = client.subscribe(newChannel, (msg: unknown) => {
       data.value = msg as TResult
+      optimisticBase.value = undefined
+      isOptimistic.value = false
     })
 
     unsubError = client.onSubscribeError((_ch) => {
@@ -112,9 +144,35 @@ export function useReactiveQuery<TResult, TArgs>(
     })
   })
 
+  // Auto-reconnect refetch
+  let realtimeUnsub: (() => void) | null = null
+
+  const stopReconnectWatch = watch(
+    () => toValue(options.refetchOnReconnect) ?? true,
+    (shouldRefetch) => {
+      realtimeUnsub?.()
+      realtimeUnsub = null
+      if (!shouldRefetch) return
+
+      let prevStatus = client.store.state.status
+      const sub = client.store.subscribe((state) => {
+        const newStatus = state.status
+        if (prevStatus !== 'connected' && newStatus === 'connected') {
+          void fetchData()
+        }
+        prevStatus = newStatus
+      })
+      realtimeUnsub = sub.unsubscribe
+    },
+    { immediate: true },
+  )
+
   onUnmounted(() => {
     unsubMessage?.()
     unsubError?.()
+    stopReconnectWatch()
+    realtimeUnsub?.()
+    realtimeUnsub = null
   })
 
   return {
@@ -125,5 +183,7 @@ export function useReactiveQuery<TResult, TArgs>(
     refetch: () => {
       void fetchData()
     },
+    optimisticUpdate,
+    isOptimistic,
   }
 }

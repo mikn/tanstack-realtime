@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 import { useSubscribe } from './useSubscribe.js'
+import { useOnReconnect } from './useOnReconnect.js'
 
 export type ReactiveQueryResult<T> = {
   data: T
@@ -11,6 +12,8 @@ type State<T> = {
   channel: string | null
   isFetching: boolean
   error: unknown
+  optimisticBase: T | undefined
+  isOptimistic: boolean
 }
 
 type Action<T> =
@@ -18,6 +21,8 @@ type Action<T> =
   | { type: 'FETCH_SUCCESS'; data: T; channel: string }
   | { type: 'FETCH_ERROR'; error: unknown }
   | { type: 'SERVER_UPDATE'; data: T }
+  | { type: 'OPTIMISTIC_UPDATE'; transform: (prev: T | undefined) => T }
+  | { type: 'ROLLBACK' }
 
 function reducer<T>(state: State<T>, action: Action<T>): State<T> {
   switch (action.type) {
@@ -29,11 +34,33 @@ function reducer<T>(state: State<T>, action: Action<T>): State<T> {
         channel: action.channel,
         isFetching: false,
         error: null,
+        optimisticBase: undefined,
+        isOptimistic: false,
       }
     case 'FETCH_ERROR':
       return { ...state, isFetching: false, error: action.error }
     case 'SERVER_UPDATE':
-      return { ...state, data: action.data }
+      return {
+        ...state,
+        data: action.data,
+        optimisticBase: undefined,
+        isOptimistic: false,
+      }
+    case 'OPTIMISTIC_UPDATE':
+      return {
+        ...state,
+        data: action.transform(state.data),
+        // Save snapshot only on first optimistic update
+        optimisticBase: state.isOptimistic ? state.optimisticBase : state.data,
+        isOptimistic: true,
+      }
+    case 'ROLLBACK':
+      return {
+        ...state,
+        data: state.optimisticBase,
+        optimisticBase: undefined,
+        isOptimistic: false,
+      }
     default:
       return state
   }
@@ -42,6 +69,7 @@ function reducer<T>(state: State<T>, action: Action<T>): State<T> {
 export interface UseReactiveQueryOptions {
   enabled?: boolean
   keepPreviousData?: boolean
+  refetchOnReconnect?: boolean
 }
 
 /**
@@ -67,8 +95,12 @@ export function useReactiveQuery<TResult, TArgs = void>(
   isFetching: boolean
   error: unknown
   refetch: () => void
+  optimisticUpdate: (
+    transform: (prev: TResult | undefined) => TResult,
+  ) => () => void
+  isOptimistic: boolean
 } {
-  const { enabled = true } = options
+  const { enabled = true, refetchOnReconnect = true } = options
 
   const [state, dispatch] = useReducer(
     reducer as (s: State<TResult>, a: Action<TResult>) => State<TResult>,
@@ -77,6 +109,8 @@ export function useReactiveQuery<TResult, TArgs = void>(
       channel: null,
       isFetching: false,
       error: null,
+      optimisticBase: undefined,
+      isOptimistic: false,
     },
   )
 
@@ -126,6 +160,18 @@ export function useReactiveQuery<TResult, TArgs = void>(
   // the real subscription by only passing the channel when it's non-empty.
   useSubscribeIfChannelSet(activeChannel, handleMessage)
 
+  useOnReconnect(() => {
+    if (refetchOnReconnect) setRefetchTick()
+  })
+
+  const optimisticUpdate = useCallback(
+    (transform: (prev: TResult | undefined) => TResult) => {
+      dispatch({ type: 'OPTIMISTIC_UPDATE', transform })
+      return () => dispatch({ type: 'ROLLBACK' })
+    },
+    [],
+  )
+
   return {
     data: state.data,
     // isPending: true only when we have no data yet and a fetch is in-flight
@@ -133,6 +179,8 @@ export function useReactiveQuery<TResult, TArgs = void>(
     isFetching: state.isFetching,
     error: state.error,
     refetch: () => setRefetchTick(),
+    optimisticUpdate,
+    isOptimistic: state.isOptimistic,
   }
 }
 
