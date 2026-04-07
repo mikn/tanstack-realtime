@@ -89,6 +89,7 @@ export default defineWorkspace([
         'packages/__tests__/solidPrimitives.test.ts',
         'packages/__tests__/vuePrimitives.test.ts',
         'packages/__tests__/reactiveLayer.test.ts',
+        'packages/__tests__/reactiveQuery.test.ts',
       ],
       pool: 'forks',
       poolOptions: { forks: { singleFork: true } },
