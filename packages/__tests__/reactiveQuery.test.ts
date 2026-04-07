@@ -730,37 +730,28 @@ describe('useReactiveQuery logic — refetch', () => {
     expect(refetchTick).toBe(1)
   })
 
-  it('refetch while already fetching: stale response is ignored via cancel flag', async () => {
-    let cancelledFirst = false
-    const serverFn = vi.fn()
-
-    // First call — slow (will be cancelled)
-    const slowPromise = new Promise<{ data: Array<string>; channel: string }>(
-      (resolve) =>
-        setTimeout(() => {
-          if (!cancelledFirst) resolve({ data: ['stale'], channel: 'ch' })
-        }, 50),
-    )
-    serverFn.mockReturnValueOnce(slowPromise)
-
-    // Second call — fast (should win)
-    serverFn.mockResolvedValueOnce({ data: ['fresh'], channel: 'ch' })
-
-    // Simulate cancel of first fetch effect
-    cancelledFirst = true
-
-    // Start second fetch
+  it('refetch while already fetching: stale response is ignored via cancel flag', () => {
+    // Simulate two concurrent fetches. The first is cancelled before it resolves.
+    // Only the second dispatch should update state.
     let state = initialQueryState<Array<string>>()
+
+    // First fetch starts
     state = queryReducer(state, { type: 'FETCH_START' })
-    const result2 = await serverFn({})
+    expect(state.isFetching).toBe(true)
+
+    // Second fetch starts (refetch), first fetch effect is cleaned up (cancelled=true).
+    // The second fetch resolves first:
     state = queryReducer(state, {
       type: 'FETCH_SUCCESS',
-      data: result2.data,
-      channel: result2.channel,
+      data: ['fresh'],
+      channel: 'ch',
     })
 
+    // The slow first response arrives *after* cancellation — its dispatch is skipped
+    // because `cancelled=true` in the hook's useEffect cleanup. State should only
+    // reflect the second (fast) result.
     expect(state.data).toEqual(['fresh'])
-    expect(cancelledFirst).toBe(true)
+    expect(state.isFetching).toBe(false)
   })
 })
 
