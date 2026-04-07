@@ -582,6 +582,134 @@ function TagEditor({ postId }: { postId: string }) {
         behavior, <a href="#/docs/ephemeral">Ephemeral Channels</a> for pairing
         ephemeral animations with persistent CRDT counters.
       </p>
+
+      <h2 id="useReactiveQuery">useReactiveQuery</h2>
+      <p>
+        Subscribes to a reactive server query and keeps the result live. See the{' '}
+        <a href="#/docs/reactive-queries">Reactive Queries</a> guide for full
+        examples.
+      </p>
+      <CodeBlock
+        title="TodoList.tsx"
+        code={`import { useReactiveQuery } from '@tanstack/react-realtime'
+import { fetchTodos } from '../server/todos'
+
+function TodoList({ teamId }: { teamId: string }) {
+  const { data, isPending, error, optimisticUpdate } =
+    useReactiveQuery(fetchTodos, { teamId })
+
+  if (isPending) return <p>Loading…</p>
+  if (error)     return <p>Error: {String(error)}</p>
+  return <ul>{data?.map((t) => <li key={t.id}>{t.title}</li>)}</ul>
+}`}
+      />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function useReactiveQuery<TResult, TArgs>(
+  serverFn: (args: TArgs) => Promise<ReactiveQueryResult<TResult>>,
+  args: TArgs,
+  options?: {
+    enabled?: boolean            // default: true
+    refetchOnReconnect?: boolean // default: true
+  }
+): {
+  data: TResult | undefined
+  isPending: boolean
+  isFetching: boolean
+  error: unknown
+  isOptimistic: boolean
+  optimisticUpdate: (transform: (prev: TResult | undefined) => TResult) => () => void
+  refetch: () => void
+}`}
+      />
+
+      <h2 id="useReactiveMutation">useReactiveMutation</h2>
+      <p>
+        Mutation hook with loading state and error handling. See the{' '}
+        <a href="#/docs/reactive-queries">Reactive Queries</a> guide for full
+        examples.
+      </p>
+      <CodeBlock
+        title="AddTodoForm.tsx"
+        code={`import { useReactiveMutation } from '@tanstack/react-realtime'
+import { createTodo } from '../server/todos'
+
+function AddTodoForm({ teamId }: { teamId: string }) {
+  const { mutate, isPending, error } = useReactiveMutation(createTodo)
+
+  return (
+    <button
+      disabled={isPending}
+      onClick={() => mutate({ id: crypto.randomUUID(), teamId, title: 'New', done: false })}
+    >
+      {isPending ? 'Saving…' : 'Add'}
+    </button>
+  )
+}`}
+      />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function useReactiveMutation<TArgs, TResult = unknown>(
+  mutateFn: (args: TArgs) => Promise<TResult>,
+  options?: {
+    onSuccess?: (data: TResult) => void
+    onError?: (error: unknown) => void
+  }
+): {
+  mutate: (args: TArgs) => Promise<TResult>
+  isPending: boolean
+  error: unknown
+  data: TResult | undefined
+  reset: () => void
+}`}
+      />
+
+      <h2 id="useReactivePaginatedQuery">useReactivePaginatedQuery</h2>
+      <p>
+        Paginated variant of <code>useReactiveQuery</code>. Accumulates pages
+        and keeps each page live. See the{' '}
+        <a href="#/docs/reactive-queries">Reactive Queries</a> guide for full
+        examples.
+      </p>
+      <CodeBlock
+        title="FeedList.tsx"
+        code={`import { useReactivePaginatedQuery } from '@tanstack/react-realtime'
+import { fetchFeedPage } from '../server/feed'
+
+function FeedList({ teamId }: { teamId: string }) {
+  const { items, isPending, hasNextPage, fetchNextPage } =
+    useReactivePaginatedQuery(fetchFeedPage, { teamId })
+
+  return (
+    <>
+      <ul>{items.map((i) => <li key={i.id}>{i.text}</li>)}</ul>
+      {hasNextPage && <button onClick={() => fetchNextPage()}>Load more</button>}
+    </>
+  )
+}`}
+      />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function useReactivePaginatedQuery<TItem, TArgs>(
+  serverFn: (args: TArgs & { cursor?: string }) => Promise<ReactiveQueryResult<{
+    items: TItem[]
+    nextCursor?: string
+  }>>,
+  args: TArgs,
+  options?: {
+    enabled?: boolean
+    refetchOnReconnect?: boolean
+  }
+): {
+  items: TItem[]
+  isPending: boolean
+  isFetching: boolean
+  error: unknown
+  hasNextPage: boolean
+  isFetchingNextPage: boolean
+  fetchNextPage: () => void
+}`}
+      />
     </article>
   )
 }

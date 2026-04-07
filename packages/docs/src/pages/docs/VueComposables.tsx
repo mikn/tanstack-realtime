@@ -68,7 +68,166 @@ import { client } from './client'
           <code>useSyncedCounter</code>, <code>useSyncedValue</code>,{' '}
           <code>useSyncedSet</code>
         </li>
+        <li>
+          <code>useReactiveQuery</code>, <code>useReactiveMutation</code>,{' '}
+          <code>useReactivePaginatedQuery</code>
+        </li>
       </ul>
+
+      <h2 id="useReactiveQuery">useReactiveQuery</h2>
+      <p>
+        Subscribes to a reactive server query and keeps the result live. The{' '}
+        <code>args</code> parameter accepts a plain object or a{' '}
+        <code>MaybeRef&lt;TArgs&gt;</code> — Vue will automatically track
+        reactive references and re-subscribe when they change. See the{' '}
+        <a href="#/docs/reactive-queries">Reactive Queries</a> guide for full
+        examples.
+      </p>
+      <CodeBlock
+        title="TodoList.vue"
+        code={`<script setup lang="ts">
+import { toRef } from 'vue'
+import { useReactiveQuery } from '@tanstack/vue-realtime'
+import { fetchTodos } from '../server/todos'
+
+const props = defineProps<{ teamId: string }>()
+
+const { data, isPending, error, optimisticUpdate } = useReactiveQuery(
+  fetchTodos,
+  toRef(props, 'teamId').value ? { teamId: props.teamId } : { teamId: '' },
+)
+</script>
+
+<template>
+  <p v-if="isPending">Loading…</p>
+  <p v-else-if="error">Error: {{ error }}</p>
+  <ul v-else>
+    <li v-for="todo in data" :key="todo.id">{{ todo.title }}</li>
+  </ul>
+</template>`}
+      />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function useReactiveQuery<TResult, TArgs>(
+  serverFn: (args: TArgs) => Promise<ReactiveQueryResult<TResult>>,
+  args: MaybeRef<TArgs>,      // plain object or ref — reactive refs are tracked
+  options?: {
+    enabled?: boolean
+    refetchOnReconnect?: boolean
+  }
+): {
+  data: Ref<TResult | undefined>
+  isPending: Ref<boolean>
+  isFetching: Ref<boolean>
+  error: Ref<unknown>
+  isOptimistic: Ref<boolean>
+  optimisticUpdate: (transform: (prev: TResult | undefined) => TResult) => () => void
+  refetch: () => void
+}`}
+      />
+
+      <h2 id="useReactiveMutation">useReactiveMutation</h2>
+      <p>
+        Mutation composable with loading state and error handling. Pair it with{' '}
+        <code>optimisticUpdate</code> from <code>useReactiveQuery</code> for
+        full optimistic UI. See the{' '}
+        <a href="#/docs/reactive-queries">Reactive Queries</a> guide for full
+        examples.
+      </p>
+      <CodeBlock
+        title="AddTodoForm.vue"
+        code={`<script setup lang="ts">
+import { useReactiveMutation } from '@tanstack/vue-realtime'
+import { createTodo } from '../server/todos'
+
+const props = defineProps<{ teamId: string }>()
+
+const { mutate, isPending, error, reset } = useReactiveMutation(createTodo, {
+  onSuccess: (todo) => console.log('Created:', todo.id),
+  onError:   (err) => console.error('Failed:', err),
+})
+
+function handleAdd() {
+  mutate({ id: crypto.randomUUID(), teamId: props.teamId, title: 'New', done: false })
+}
+</script>
+
+<template>
+  <p v-if="error">{{ error }} <button @click="reset">Dismiss</button></p>
+  <button :disabled="isPending" @click="handleAdd">
+    {{ isPending ? 'Saving…' : 'Add' }}
+  </button>
+</template>`}
+      />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function useReactiveMutation<TArgs, TResult = unknown>(
+  mutateFn: (args: TArgs) => Promise<TResult>,
+  options?: {
+    onSuccess?: (data: TResult) => void
+    onError?: (error: unknown) => void
+  }
+): {
+  mutate: (args: TArgs) => Promise<TResult>
+  isPending: Ref<boolean>
+  error: Ref<unknown>
+  data: Ref<TResult | undefined>
+  reset: () => void
+}`}
+      />
+
+      <h2 id="useReactivePaginatedQuery">useReactivePaginatedQuery</h2>
+      <p>
+        Paginated variant of <code>useReactiveQuery</code>. Accumulates pages as
+        you call <code>fetchNextPage</code> and keeps each page live. The{' '}
+        <code>args</code> parameter accepts <code>MaybeRef&lt;TArgs&gt;</code>.
+        See the <a href="#/docs/reactive-queries">Reactive Queries</a> guide for
+        full examples.
+      </p>
+      <CodeBlock
+        title="FeedList.vue"
+        code={`<script setup lang="ts">
+import { useReactivePaginatedQuery } from '@tanstack/vue-realtime'
+import { fetchFeedPage } from '../server/feed'
+
+const props = defineProps<{ teamId: string }>()
+
+const { items, isPending, hasNextPage, isFetchingNextPage, fetchNextPage } =
+  useReactivePaginatedQuery(fetchFeedPage, { teamId: props.teamId })
+</script>
+
+<template>
+  <p v-if="isPending">Loading…</p>
+  <ul v-else>
+    <li v-for="item in items" :key="item.id">{{ item.text }}</li>
+  </ul>
+  <button v-if="hasNextPage" :disabled="isFetchingNextPage" @click="fetchNextPage">
+    {{ isFetchingNextPage ? 'Loading…' : 'Load more' }}
+  </button>
+</template>`}
+      />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function useReactivePaginatedQuery<TItem, TArgs>(
+  serverFn: (args: TArgs & { cursor?: string }) => Promise<ReactiveQueryResult<{
+    items: TItem[]
+    nextCursor?: string
+  }>>,
+  args: MaybeRef<TArgs>,
+  options?: {
+    enabled?: boolean
+    refetchOnReconnect?: boolean
+  }
+): {
+  items: Ref<TItem[]>
+  isPending: Ref<boolean>
+  isFetching: Ref<boolean>
+  error: Ref<unknown>
+  hasNextPage: Ref<boolean>
+  isFetchingNextPage: Ref<boolean>
+  fetchNextPage: () => void
+}`}
+      />
 
       <h2>Testing utilities</h2>
       <p>

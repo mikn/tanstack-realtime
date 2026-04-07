@@ -26,6 +26,7 @@ import { ApiReference } from './pages/docs/ApiReference'
 import { WireProtocol } from './pages/docs/WireProtocol'
 import { Testing } from './pages/docs/Testing'
 import { ChoosingAPattern } from './pages/docs/ChoosingAPattern'
+import { ReactiveQueries } from './pages/docs/ReactiveQueries'
 import { SolidPrimitives } from './pages/docs/SolidPrimitives'
 import { VueComposables } from './pages/docs/VueComposables'
 import { Devtools } from './pages/docs/Devtools'
@@ -52,6 +53,7 @@ const docRoutes: Partial<Record<string, () => React.JSX.Element>> = {
   '#/docs/getting-started': GettingStarted,
   '#/docs/collections': Collections,
   '#/docs/server-functions': ServerFunctions,
+  '#/docs/reactive-queries': ReactiveQueries,
   '#/docs/crdts': CRDTs,
   '#/docs/presence': Presence,
   '#/docs/channels': Channels,
@@ -87,6 +89,7 @@ const docOrder = [
   { hash: '#/docs/collections', label: 'Collections' },
   { hash: '#/docs/choosing-a-pattern', label: 'Choosing a Pattern' },
   { hash: '#/docs/server-functions', label: 'TanStack Start + Drizzle' },
+  { hash: '#/docs/reactive-queries', label: 'Reactive Queries' },
   { hash: '#/docs/authentication', label: 'Authentication' },
   { hash: '#/docs/rich-text-crdts', label: 'Rich Text (Y.js)' },
   { hash: '#/docs/centrifugo', label: 'Centrifugo Guide' },

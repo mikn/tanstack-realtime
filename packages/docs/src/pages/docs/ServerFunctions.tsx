@@ -350,6 +350,43 @@ export const realtimePublish = realtime.publish`}
         No changes needed in the server functions or the collection — the
         backend is transparent to the rest of the stack.
       </p>
+
+      <h2 id="queryWithChannel">queryWithChannel</h2>
+      <p>
+        <code>realtime.queryWithChannel</code> wraps a server query function so
+        that it returns <code>{'{ data: T; channel: string }'}</code> instead of
+        just <code>T</code>. The client-side{' '}
+        <a href="#/docs/reactive-queries">reactive query hooks</a> use the
+        channel string to subscribe to live updates automatically.
+      </p>
+      <CodeBlock
+        title="app/server/todos.ts"
+        code={`import { createServerFn } from '@tanstack/start'
+import { eq } from 'drizzle-orm'
+import { db } from '../db'
+import { todos } from '../../db/schema'
+import { realtime } from '../realtime'
+
+export const getTodos = realtime.queryWithChannel(
+  async (db, { teamId }: { teamId: string }) => {
+    return db.select().from(todos).where(eq(todos.teamId, teamId))
+  },
+)
+
+export const fetchTodos = createServerFn()
+  .handler(({ data }: { data: { teamId: string } }) =>
+    getTodos(db, data)
+  )`}
+      />
+      <p>
+        The channel name is derived automatically from the query arguments, so
+        different argument values subscribe to different channels. You never
+        need to define a channel key manually.
+      </p>
+      <p>
+        See <a href="#/docs/reactive-queries">Reactive Queries</a> for the
+        complete client-side usage guide.
+      </p>
     </article>
   )
 }
