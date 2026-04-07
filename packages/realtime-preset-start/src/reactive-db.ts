@@ -23,7 +23,7 @@ export interface ReactiveQueryContext {
   writes: Array<WriteDescriptor>
 }
 
-export const reactiveCtx = new AsyncLocalStorage<ReactiveQueryContext>()
+const reactiveCtx = new AsyncLocalStorage<ReactiveQueryContext>()
 
 export async function runInReactiveContext<T>(
   fn: () => Promise<T>,
@@ -51,12 +51,19 @@ function hasPromiseLike(val: unknown): val is AnyBuilder {
 /**
  * Wraps a query builder after `.from(table)` has been called.
  * Intercepts `.then()` to record the read and forward positional params.
+ *
+ * The store is captured at proxy-creation time because `.then()` is invoked
+ * after AsyncLocalStorage.run() returns (the thenable is awaited in the outer
+ * async function, outside the run context). Capturing here ensures the store
+ * reference is still valid when `.then()` fires.
  */
 function wrapQueryBuilder(
   builder: AnyBuilder,
   tableName: string,
   columns: ColumnMap,
 ): AnyBuilder {
+  // Capture NOW — wrapQueryBuilder is called inside AsyncLocalStorage.run()
+  const capturedStore = reactiveCtx.getStore()
   return new Proxy(builder, {
     get(target, prop, receiver) {
       if (prop === 'then') {
@@ -64,13 +71,17 @@ function wrapQueryBuilder(
           onFulfilled?: ((value: unknown) => unknown) | null,
           onRejected?: ((reason: unknown) => unknown) | null,
         ) => {
-          const store = reactiveCtx.getStore()
-          if (store && typeof target['toSQL'] === 'function') {
+          if (capturedStore && typeof target['toSQL'] === 'function') {
             try {
               const { sql, params } = (
                 target['toSQL'] as () => { sql: string; params: Array<unknown> }
               )()
-              store.reads.push({ table: tableName, sql, params, columns })
+              capturedStore.reads.push({
+                table: tableName,
+                sql,
+                params,
+                columns,
+              })
             } catch {
               // If toSQL fails, skip recording — don't break execution
             }
@@ -144,8 +155,12 @@ function wrapSelectFrom(builder: AnyBuilder): AnyBuilder {
 
 /**
  * Wraps a write (insert/update/delete) builder to intercept `.then()`.
+ *
+ * Same store-capture rationale as wrapQueryBuilder.
  */
 function wrapWrite(builder: AnyBuilder, tableName: string): AnyBuilder {
+  // Capture NOW — wrapWrite is called inside AsyncLocalStorage.run()
+  const capturedStore = reactiveCtx.getStore()
   return new Proxy(builder, {
     get(target, prop, receiver) {
       if (prop === 'then') {
@@ -160,12 +175,14 @@ function wrapWrite(builder: AnyBuilder, tableName: string): AnyBuilder {
               ) => Promise<unknown>)
             | undefined
           const wrappedFulfilled = (result: unknown) => {
-            const store = reactiveCtx.getStore()
-            if (store) {
+            if (capturedStore) {
               const rows = Array.isArray(result)
                 ? (result as Array<Record<string, unknown>>)
                 : []
-              store.writes.push({ table: tableName, affectedRows: rows })
+              capturedStore.writes.push({
+                table: tableName,
+                affectedRows: rows,
+              })
             }
             return onFulfilled ? onFulfilled(result) : result
           }
@@ -181,8 +198,10 @@ function wrapWrite(builder: AnyBuilder, tableName: string): AnyBuilder {
           const result: unknown = (
             val as (...a: Array<unknown>) => unknown
           ).apply(target, args)
-          if (hasPromiseLike(result)) {
-            return wrapWrite(result, tableName)
+          // Always re-wrap object results so intermediate builders
+          // (e.g. .values() → .returning()) stay within the proxy chain.
+          if (result !== null && typeof result === 'object') {
+            return wrapWrite(result as AnyBuilder, tableName)
           }
           return result
         }

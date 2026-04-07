@@ -21,7 +21,7 @@ interface AstRef {
 
 interface AstParameter {
   type: 'parameter'
-  name: number
+  name: number | string // pgsql-ast-parser returns "$1" style strings
 }
 
 interface AstInteger {
@@ -94,6 +94,33 @@ function buildReverseMap(columns: ColumnMap): Record<string, string> {
 }
 
 /**
+ * Validate that an AST node can be used as a value operand.
+ * Throws ReactivePredicateParseError at compile time for unsupported types
+ * (e.g. sub-selects, function calls) so callers get an error immediately
+ * rather than at row-evaluation time.
+ */
+function validateValueNode(node: AstNode): void {
+  switch (node.type) {
+    case 'ref':
+    case 'parameter':
+    case 'integer':
+    case 'numeric':
+    case 'string':
+    case 'boolean':
+    case 'null':
+      return
+    case 'list':
+      for (const expr of node.expressions) validateValueNode(expr)
+      return
+    default:
+      throw new ReactivePredicateParseError(
+        `Unsupported value node type "${(node as { type: string }).type}" in predicate. ` +
+          'Use the `matches` escape hatch for complex predicates.',
+      )
+  }
+}
+
+/**
  * Resolve an AST node to a concrete value (not a matcher function).
  */
 function resolveValue(
@@ -105,8 +132,14 @@ function resolveValue(
   switch (node.type) {
     case 'ref':
       return row[dbToJs[node.name] ?? node.name]
-    case 'parameter':
-      return params[node.name - 1]
+    case 'parameter': {
+      // pgsql-ast-parser v12 returns name as "$1" (string); handle both string and number
+      const idx =
+        typeof node.name === 'string'
+          ? parseInt(node.name.replace('$', ''), 10) - 1
+          : node.name - 1
+      return params[idx]
+    }
     case 'integer':
       return node.value
     case 'numeric':
@@ -145,44 +178,58 @@ function buildMatcher(
           buildMatcher(left, params, dbToJs)(row) ||
           buildMatcher(right, params, dbToJs)(row)
       case '=':
+        validateValueNode(left)
+        validateValueNode(right)
         return (row) =>
           resolveValue(left, row, dbToJs, params) ===
           resolveValue(right, row, dbToJs, params)
       case '<>':
       case '!=':
+        validateValueNode(left)
+        validateValueNode(right)
         return (row) =>
           resolveValue(left, row, dbToJs, params) !==
           resolveValue(right, row, dbToJs, params)
       case '>':
+        validateValueNode(left)
+        validateValueNode(right)
         return (row) => {
           const l = resolveValue(left, row, dbToJs, params)
           const r = resolveValue(right, row, dbToJs, params)
           return (l as number) > (r as number)
         }
       case '>=':
+        validateValueNode(left)
+        validateValueNode(right)
         return (row) => {
           const l = resolveValue(left, row, dbToJs, params)
           const r = resolveValue(right, row, dbToJs, params)
           return (l as number) >= (r as number)
         }
       case '<':
+        validateValueNode(left)
+        validateValueNode(right)
         return (row) => {
           const l = resolveValue(left, row, dbToJs, params)
           const r = resolveValue(right, row, dbToJs, params)
           return (l as number) < (r as number)
         }
       case '<=':
+        validateValueNode(left)
+        validateValueNode(right)
         return (row) => {
           const l = resolveValue(left, row, dbToJs, params)
           const r = resolveValue(right, row, dbToJs, params)
           return (l as number) <= (r as number)
         }
       case 'IN': {
+        validateValueNode(left)
         if (right.type !== 'list') {
           throw new ReactivePredicateParseError(
             'IN operator expects a list on the right side.',
           )
         }
+        validateValueNode(right)
         return (row) => {
           const leftVal = resolveValue(left, row, dbToJs, params)
           const vals = right.expressions.map((e) =>
@@ -236,9 +283,29 @@ function buildMatcher(
 
 /**
  * Parse the WHERE SQL and return the AST node for the WHERE clause.
+ * Accepts either:
+ *   - A bare WHERE condition expression: `"table"."col" = $1`
+ *   - A full SQL statement: `SELECT ... FROM ... WHERE "table"."col" = $1`
+ * In the latter case the WHERE clause is extracted from the full statement.
  */
 function parseWhereClause(whereSQL: string): AstNode {
-  const ast = parse('SELECT 1 WHERE ' + whereSQL)
+  // If input looks like a full SQL statement, parse it directly to extract WHERE
+  const trimmed = whereSQL.trimStart()
+  const upperTrimmed = trimmed.toUpperCase()
+  const isFullStatement =
+    upperTrimmed.startsWith('SELECT ') ||
+    upperTrimmed.startsWith('INSERT ') ||
+    upperTrimmed.startsWith('UPDATE ') ||
+    upperTrimmed.startsWith('DELETE ')
+
+  let sqlToParse: string
+  if (isFullStatement) {
+    sqlToParse = trimmed
+  } else {
+    sqlToParse = 'SELECT 1 WHERE ' + whereSQL
+  }
+
+  const ast = parse(sqlToParse)
   if (ast.length === 0) {
     throw new ReactivePredicateParseError(
       `Failed to parse WHERE clause: "${whereSQL}"`,
@@ -292,16 +359,22 @@ function collectEqualities(
   }
 
   if (op === '=') {
+    // Helper to get parameter index from parameter node name ($1 → 0, etc.)
+    const paramIdx = (paramNode: AstParameter): number =>
+      typeof paramNode.name === 'string'
+        ? parseInt(paramNode.name.replace('$', ''), 10) - 1
+        : paramNode.name - 1
+
     // col = $N
     if (left.type === 'ref' && right.type === 'parameter') {
       const jsField = dbToJs[left.name] ?? left.name
-      result[jsField] = params[right.name - 1]
+      result[jsField] = params[paramIdx(right)]
       return
     }
     // $N = col
     if (right.type === 'ref' && left.type === 'parameter') {
       const jsField = dbToJs[right.name] ?? right.name
-      result[jsField] = params[left.name - 1]
+      result[jsField] = params[paramIdx(left)]
       return
     }
   }

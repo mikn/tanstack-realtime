@@ -57,6 +57,7 @@ export {
   compilePredicate,
   deriveChannelKey,
   extractEqualityConditions,
+  ReactivePredicateParseError,
 } from './compile-predicate.js'
 export { createSubscriptionManager } from './subscription-manager.js'
 export type {

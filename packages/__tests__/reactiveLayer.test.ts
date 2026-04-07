@@ -22,32 +22,36 @@ import { serializeKey } from '@tanstack/realtime'
 import type { SubscriptionEntry } from '@tanstack/realtime-preset-start'
 
 // ---------------------------------------------------------------------------
-// Mock drizzle-orm so wrapReactiveDb tests don't need real Drizzle tables
+// Drizzle-compatible fake table objects
+// Drizzle's getTableName reads table[Symbol.for("drizzle:Name")]
+// Drizzle's getTableColumns reads table[Table.Symbol.Columns]
+//   where Table.Symbol.Columns = Symbol.for("drizzle:Columns")
 // ---------------------------------------------------------------------------
 
-vi.mock('drizzle-orm', () => ({
-  getTableName: (table: any) => table.__tableName ?? 'test_table',
-  getTableColumns: (table: any) => table.__columns ?? { id: { name: 'id' } },
-}))
+const DRIZZLE_NAME_SYM = Symbol.for('drizzle:Name')
+const DRIZZLE_COLUMNS_SYM = Symbol.for('drizzle:Columns')
 
-// ---------------------------------------------------------------------------
-// Shared column map used in compilePredicate / extractEqualityConditions
-// ---------------------------------------------------------------------------
+function makeFakeTable(
+  tableName: string,
+  columns: Record<string, { name: string }>,
+) {
+  const t: any = {}
+  t[DRIZZLE_NAME_SYM] = tableName
+  t[DRIZZLE_COLUMNS_SYM] = columns
+  return t
+}
 
-const columns = {
+const todosColumns = {
   teamId: { name: 'team_id' },
   done: { name: 'done' },
   count: { name: 'count' },
 }
 
-// ---------------------------------------------------------------------------
-// Fake table / builder helpers for wrapReactiveDb tests
-// ---------------------------------------------------------------------------
+const fakeTable = makeFakeTable('todos', todosColumns)
 
-const fakeTable = {
-  __tableName: 'todos',
-  __columns: { teamId: { name: 'team_id' }, done: { name: 'done' } },
-}
+// ---------------------------------------------------------------------------
+// Fake query builder factory
+// ---------------------------------------------------------------------------
 
 function makeFakeBuilder(
   sql: string,
@@ -62,6 +66,17 @@ function makeFakeBuilder(
     then: (res: any, rej: any) => Promise.resolve(result).then(res, rej),
   }
   return builder
+}
+
+// ---------------------------------------------------------------------------
+// Shared column map used in compilePredicate / extractEqualityConditions tests
+// (These tests call the function directly, not through drizzle)
+// ---------------------------------------------------------------------------
+
+const columns = {
+  teamId: { name: 'team_id' },
+  done: { name: 'done' },
+  count: { name: 'count' },
 }
 
 // ---------------------------------------------------------------------------
@@ -166,9 +181,10 @@ describe('compilePredicate', () => {
     expect(pred({ team_id: 'A' })).toBe(false)
   })
 
-  it('Unsupported SQL throws ReactivePredicateParseError', () => {
+  it('Unsupported SQL operator (LIKE) throws ReactivePredicateParseError at compile time', () => {
+    // LIKE is parsed as binary op "LIKE" which hits the default case
     expect(() =>
-      compilePredicate('"todos"."team_id" = (SELECT $1)', ['A'], columns),
+      compilePredicate('"todos"."team_id" LIKE $1', ['A%'], columns),
     ).toThrow(ReactivePredicateParseError)
   })
 })
@@ -267,15 +283,21 @@ describe('wrapReactiveDb', () => {
 
   it('write captured with rows when result is an array', async () => {
     const insertedRows = [{ id: 1, teamId: 'A' }]
+    // The intermediate values() builder must be thenable (or have toSQL) so
+    // wrapWrite can propagate through the chain to .returning().
+    const returningBuilder: any = {
+      toSQL: () => ({ sql: 'INSERT INTO todos RETURNING *', params: [] }),
+      then: (res: any, _rej: any) =>
+        Promise.resolve(insertedRows).then(res, _rej),
+    }
+    const valuesBuilder: any = {
+      // Must be thenable so wrapWrite wraps it and can intercept .returning()
+      then: (res: any, _rej: any) => Promise.resolve([]).then(res, _rej),
+      returning: () => returningBuilder,
+    }
     const rawDb: any = {
       insert: (_t: any) => ({
-        values: (_vals: any) => ({
-          returning: () => ({
-            toSQL: () => ({ sql: 'INSERT INTO todos', params: [] }),
-            then: (res: any, _rej: any) =>
-              Promise.resolve(insertedRows).then(res, _rej),
-          }),
-        }),
+        values: (_vals: any) => valuesBuilder,
       }),
     }
     const wrappedDb = wrapReactiveDb(rawDb)
@@ -455,7 +477,7 @@ describe('extractEqualityConditions', () => {
   })
 
   it('mixed AND+OR at top-level returns {}', () => {
-    // This parses as OR at top level
+    // This parses as OR at top level: (A AND B) OR C
     const result = extractEqualityConditions(
       '"todos"."team_id" = $1 AND "todos"."done" = $2 OR "todos"."team_id" = $3',
       ['A', true, 'B'],
@@ -527,7 +549,7 @@ describe('createReactiveLoader', () => {
 
     const loader = createReactiveLoader({
       subscriptionManager: mockMgr,
-      query: () => wrappedDb.select().from(fakeTable),
+      query: async () => await wrappedDb.select().from(fakeTable),
     })
 
     const result = await loader.load()
@@ -551,7 +573,7 @@ describe('createReactiveLoader', () => {
 
     const loader = createReactiveLoader({
       subscriptionManager: mockMgr,
-      query: () => wrappedDb.select().from(fakeTable),
+      query: async () => await wrappedDb.select().from(fakeTable),
     })
 
     await loader.load()
@@ -574,7 +596,7 @@ describe('createReactiveLoader', () => {
     const loader = createReactiveLoader({
       subscriptionManager: mockMgr,
       channel: 'my-explicit-channel',
-      query: () => wrappedDb.select().from(fakeTable),
+      query: async () => await wrappedDb.select().from(fakeTable),
     })
 
     await loader.load()
@@ -627,7 +649,7 @@ describe('createReactiveLoader', () => {
 
     const loader = createReactiveLoader({
       subscriptionManager: mockMgr,
-      query: () => wrappedDb.select().from(fakeTable),
+      query: async () => await wrappedDb.select().from(fakeTable),
     })
 
     const result = await loader.load()
@@ -653,15 +675,18 @@ describe('createReactiveMutation', () => {
     const mockMgr = makeMockMgr()
     const insertedRows = [{ id: 1, teamId: 'A' }]
 
+    const returningBuilder: any = {
+      toSQL: () => ({ sql: 'INSERT INTO todos RETURNING *', params: [] }),
+      then: (res: any, _rej: any) =>
+        Promise.resolve(insertedRows).then(res, _rej),
+    }
+    const valuesBuilder: any = {
+      then: (res: any, _rej: any) => Promise.resolve([]).then(res, _rej),
+      returning: () => returningBuilder,
+    }
     const rawDb: any = {
       insert: (_t: any) => ({
-        values: (_vals: any) => ({
-          returning: () => ({
-            toSQL: () => ({ sql: 'INSERT INTO todos', params: [] }),
-            then: (res: any, _rej: any) =>
-              Promise.resolve(insertedRows).then(res, _rej),
-          }),
-        }),
+        values: (_vals: any) => valuesBuilder,
       }),
     }
     const wrappedDb = wrapReactiveDb(rawDb)
@@ -707,6 +732,15 @@ describe('createReactiveMutation', () => {
 
 describe('createStartHandler — reactive integration', () => {
   function makeReactiveDb(queryResult: Array<any>, insertResult: Array<any>) {
+    const returningBuilder: any = {
+      toSQL: () => ({ sql: 'INSERT INTO todos RETURNING *', params: [] }),
+      then: (res: any, _rej: any) =>
+        Promise.resolve(insertResult).then(res, _rej),
+    }
+    const valuesBuilder: any = {
+      then: (res: any, _rej: any) => Promise.resolve([]).then(res, _rej),
+      returning: () => returningBuilder,
+    }
     const rawDb: any = {
       select: () => ({
         from: (_t: any) =>
@@ -717,13 +751,7 @@ describe('createStartHandler — reactive integration', () => {
           ),
       }),
       insert: (_t: any) => ({
-        values: (_vals: any) => ({
-          returning: () => ({
-            toSQL: () => ({ sql: 'INSERT INTO todos', params: [] }),
-            then: (res: any, _rej: any) =>
-              Promise.resolve(insertResult).then(res, _rej),
-          }),
-        }),
+        values: (_vals: any) => valuesBuilder,
       }),
     }
     return wrapReactiveDb(rawDb)
@@ -737,7 +765,7 @@ describe('createStartHandler — reactive integration', () => {
     )
 
     // Register subscription
-    await realtime.query(() => wrappedDb.select().from(fakeTable))
+    await realtime.query(async () => await wrappedDb.select().from(fakeTable))
 
     const expectedChannel = serializeKey(['todos', { teamId: 'A' }])
     expect(
@@ -747,8 +775,11 @@ describe('createStartHandler — reactive integration', () => {
     // Trigger mutation with matching row
     const invalidateSpy = vi.spyOn(realtime.subscriptionManager, 'invalidate')
 
-    await realtime.mutate(() =>
-      (wrappedDb.insert(fakeTable) as any).values({ teamId: 'A' }).returning(),
+    await realtime.mutate(
+      async () =>
+        await (wrappedDb.insert(fakeTable) as any)
+          .values({ teamId: 'A' })
+          .returning(),
     )
 
     expect(invalidateSpy).toHaveBeenCalledTimes(1)
@@ -758,28 +789,12 @@ describe('createStartHandler — reactive integration', () => {
   })
 
   it('affectedRows:[] write invalidates all subscriptions on that table', async () => {
-    const realtime = createStartHandler({})
-    const wrappedDb = makeReactiveDb([{ id: 1, teamId: 'A' }], [])
-
-    // Register a subscription
-    await realtime.query(() => wrappedDb.select().from(fakeTable))
-
-    const channel = serializeKey(['todos', { teamId: 'A' }])
-    expect(realtime.subscriptionManager.activeChannels().has(channel)).toBe(
-      true,
-    )
-
-    // Invalidate with table-level (affectedRows: [])
-    const publishCalls: Array<{ channel: string; data: unknown }> = []
     const backend = {
-      publish: vi.fn(async (ch: string, data: unknown) => {
-        publishCalls.push({ channel: ch, data })
-      }),
+      publish: vi.fn(async (_ch: string, _data: unknown) => {}),
     }
     const realtime2 = createStartHandler({ backend })
-    // Register the same subscription via query
     const wrappedDb2 = makeReactiveDb([{ id: 1, teamId: 'A' }], [])
-    await realtime2.query(() => wrappedDb2.select().from(fakeTable))
+    await realtime2.query(async () => await wrappedDb2.select().from(fakeTable))
 
     await realtime2.invalidate([{ table: 'todos', affectedRows: [] }])
 
@@ -794,7 +809,7 @@ describe('createStartHandler — reactive integration', () => {
     const realtime = createStartHandler({})
     const wrappedDb = makeReactiveDb([{ id: 1, teamId: 'A' }], [])
 
-    await realtime.query(() => wrappedDb.select().from(fakeTable))
+    await realtime.query(async () => await wrappedDb.select().from(fakeTable))
 
     // Direct invalidation with matching rows
     const invalidateSpy = vi.spyOn(realtime.subscriptionManager, 'invalidate')
