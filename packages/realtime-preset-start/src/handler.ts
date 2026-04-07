@@ -9,6 +9,15 @@ import type { SubscriptionManager } from './subscription-manager.js'
 import type { WriteDescriptor } from './reactive-db.js'
 
 // ---------------------------------------------------------------------------
+// ReactiveQueryResult — returned by queryWithChannel
+// ---------------------------------------------------------------------------
+
+export type ReactiveQueryResult<T> = {
+  data: T
+  channel: string
+}
+
+// ---------------------------------------------------------------------------
 // PublishBackend — pluggable pub/sub storage interface
 // ---------------------------------------------------------------------------
 
@@ -256,6 +265,20 @@ export interface StartRealtimeHandler {
     (<T>(channel: QueryKey | string, fn: () => Promise<T>) => Promise<T>)
 
   /**
+   * Register a reactive query and return its initial result together with
+   * the channel key the client should subscribe to.
+   * Channel key AND predicate are both auto-derived from the WHERE clause
+   * when using wrapReactiveDb(). Pass explicit channel as first arg as escape hatch.
+   */
+  queryWithChannel: (<T>(
+    fn: () => Promise<T>,
+  ) => Promise<ReactiveQueryResult<T>>) &
+    (<T>(
+      channel: QueryKey | string,
+      fn: () => Promise<T>,
+    ) => Promise<ReactiveQueryResult<T>>)
+
+  /**
    * Run a mutation and automatically invalidate matching subscriptions.
    * Use wrapReactiveDb() db with .returning() for predicate-level precision.
    * opts.writes overrides auto-capture.
@@ -442,6 +465,24 @@ export function createStartHandler(
         channel: channelOrFn,
         query: fn!,
       }).load()
+    },
+
+    queryWithChannel<T>(
+      channelOrFn: QueryKey | string | (() => Promise<T>),
+      fn?: () => Promise<T>,
+    ): Promise<ReactiveQueryResult<T>> {
+      if (typeof channelOrFn === 'function') {
+        return createReactiveLoader<T>({
+          subscriptionManager: mgr,
+          channel: undefined,
+          query: channelOrFn,
+        }).loadWithChannel()
+      }
+      return createReactiveLoader<T>({
+        subscriptionManager: mgr,
+        channel: channelOrFn,
+        query: fn!,
+      }).loadWithChannel()
     },
 
     mutate<T>(

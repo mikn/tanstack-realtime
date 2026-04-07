@@ -34,102 +34,113 @@ export interface ReactiveLoaderOptions<TResult> {
 
 export function createReactiveLoader<TResult>(
   options: ReactiveLoaderOptions<TResult>,
-): { load: () => Promise<TResult> } {
+): {
+  load: () => Promise<TResult>
+  loadWithChannel: () => Promise<{ data: TResult; channel: string }>
+} {
+  async function loadInternal(): Promise<{ data: TResult; channel: string }> {
+    const { result, ctx } = await runInReactiveContext(options.query)
+
+    let channel: string
+    let queryPredicate: {
+      table: string
+      sql: string
+      params: ReadonlyArray<unknown>
+      columns: ColumnMap
+      compiled: (row: Record<string, unknown>) => boolean
+    }
+
+    if (ctx.reads[0]) {
+      // Auto path: predicate extracted from reactive context
+      const read = ctx.reads[0]
+      let compiled: (row: Record<string, unknown>) => boolean
+      let autoChannel: string | undefined
+
+      try {
+        compiled = compilePredicate(read.sql, read.params, read.columns)
+      } catch (err) {
+        if (
+          err instanceof ReactivePredicateParseError &&
+          err.message.includes('No WHERE clause')
+        ) {
+          // Table-level subscription: query has no WHERE clause
+          compiled = () => true
+          autoChannel = serializeKey([read.table])
+        } else {
+          throw err
+        }
+      }
+
+      queryPredicate = {
+        table: read.table,
+        sql: read.sql,
+        params: read.params,
+        columns: read.columns,
+        compiled,
+      }
+      channel =
+        options.channel !== undefined
+          ? typeof options.channel === 'string'
+            ? options.channel
+            : serializeKey(options.channel)
+          : (autoChannel ??
+            deriveChannelKey(read.table, read.sql, read.params, read.columns))
+    } else if (options.predicate && 'where' in options.predicate) {
+      // Explicit where path
+      const pred = options.predicate
+      const { sql, params } = pred.where.toSQL()
+      const compiled = compilePredicate(sql, params, pred.columns)
+      queryPredicate = {
+        table: pred.table,
+        sql,
+        params,
+        columns: pred.columns,
+        compiled,
+      }
+      channel =
+        options.channel !== undefined
+          ? typeof options.channel === 'string'
+            ? options.channel
+            : serializeKey(options.channel)
+          : deriveChannelKey(pred.table, sql, params, pred.columns)
+    } else if (options.predicate && 'matches' in options.predicate) {
+      // Explicit matches path
+      const pred = options.predicate
+      queryPredicate = {
+        table: pred.table,
+        sql: '',
+        params: [],
+        columns: {},
+        compiled: pred.matches,
+      }
+      channel =
+        options.channel !== undefined
+          ? typeof options.channel === 'string'
+            ? options.channel
+            : serializeKey(options.channel)
+          : deriveChannelKey(pred.table, undefined, [], {})
+    } else {
+      throw new Error(
+        "createReactiveLoader: no read set captured — use wrapReactiveDb() or provide 'predicate'",
+      )
+    }
+
+    options.subscriptionManager.register({
+      channel,
+      predicate: queryPredicate,
+      requery: options.query,
+    })
+
+    return { data: result, channel }
+  }
+
   return {
     async load(): Promise<TResult> {
-      const { result, ctx } = await runInReactiveContext(options.query)
-
-      let channel: string
-      let queryPredicate: {
-        table: string
-        sql: string
-        params: ReadonlyArray<unknown>
-        columns: ColumnMap
-        compiled: (row: Record<string, unknown>) => boolean
-      }
-
-      if (ctx.reads[0]) {
-        // Auto path: predicate extracted from reactive context
-        const read = ctx.reads[0]
-        let compiled: (row: Record<string, unknown>) => boolean
-        let autoChannel: string | undefined
-
-        try {
-          compiled = compilePredicate(read.sql, read.params, read.columns)
-        } catch (err) {
-          if (
-            err instanceof ReactivePredicateParseError &&
-            err.message.includes('No WHERE clause')
-          ) {
-            // Table-level subscription: query has no WHERE clause
-            compiled = () => true
-            autoChannel = serializeKey([read.table])
-          } else {
-            throw err
-          }
-        }
-
-        queryPredicate = {
-          table: read.table,
-          sql: read.sql,
-          params: read.params,
-          columns: read.columns,
-          compiled,
-        }
-        channel =
-          options.channel !== undefined
-            ? typeof options.channel === 'string'
-              ? options.channel
-              : serializeKey(options.channel)
-            : (autoChannel ??
-              deriveChannelKey(read.table, read.sql, read.params, read.columns))
-      } else if (options.predicate && 'where' in options.predicate) {
-        // Explicit where path
-        const pred = options.predicate
-        const { sql, params } = pred.where.toSQL()
-        const compiled = compilePredicate(sql, params, pred.columns)
-        queryPredicate = {
-          table: pred.table,
-          sql,
-          params,
-          columns: pred.columns,
-          compiled,
-        }
-        channel =
-          options.channel !== undefined
-            ? typeof options.channel === 'string'
-              ? options.channel
-              : serializeKey(options.channel)
-            : deriveChannelKey(pred.table, sql, params, pred.columns)
-      } else if (options.predicate && 'matches' in options.predicate) {
-        // Explicit matches path
-        const pred = options.predicate
-        queryPredicate = {
-          table: pred.table,
-          sql: '',
-          params: [],
-          columns: {},
-          compiled: pred.matches,
-        }
-        channel =
-          options.channel !== undefined
-            ? typeof options.channel === 'string'
-              ? options.channel
-              : serializeKey(options.channel)
-            : deriveChannelKey(pred.table, undefined, [], {})
-      } else {
-        throw new Error(
-          "createReactiveLoader: no read set captured — use wrapReactiveDb() or provide 'predicate'",
-        )
-      }
-
-      options.subscriptionManager.register({
-        channel,
-        predicate: queryPredicate,
-        requery: options.query,
-      })
-
-      return result
+      const { data } = await loadInternal()
+      return data
+    },
+    async loadWithChannel(): Promise<{ data: TResult; channel: string }> {
+      return loadInternal()
     },
   }
 }

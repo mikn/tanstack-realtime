@@ -70,6 +70,15 @@ export type { UseChannelStatsResult } from './useChannelStats.js'
 
 export { useOnReconnect } from './useOnReconnect.js'
 
+export { useReactiveQuery } from './useReactiveQuery.js'
+export type {
+  UseReactiveQueryOptions,
+  ReactiveQueryResult,
+} from './useReactiveQuery.js'
+
+export { useReactiveMutation } from './useReactiveMutation.js'
+export type { UseReactiveMutationOptions } from './useReactiveMutation.js'
+
 // CRDT standalone hooks
 export { useSyncedCounter } from './useSyncedCounter.js'
 export type {

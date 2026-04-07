@@ -43,6 +43,7 @@
 export { createStartHandler } from './handler.js'
 export type {
   PublishBackend,
+  ReactiveQueryResult,
   StartHandlerOptions,
   StartRealtimeHandler,
 } from './handler.js'
