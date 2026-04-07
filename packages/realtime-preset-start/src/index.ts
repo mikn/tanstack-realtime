@@ -46,3 +46,25 @@ export type {
   StartHandlerOptions,
   StartRealtimeHandler,
 } from './handler.js'
+export { wrapReactiveDb, runInReactiveContext } from './reactive-db.js'
+export type {
+  ColumnMap,
+  ReadEntry,
+  ReactiveQueryContext,
+  WriteDescriptor,
+} from './reactive-db.js'
+export {
+  compilePredicate,
+  deriveChannelKey,
+  extractEqualityConditions,
+} from './compile-predicate.js'
+export { createSubscriptionManager } from './subscription-manager.js'
+export type {
+  SubscriptionManager,
+  QueryPredicate,
+  SubscriptionEntry,
+} from './subscription-manager.js'
+export { createReactiveLoader } from './reactive-loader.js'
+export type { ReactiveLoaderOptions } from './reactive-loader.js'
+export { createReactiveMutation } from './reactive-mutation.js'
+export type { ReactiveMutationOptions } from './reactive-mutation.js'

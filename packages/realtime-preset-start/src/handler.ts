@@ -1,7 +1,12 @@
 import { createSseHandler } from '@tanstack/realtime-adapter-sse'
 import { createServerStream, serializeKey } from '@tanstack/realtime'
+import { createSubscriptionManager } from './subscription-manager.js'
+import { createReactiveLoader } from './reactive-loader.js'
+import { createReactiveMutation } from './reactive-mutation.js'
 import type { PublishFn, QueryKey, ServerStream } from '@tanstack/realtime'
 import type { SseHandlerOptions } from '@tanstack/realtime-adapter-sse'
+import type { SubscriptionManager } from './subscription-manager.js'
+import type { WriteDescriptor } from './reactive-db.js'
 
 // ---------------------------------------------------------------------------
 // PublishBackend — pluggable pub/sub storage interface
@@ -135,6 +140,12 @@ export interface StartHandlerOptions extends SseHandlerOptions {
    * the message to their own local SSE connections.
    */
   backend?: PublishBackend
+
+  /**
+   * An existing subscription manager to use instead of creating a new one.
+   * When omitted, a new subscription manager is created automatically.
+   */
+  subscriptionManager?: SubscriptionManager
 }
 
 /**
@@ -230,6 +241,35 @@ export interface StartRealtimeHandler {
    * on server shutdown or during hot-module replacement.
    */
   dispose: () => void
+
+  /**
+   * The subscription manager. Auto-created if not passed in options.
+   */
+  subscriptionManager: SubscriptionManager
+
+  /**
+   * Register a reactive query and return its initial result.
+   * Channel key AND predicate are both auto-derived from the WHERE clause
+   * when using wrapReactiveDb(). Pass explicit channel as first arg as escape hatch.
+   */
+  query: (<T>(fn: () => Promise<T>) => Promise<T>) &
+    (<T>(channel: QueryKey | string, fn: () => Promise<T>) => Promise<T>)
+
+  /**
+   * Run a mutation and automatically invalidate matching subscriptions.
+   * Use wrapReactiveDb() db with .returning() for predicate-level precision.
+   * opts.writes overrides auto-capture.
+   */
+  mutate: <T>(
+    fn: () => Promise<T>,
+    opts?: { writes?: ReadonlyArray<WriteDescriptor> },
+  ) => Promise<T>
+
+  /**
+   * Directly invalidate channels by write descriptors.
+   * Use affectedRows:[] for table-level invalidation.
+   */
+  invalidate: (writes: ReadonlyArray<WriteDescriptor>) => Promise<void>
 }
 
 // ---------------------------------------------------------------------------
@@ -319,7 +359,18 @@ export interface StartRealtimeHandler {
 export function createStartHandler(
   options: StartHandlerOptions = {},
 ): StartRealtimeHandler {
-  const { backend, ...sseOptions } = options
+  const { backend, subscriptionManager: passedManager, ...sseOptions } = options
+
+  // Save the user-provided onChannelEmpty before we wrap it
+  const existingOnChannelEmpty = sseOptions.onChannelEmpty
+
+  // Mutable ref lets onChannelEmpty close over mgr without a `let` reassignment
+  const mgrRef: { current: SubscriptionManager | null } = { current: null }
+  sseOptions.onChannelEmpty = (channel: string) => {
+    mgrRef.current?.unregister(channel)
+    existingOnChannelEmpty?.(channel)
+  }
+
   const sse = createSseHandler(sseOptions)
 
   // If the backend provides a subscribe hook, wire it up so messages arriving
@@ -348,6 +399,9 @@ export function createStartHandler(
     }
   }
 
+  const mgr = passedManager ?? createSubscriptionManager(publish)
+  mgrRef.current = mgr
+
   return {
     handle: (req: Request) => sse.handle(req),
 
@@ -368,6 +422,41 @@ export function createStartHandler(
 
     dispose() {
       unsubscribeBackend?.()
+    },
+
+    subscriptionManager: mgr,
+
+    query<T>(
+      channelOrFn: QueryKey | string | (() => Promise<T>),
+      fn?: () => Promise<T>,
+    ): Promise<T> {
+      if (typeof channelOrFn === 'function') {
+        return createReactiveLoader<T>({
+          subscriptionManager: mgr,
+          channel: undefined,
+          query: channelOrFn,
+        }).load()
+      }
+      return createReactiveLoader<T>({
+        subscriptionManager: mgr,
+        channel: channelOrFn,
+        query: fn!,
+      }).load()
+    },
+
+    mutate<T>(
+      fn: () => Promise<T>,
+      opts?: { writes?: ReadonlyArray<WriteDescriptor> },
+    ): Promise<T> {
+      return createReactiveMutation<unknown, T>({
+        subscriptionManager: mgr,
+        mutation: (_input: unknown) => fn(),
+        writes: opts?.writes ? (_result: T) => opts.writes! : undefined,
+      }).mutate(undefined)
+    },
+
+    invalidate(writes: ReadonlyArray<WriteDescriptor>): Promise<void> {
+      return mgr.invalidate(writes)
     },
   }
 }
