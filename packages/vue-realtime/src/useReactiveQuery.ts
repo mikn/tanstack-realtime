@@ -1,11 +1,12 @@
-import { computed, onUnmounted, ref, toValue, watch } from 'vue'
+import { computed, onUnmounted, ref, shallowRef, toValue, watch } from 'vue'
+import { deriveCacheKey, getOrCreateQueryCollection } from '@tanstack/realtime'
 import { useRealtimeClient } from './context.js'
+import { useOnReconnect } from './useOnReconnect.js'
+import type { QueryEntry, ReactiveQueryResult } from '@tanstack/realtime'
+import type { Collection } from '@tanstack/db'
 import type { ComputedRef, MaybeRef, Ref } from 'vue'
 
-export type ReactiveQueryResult<T> = {
-  data: T
-  channel: string
-}
+export type { ReactiveQueryResult }
 
 export interface UseReactiveQueryOptions {
   enabled?: MaybeRef<boolean>
@@ -35,11 +36,13 @@ export interface UseReactiveQueryResult<TResult> {
  * Fetches data from a server function that returns `{ data, channel }`, then
  * subscribes to the returned channel for live updates.
  *
- * Re-fetches automatically when `args` changes. The subscription is torn down
- * and re-established whenever the channel changes (i.e. when args change and
- * the server returns a new channel).
+ * Unlike the previous implementation, this version stores query state in a
+ * module-level TanStack DB Collection registry. Components sharing the same
+ * `(serverFn, args)` pair share one collection, one fetch, and one SSE
+ * subscription.
  *
- * Must be used inside `<RealtimeProvider>`.
+ * Re-fetches automatically when `args` changes. Must be used inside
+ * `<RealtimeProvider>`.
  *
  * @example
  * const { data, isPending, isFetching, error, refetch } = useReactiveQuery(
@@ -54,61 +57,95 @@ export function useReactiveQuery<TResult, TArgs>(
 ): UseReactiveQueryResult<TResult> {
   const client = useRealtimeClient('useReactiveQuery')
 
-  const data = ref<TResult | undefined>(undefined) as Ref<TResult | undefined>
-  const channel: Ref<string> = ref('')
-  const isFetching: Ref<boolean> = ref(false)
-  const error: Ref<unknown> = ref(null)
-
-  const optimisticBase = ref<TResult | undefined>(undefined) as Ref<
-    TResult | undefined
-  >
+  // Per-hook local state
+  const isFetching = ref(false)
   const isOptimistic = ref(false)
+  const snapshotRef: { current: TResult | undefined } = { current: undefined }
 
-  const isPending: ComputedRef<boolean> = computed(
-    () => data.value === undefined && isFetching.value,
-  )
+  // Reactive entry read from the shared collection
+  // shallowRef avoids Vue's deep UnwrapRef transformation on generic types
+  const entry = shallowRef<QueryEntry<TResult> | undefined>(undefined)
 
-  async function fetchData(): Promise<void> {
+  const data: Ref<TResult | undefined> = computed(
+    () => entry.value?.value,
+  ) as unknown as Ref<TResult | undefined>
+
+  const error: Ref<unknown> = computed(
+    () => entry.value?.error ?? null,
+  ) as unknown as Ref<unknown>
+
+  const isPending: ComputedRef<boolean> = computed(() => {
     const enabled = toValue(options.enabled) ?? true
-    if (!enabled) return
+    if (!enabled) return false
+    return entry.value?.value === undefined && entry.value?.error == null
+  })
 
-    isFetching.value = true
-    error.value = null
+  // Track the current collection + its cleanup so we can swap on args change
+  let collectionRef: Collection<QueryEntry<unknown>, string> | null = null
+  let registryRefetch: (() => void) | null = null
+  let changesUnsub: (() => void) | null = null
 
-    try {
-      const result = await serverFn(toValue(args))
-      data.value = result.data
-      channel.value = result.channel
-      optimisticBase.value = undefined
-      isOptimistic.value = false
-    } catch (e) {
-      error.value = e
-    } finally {
-      isFetching.value = false
+  function setupCollection(currentArgs: TArgs): void {
+    // Tear down previous subscription
+    changesUnsub?.()
+    changesUnsub = null
+    collectionRef = null
+    registryRefetch = null
+
+    const enabled = toValue(options.enabled) ?? true
+    if (!enabled) {
+      entry.value = undefined
+      return
     }
+
+    const cacheKey = deriveCacheKey(serverFn as Function, currentArgs)
+
+    const registryEntry = getOrCreateQueryCollection<TResult>(
+      cacheKey,
+      serverFn as (a: unknown) => Promise<ReactiveQueryResult<TResult>>,
+      currentArgs,
+      client,
+    )
+
+    collectionRef = registryEntry.collection
+    registryRefetch = registryEntry.refetch
+
+    // Read initial value synchronously
+    const typedCollection = collectionRef as unknown as Collection<
+      QueryEntry<TResult>,
+      string
+    >
+    entry.value = typedCollection.get('result')
+
+    // Subscribe to changes for reactivity
+    const sub = typedCollection.subscribeChanges((changes) => {
+      for (const change of changes) {
+        if (change.key === 'result') {
+          if (change.type === 'delete') {
+            entry.value = undefined
+          } else {
+            entry.value = change.value
+            // Clear fetching flag once data arrives
+            if (isFetching.value && change.value.value !== undefined) {
+              isFetching.value = false
+            }
+            // Clear optimistic flag when server value changes
+            if (isOptimistic.value) {
+              isOptimistic.value = false
+            }
+          }
+        }
+      }
+    })
+
+    changesUnsub = () => sub.unsubscribe()
   }
 
-  function optimisticUpdate(
-    transform: (prev: TResult | undefined) => TResult,
-  ): () => void {
-    optimisticBase.value = isOptimistic.value
-      ? optimisticBase.value
-      : data.value
-    isOptimistic.value = true
-    data.value = transform(data.value) as TResult | undefined
-
-    return () => {
-      data.value = optimisticBase.value
-      optimisticBase.value = undefined
-      isOptimistic.value = false
-    }
-  }
-
-  // Watch args and re-fetch when they change
+  // Watch args and enabled, re-run setup when they change
   watch(
-    () => toValue(args),
-    () => {
-      void fetchData()
+    [() => toValue(args), () => toValue(options.enabled) ?? true],
+    ([currentArgs]) => {
+      setupCollection(currentArgs)
     },
     {
       immediate: true,
@@ -116,73 +153,55 @@ export function useReactiveQuery<TResult, TArgs>(
     },
   )
 
-  // Manage the subscription manually so we can react to channel changes.
-  // We cannot call useSubscribe here because that takes a static string at
-  // setup time; our channel arrives asynchronously from the server.
-  let unsubMessage: (() => void) | null = null
-  let unsubError: (() => void) | null = null
+  function optimisticUpdate(
+    transform: (prev: TResult | undefined) => TResult,
+  ): () => void {
+    if (collectionRef == null) return () => undefined
 
-  watch(channel, (newChannel) => {
-    // Tear down any previous subscription
-    unsubMessage?.()
-    unsubError?.()
-    unsubMessage = null
-    unsubError = null
+    const typedCollection = collectionRef as unknown as Collection<
+      QueryEntry<TResult>,
+      string
+    >
 
-    // Guard: don't subscribe to an empty channel (initial state before fetch)
-    if (!newChannel) return
+    snapshotRef.current = entry.value?.value
+    isOptimistic.value = true
+    const newValue = transform(snapshotRef.current)
 
-    unsubMessage = client.subscribe(newChannel, (msg: unknown) => {
-      data.value = msg as TResult
-      optimisticBase.value = undefined
+    typedCollection.update('result', (draft) => {
+      ;(draft as QueryEntry<TResult>).value = newValue
+    })
+
+    return () => {
       isOptimistic.value = false
-    })
+      const snapshot = snapshotRef.current
+      typedCollection.update('result', (draft) => {
+        ;(draft as QueryEntry<TResult>).value = snapshot
+      })
+    }
+  }
 
-    unsubError = client.onSubscribeError((_ch) => {
-      // Subscription-level errors are surfaced via subscribeError on useSubscribe;
-      // here we simply ignore them — consumers can wrap with useSubscribe if needed.
-    })
-  })
+  function refetch(): void {
+    isFetching.value = true
+    registryRefetch?.()
+  }
 
   // Auto-reconnect refetch
-  let realtimeUnsub: (() => void) | null = null
-
-  const stopReconnectWatch = watch(
-    () => toValue(options.refetchOnReconnect) ?? true,
-    (shouldRefetch) => {
-      realtimeUnsub?.()
-      realtimeUnsub = null
-      if (!shouldRefetch) return
-
-      let prevStatus = client.store.state.status
-      const sub = client.store.subscribe((state) => {
-        const newStatus = state.status
-        if (prevStatus !== 'connected' && newStatus === 'connected') {
-          void fetchData()
-        }
-        prevStatus = newStatus
-      })
-      realtimeUnsub = sub.unsubscribe
-    },
-    { immediate: true },
-  )
+  useOnReconnect(() => {
+    const shouldRefetch = toValue(options.refetchOnReconnect) ?? true
+    if (shouldRefetch) refetch()
+  })
 
   onUnmounted(() => {
-    unsubMessage?.()
-    unsubError?.()
-    stopReconnectWatch()
-    realtimeUnsub?.()
-    realtimeUnsub = null
+    changesUnsub?.()
+    changesUnsub = null
   })
 
   return {
-    data,
+    data: data as unknown as Ref<TResult | undefined>,
     isPending,
     isFetching,
-    error,
-    refetch: () => {
-      void fetchData()
-    },
+    error: error,
+    refetch,
     optimisticUpdate,
     isOptimistic,
   }

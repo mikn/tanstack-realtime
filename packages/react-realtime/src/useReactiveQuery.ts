@@ -1,74 +1,15 @@
-import { useCallback, useEffect, useReducer, useRef } from 'react'
-import { useSubscribe } from './useSubscribe.js'
+import { use, useCallback, useMemo, useRef, useState } from 'react'
+import { useLiveQuery } from '@tanstack/react-db'
+import { deriveCacheKey, getOrCreateQueryCollection } from '@tanstack/realtime'
+import { RealtimeContext } from './context.js'
 import { useOnReconnect } from './useOnReconnect.js'
+import type { QueryEntry, ReactiveQueryResult } from '@tanstack/realtime'
+import type { Collection } from '@tanstack/db'
 
-export type ReactiveQueryResult<T> = {
-  data: T
-  channel: string
-}
-
-type State<T> = {
-  data: T | undefined
-  channel: string | null
-  isFetching: boolean
-  error: unknown
-  optimisticBase: T | undefined
-  isOptimistic: boolean
-}
-
-type Action<T> =
-  | { type: 'FETCH_START' }
-  | { type: 'FETCH_SUCCESS'; data: T; channel: string }
-  | { type: 'FETCH_ERROR'; error: unknown }
-  | { type: 'SERVER_UPDATE'; data: T }
-  | { type: 'OPTIMISTIC_UPDATE'; transform: (prev: T | undefined) => T }
-  | { type: 'ROLLBACK' }
-
-function reducer<T>(state: State<T>, action: Action<T>): State<T> {
-  switch (action.type) {
-    case 'FETCH_START':
-      return { ...state, isFetching: true, error: null }
-    case 'FETCH_SUCCESS':
-      return {
-        data: action.data,
-        channel: action.channel,
-        isFetching: false,
-        error: null,
-        optimisticBase: undefined,
-        isOptimistic: false,
-      }
-    case 'FETCH_ERROR':
-      return { ...state, isFetching: false, error: action.error }
-    case 'SERVER_UPDATE':
-      return {
-        ...state,
-        data: action.data,
-        optimisticBase: undefined,
-        isOptimistic: false,
-      }
-    case 'OPTIMISTIC_UPDATE':
-      return {
-        ...state,
-        data: action.transform(state.data),
-        // Save snapshot only on first optimistic update
-        optimisticBase: state.isOptimistic ? state.optimisticBase : state.data,
-        isOptimistic: true,
-      }
-    case 'ROLLBACK':
-      return {
-        ...state,
-        data: state.optimisticBase,
-        optimisticBase: undefined,
-        isOptimistic: false,
-      }
-    default:
-      return state
-  }
-}
+export type { ReactiveQueryResult }
 
 export interface UseReactiveQueryOptions {
   enabled?: boolean
-  keepPreviousData?: boolean
   refetchOnReconnect?: boolean
 }
 
@@ -76,8 +17,16 @@ export interface UseReactiveQueryOptions {
  * Subscribes to a reactive server query and auto-updates when the server
  * publishes new data on the associated channel.
  *
+ * Unlike the previous `useReducer`-based implementation, this version stores
+ * query state in a module-level TanStack DB Collection registry. Components
+ * sharing the same `(serverFn, args)` pair share one collection, one fetch,
+ * and one SSE subscription.
+ *
  * The `serverFn` should return a `ReactiveQueryResult<T>` containing both
  * the initial data and a channel name to subscribe to for live updates.
+ *
+ * **Note on `enabled`:** When `enabled` is `false`, no collection is created
+ * and no fetch is performed. The hook returns a pending state.
  *
  * @example
  * const { data, isPending, error, refetch } = useReactiveQuery(
@@ -94,109 +43,122 @@ export function useReactiveQuery<TResult, TArgs = void>(
   isPending: boolean
   isFetching: boolean
   error: unknown
-  refetch: () => void
+  isOptimistic: boolean
   optimisticUpdate: (
     transform: (prev: TResult | undefined) => TResult,
   ) => () => void
-  isOptimistic: boolean
+  refetch: () => void
 } {
+  const client = use(RealtimeContext)
   const { enabled = true, refetchOnReconnect = true } = options
 
-  const [state, dispatch] = useReducer(
-    reducer as (s: State<TResult>, a: Action<TResult>) => State<TResult>,
-    {
-      data: undefined,
-      channel: null,
-      isFetching: false,
-      error: null,
-      optimisticBase: undefined,
-      isOptimistic: false,
-    },
+  // Compute a stable serialised cache key for this (serverFn, args) pair.
+  // JSON.stringify(args) is used as the args part, so args must be
+  // JSON-serialisable. The serverFn is identified by object identity.
+  const argsJson = JSON.stringify(args)
+  const cacheKey = useMemo(
+    () => deriveCacheKey(serverFn as Function, args),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [serverFn, argsJson],
   )
 
-  // Stable ref to args to avoid infinite effect loops on object identity changes
-  const argsRef = useRef(args)
-  useEffect(() => {
-    argsRef.current = args
-  })
+  // Retrieve (or lazily create) the shared collection for this query.
+  // When `enabled` is false we skip this and return a pending state instead.
+  const registryEntry = useMemo(
+    () =>
+      enabled && client != null
+        ? getOrCreateQueryCollection<TResult>(
+            cacheKey,
+            serverFn as (a: unknown) => Promise<ReactiveQueryResult<TResult>>,
+            args,
+            client,
+          )
+        : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cacheKey, client, enabled],
+  )
 
-  // Refetch trigger — increment to force a re-fetch
-  const [refetchTick, setRefetchTick] = useReducer((n: number) => n + 1, 0)
+  const collection = registryEntry?.collection as
+    | (Collection<QueryEntry<TResult>, string> & { singleResult?: true })
+    | null
 
-  // Serialize args to a stable string for effect dependency
-  const argsKey = JSON.stringify(args)
+  // useLiveQuery must be called unconditionally (Rules of Hooks).
+  // When `collection` is null (disabled), pass null so the hook returns
+  // undefined data.
+  const { data: entry, isLoading } = useLiveQuery(
+    (q) =>
+      collection != null ? q.from({ result: collection }).findOne() : null,
+    [collection],
+  )
 
-  useEffect(() => {
-    if (!enabled) return
-    let cancelled = false
-    dispatch({ type: 'FETCH_START' })
-    serverFn(argsRef.current)
-      .then(({ data, channel }) => {
-        if (cancelled) return
-        dispatch({ type: 'FETCH_SUCCESS', data, channel })
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return
-        dispatch({ type: 'FETCH_ERROR', error })
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [serverFn, argsKey, enabled, refetchTick])
+  const [isFetching, setIsFetching] = useState(false)
+  const [isOptimistic, setIsOptimistic] = useState(false)
+  const snapshotRef = useRef<TResult | undefined>(undefined)
 
-  // Guard: only subscribe when we have a non-empty channel string.
-  // useSubscribe does not guard against empty strings internally.
-  const activeChannel = state.channel ?? ''
+  // Clear optimistic flag when the server value changes.
+  const prevValueRef = useRef<TResult | undefined>(undefined)
+  const currentValue = (entry as QueryEntry<TResult> | undefined)?.value
+  if (prevValueRef.current !== currentValue && isOptimistic) {
+    setIsOptimistic(false)
+  }
+  prevValueRef.current = currentValue
 
-  const handleMessage = useCallback((msg: unknown) => {
-    dispatch({ type: 'SERVER_UPDATE', data: msg as TResult })
-  }, [])
-
-  // Conditionally subscribe — when activeChannel is empty this hook still
-  // mounts but we skip subscribing by passing an empty string only after
-  // ensuring useSubscribe handles it. Because useSubscribe calls
-  // client.subscribe unconditionally, we pass a no-op guard channel:
-  // we use the hook unconditionally (Rules of Hooks) but short-circuit
-  // the real subscription by only passing the channel when it's non-empty.
-  useSubscribeIfChannelSet(activeChannel, handleMessage)
-
-  useOnReconnect(() => {
-    if (refetchOnReconnect) setRefetchTick()
-  })
+  // Clear fetching flag once data arrives.
+  const prevEntryRef = useRef<QueryEntry<TResult> | undefined>(undefined)
+  if (
+    isFetching &&
+    prevEntryRef.current !== (entry as QueryEntry<TResult> | undefined) &&
+    (entry as QueryEntry<TResult> | undefined)?.value !== undefined
+  ) {
+    setIsFetching(false)
+  }
+  prevEntryRef.current = entry as QueryEntry<TResult> | undefined
 
   const optimisticUpdate = useCallback(
     (transform: (prev: TResult | undefined) => TResult) => {
-      dispatch({ type: 'OPTIMISTIC_UPDATE', transform })
-      return () => dispatch({ type: 'ROLLBACK' })
+      if (collection == null) return () => undefined
+
+      snapshotRef.current = (entry as QueryEntry<TResult> | undefined)?.value
+      setIsOptimistic(true)
+      const newValue = transform(snapshotRef.current)
+
+      collection.update('result', (draft) => {
+        ;(draft as QueryEntry<TResult>).value = newValue
+      })
+
+      return () => {
+        setIsOptimistic(false)
+        const snapshot = snapshotRef.current
+        collection.update('result', (draft) => {
+          ;(draft as QueryEntry<TResult>).value = snapshot
+        })
+      }
     },
-    [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [collection, (entry as QueryEntry<TResult> | undefined)?.value],
   )
 
-  return {
-    data: state.data,
-    // isPending: true only when we have no data yet and a fetch is in-flight
-    isPending: state.data === undefined && state.isFetching,
-    isFetching: state.isFetching,
-    error: state.error,
-    refetch: () => setRefetchTick(),
-    optimisticUpdate,
-    isOptimistic: state.isOptimistic,
-  }
-}
+  const refetch = useCallback(() => {
+    setIsFetching(true)
+    registryEntry?.refetch()
+  }, [registryEntry])
 
-/**
- * Internal helper that calls `useSubscribe` only when `channel` is non-empty.
- * This wraps the conditional logic in its own hook to satisfy Rules of Hooks
- * while guarding against subscribing to an empty-string channel.
- */
-function useSubscribeIfChannelSet(
-  channel: string,
-  onMessage: (data: unknown) => void,
-): void {
-  // We must call useSubscribe unconditionally (Rules of Hooks), but we can
-  // direct it to a sentinel no-op channel when the real channel isn't known yet.
-  // The sentinel channel '__reactive_query_no_channel__' is intentionally
-  // unlikely to collide with any real channel name.
-  const safeChannel = channel !== '' ? channel : '__reactive_query_no_channel__'
-  useSubscribe(safeChannel, onMessage)
+  useOnReconnect(() => {
+    if (refetchOnReconnect) refetch()
+  })
+
+  const typedEntry = entry as QueryEntry<TResult> | undefined
+
+  return {
+    data: typedEntry?.value,
+    isPending: !enabled
+      ? false
+      : (isLoading || typedEntry?.value === undefined) &&
+        typedEntry?.error == null,
+    isFetching: isLoading || isFetching,
+    error: typedEntry?.error ?? null,
+    isOptimistic,
+    optimisticUpdate,
+    refetch,
+  }
 }

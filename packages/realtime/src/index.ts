@@ -242,6 +242,16 @@ export type {
   ChannelDefCheckpointConfig,
 } from './server/index.js'
 
+// Query collection registry — shared cache for useReactiveQuery
+export {
+  deriveCacheKey,
+  getOrCreateQueryCollection,
+} from './queryCollectionRegistry.js'
+export type {
+  QueryEntry,
+  ReactiveQueryResult,
+} from './queryCollectionRegistry.js'
+
 // Testing utilities
 export {
   createMockTransport,

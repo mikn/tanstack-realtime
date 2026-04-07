@@ -20,7 +20,11 @@ import {
   createSubscriptionManager,
   wrapReactiveDb,
 } from '@tanstack/realtime-preset-start'
-import { serializeKey } from '@tanstack/realtime'
+import {
+  deriveCacheKey,
+  getOrCreateQueryCollection,
+  serializeKey,
+} from '@tanstack/realtime'
 
 // ---------------------------------------------------------------------------
 // Drizzle-compatible fake table objects (same pattern as reactiveLayer.test.ts)
@@ -1706,5 +1710,228 @@ describe('useReactivePaginatedQuery — pagination reducer', () => {
     // State unchanged
     expect(state.pages).toHaveLength(1)
     expect(paginatedItems(state)).toEqual(['a'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Helpers for groups 18 & 19
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal mock RealtimeClient that satisfies the interface used by
+ * getOrCreateQueryCollection (only `subscribe` is called internally).
+ */
+function makeMockClient() {
+  return {
+    clientId: 'test-client',
+    store: { state: { status: 'connected' } } as any,
+    connect: vi.fn().mockResolvedValue(undefined),
+    disconnect: vi.fn(),
+    destroy: vi.fn(),
+    subscribe: vi.fn().mockReturnValue(() => {}),
+    publish: vi.fn().mockResolvedValue(undefined),
+    joinPresence: vi.fn(),
+    leavePresence: vi.fn(),
+  } as any
+}
+
+// ---------------------------------------------------------------------------
+// 18. Shared cache — deduplication
+// ---------------------------------------------------------------------------
+
+describe('shared cache — deduplication (deriveCacheKey & getOrCreateQueryCollection)', () => {
+  // 18.1
+  it('deriveCacheKey: same (fn, args) → same key', () => {
+    const fn = vi.fn()
+    const args = { teamId: 'A' }
+    expect(deriveCacheKey(fn, args)).toBe(deriveCacheKey(fn, args))
+  })
+
+  // 18.2
+  it('deriveCacheKey: different args → different key', () => {
+    const fn = vi.fn()
+    expect(deriveCacheKey(fn, { teamId: 'A' })).not.toBe(
+      deriveCacheKey(fn, { teamId: 'B' }),
+    )
+  })
+
+  // 18.3
+  it('deriveCacheKey: different fn → different key', () => {
+    const fn1 = vi.fn()
+    const fn2 = vi.fn()
+    const args = { teamId: 'X' }
+    expect(deriveCacheKey(fn1, args)).not.toBe(deriveCacheKey(fn2, args))
+  })
+
+  // 18.4
+  it('getOrCreateQueryCollection: same key called twice → returns same collection reference', async () => {
+    const serverFn = vi
+      .fn()
+      .mockResolvedValue({ data: ['item'], channel: 'ch-18-4' })
+    const client = makeMockClient()
+    const key = 'test-group-18::key-18-4'
+
+    const entry1 = getOrCreateQueryCollection(key, serverFn, {}, client)
+    const entry2 = getOrCreateQueryCollection(key, serverFn, {}, client)
+
+    expect(entry1.collection).toBe(entry2.collection)
+  })
+
+  // 18.5
+  it('getOrCreateQueryCollection: serverFn is called once when collection is shared', async () => {
+    const serverFn = vi
+      .fn()
+      .mockResolvedValue({ data: ['item'], channel: 'ch-18-5' })
+    const client = makeMockClient()
+    const key = 'test-group-18::key-18-5'
+
+    const entry1 = getOrCreateQueryCollection(key, serverFn, {}, client)
+    getOrCreateQueryCollection(key, serverFn, {}, client)
+
+    // Trigger sync so serverFn is actually called (sync is lazy by default)
+    entry1.collection.preload().catch(() => {})
+
+    // Allow the async fetch to settle (setTimeout flushes the microtask queue)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    // serverFn should only have been called once (first creation)
+    expect(serverFn).toHaveBeenCalledTimes(1)
+  })
+
+  // 18.6
+  it('getOrCreateQueryCollection: different key → different collection, separate serverFn call', async () => {
+    const serverFn1 = vi
+      .fn()
+      .mockResolvedValue({ data: ['a'], channel: 'ch-18-6a' })
+    const serverFn2 = vi
+      .fn()
+      .mockResolvedValue({ data: ['b'], channel: 'ch-18-6b' })
+    const client = makeMockClient()
+
+    const entry1 = getOrCreateQueryCollection(
+      'test-group-18::key-18-6a',
+      serverFn1,
+      {},
+      client,
+    )
+    const entry2 = getOrCreateQueryCollection(
+      'test-group-18::key-18-6b',
+      serverFn2,
+      {},
+      client,
+    )
+
+    expect(entry1.collection).not.toBe(entry2.collection)
+
+    // Trigger sync on both collections so their serverFns are actually called
+    entry1.collection.preload().catch(() => {})
+    entry2.collection.preload().catch(() => {})
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(serverFn1).toHaveBeenCalledTimes(1)
+    expect(serverFn2).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 19. Shared cache — optimistic propagation via collection
+// ---------------------------------------------------------------------------
+
+describe('shared cache — optimistic propagation via collection', () => {
+  // 19.1
+  it('collection.update() mutates the row — next read sees updated value', async () => {
+    const serverFn = vi
+      .fn()
+      .mockResolvedValue({ data: { count: 0 }, channel: 'ch-19-1' })
+    const client = makeMockClient()
+    const key = 'test-group-19::key-19-1'
+
+    const { collection } = getOrCreateQueryCollection<{ count: number }>(
+      key,
+      serverFn,
+      {},
+      client,
+    )
+
+    // Wait for the initial fetch to resolve and collection to be ready
+    await (collection as any).stateWhenReady()
+
+    // Perform an optimistic update
+    collection.update('result', (draft: any) => {
+      draft.value = { count: 42 }
+    })
+
+    const state = (collection as any).state as Map<string, any>
+    expect(state.get('result')?.value).toEqual({ count: 42 })
+  })
+
+  // 19.2
+  it('two references to the same collection both see the mutation', async () => {
+    const serverFn = vi
+      .fn()
+      .mockResolvedValue({ data: { count: 0 }, channel: 'ch-19-2' })
+    const client = makeMockClient()
+    const key = 'test-group-19::key-19-2'
+
+    const entry1 = getOrCreateQueryCollection<{ count: number }>(
+      key,
+      serverFn,
+      {},
+      client,
+    )
+    const entry2 = getOrCreateQueryCollection<{ count: number }>(
+      key,
+      serverFn,
+      {},
+      client,
+    )
+
+    // Both references point to the same collection
+    expect(entry1.collection).toBe(entry2.collection)
+
+    await (entry1.collection as any).stateWhenReady()
+
+    // Mutate via entry1
+    entry1.collection.update('result', (draft: any) => {
+      draft.value = { count: 99 }
+    })
+
+    // Read via entry2 — should see the same mutation
+    const state = (entry2.collection as any).state as Map<string, any>
+    expect(state.get('result')?.value).toEqual({ count: 99 })
+  })
+
+  // 19.3
+  it('refetch: re-calls serverFn and writes new data into collection', async () => {
+    let callCount = 0
+    const serverFn = vi.fn().mockImplementation(() => {
+      callCount++
+      return Promise.resolve({
+        data: { count: callCount * 10 },
+        channel: 'ch-19-3',
+      })
+    })
+    const client = makeMockClient()
+    const key = 'test-group-19::key-19-3'
+
+    const { collection, refetch } = getOrCreateQueryCollection<{
+      count: number
+    }>(key, serverFn, {}, client)
+
+    // Wait for initial fetch
+    await (collection as any).stateWhenReady()
+
+    const stateAfterFirst = (collection as any).state as Map<string, any>
+    expect(stateAfterFirst.get('result')?.value).toEqual({ count: 10 })
+    expect(serverFn).toHaveBeenCalledTimes(1)
+
+    // Trigger refetch
+    refetch()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const stateAfterRefetch = (collection as any).state as Map<string, any>
+    expect(stateAfterRefetch.get('result')?.value).toEqual({ count: 20 })
+    expect(serverFn).toHaveBeenCalledTimes(2)
   })
 })

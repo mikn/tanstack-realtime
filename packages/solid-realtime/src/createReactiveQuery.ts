@@ -1,11 +1,12 @@
 import { createEffect, createMemo, createSignal, onCleanup } from 'solid-js'
+import { deriveCacheKey, getOrCreateQueryCollection } from '@tanstack/realtime'
 import { useRealtimeClient } from './context.js'
+import { useOnReconnect } from './useOnReconnect.js'
 import type { Accessor } from 'solid-js'
+import type { Collection } from '@tanstack/db'
+import type { QueryEntry, ReactiveQueryResult } from '@tanstack/realtime'
 
-export type ReactiveQueryResult<T> = {
-  data: T
-  channel: string
-}
+export type { ReactiveQueryResult }
 
 export interface CreateReactiveQueryOptions {
   enabled?: Accessor<boolean>
@@ -16,9 +17,13 @@ export interface CreateReactiveQueryOptions {
  * Fetches data from a server function that returns `{ data, channel }`, then
  * subscribes to the returned channel for live updates.
  *
+ * Unlike the previous implementation, this version stores query state in a
+ * module-level TanStack DB Collection registry. Components sharing the same
+ * `(serverFn, args)` pair share one collection, one fetch, and one SSE
+ * subscription.
+ *
  * Re-fetches automatically when `args` changes (tracked reactively via
- * Solid's fine-grained reactivity). The subscription is torn down and
- * re-established whenever the channel changes.
+ * Solid's fine-grained reactivity).
  *
  * Must be used inside `<RealtimeProvider>`.
  *
@@ -36,106 +41,127 @@ export function createReactiveQuery<TResult, TArgs>(
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const client = useRealtimeClient('createReactiveQuery')
 
-  const [data, setData] = createSignal<TResult | undefined>(undefined)
-  const [channel, setChannel] = createSignal<string>('')
+  // Per-hook local state
   const [isFetching, setIsFetching] = createSignal(false)
-  const [error, setError] = createSignal<unknown>(null)
-  const [refetchTick, setRefetchTick] = createSignal(0)
-  const [optimisticBase, setOptimisticBase] = createSignal<TResult | undefined>(
-    undefined,
-  )
   const [isOptimistic, setIsOptimistic] = createSignal(false)
 
-  const isPending = createMemo(() => data() === undefined && isFetching())
+  // Reactive signal that holds the current QueryEntry read from the collection.
+  // We update it manually by subscribing to collection changes.
+  const [entry, setEntry] = createSignal<QueryEntry<TResult> | undefined>(
+    undefined,
+  )
 
-  // Fetch effect: re-runs whenever args() or refetchTick() changes
-  createEffect(() => {
-    const currentArgs = args()
-    refetchTick() // subscribe to manual refetch trigger
+  // The current registry entry (collection + refetch). Null when disabled.
+  const [registryEntry, setRegistryEntry] = createSignal<{
+    collection: Collection<QueryEntry<unknown>, string>
+    refetch: () => void
+  } | null>(null)
+
+  // Derived cache key — recomputed whenever args changes.
+  const cacheKey = createMemo(() => {
     const enabled = options.enabled?.() ?? true
-    if (!enabled) return
-
-    setIsFetching(true)
-    setError(null)
-
-    let cancelled = false
-    serverFn(currentArgs)
-      .then(({ data: d, channel: c }) => {
-        if (cancelled) return
-        setData(() => d)
-        setChannel(c)
-        setIsFetching(false)
-        setOptimisticBase(undefined)
-        setIsOptimistic(false)
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return
-        setError(e)
-        setIsFetching(false)
-      })
-
-    onCleanup(() => {
-      cancelled = true
-    })
+    if (!enabled) return null
+    return deriveCacheKey(serverFn as Function, args())
   })
 
-  // Subscription effect: re-runs whenever the channel changes.
-  // We manage subscriptions directly via the client so we can react to the
-  // channel value that arrives asynchronously from the server.
+  // Effect: obtain (or create) the collection whenever the cache key changes.
   createEffect(() => {
-    const currentChannel = channel()
+    const key = cacheKey()
+    if (key == null) {
+      setRegistryEntry(null)
+      return
+    }
 
-    // Guard: don't subscribe to an empty channel (initial state before fetch)
-    if (!currentChannel) return
+    const re = getOrCreateQueryCollection<TResult>(
+      key,
+      serverFn as (a: unknown) => Promise<ReactiveQueryResult<TResult>>,
+      args(),
+      client,
+    )
 
-    const unsubMessage = client.subscribe(currentChannel, (msg: unknown) => {
-      setData(() => msg as TResult)
-      setOptimisticBase(undefined) // Clear optimistic state
-      setIsOptimistic(false)
-    })
+    setRegistryEntry(
+      re as {
+        collection: Collection<QueryEntry<unknown>, string>
+        refetch: () => void
+      },
+    )
 
-    // Subscribe to subscription errors (non-fatal — just track)
-    const unsubError = client.onSubscribeError((_ch) => {
-      // Channel-level error handling could be added here if needed
-    })
+    // Subscribe to collection changes so that `entry` stays reactive.
+    const col = re.collection as Collection<QueryEntry<TResult>, string>
 
-    onCleanup(() => {
-      unsubMessage()
-      unsubError()
-    })
-  })
+    // Read current value immediately.
+    const current = col.get('result')
+    setEntry(current)
 
-  // Auto-reconnect refetch effect
-  createEffect(() => {
-    const shouldRefetch = options.refetchOnReconnect?.() ?? true
-    if (!shouldRefetch) return
-
-    let prevStatus = client.store.state.status
-    const sub = client.store.subscribe((state) => {
-      const newStatus = state.status
-      if (prevStatus !== 'connected' && newStatus === 'connected') {
-        setRefetchTick((n) => n + 1)
+    // Listen for future changes.
+    const sub = col.subscribeChanges(() => {
+      setEntry(col.get('result'))
+      // Clear fetching flag once data arrives.
+      if (col.get('result')?.value !== undefined) {
+        setIsFetching(false)
       }
-      prevStatus = newStatus
+      // Clear optimistic flag when server value changes (a new sync write
+      // arrived, meaning the server confirmed or replaced the optimistic value).
+      if (isOptimistic()) {
+        setIsOptimistic(false)
+      }
     })
 
-    onCleanup(() => sub.unsubscribe())
+    onCleanup(() => {
+      sub.unsubscribe()
+    })
   })
+
+  // Auto-reconnect refetch
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useOnReconnect(() => {
+    const shouldRefetch = options.refetchOnReconnect?.() ?? true
+    if (shouldRefetch) {
+      setIsFetching(true)
+      registryEntry()?.refetch()
+    }
+  })
+
+  const typedEntry = createMemo(() => entry())
+
+  const data = createMemo(() => typedEntry()?.value)
+
+  const isPending = createMemo(() => {
+    const enabled = options.enabled?.() ?? true
+    if (!enabled) return false
+    const e = typedEntry()
+    return (e === undefined || e.value === undefined) && e?.error == null
+  })
+
+  const error = createMemo(() => typedEntry()?.error ?? null)
 
   function optimisticUpdate(
     transform: (prev: TResult | undefined) => TResult,
   ): () => void {
-    // Save snapshot only on first optimistic update
-    setOptimisticBase((prev) => (isOptimistic() ? prev : data()))
-    setIsOptimistic(true)
-    setData(() => transform(data()))
+    const col = registryEntry()?.collection as
+      | Collection<QueryEntry<TResult>, string>
+      | undefined
+    if (col == null) return () => undefined
 
-    // Return rollback function
+    const snapshot = col.get('result')?.value
+    setIsOptimistic(true)
+    const newValue = transform(snapshot)
+
+    col.update('result', (draft) => {
+      ;(draft as QueryEntry<TResult>).value = newValue
+    })
+
     return () => {
-      setData(() => optimisticBase())
-      setOptimisticBase(undefined)
       setIsOptimistic(false)
+      col.update('result', (draft) => {
+        ;(draft as QueryEntry<TResult>).value = snapshot
+      })
     }
+  }
+
+  function refetch() {
+    setIsFetching(true)
+    registryEntry()?.refetch()
   }
 
   return {
@@ -145,6 +171,6 @@ export function createReactiveQuery<TResult, TArgs>(
     error,
     isOptimistic,
     optimisticUpdate,
-    refetch: () => setRefetchTick((n) => n + 1),
+    refetch,
   }
 }
