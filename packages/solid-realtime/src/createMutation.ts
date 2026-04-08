@@ -46,7 +46,7 @@ export function createMutation<TArgs, TResult>(
 
     let rollback: (() => void) | null = null
     if (options.optimistic != null) {
-      const { cache, rollback: rb } = createOptimisticCache(client)
+      const { cache, rollback: rb } = createOptimisticCache()
       options.optimistic(cache, args)
       rollback = rb
     }

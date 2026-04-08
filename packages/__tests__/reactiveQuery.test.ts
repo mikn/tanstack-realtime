@@ -1737,28 +1737,32 @@ describe('shared cache — deduplication (deriveCacheKey & getOrCreateQueryColle
 
   // 18.4
   it('getOrCreateQueryCollection: same key called twice → returns same collection reference', async () => {
-    const serverFn = vi
-      .fn()
-      .mockResolvedValue({ data: ['item'], channel: 'ch-18-4' })
+    const serverFn = vi.fn().mockResolvedValue({
+      data: [{ id: '1', text: 'item' }],
+      channel: 'ch-18-4',
+    })
     const client = makeMockClient()
     const key = 'test-group-18::key-18-4'
+    const getKey = (item: { id: string }) => item.id
 
-    const entry1 = getOrCreateQueryCollection(key, serverFn, {}, client)
-    const entry2 = getOrCreateQueryCollection(key, serverFn, {}, client)
+    const entry1 = getOrCreateQueryCollection(key, serverFn, {}, getKey, client)
+    const entry2 = getOrCreateQueryCollection(key, serverFn, {}, getKey, client)
 
     expect(entry1.collection).toBe(entry2.collection)
   })
 
   // 18.5
   it('getOrCreateQueryCollection: serverFn is called once when collection is shared', async () => {
-    const serverFn = vi
-      .fn()
-      .mockResolvedValue({ data: ['item'], channel: 'ch-18-5' })
+    const serverFn = vi.fn().mockResolvedValue({
+      data: [{ id: '1', text: 'item' }],
+      channel: 'ch-18-5',
+    })
     const client = makeMockClient()
     const key = 'test-group-18::key-18-5'
+    const getKey = (item: { id: string }) => item.id
 
-    const entry1 = getOrCreateQueryCollection(key, serverFn, {}, client)
-    getOrCreateQueryCollection(key, serverFn, {}, client)
+    const entry1 = getOrCreateQueryCollection(key, serverFn, {}, getKey, client)
+    getOrCreateQueryCollection(key, serverFn, {}, getKey, client)
 
     // Trigger sync so serverFn is actually called (sync is lazy by default)
     entry1.collection.preload().catch(() => {})
@@ -1774,22 +1778,25 @@ describe('shared cache — deduplication (deriveCacheKey & getOrCreateQueryColle
   it('getOrCreateQueryCollection: different key → different collection, separate serverFn call', async () => {
     const serverFn1 = vi
       .fn()
-      .mockResolvedValue({ data: ['a'], channel: 'ch-18-6a' })
+      .mockResolvedValue({ data: [{ id: 'a' }], channel: 'ch-18-6a' })
     const serverFn2 = vi
       .fn()
-      .mockResolvedValue({ data: ['b'], channel: 'ch-18-6b' })
+      .mockResolvedValue({ data: [{ id: 'b' }], channel: 'ch-18-6b' })
     const client = makeMockClient()
+    const getKey = (item: { id: string }) => item.id
 
     const entry1 = getOrCreateQueryCollection(
       'test-group-18::key-18-6a',
       serverFn1,
       {},
+      getKey,
       client,
     )
     const entry2 = getOrCreateQueryCollection(
       'test-group-18::key-18-6b',
       serverFn2,
       {},
+      getKey,
       client,
     )
 
@@ -1816,50 +1823,54 @@ describe('shared cache — optimistic propagation via collection', () => {
   })
 
   // 19.1
-  it('collection.update() mutates the row — next read sees updated value', async () => {
-    const serverFn = vi
-      .fn()
-      .mockResolvedValue({ data: { count: 0 }, channel: 'ch-19-1' })
+  it('collection.update() mutates an item — next read sees updated value', async () => {
+    const serverFn = vi.fn().mockResolvedValue({
+      data: [{ id: 'item', count: 0 }],
+      channel: 'ch-19-1',
+    })
     const client = makeMockClient()
     const key = 'test-group-19::key-19-1'
+    const getKey = (item: { id: string }) => item.id
 
-    const { collection } = getOrCreateQueryCollection<{ count: number }>(
-      key,
-      serverFn,
-      {},
-      client,
-    )
+    const { collection } = getOrCreateQueryCollection<{
+      id: string
+      count: number
+    }>(key, serverFn, {}, getKey, client)
 
     // Wait for the initial fetch to resolve and collection to be ready
     await (collection as any).stateWhenReady()
 
-    // Perform an optimistic update
-    collection.update('result', (draft: any) => {
-      draft.value = { count: 42 }
+    // Perform an optimistic update on the item keyed 'item'
+    collection.update('item', (draft: any) => {
+      draft.count = 42
     })
 
     const state = (collection as any).state as Map<string, any>
-    expect(state.get('result')?.value).toEqual({ count: 42 })
+    expect(state.get('item')).toMatchObject({ id: 'item', count: 42 })
   })
 
   // 19.2
   it('two subscribeChanges callbacks on same collection both receive the mutation', async () => {
-    const serverFn = vi
-      .fn()
-      .mockResolvedValue({ data: { count: 0 }, channel: 'ch-19-2' })
+    const serverFn = vi.fn().mockResolvedValue({
+      data: [{ id: 'item', count: 0 }],
+      channel: 'ch-19-2',
+    })
     const client = makeMockClient()
     const key = 'test-group-19::key-19-2'
+    const getKey = (item: { id: string }) => item.id
 
-    const entry1 = getOrCreateQueryCollection<{ count: number }>(
+    const entry1 = getOrCreateQueryCollection<{ id: string; count: number }>(
       key,
       serverFn,
       {},
+      getKey,
       client,
     )
-    const entry2 = getOrCreateQueryCollection<{ count: number }>(
+    const entry2 = getOrCreateQueryCollection<{ id: string; count: number }>(
       key,
       serverFn,
       {},
+      getKey,
       client,
     )
 
@@ -1880,8 +1891,8 @@ describe('shared cache — optimistic propagation via collection', () => {
     )
 
     // Mutate via entry1
-    entry1.collection.update('result', (draft: any) => {
-      draft.value = { count: 99 }
+    entry1.collection.update('item', (draft: any) => {
+      draft.count = 99
     })
 
     // Both callbacks should have fired
@@ -1890,7 +1901,7 @@ describe('shared cache — optimistic propagation via collection', () => {
 
     // Read via entry2 — should see the same mutation
     const state = (entry2.collection as any).state as Map<string, any>
-    expect(state.get('result')?.value).toEqual({ count: 99 })
+    expect(state.get('item')).toMatchObject({ id: 'item', count: 99 })
 
     sub1.unsubscribe()
     sub2.unsubscribe()
@@ -1902,22 +1913,24 @@ describe('shared cache — optimistic propagation via collection', () => {
     const serverFn = vi.fn().mockImplementation(() => {
       callCount++
       return Promise.resolve({
-        data: { count: callCount * 10 },
+        data: [{ id: 'item', count: callCount * 10 }],
         channel: 'ch-19-3',
       })
     })
     const client = makeMockClient()
     const key = 'test-group-19::key-19-3'
+    const getKey = (item: { id: string }) => item.id
 
     const { collection, refetch } = getOrCreateQueryCollection<{
+      id: string
       count: number
-    }>(key, serverFn, {}, client)
+    }>(key, serverFn, {}, getKey, client)
 
     // Wait for initial fetch
     await (collection as any).stateWhenReady()
 
     const stateAfterFirst = (collection as any).state as Map<string, any>
-    expect(stateAfterFirst.get('result')?.value).toEqual({ count: 10 })
+    expect(stateAfterFirst.get('item')).toMatchObject({ id: 'item', count: 10 })
     expect(serverFn).toHaveBeenCalledTimes(1)
 
     // Trigger refetch
@@ -1925,7 +1938,10 @@ describe('shared cache — optimistic propagation via collection', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     const stateAfterRefetch = (collection as any).state as Map<string, any>
-    expect(stateAfterRefetch.get('result')?.value).toEqual({ count: 20 })
+    expect(stateAfterRefetch.get('item')).toMatchObject({
+      id: 'item',
+      count: 20,
+    })
     expect(serverFn).toHaveBeenCalledTimes(2)
   })
 })
@@ -2023,19 +2039,21 @@ describe('Registry lifecycle', () => {
   // 20.1 – clearRegistry() wipes all entries so the next call creates a fresh one
   it('clearRegistry() removes all entries — getOrCreateQueryCollection creates a fresh collection after clear', async () => {
     // Adversarial: a stale cached entry must not be returned after a clear.
-    const serverFn = vi
-      .fn()
-      .mockResolvedValue({ data: 'first', channel: 'ch-20-1' })
+    const serverFn = vi.fn().mockResolvedValue({
+      data: [{ id: '1', text: 'first' }],
+      channel: 'ch-20-1',
+    })
     const client = makeMockClient()
     const key = 'test-group-20::key-20-1'
+    const getKey = (item: { id: string }) => item.id
 
-    const entry1 = getOrCreateQueryCollection(key, serverFn, {}, client)
+    const entry1 = getOrCreateQueryCollection(key, serverFn, {}, getKey, client)
     await new Promise((r) => setTimeout(r, 0))
 
     // Clear the registry
     clearRegistry()
 
-    const entry2 = getOrCreateQueryCollection(key, serverFn, {}, client)
+    const entry2 = getOrCreateQueryCollection(key, serverFn, {}, getKey, client)
     await new Promise((r) => setTimeout(r, 0))
 
     // A brand-new collection object must have been created
@@ -2046,20 +2064,22 @@ describe('Registry lifecycle', () => {
   it('After clearRegistry(), serverFn is called again for the same key (fresh fetch)', async () => {
     // Adversarial: confirms the registry truly discards stale fetch state so
     // the next consumer cannot receive a stale value without a network round-trip.
-    const serverFn = vi
-      .fn()
-      .mockResolvedValue({ data: 'value', channel: 'ch-20-2' })
+    const serverFn = vi.fn().mockResolvedValue({
+      data: [{ id: '1', text: 'value' }],
+      channel: 'ch-20-2',
+    })
     const client = makeMockClient()
     const key = 'test-group-20::key-20-2'
+    const getKey = (item: { id: string }) => item.id
 
-    const entry1 = getOrCreateQueryCollection(key, serverFn, {}, client)
+    const entry1 = getOrCreateQueryCollection(key, serverFn, {}, getKey, client)
     entry1.collection.preload().catch(() => {})
     await new Promise((r) => setTimeout(r, 0))
     expect(serverFn).toHaveBeenCalledTimes(1)
 
     clearRegistry()
 
-    const entry2 = getOrCreateQueryCollection(key, serverFn, {}, client)
+    const entry2 = getOrCreateQueryCollection(key, serverFn, {}, getKey, client)
     entry2.collection.preload().catch(() => {})
     await new Promise((r) => setTimeout(r, 0))
 
@@ -2084,32 +2104,31 @@ describe('Registry lifecycle', () => {
 
     const clientB = makeMockClient()
 
-    const serverFnA = vi
-      .fn()
-      .mockResolvedValue({ data: { label: 'A-initial' }, channel: 'ch-20-3-A' })
-    const serverFnB = vi
-      .fn()
-      .mockResolvedValue({ data: { label: 'B-initial' }, channel: 'ch-20-3-B' })
+    const serverFnA = vi.fn().mockResolvedValue({
+      data: [{ id: 'a', label: 'A-initial' }],
+      channel: 'ch-20-3-A',
+    })
+    const serverFnB = vi.fn().mockResolvedValue({
+      data: [{ id: 'b', label: 'B-initial' }],
+      channel: 'ch-20-3-B',
+    })
+    const getKey = (item: { id: string }) => item.id
 
-    const { collection: colA } = getOrCreateQueryCollection<{ label: string }>(
-      'test-group-20::key-20-3-A',
-      serverFnA,
-      {},
-      clientA,
-    )
-    const { collection: colB } = getOrCreateQueryCollection<{ label: string }>(
-      'test-group-20::key-20-3-B',
-      serverFnB,
-      {},
-      clientB,
-    )
+    const { collection: colA } = getOrCreateQueryCollection<{
+      id: string
+      label: string
+    }>('test-group-20::key-20-3-A', serverFnA, {}, getKey, clientA)
+    const { collection: colB } = getOrCreateQueryCollection<{
+      id: string
+      label: string
+    }>('test-group-20::key-20-3-B', serverFnB, {}, getKey, clientB)
 
     await (colA as any).stateWhenReady()
     await (colB as any).stateWhenReady()
 
-    // Simulate an SSE push on channel A
+    // Simulate an SSE push on channel A — delivers an updated array
     expect(sseCallbackA).not.toBeNull()
-    sseCallbackA!({ label: 'A-updated-via-SSE' })
+    sseCallbackA!([{ id: 'a', label: 'A-updated-via-SSE' }])
 
     // Give any microtasks a chance to flush
     await new Promise((r) => setTimeout(r, 0))
@@ -2118,10 +2137,10 @@ describe('Registry lifecycle', () => {
     const stateB = (colB as any).state as Map<string, any>
 
     // Key A must have the SSE value
-    expect(stateA.get('result')?.value).toEqual({ label: 'A-updated-via-SSE' })
+    expect(stateA.get('a')).toMatchObject({ label: 'A-updated-via-SSE' })
 
     // Key B must still have its original server value — no cross-contamination
-    expect(stateB.get('result')?.value).toEqual({ label: 'B-initial' })
+    expect(stateB.get('b')).toMatchObject({ label: 'B-initial' })
   })
 })
 
@@ -2134,70 +2153,70 @@ describe('Adversarial / race conditions', () => {
     clearRegistry()
   })
 
-  // 21.1 – synchronous serverFn rejection → collection gets error, value stays undefined
-  it('serverFn throws synchronously (rejects) → collection row gets error, value stays undefined', async () => {
+  // 21.1 – synchronous serverFn rejection → entry.error is set, collection is empty
+  it('serverFn throws synchronously (rejects) → entry.error is set, collection has no items', async () => {
     // Adversarial: verifies the error path in the sync loop so callers can
     // surface error state to their UI rather than hanging on pending.
     const boom = new Error('boom')
     const serverFn = vi.fn().mockRejectedValue(boom)
     const client = makeMockClient()
     const key = 'test-group-21::key-21-1'
+    const getKey = (item: { id: string }) => item.id
 
-    const { collection } = getOrCreateQueryCollection(key, serverFn, {}, client)
+    const entry = getOrCreateQueryCollection(key, serverFn, {}, getKey, client)
+    const { collection } = entry
 
     // stateWhenReady resolves after markReady() is called, which happens even
     // in the error branch.
     await (collection as any).stateWhenReady()
 
+    // Error is stored on the registry entry, not in the collection
+    expect(entry.error).toBe(boom)
+    // No items were inserted since the fetch failed
     const state = (collection as any).state as Map<string, any>
-    const row = state.get('result')
-    expect(row?.error).toBe(boom)
-    expect(row?.value).toBeUndefined()
+    expect(state.size).toBe(0)
   })
 
-  // 21.2 – optimistic update applied BEFORE initial fetch resolves
-  it('Optimistic update applied BEFORE initial fetch resolves → optimistic value visible; then fetch resolves and overwrites it', async () => {
-    // Adversarial: simulates a user action that writes optimistically before
-    // the initial server round-trip completes. The server value must win when
-    // the fetch eventually resolves.
+  // 21.2 – optimistic insert applied BEFORE initial fetch resolves
+  it('Optimistic insert BEFORE initial fetch resolves → item visible; then fetch resolves and server data wins', async () => {
+    // Adversarial: simulates a user action that inserts optimistically before
+    // the initial server round-trip completes. The server value must take over
+    // once the fetch eventually resolves.
     const deferred = makeDeferred<{
-      data: { count: number }
+      data: Array<{ id: string; count: number }>
       channel: string
     }>()
     const serverFn = vi.fn().mockReturnValue(deferred.promise)
     const client = makeMockClient()
     const key = 'test-group-21::key-21-2'
+    const getKey = (item: { id: string }) => item.id
 
-    const { collection } = getOrCreateQueryCollection<{ count: number }>(
+    const entry = getOrCreateQueryCollection<{ id: string; count: number }>(
       key,
       serverFn,
       {},
+      getKey,
       client,
     )
+    const { collection } = entry
 
-    // Start sync so the placeholder row is written and the deferred serverFn
-    // call is issued.  We do NOT await the promise (it won't resolve until we
-    // resolve the deferred), but calling preload() starts the sync loop
-    // synchronously so the placeholder insert happens immediately.
+    // Start sync so the deferred serverFn call is issued.
     collection.preload().catch(() => {})
     await new Promise((r) => setTimeout(r, 0))
 
-    // The placeholder row exists; apply an optimistic update now
-    // (before the deferred promise resolves).
-    collection.update('result', (draft: any) => {
-      draft.value = { count: 999 }
-    })
+    // Insert optimistically before the fetch resolves.
+    collection.insert({ id: 'item', count: 999 } as any)
 
     const stateBefore = (collection as any).state as Map<string, any>
-    expect(stateBefore.get('result')?.value).toEqual({ count: 999 })
+    expect(stateBefore.get('item')).toMatchObject({ count: 999 })
 
-    // Now resolve the server fetch
-    deferred.resolve({ data: { count: 1 }, channel: 'ch-21-2' })
+    // Now resolve the server fetch — the server item should be written
+    deferred.resolve({ data: [{ id: 'item', count: 1 }], channel: 'ch-21-2' })
     await new Promise((r) => setTimeout(r, 0))
 
-    // The server value should overwrite the optimistic one
+    // Server value should now be in the collection
     const stateAfter = (collection as any).state as Map<string, any>
-    expect(stateAfter.get('result')?.value).toEqual({ count: 1 })
+    expect(stateAfter.get('item')).toMatchObject({ count: 1 })
   })
 
   // 21.3 – refetch called while first fetch is still pending (last write wins)
@@ -2208,11 +2227,11 @@ describe('Adversarial / race conditions', () => {
     // (or consciously change it to "last-issued wins").
 
     const deferred1 = makeDeferred<{
-      data: { round: number }
+      data: Array<{ id: string; round: number }>
       channel: string
     }>()
     const deferred2 = makeDeferred<{
-      data: { round: number }
+      data: Array<{ id: string; round: number }>
       channel: string
     }>()
     let callCount = 0
@@ -2222,10 +2241,12 @@ describe('Adversarial / race conditions', () => {
     })
     const client = makeMockClient()
     const key = 'test-group-21::key-21-3'
+    const getKey = (item: { id: string }) => item.id
 
     const { collection, refetch } = getOrCreateQueryCollection<{
+      id: string
       round: number
-    }>(key, serverFn, {}, client)
+    }>(key, serverFn, {}, getKey, client)
 
     // Start sync so the initial serverFn call (call #1) is issued.
     collection.preload().catch(() => {})
@@ -2239,20 +2260,20 @@ describe('Adversarial / race conditions', () => {
     expect(serverFn).toHaveBeenCalledTimes(2)
 
     // Resolve first fetch before second — second write will come later
-    deferred1.resolve({ data: { round: 1 }, channel: 'ch-21-3' })
+    deferred1.resolve({ data: [{ id: 'item', round: 1 }], channel: 'ch-21-3' })
     await new Promise((r) => setTimeout(r, 0))
     expect(
-      ((collection as any).state as Map<string, any>).get('result')?.value,
-    ).toEqual({ round: 1 })
+      ((collection as any).state as Map<string, any>).get('item'),
+    ).toMatchObject({ round: 1 })
 
     // Resolve second fetch — it resolves after first, so it wins
-    deferred2.resolve({ data: { round: 2 }, channel: 'ch-21-3' })
+    deferred2.resolve({ data: [{ id: 'item', round: 2 }], channel: 'ch-21-3' })
     await new Promise((r) => setTimeout(r, 0))
 
     // Last write wins: value is round 2
     expect(
-      ((collection as any).state as Map<string, any>).get('result')?.value,
-    ).toEqual({ round: 2 })
+      ((collection as any).state as Map<string, any>).get('item'),
+    ).toMatchObject({ round: 2 })
   })
 
   // 21.3b – reversed resolution: second fetch resolves before first
@@ -2265,11 +2286,11 @@ describe('Adversarial / race conditions', () => {
     // wins" semantics instead.
 
     const deferred1 = makeDeferred<{
-      data: { round: number }
+      data: Array<{ id: string; round: number }>
       channel: string
     }>()
     const deferred2 = makeDeferred<{
-      data: { round: number }
+      data: Array<{ id: string; round: number }>
       channel: string
     }>()
     let callCount = 0
@@ -2279,10 +2300,12 @@ describe('Adversarial / race conditions', () => {
     })
     const client = makeMockClient()
     const key = 'test-group-21::key-21-3b'
+    const getKey = (item: { id: string }) => item.id
 
     const { collection, refetch } = getOrCreateQueryCollection<{
+      id: string
       round: number
-    }>(key, serverFn, {}, client)
+    }>(key, serverFn, {}, getKey, client)
 
     // Start sync so the initial serverFn call (call #1 → deferred1) is issued.
     collection.preload().catch(() => {})
@@ -2295,68 +2318,63 @@ describe('Adversarial / race conditions', () => {
     expect(serverFn).toHaveBeenCalledTimes(2)
 
     // Resolve second fetch FIRST
-    deferred2.resolve({ data: { round: 2 }, channel: 'ch-21-3b' })
+    deferred2.resolve({ data: [{ id: 'item', round: 2 }], channel: 'ch-21-3b' })
     await new Promise((r) => setTimeout(r, 0))
     expect(
-      ((collection as any).state as Map<string, any>).get('result')?.value,
-    ).toEqual({ round: 2 })
+      ((collection as any).state as Map<string, any>).get('item'),
+    ).toMatchObject({ round: 2 })
 
     // Then resolve first fetch — it arrives last, so it overwrites second
-    deferred1.resolve({ data: { round: 1 }, channel: 'ch-21-3b' })
+    deferred1.resolve({ data: [{ id: 'item', round: 1 }], channel: 'ch-21-3b' })
     await new Promise((r) => setTimeout(r, 0))
 
     // Current (non-ideal) behaviour: last-write-wins means round 1 wins here
     expect(
-      ((collection as any).state as Map<string, any>).get('result')?.value,
-    ).toEqual({ round: 1 })
+      ((collection as any).state as Map<string, any>).get('item'),
+    ).toMatchObject({ round: 1 })
   })
 
-  // 21.4 – rollback: update with snapshot value after server write → snapshot is restored
-  it('Rollback: collection.update() with snapshot value after server already updated → collection has snapshot value (rollback is just another update)', async () => {
+  // 21.4 – rollback: update item, then update back to snapshot → snapshot is restored
+  it('Rollback: collection.update() item with snapshot value → collection has original value', async () => {
     // Adversarial: verifies that the collection's update() is purely a
     // client-side mutation with no special rollback mechanism — callers perform
     // rollback by writing the snapshot back in.
-    const serverFn = vi
-      .fn()
-      .mockResolvedValue({ data: { score: 10 }, channel: 'ch-21-4' })
+    const serverFn = vi.fn().mockResolvedValue({
+      data: [{ id: 'item', score: 10 }],
+      channel: 'ch-21-4',
+    })
     const client = makeMockClient()
     const key = 'test-group-21::key-21-4'
+    const getKey = (item: { id: string }) => item.id
 
-    const { collection } = getOrCreateQueryCollection<{ score: number }>(
-      key,
-      serverFn,
-      {},
-      client,
-    )
+    const { collection } = getOrCreateQueryCollection<{
+      id: string
+      score: number
+    }>(key, serverFn, {}, getKey, client)
 
     await (collection as any).stateWhenReady()
 
-    // Capture snapshot of the original value
-    const snapshot = {
-      ...((collection as any).state as Map<string, any>).get('result')?.value,
-    }
-    expect(snapshot).toEqual({ score: 10 })
+    // Capture snapshot of the original score
+    const getState = () => (collection as any).state as Map<string, any>
+    const snapshotScore = getState().get('item')?.score
+    expect(snapshotScore).toBe(10)
 
     // Apply an optimistic mutation
-    collection.update('result', (draft: any) => {
-      draft.value = { score: 99 }
+    collection.update('item', (draft: any) => {
+      draft.score = 99
     })
-    expect(
-      ((collection as any).state as Map<string, any>).get('result')?.value,
-    ).toEqual({ score: 99 })
+    expect(getState().get('item')?.score).toBe(99)
 
     // Roll back by writing the snapshot back in
-    collection.update('result', (draft: any) => {
-      draft.value = snapshot
+    collection.update('item', (draft: any) => {
+      draft.score = snapshotScore
     })
 
-    expect(
-      ((collection as any).state as Map<string, any>).get('result')?.value,
-    ).toEqual({ score: 10 })
+    expect(getState().get('item')?.score).toBe(10)
   })
 
   // 21.5 – SSE message arrives after optimistic update → server value wins
-  it('SSE message arrives after optimistic update → collection row has SSE value (server wins)', async () => {
+  it('SSE message arrives after optimistic update → collection item has SSE value (server wins)', async () => {
     // Adversarial: after an optimistic mutation, a live server push via SSE
     // must overwrite the optimistic value. This ensures real-time correctness.
 
@@ -2369,36 +2387,36 @@ describe('Adversarial / race conditions', () => {
         return () => {}
       })
 
-    const serverFn = vi
-      .fn()
-      .mockResolvedValue({ data: { score: 5 }, channel: 'ch-21-5' })
+    const serverFn = vi.fn().mockResolvedValue({
+      data: [{ id: 'item', score: 5 }],
+      channel: 'ch-21-5',
+    })
     const key = 'test-group-21::key-21-5'
+    const getKey = (item: { id: string }) => item.id
 
-    const { collection } = getOrCreateQueryCollection<{ score: number }>(
-      key,
-      serverFn,
-      {},
-      client,
-    )
+    const { collection } = getOrCreateQueryCollection<{
+      id: string
+      score: number
+    }>(key, serverFn, {}, getKey, client)
 
     await (collection as any).stateWhenReady()
 
     // Apply optimistic update
-    collection.update('result', (draft: any) => {
-      draft.value = { score: 42 }
+    collection.update('item', (draft: any) => {
+      draft.score = 42
     })
     expect(
-      ((collection as any).state as Map<string, any>).get('result')?.value,
-    ).toEqual({ score: 42 })
+      ((collection as any).state as Map<string, any>).get('item')?.score,
+    ).toBe(42)
 
-    // Simulate an SSE push from the server
+    // Simulate an SSE push from the server — delivers an updated array
     expect(sseCallback).not.toBeNull()
-    sseCallback!({ score: 100 })
+    sseCallback!([{ id: 'item', score: 100 }])
     await new Promise((r) => setTimeout(r, 0))
 
-    // Server value via SSE must overwrite the optimistic value
+    // Server value via SSE must be reflected in the collection
     expect(
-      ((collection as any).state as Map<string, any>).get('result')?.value,
-    ).toEqual({ score: 100 })
+      ((collection as any).state as Map<string, any>).get('item')?.score,
+    ).toBe(100)
   })
 })

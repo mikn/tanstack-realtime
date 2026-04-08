@@ -90,7 +90,7 @@ export function useMutation<TArgs, TResult>(
 
       let rollback: (() => void) | null = null
       if (optimistic != null && client != null) {
-        const { cache, rollback: rb } = createOptimisticCache(client)
+        const { cache, rollback: rb } = createOptimisticCache()
         optimistic(cache, args)
         rollback = rb
       }

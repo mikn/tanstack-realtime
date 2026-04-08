@@ -1,8 +1,7 @@
 import {
   deriveCacheKey,
-  getOrCreateQueryCollection,
+  lookupQueryCollection,
 } from './queryCollectionRegistry.js'
-import type { RealtimeClient } from './core/types.js'
 import type { ReactiveQueryFn } from './queryCollectionRegistry.js'
 
 /**
@@ -23,10 +22,10 @@ import type { ReactiveQueryFn } from './queryCollectionRegistry.js'
  * })
  */
 export interface OptimisticCache {
-  update: <TArgs, TResult>(
-    queryFn: ReactiveQueryFn<TArgs, TResult>,
+  update: <TArgs, TItem>(
+    queryFn: ReactiveQueryFn<TArgs, Array<TItem>>,
     args: TArgs,
-    transform: (prev: TResult | undefined) => TResult,
+    transform: (prev: Array<TItem>) => Array<TItem>,
   ) => void
 }
 
@@ -40,45 +39,83 @@ export interface OptimisticCache {
  * apply optimistic updates before the server call, then rollback on error
  * (or let the SSE push confirm on success).
  */
-export function createOptimisticCache(client: RealtimeClient): {
+export function createOptimisticCache(): {
   cache: OptimisticCache
   rollback: () => void
 } {
   const rollbacks: Array<() => void> = []
 
   const cache: OptimisticCache = {
-    update<TArgs, TResult>(
-      queryFn: ReactiveQueryFn<TArgs, TResult>,
+    update<TArgs, TItem>(
+      queryFn: ReactiveQueryFn<TArgs, Array<TItem>>,
       args: TArgs,
-      transform: (prev: TResult | undefined) => TResult,
+      transform: (prev: Array<TItem>) => Array<TItem>,
     ): void {
       const key = deriveCacheKey(queryFn as unknown as Function, args)
-      const entry = getOrCreateQueryCollection<TResult>(
-        key,
-        queryFn as unknown as (
-          a: unknown,
-        ) => Promise<{ data: TResult; channel: string }>,
-        args,
-        client,
-      )
+      const entry = lookupQueryCollection<TItem>(key)
+      if (entry == null) {
+        // Query not currently mounted — skip silently.
+        return
+      }
 
-      const snapshot = (
-        entry.collection as unknown as {
-          get: (key: string) => { value: TResult | undefined } | undefined
+      // Snapshot the server-confirmed state for rollback.
+      const snapshot = new Map(entry.currentItems)
+
+      // Compute the new optimistic item list.
+      const prevItems = Array.from(entry.currentItems.values())
+      const newItems = transform(prevItems)
+
+      const prevKeys = new Set(snapshot.keys())
+      const newKeys = new Set(newItems.map((item) => entry.getKey(item)))
+
+      // Delete items removed by the transform.
+      for (const k of prevKeys) {
+        if (!newKeys.has(k)) {
+          entry.collection.delete(k)
+          entry.currentItems.delete(k)
         }
-      ).get('result')?.value
+      }
 
-      entry.collection.update('result', (draft) => {
-        const newValue = transform(
-          (draft as unknown as { value: TResult | undefined }).value,
-        )
-        ;(draft as unknown as { value: TResult }).value = newValue
-      })
+      // Insert new items / update changed items.
+      for (const item of newItems) {
+        const k = entry.getKey(item)
+        if (prevKeys.has(k)) {
+          entry.collection.update(k, (draft) => {
+            Object.assign(draft as object, item)
+          })
+        } else {
+          entry.collection.insert(item as unknown as Record<string, unknown>)
+        }
+        entry.currentItems.set(k, item)
+      }
 
       rollbacks.push(() => {
-        entry.collection.update('result', (draft) => {
-          ;(draft as unknown as { value: TResult | undefined }).value = snapshot
-        })
+        const currentKeys = new Set(entry.currentItems.keys())
+        const snapshotKeys = new Set(snapshot.keys())
+
+        // Delete items that were added by the optimistic update.
+        for (const k of currentKeys) {
+          if (!snapshotKeys.has(k)) {
+            entry.collection.delete(k)
+          }
+        }
+
+        // Restore items that were updated or removed.
+        for (const [k, item] of snapshot) {
+          if (!currentKeys.has(k)) {
+            entry.collection.insert(item as unknown as Record<string, unknown>)
+          } else {
+            entry.collection.update(k, (draft) => {
+              Object.assign(draft as object, item)
+            })
+          }
+        }
+
+        // Restore the tracking map.
+        entry.currentItems.clear()
+        for (const [k, item] of snapshot) {
+          entry.currentItems.set(k, item)
+        }
       })
     },
   }

@@ -3,10 +3,12 @@ import { useLiveQuery } from '@tanstack/react-db'
 import { deriveCacheKey, getOrCreateQueryCollection } from '@tanstack/realtime'
 import { RealtimeContext } from './context.js'
 import { useOnReconnect } from './useOnReconnect.js'
-import type { QueryEntry, ReactiveQueryFn } from '@tanstack/realtime'
+import type { ReactiveQueryFn } from '@tanstack/realtime'
 import type { Collection } from '@tanstack/db'
 
-export interface UseQueryOptions {
+export interface UseQueryOptions<TItem> {
+  /** Extract a stable string key from each item. Required. */
+  getKey: (item: TItem) => string
   enabled?: boolean
   refetchOnReconnect?: boolean
 }
@@ -20,6 +22,9 @@ export interface UseQueryOptions {
  *
  * `serverFn` must be a function created with `realtime.query()`.
  *
+ * The returned `collection` is a fully typed TanStack DB `Collection` —
+ * pass it to `useLiveQuery` for client-side filtering, sorting, or joining.
+ *
  * @example
  * // server.ts
  * export const getTodos = realtime.query(async ({ teamId }) =>
@@ -27,25 +32,30 @@ export interface UseQueryOptions {
  * )
  *
  * // Component.tsx
- * const { data, isPending, error } = useQuery(getTodos, { teamId })
+ * const { data, collection, isPending } = useQuery(getTodos, { teamId }, {
+ *   getKey: (t) => t.id,
+ * })
+ *
+ * // Client-side filter via TanStack DB
+ * const { data: active } = useLiveQuery(
+ *   (q) => q.from({ todos: collection }).where('done', '=', false),
+ *   [collection],
+ * )
  */
-export function useQuery<TArgs, TResult>(
-  serverFn: ReactiveQueryFn<TArgs, TResult>,
+export function useQuery<TArgs, TItem>(
+  serverFn: ReactiveQueryFn<TArgs, Array<TItem>>,
   args: TArgs,
-  options: UseQueryOptions = {},
+  options: UseQueryOptions<TItem>,
 ): {
-  data: TResult | undefined
+  data: Array<TItem>
+  collection: Collection<TItem, string> | null
   isPending: boolean
   isFetching: boolean
   error: unknown
-  isOptimistic: boolean
-  optimisticUpdate: (
-    transform: (prev: TResult | undefined) => TResult,
-  ) => () => void
   refetch: () => void
 } {
   const client = use(RealtimeContext)
-  const { enabled = true, refetchOnReconnect = true } = options
+  const { getKey, enabled = true, refetchOnReconnect = true } = options
 
   const argsJson = JSON.stringify(args)
   const cacheKey = useMemo(
@@ -57,12 +67,13 @@ export function useQuery<TArgs, TResult>(
   const registryEntry = useMemo(
     () =>
       enabled && client != null
-        ? getOrCreateQueryCollection<TResult>(
+        ? getOrCreateQueryCollection<TItem>(
             cacheKey,
             serverFn as unknown as (
               a: unknown,
-            ) => Promise<{ data: TResult; channel: string }>,
+            ) => Promise<{ data: Array<TItem>; channel: string }>,
             args,
+            getKey,
             client,
           )
         : null,
@@ -70,68 +81,44 @@ export function useQuery<TArgs, TResult>(
     [cacheKey, client, enabled],
   )
 
-  const collection = registryEntry?.collection as
-    | (Collection<QueryEntry<TResult>, string> & { singleResult?: true })
-    | null
+  const collection = (registryEntry?.collection ?? null) as Collection<
+    TItem,
+    string
+  > | null
 
-  const { data: entry, isLoading } = useLiveQuery(
-    (q) =>
-      collection != null ? q.from({ result: collection }).findOne() : null,
+  const { data: items, isLoading } = useLiveQuery(
+    (q) => (collection != null ? q.from({ result: collection }) : null),
     [collection],
   )
 
   const [isFetching, setIsFetching] = useState(false)
-  const [isOptimistic, setIsOptimistic] = useState(false)
-  const snapshotRef = useRef<TResult | undefined>(undefined)
-  const optimisticValueRef = useRef<TResult | undefined>(undefined)
+  const [error, setError] = useState<unknown>(null)
 
-  const typedEntry = entry
-  const entryValue = typedEntry?.value
-
+  // Subscribe to error notifications from the registry entry
   useEffect(() => {
-    if (!isOptimistic) return
-    if (entryValue !== optimisticValueRef.current) {
-      setIsOptimistic(false)
-      optimisticValueRef.current = undefined
+    if (registryEntry == null) return
+    const onError = (e: unknown) => setError(e)
+    registryEntry.errorListeners.add(onError)
+    // Sync any error that may have already occurred
+    if (registryEntry.error != null) setError(registryEntry.error)
+    return () => {
+      registryEntry.errorListeners.delete(onError)
     }
-  }, [entryValue, isOptimistic])
+  }, [registryEntry])
 
-  const prevEntryValueRef = useRef<TResult | undefined>(undefined)
+  // Clear isFetching when new data arrives
+  const isFetchingRef = useRef(false)
+  isFetchingRef.current = isFetching
   useEffect(() => {
-    if (
-      isFetching &&
-      entryValue !== undefined &&
-      entryValue !== prevEntryValueRef.current
-    ) {
-      setIsFetching(false)
+    if (registryEntry == null) return
+    const onData = () => {
+      if (isFetchingRef.current) setIsFetching(false)
     }
-    prevEntryValueRef.current = entryValue
-  }, [entryValue, isFetching])
-
-  const optimisticUpdate = useCallback(
-    (transform: (prev: TResult | undefined) => TResult) => {
-      if (collection == null) return () => undefined
-
-      snapshotRef.current = entry?.value
-      const newValue = transform(snapshotRef.current)
-      optimisticValueRef.current = newValue
-      setIsOptimistic(true)
-
-      collection.update('result', (draft) => {
-        ;(draft as QueryEntry<TResult>).value = newValue
-      })
-
-      return () => {
-        setIsOptimistic(false)
-        optimisticValueRef.current = undefined
-        const snapshot = snapshotRef.current
-        collection.update('result', (draft) => {
-          ;(draft as QueryEntry<TResult>).value = snapshot
-        })
-      }
-    },
-    [collection, entry],
-  )
+    registryEntry.dataListeners.add(onData)
+    return () => {
+      registryEntry.dataListeners.delete(onData)
+    }
+  }, [registryEntry])
 
   const refetch = useCallback(() => {
     setIsFetching(true)
@@ -143,15 +130,11 @@ export function useQuery<TArgs, TResult>(
   })
 
   return {
-    data: typedEntry?.value,
-    isPending: !enabled
-      ? false
-      : (isLoading || typedEntry?.value === undefined) &&
-        typedEntry?.error == null,
+    data: items ?? [],
+    collection,
+    isPending: !enabled ? false : isLoading,
     isFetching: isLoading || isFetching,
-    error: typedEntry?.error ?? null,
-    isOptimistic,
-    optimisticUpdate,
+    error,
     refetch,
   }
 }

@@ -2,19 +2,23 @@ import { computed, onUnmounted, ref, shallowRef, toValue, watch } from 'vue'
 import { deriveCacheKey, getOrCreateQueryCollection } from '@tanstack/realtime'
 import { useRealtimeClient } from './context.js'
 import { useOnReconnect } from './useOnReconnect.js'
-import type { QueryEntry, ReactiveQueryFn } from '@tanstack/realtime'
+import type { ReactiveQueryFn } from '@tanstack/realtime'
 import type { Collection } from '@tanstack/db'
 import type { ComputedRef, MaybeRef, Ref } from 'vue'
 
-export interface UseQueryOptions {
+export interface UseQueryOptions<TItem> {
+  /** Extract a stable string key from each item. Required. */
+  getKey: (item: TItem) => string
   enabled?: MaybeRef<boolean>
   refetchOnReconnect?: MaybeRef<boolean>
 }
 
-export interface UseQueryResult<TResult> {
-  /** The most recently fetched (or server-pushed) data, or `undefined` before the first fetch. */
-  data: Ref<TResult | undefined>
-  /** `true` when data is `undefined` AND a fetch is in progress (initial load). */
+export interface UseQueryResult<TItem> {
+  /** The live array of items from the server, or `[]` before the first fetch. */
+  data: Ref<Array<TItem>>
+  /** The TanStack DB collection — pass to `useLiveQuery` for client-side queries. */
+  collection: Ref<Collection<TItem, string> | null>
+  /** `true` while the initial fetch is in progress. */
   isPending: ComputedRef<boolean>
   /** `true` while any fetch is in progress (including background re-fetches). */
   isFetching: Ref<boolean>
@@ -22,22 +26,20 @@ export interface UseQueryResult<TResult> {
   error: Ref<unknown>
   /** Manually trigger a re-fetch with the current args. */
   refetch: () => void
-  /** Apply an optimistic update. Returns a rollback function. */
-  optimisticUpdate: (
-    transform: (prev: TResult | undefined) => TResult,
-  ) => () => void
-  /** `true` while an optimistic update is in effect and has not yet been confirmed by the server. */
-  isOptimistic: Ref<boolean>
 }
 
 /**
- * Fetches data from a reactive server function and subscribes to the returned
- * channel for live updates.
+ * Subscribes to a reactive server query and auto-updates when the server
+ * publishes new data on the associated channel.
  *
  * Components sharing the same `(serverFn, args)` pair share one collection,
  * one fetch, and one SSE subscription via the module-level registry.
  *
  * `serverFn` must be a function created with `realtime.query()`.
+ *
+ * The returned `collection` is a fully typed TanStack DB `Collection` —
+ * pass it to a live query composable for client-side filtering, sorting,
+ * or joining.
  *
  * @example
  * // server.ts
@@ -46,52 +48,52 @@ export interface UseQueryResult<TResult> {
  * )
  *
  * // Component.vue
- * const { data, isPending, error } = useQuery(
+ * const { data, isPending } = useQuery(
  *   getTodos,
  *   computed(() => ({ teamId: currentTeamId.value })),
+ *   { getKey: (t) => t.id },
  * )
  */
-export function useQuery<TArgs, TResult>(
-  serverFn: ReactiveQueryFn<TArgs, TResult>,
+export function useQuery<TArgs, TItem>(
+  serverFn: ReactiveQueryFn<TArgs, Array<TItem>>,
   args: MaybeRef<TArgs>,
-  options: UseQueryOptions = {},
-): UseQueryResult<TResult> {
+  options: UseQueryOptions<TItem>,
+): UseQueryResult<TItem> {
   const client = useRealtimeClient('useQuery')
 
   const isFetching = ref(false)
-  const isOptimistic = ref(false)
-  const snapshotRef: { current: TResult | undefined } = { current: undefined }
-  const optimisticValueRef = ref<TResult | undefined>(undefined)
+  const error: Ref<unknown> = ref(null)
+  const isReady = ref(false)
+  const itemsMap = shallowRef<Map<string, TItem>>(new Map())
 
-  const entry = shallowRef<QueryEntry<TResult> | undefined>(undefined)
+  const collection: Ref<Collection<TItem, string> | null> = ref(null)
 
-  const data: Ref<TResult | undefined> = computed(
-    () => entry.value?.value,
-  ) as unknown as Ref<TResult | undefined>
-
-  const error: Ref<unknown> = computed(
-    () => entry.value?.error ?? null,
-  ) as unknown as Ref<unknown>
+  const data = computed(() =>
+    Array.from(itemsMap.value.values()),
+  ) as unknown as Ref<Array<TItem>>
 
   const isPending: ComputedRef<boolean> = computed(() => {
     const enabled = toValue(options.enabled) ?? true
     if (!enabled) return false
-    return entry.value?.value === undefined && entry.value?.error == null
+    return !isReady.value
   })
 
-  let collectionRef: Collection<QueryEntry<unknown>, string> | null = null
-  let registryRefetch: (() => void) | null = null
-  let changesUnsub: (() => void) | null = null
+  let cleanupFns: Array<() => void> = []
+
+  function teardown() {
+    for (const fn of cleanupFns) fn()
+    cleanupFns = []
+  }
 
   function setupCollection(currentArgs: TArgs): void {
-    changesUnsub?.()
-    changesUnsub = null
-    collectionRef = null
-    registryRefetch = null
+    teardown()
 
     const enabled = toValue(options.enabled) ?? true
     if (!enabled) {
-      entry.value = undefined
+      collection.value = null
+      isReady.value = false
+      error.value = null
+      itemsMap.value = new Map()
       return
     }
 
@@ -100,51 +102,59 @@ export function useQuery<TArgs, TResult>(
       currentArgs,
     )
 
-    const registryEntry = getOrCreateQueryCollection<TResult>(
+    const re = getOrCreateQueryCollection<TItem>(
       cacheKey,
       serverFn as unknown as (
         a: unknown,
-      ) => Promise<{ data: TResult; channel: string }>,
+      ) => Promise<{ data: Array<TItem>; channel: string }>,
       currentArgs,
+      options.getKey,
       client,
     )
 
-    collectionRef = registryEntry.collection
-    registryRefetch = registryEntry.refetch
+    collection.value = re.collection as unknown as Collection<TItem, string>
 
-    const typedCollection = collectionRef as unknown as Collection<
-      QueryEntry<TResult>,
-      string
-    >
+    // Sync state that may have already resolved
+    if (re.isReady) isReady.value = true
+    if (re.error != null) error.value = re.error
+    itemsMap.value = new Map(re.currentItems)
 
-    const sub = typedCollection.subscribeChanges((changes) => {
+    const onReady = () => {
+      isReady.value = true
+    }
+    re.readyListeners.add(onReady)
+
+    const onError = (e: unknown) => {
+      error.value = e
+    }
+    re.errorListeners.add(onError)
+
+    const onData = () => {
+      isFetching.value = false
+      itemsMap.value = new Map(re.currentItems)
+    }
+    re.dataListeners.add(onData)
+
+    const sub = (
+      re.collection as unknown as Collection<TItem, string>
+    ).subscribeChanges((changes) => {
+      const next = new Map(itemsMap.value)
       for (const change of changes) {
-        if (change.key === 'result') {
-          if (change.type === 'delete') {
-            entry.value = undefined
-            if (isOptimistic.value) {
-              isOptimistic.value = false
-              optimisticValueRef.value = undefined
-            }
-          } else {
-            const incoming = change.value
-            entry.value = incoming
-            if (isFetching.value && incoming.value !== undefined) {
-              isFetching.value = false
-            }
-            if (
-              isOptimistic.value &&
-              incoming.value !== optimisticValueRef.value
-            ) {
-              isOptimistic.value = false
-              optimisticValueRef.value = undefined
-            }
-          }
+        if (change.type === 'delete') {
+          next.delete(String(change.key))
+        } else {
+          next.set(String(change.key), change.value)
         }
       }
+      itemsMap.value = next
     })
 
-    changesUnsub = () => sub.unsubscribe()
+    cleanupFns.push(
+      () => re.readyListeners.delete(onReady),
+      () => re.errorListeners.delete(onError),
+      () => re.dataListeners.delete(onData),
+      () => sub.unsubscribe(),
+    )
   }
 
   watch(
@@ -152,44 +162,25 @@ export function useQuery<TArgs, TResult>(
     ([currentArgs]) => {
       setupCollection(currentArgs)
     },
-    {
-      immediate: true,
-      deep: true,
-    },
+    { immediate: true, deep: true },
   )
-
-  function optimisticUpdate(
-    transform: (prev: TResult | undefined) => TResult,
-  ): () => void {
-    if (collectionRef == null) return () => undefined
-
-    const typedCollection = collectionRef as unknown as Collection<
-      QueryEntry<TResult>,
-      string
-    >
-
-    snapshotRef.current = entry.value?.value
-    const newValue = transform(snapshotRef.current)
-    optimisticValueRef.value = newValue
-    isOptimistic.value = true
-
-    typedCollection.update('result', (draft) => {
-      ;(draft as QueryEntry<TResult>).value = newValue
-    })
-
-    return () => {
-      isOptimistic.value = false
-      optimisticValueRef.value = undefined
-      const snapshot = snapshotRef.current
-      typedCollection.update('result', (draft) => {
-        ;(draft as QueryEntry<TResult>).value = snapshot
-      })
-    }
-  }
 
   function refetch(): void {
     isFetching.value = true
-    registryRefetch?.()
+    const cacheKey = deriveCacheKey(
+      serverFn as unknown as Function,
+      toValue(args),
+    )
+    const re = getOrCreateQueryCollection<TItem>(
+      cacheKey,
+      serverFn as unknown as (
+        a: unknown,
+      ) => Promise<{ data: Array<TItem>; channel: string }>,
+      toValue(args),
+      options.getKey,
+      client,
+    )
+    re.refetch()
   }
 
   useOnReconnect(() => {
@@ -198,17 +189,15 @@ export function useQuery<TArgs, TResult>(
   })
 
   onUnmounted(() => {
-    changesUnsub?.()
-    changesUnsub = null
+    teardown()
   })
 
   return {
-    data: data as unknown as Ref<TResult | undefined>,
+    data: data as unknown as Ref<Array<TItem>>,
+    collection,
     isPending,
     isFetching,
     error,
     refetch,
-    optimisticUpdate,
-    isOptimistic,
   }
 }

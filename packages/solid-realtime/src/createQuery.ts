@@ -4,21 +4,26 @@ import { useRealtimeClient } from './context.js'
 import { useOnReconnect } from './useOnReconnect.js'
 import type { Accessor } from 'solid-js'
 import type { Collection } from '@tanstack/db'
-import type { QueryEntry, ReactiveQueryFn } from '@tanstack/realtime'
+import type { ReactiveQueryFn } from '@tanstack/realtime'
 
-export interface CreateQueryOptions {
+export interface CreateQueryOptions<TItem> {
+  /** Extract a stable string key from each item. Required. */
+  getKey: (item: TItem) => string
   enabled?: Accessor<boolean>
   refetchOnReconnect?: Accessor<boolean>
 }
 
 /**
- * Fetches data from a reactive server function and subscribes to the returned
- * channel for live updates.
+ * Subscribes to a reactive server query and auto-updates when the server
+ * publishes new data on the associated channel.
  *
  * Components sharing the same `(serverFn, args)` pair share one collection,
  * one fetch, and one SSE subscription via the module-level registry.
  *
  * `serverFn` must be a function created with `realtime.query()`.
+ *
+ * The returned `collection` is a fully typed TanStack DB `Collection` —
+ * use it with `createLiveQuery` for client-side filtering, sorting, or joining.
  *
  * @example
  * // server.ts
@@ -27,33 +32,28 @@ export interface CreateQueryOptions {
  * )
  *
  * // Component.tsx (Solid)
- * const { data, isPending, error } = createQuery(
+ * const { data, isPending } = createQuery(
  *   getTodos,
  *   () => ({ teamId: props.teamId }),
+ *   { getKey: (t) => t.id },
  * )
  */
-export function createQuery<TArgs, TResult>(
-  serverFn: ReactiveQueryFn<TArgs, TResult>,
+export function createQuery<TArgs, TItem>(
+  serverFn: ReactiveQueryFn<TArgs, Array<TItem>>,
   args: Accessor<TArgs>,
-  options: CreateQueryOptions = {},
+  options: CreateQueryOptions<TItem>,
 ) {
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const client = useRealtimeClient('createQuery')
 
   const [isFetching, setIsFetching] = createSignal(false)
-  const [isOptimistic, setIsOptimistic] = createSignal(false)
-  const [optimisticValue, setOptimisticValue] = createSignal<
-    TResult | undefined
-  >(undefined)
+  const [error, setError] = createSignal<unknown>(null)
+  const [isReady, setIsReady] = createSignal(false)
+  const [itemsMap, setItemsMap] = createSignal<Map<string, TItem>>(new Map())
 
-  const [entry, setEntry] = createSignal<QueryEntry<TResult> | undefined>(
-    undefined,
-  )
-
-  const [registryEntry, setRegistryEntry] = createSignal<{
-    collection: Collection<QueryEntry<unknown>, string>
-    refetch: () => void
-  } | null>(null)
+  const [registryEntry, setRegistryEntry] = createSignal<ReturnType<
+    typeof getOrCreateQueryCollection<TItem>
+  > | null>(null)
 
   const cacheKey = createMemo(() => {
     const enabled = options.enabled?.() ?? true
@@ -65,48 +65,65 @@ export function createQuery<TArgs, TResult>(
     const key = cacheKey()
     if (key == null) {
       setRegistryEntry(null)
+      setItemsMap(new Map())
+      setIsReady(false)
+      setError(null)
       return
     }
 
-    const re = getOrCreateQueryCollection<TResult>(
+    const re = getOrCreateQueryCollection<TItem>(
       key,
       serverFn as unknown as (
         a: unknown,
-      ) => Promise<{ data: TResult; channel: string }>,
+      ) => Promise<{ data: Array<TItem>; channel: string }>,
       args(),
+      options.getKey,
       client,
     )
 
-    setRegistryEntry(
-      re as {
-        collection: Collection<QueryEntry<unknown>, string>
-        refetch: () => void
+    setRegistryEntry(re)
+
+    // Sync any state that already resolved before this effect ran
+    if (re.isReady) setIsReady(true)
+    if (re.error != null) setError(re.error)
+    setItemsMap(new Map(re.currentItems))
+
+    // Listen for first-ready signal
+    const onReady = () => setIsReady(true)
+    re.readyListeners.add(onReady)
+
+    // Listen for errors
+    const onError = (e: unknown) => setError(e)
+    re.errorListeners.add(onError)
+
+    // Listen for data updates to clear isFetching and refresh itemsMap
+    const onData = () => {
+      setIsFetching(false)
+      setItemsMap(new Map(re.currentItems))
+    }
+    re.dataListeners.add(onData)
+
+    // Subscribe to collection changes to keep itemsMap reactive
+    const sub = (re.collection as Collection<TItem, string>).subscribeChanges(
+      (changes) => {
+        setItemsMap((prev) => {
+          const next = new Map(prev)
+          for (const change of changes) {
+            if (change.type === 'delete') {
+              next.delete(String(change.key))
+            } else {
+              next.set(String(change.key), change.value)
+            }
+          }
+          return next
+        })
       },
     )
 
-    const col = re.collection as Collection<QueryEntry<TResult>, string>
-
-    const current = col.get('result')
-    setEntry(current)
-
-    const sub = col.subscribeChanges((changes) => {
-      const resultChange = changes.find((c) => c.key === 'result')
-      if (resultChange === undefined) return
-
-      const incoming =
-        resultChange.type === 'delete' ? undefined : resultChange.value
-
-      if (incoming?.value !== undefined) {
-        setIsFetching(false)
-      }
-      if (isOptimistic() && incoming?.value !== optimisticValue()) {
-        setIsOptimistic(false)
-        setOptimisticValue(undefined)
-      }
-      setEntry(incoming)
-    })
-
     onCleanup(() => {
+      re.readyListeners.delete(onReady)
+      re.errorListeners.delete(onError)
+      re.dataListeners.delete(onData)
       sub.unsubscribe()
     })
   })
@@ -120,44 +137,18 @@ export function createQuery<TArgs, TResult>(
     }
   })
 
-  const typedEntry = createMemo(() => entry())
+  const data = createMemo(() => Array.from(itemsMap().values()))
 
-  const data = createMemo(() => typedEntry()?.value)
+  const collection = createMemo(
+    () =>
+      (registryEntry()?.collection ?? null) as Collection<TItem, string> | null,
+  )
 
   const isPending = createMemo(() => {
     const enabled = options.enabled?.() ?? true
     if (!enabled) return false
-    const e = typedEntry()
-    return (e === undefined || e.value === undefined) && e?.error == null
+    return !isReady()
   })
-
-  const error = createMemo(() => typedEntry()?.error ?? null)
-
-  function optimisticUpdate(
-    transform: (prev: TResult | undefined) => TResult,
-  ): () => void {
-    const col = registryEntry()?.collection as
-      | Collection<QueryEntry<TResult>, string>
-      | undefined
-    if (col == null) return () => undefined
-
-    const snapshot = col.get('result')?.value
-    const newValue = transform(snapshot)
-    setOptimisticValue(() => newValue)
-    setIsOptimistic(true)
-
-    col.update('result', (draft) => {
-      ;(draft as QueryEntry<TResult>).value = newValue
-    })
-
-    return () => {
-      setIsOptimistic(false)
-      setOptimisticValue(undefined)
-      col.update('result', (draft) => {
-        ;(draft as QueryEntry<TResult>).value = snapshot
-      })
-    }
-  }
 
   function refetch() {
     setIsFetching(true)
@@ -166,11 +157,10 @@ export function createQuery<TArgs, TResult>(
 
   return {
     data,
+    collection,
     isPending,
     isFetching,
     error,
-    isOptimistic,
-    optimisticUpdate,
     refetch,
   }
 }

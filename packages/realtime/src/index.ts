@@ -246,10 +246,10 @@ export type {
 export {
   deriveCacheKey,
   getOrCreateQueryCollection,
+  lookupQueryCollection,
   subscribeToRealtimeBatch,
 } from './queryCollectionRegistry.js'
 export type {
-  QueryEntry,
   ReactiveQueryFn,
   ReactiveMutationFn,
   ReactiveQueryResult,
