@@ -43,7 +43,8 @@
 export { createStartHandler } from './handler.js'
 export type {
   PublishBackend,
-  ReactiveQueryResult,
+  ReactiveQueryFn,
+  ReactiveMutationFn,
   StartHandlerOptions,
   StartRealtimeHandler,
 } from './handler.js'
@@ -68,7 +69,3 @@ export type {
   QueryPredicate,
   SubscriptionEntry,
 } from './subscription-manager.js'
-export { createReactiveLoader } from './reactive-loader.js'
-export type { ReactiveLoaderOptions } from './reactive-loader.js'
-export { createReactiveMutation } from './reactive-mutation.js'
-export type { ReactiveMutationOptions } from './reactive-mutation.js'

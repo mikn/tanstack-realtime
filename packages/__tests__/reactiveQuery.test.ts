@@ -1,11 +1,11 @@
 /**
- * Tests for the new queryWithChannel, useReactiveQuery, and useReactiveMutation APIs.
+ * Tests for the query/mutation factory API and related hooks.
  *
- * Server-side tests (1–4) run in plain Node.js using the same mock DB pattern
- * as reactiveLayer.test.ts. They test the `queryWithChannel` method on the
+ * Server-side tests (1–3) run in plain Node.js using the same mock DB pattern
+ * as reactiveLayer.test.ts. They test the `query` factory method on the
  * handler returned by `createStartHandler`.
  *
- * React hook tests (5–14) test the hook logic directly without a DOM renderer
+ * React hook tests (4–14) test the hook logic directly without a DOM renderer
  * since @testing-library/react is not installed. The tests drive the reducers
  * and callback chains directly, mirroring the pattern in reactHooks.test.ts.
  *
@@ -102,32 +102,17 @@ function makeSelectDbNoWhere(queryResult: Array<any>) {
 }
 
 // ---------------------------------------------------------------------------
-// Type helper
-//
-// queryWithChannel is defined in packages/realtime-preset-start/src/handler.ts
-// and exported from the source index, but the pre-built dist/index.d.ts has
-// not yet been regenerated to include it (another agent is completing the
-// implementation). Cast the handler to `any` locally in each test so the
-// logic compiles today while the type is added by the implementation agent.
-// Remove the cast once `StartRealtimeHandler` exports `queryWithChannel`.
+// 1. query factory: auto-derived channel from WHERE clause
 // ---------------------------------------------------------------------------
 
-type AnyHandler = ReturnType<typeof createStartHandler> & {
-  queryWithChannel: (...args: Array<any>) => Promise<any>
-}
-
-// ---------------------------------------------------------------------------
-// 1. queryWithChannel: auto-derived channel from WHERE clause
-// ---------------------------------------------------------------------------
-
-describe('queryWithChannel — auto-derived channel', () => {
+describe('query factory — auto-derived channel', () => {
   it('returns { data, channel } with channel derived from WHERE teamId = A', async () => {
-    const handler = createStartHandler({ pingInterval: 0 }) as AnyHandler
+    const handler = createStartHandler({ pingInterval: 0 })
     const db = makeSelectDb([{ id: 1, teamId: 'A' }])
 
-    const result = await handler.queryWithChannel(
+    const result = await handler.query(
       async () => await db.select().from(fakeTable),
-    )
+    )(undefined)
 
     expect(result).toHaveProperty('data')
     expect(result).toHaveProperty('channel')
@@ -141,12 +126,12 @@ describe('queryWithChannel — auto-derived channel', () => {
       { id: 1, teamId: 'A', done: false },
       { id: 2, teamId: 'A', done: true },
     ]
-    const handler = createStartHandler({ pingInterval: 0 }) as AnyHandler
+    const handler = createStartHandler({ pingInterval: 0 })
     const db = makeSelectDb(todos)
 
-    const { data, channel } = await handler.queryWithChannel(
+    const { data, channel } = await handler.query(
       async () => await db.select().from(fakeTable),
-    )
+    )(undefined)
 
     expect(data).toEqual(todos)
     expect(typeof channel).toBe('string')
@@ -155,63 +140,17 @@ describe('queryWithChannel — auto-derived channel', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 2. queryWithChannel: explicit channel override
+// 2. query factory: registers a subscription (so future invalidations work)
 // ---------------------------------------------------------------------------
 
-describe('queryWithChannel — explicit channel override', () => {
-  it('returns the explicit channel string when provided as first arg', async () => {
-    const handler = createStartHandler({ pingInterval: 0 }) as AnyHandler
-    const db = makeSelectDb([{ id: 1 }])
-
-    const { data, channel } = await handler.queryWithChannel(
-      'my-explicit-channel',
-      async () => await db.select().from(fakeTable),
-    )
-
-    expect(channel).toBe('my-explicit-channel')
-    expect(data).toEqual([{ id: 1 }])
-  })
-
-  it('serializes a QueryKey array when used as explicit channel', async () => {
-    const handler = createStartHandler({ pingInterval: 0 }) as AnyHandler
-    const db = makeSelectDb([{ id: 99 }])
-    const queryKey = ['todos', { projectId: 'proj-42' }] as const
-
-    const { channel } = await handler.queryWithChannel(
-      queryKey,
-      async () => await db.select().from(fakeTable),
-    )
-
-    expect(channel).toBe(serializeKey(queryKey))
-  })
-
-  it('explicit channel overrides auto-derivation even when WHERE is present', async () => {
-    const handler = createStartHandler({ pingInterval: 0 }) as AnyHandler
-    const db = makeSelectDb([])
-
-    const { channel } = await handler.queryWithChannel(
-      'override-channel',
-      async () => await db.select().from(fakeTable),
-    )
-
-    // Should use explicit channel, not the auto-derived todos:teamId=A
-    expect(channel).toBe('override-channel')
-    expect(channel).not.toBe(serializeKey(['todos', { teamId: 'A' }]))
-  })
-})
-
-// ---------------------------------------------------------------------------
-// 3. queryWithChannel: registers a subscription (so future invalidations work)
-// ---------------------------------------------------------------------------
-
-describe('queryWithChannel — registers subscription', () => {
+describe('query factory — registers subscription', () => {
   it('registers the channel in the subscriptionManager after call', async () => {
-    const handler = createStartHandler({ pingInterval: 0 }) as AnyHandler
+    const handler = createStartHandler({ pingInterval: 0 })
     const db = makeSelectDb([{ id: 1, teamId: 'A' }])
 
-    const { channel } = await handler.queryWithChannel(
+    const { channel } = await handler.query(
       async () => await db.select().from(fakeTable),
-    )
+    )(undefined)
 
     const activeChannels = handler.subscriptionManager.activeChannels()
     expect(activeChannels.has(channel)).toBe(true)
@@ -227,12 +166,12 @@ describe('queryWithChannel — registers subscription', () => {
     const handler = createStartHandler({
       backend,
       pingInterval: 0,
-    }) as AnyHandler
+    })
     const db = makeSelectDb([{ id: 1, teamId: 'A' }])
 
-    const { channel } = await handler.queryWithChannel(
+    const { channel } = await handler.query(
       async () => await db.select().from(fakeTable),
-    )
+    )(undefined)
 
     // Trigger invalidation with a matching row
     await handler.invalidate([
@@ -249,12 +188,12 @@ describe('queryWithChannel — registers subscription', () => {
     const handler = createStartHandler({
       backend,
       pingInterval: 0,
-    }) as AnyHandler
+    })
     const db = makeSelectDb([{ id: 1, teamId: 'A' }])
 
-    const { channel } = await handler.queryWithChannel(
+    const { channel } = await handler.query(
       async () => await db.select().from(fakeTable),
-    )
+    )(undefined)
 
     // Row belongs to team B — should not invalidate team A's subscription
     await handler.invalidate([
@@ -265,7 +204,7 @@ describe('queryWithChannel — registers subscription', () => {
     expect(publishCallChannels).not.toContain(channel)
   })
 
-  it('query and queryWithChannel both register the same channel for same query', async () => {
+  it('two query calls with the same manager both register the same channel for same query', async () => {
     const mgr = createSubscriptionManager(vi.fn().mockResolvedValue(undefined))
     const handlerA = createStartHandler({
       subscriptionManager: mgr,
@@ -274,14 +213,16 @@ describe('queryWithChannel — registers subscription', () => {
     const handlerB = createStartHandler({
       subscriptionManager: mgr,
       pingInterval: 0,
-    }) as AnyHandler
+    })
 
     const dbA = makeSelectDb([])
     const dbB = makeSelectDb([])
 
-    await handlerA.query(async () => await dbA.select().from(fakeTable))
-    await handlerB.queryWithChannel(
-      async () => await dbB.select().from(fakeTable),
+    await handlerA.query(async () => await dbA.select().from(fakeTable))(
+      undefined,
+    )
+    await handlerB.query(async () => await dbB.select().from(fakeTable))(
+      undefined,
     )
 
     const channels = mgr.activeChannels()
@@ -292,28 +233,28 @@ describe('queryWithChannel — registers subscription', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 4. queryWithChannel: no WHERE clause → table-level channel
+// 3. query factory: no WHERE clause → table-level channel
 // ---------------------------------------------------------------------------
 
-describe('queryWithChannel — table-level channel (no WHERE)', () => {
+describe('query factory — table-level channel (no WHERE)', () => {
   it('derives a table-level channel when query has no WHERE clause', async () => {
-    const handler = createStartHandler({ pingInterval: 0 }) as AnyHandler
+    const handler = createStartHandler({ pingInterval: 0 })
     const db = makeSelectDbNoWhere([{ id: 1 }, { id: 2 }])
 
-    const { channel, data } = await handler.queryWithChannel(
+    const { channel, data } = await handler.query(
       async () => await db.select().from(fakeTable),
-    )
+    )(undefined)
 
     expect(channel).toBe(serializeKey(['todos']))
     expect(data).toEqual([{ id: 1 }, { id: 2 }])
   })
 
   it('table-level channel is registered in subscriptionManager', async () => {
-    const handler = createStartHandler({ pingInterval: 0 }) as AnyHandler
+    const handler = createStartHandler({ pingInterval: 0 })
     const db = makeSelectDbNoWhere([])
 
-    await handler.queryWithChannel(
-      async () => await db.select().from(fakeTable),
+    await handler.query(async () => await db.select().from(fakeTable))(
+      undefined,
     )
 
     const channels = handler.subscriptionManager.activeChannels()
@@ -330,12 +271,12 @@ describe('queryWithChannel — table-level channel (no WHERE)', () => {
     const handler = createStartHandler({
       backend,
       pingInterval: 0,
-    }) as AnyHandler
+    })
     const db = makeSelectDbNoWhere([{ id: 1 }])
 
-    const { channel } = await handler.queryWithChannel(
+    const { channel } = await handler.query(
       async () => await db.select().from(fakeTable),
-    )
+    )(undefined)
 
     // Table-level invalidation (no specific rows)
     await handler.invalidate([{ table: 'todos', affectedRows: [] }])

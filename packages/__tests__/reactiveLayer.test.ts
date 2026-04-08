@@ -6,11 +6,10 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
+import { serializeKey } from '@tanstack/realtime'
 import {
   ReactivePredicateParseError,
   compilePredicate,
-  createReactiveLoader,
-  createReactiveMutation,
   createStartHandler,
   createSubscriptionManager,
   deriveChannelKey,
@@ -18,7 +17,8 @@ import {
   runInReactiveContext,
   wrapReactiveDb,
 } from '@tanstack/realtime-preset-start'
-import { serializeKey } from '@tanstack/realtime'
+import { createReactiveLoader } from '../realtime-preset-start/src/reactive-loader.js'
+import { createReactiveMutation } from '../realtime-preset-start/src/reactive-mutation.js'
 import type { SubscriptionEntry } from '@tanstack/realtime-preset-start'
 
 // ---------------------------------------------------------------------------
@@ -896,28 +896,32 @@ describe('createStartHandler — reactive integration', () => {
     return wrapReactiveDb(rawDb)
   }
 
-  it('query() + mutate() end-to-end: only matching channel invalidated', async () => {
+  it('query() + mutation() end-to-end: only matching channel invalidated', async () => {
     const realtime = createStartHandler({})
     const wrappedDb = makeReactiveDb(
       [{ id: 1, teamId: 'A' }],
       [{ id: 2, teamId: 'A' }],
     )
 
-    // Register subscription
-    await realtime.query(async () => await wrappedDb.select().from(fakeTable))
+    // Register subscription via the new factory API
+    const getRows = realtime.query(
+      async () => await wrappedDb.select().from(fakeTable),
+    )
+    await getRows(undefined)
 
     const expectedChannel = serializeKey(['todos', { teamId: 'A' }])
     expect(
       realtime.subscriptionManager.activeChannels().has(expectedChannel),
     ).toBe(true)
 
-    // Trigger mutation with matching row
+    // Trigger mutation via the new factory API
     const invalidateSpy = vi.spyOn(realtime.subscriptionManager, 'invalidate')
 
-    await realtime.mutate(
+    const doInsert = realtime.mutation(
       async () =>
         await wrappedDb.insert(fakeTable).values({ teamId: 'A' }).returning(),
     )
+    await doInsert(undefined)
 
     expect(invalidateSpy).toHaveBeenCalledTimes(1)
     const writes = invalidateSpy.mock.calls[0][0]
@@ -931,7 +935,10 @@ describe('createStartHandler — reactive integration', () => {
     }
     const realtime2 = createStartHandler({ backend })
     const wrappedDb2 = makeReactiveDb([{ id: 1, teamId: 'A' }], [])
-    await realtime2.query(async () => await wrappedDb2.select().from(fakeTable))
+    const getRows2 = realtime2.query(
+      async () => await wrappedDb2.select().from(fakeTable),
+    )
+    await getRows2(undefined)
 
     await realtime2.invalidate([{ table: 'todos', affectedRows: [] }])
 
@@ -946,7 +953,10 @@ describe('createStartHandler — reactive integration', () => {
     const realtime = createStartHandler({})
     const wrappedDb = makeReactiveDb([{ id: 1, teamId: 'A' }], [])
 
-    await realtime.query(async () => await wrappedDb.select().from(fakeTable))
+    const getRows = realtime.query(
+      async () => await wrappedDb.select().from(fakeTable),
+    )
+    await getRows(undefined)
 
     // Direct invalidation with matching rows
     const invalidateSpy = vi.spyOn(realtime.subscriptionManager, 'invalidate')
@@ -980,11 +990,12 @@ describe('createStartHandler — reactive integration', () => {
     const wrappedDb = wrapReactiveDb(rawDb)
 
     // Should not throw even though there is no WHERE clause
-    const result = await realtime.query(
+    const getRows = realtime.query(
       async () => await wrappedDb.select().from(fakeTable),
     )
+    const { data } = await getRows(undefined)
 
-    expect(result).toEqual(fakeResult)
+    expect(data).toEqual(fakeResult)
     const expectedChannel = serializeKey(['todos'])
     expect(
       realtime.subscriptionManager.activeChannels().has(expectedChannel),

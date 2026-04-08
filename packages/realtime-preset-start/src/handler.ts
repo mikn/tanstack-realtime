@@ -9,12 +9,41 @@ import type { SubscriptionManager } from './subscription-manager.js'
 import type { WriteDescriptor } from './reactive-db.js'
 
 // ---------------------------------------------------------------------------
-// ReactiveQueryResult — returned by queryWithChannel
+// ReactiveQueryResult — returned by queryWithChannel (internal)
 // ---------------------------------------------------------------------------
 
 export type ReactiveQueryResult<T> = {
   data: T
   channel: string
+}
+
+// ---------------------------------------------------------------------------
+// Branded function types for the factory API
+// ---------------------------------------------------------------------------
+
+/**
+ * A reactive server query function created by `realtime.query()`.
+ * The phantom fields `_tag`, `_args`, `_result` are never set at runtime —
+ * they exist only for TypeScript inference in client hooks like `useQuery`.
+ */
+export type ReactiveQueryFn<TArgs, TResult> = ((
+  args: TArgs,
+) => Promise<ReactiveQueryResult<TResult>>) & {
+  readonly _tag: 'ReactiveQuery'
+  readonly _args: TArgs
+  readonly _result: TResult
+}
+
+/**
+ * A reactive server mutation function created by `realtime.mutation()`.
+ * The phantom fields exist only for TypeScript inference in `useMutation`.
+ */
+export type ReactiveMutationFn<TArgs, TResult> = ((
+  args: TArgs,
+) => Promise<TResult>) & {
+  readonly _tag: 'ReactiveMutation'
+  readonly _args: TArgs
+  readonly _result: TResult
 }
 
 // ---------------------------------------------------------------------------
@@ -257,36 +286,40 @@ export interface StartRealtimeHandler {
   subscriptionManager: SubscriptionManager
 
   /**
-   * Register a reactive query and return its initial result.
-   * Channel key AND predicate are both auto-derived from the WHERE clause
-   * when using wrapReactiveDb(). Pass explicit channel as first arg as escape hatch.
+   * Wraps an async server function to make it reactive. The returned function,
+   * when called, fetches data AND registers an SSE subscription so the client
+   * receives live updates whenever the underlying data changes.
+   *
+   * Use with `useQuery` on the client:
+   * ```ts
+   * export const getTodos = createServerFn().handler(
+   *   realtime.query(async (args: { teamId: string }) =>
+   *     db.select().from(todos).where(eq(todos.teamId, args.teamId))
+   *   )
+   * )
+   * ```
    */
-  query: (<T>(fn: () => Promise<T>) => Promise<T>) &
-    (<T>(channel: QueryKey | string, fn: () => Promise<T>) => Promise<T>)
+  query: <TArgs, TResult>(
+    fn: (args: TArgs) => Promise<TResult>,
+  ) => ReactiveQueryFn<TArgs, TResult>
 
   /**
-   * Register a reactive query and return its initial result together with
-   * the channel key the client should subscribe to.
-   * Channel key AND predicate are both auto-derived from the WHERE clause
-   * when using wrapReactiveDb(). Pass explicit channel as first arg as escape hatch.
+   * Wraps an async mutation function to run in a reactive context.
+   * After the mutation runs, any subscriptions whose predicates match the
+   * affected rows are automatically invalidated and clients receive fresh data.
+   *
+   * Use with `useMutation` on the client:
+   * ```ts
+   * export const createTodo = createServerFn().handler(
+   *   realtime.mutation(async (args: { teamId: string; title: string }) => {
+   *     await db.insert(todos).values(args)
+   *   })
+   * )
+   * ```
    */
-  queryWithChannel: (<T>(
-    fn: () => Promise<T>,
-  ) => Promise<ReactiveQueryResult<T>>) &
-    (<T>(
-      channel: QueryKey | string,
-      fn: () => Promise<T>,
-    ) => Promise<ReactiveQueryResult<T>>)
-
-  /**
-   * Run a mutation and automatically invalidate matching subscriptions.
-   * Use wrapReactiveDb() db with .returning() for predicate-level precision.
-   * opts.writes overrides auto-capture.
-   */
-  mutate: <T>(
-    fn: () => Promise<T>,
-    opts?: { writes?: ReadonlyArray<WriteDescriptor> },
-  ) => Promise<T>
+  mutation: <TArgs, TResult>(
+    fn: (args: TArgs) => Promise<TResult>,
+  ) => ReactiveMutationFn<TArgs, TResult>
 
   /**
    * Directly invalidate channels by write descriptors.
@@ -449,51 +482,26 @@ export function createStartHandler(
 
     subscriptionManager: mgr,
 
-    query<T>(
-      channelOrFn: QueryKey | string | (() => Promise<T>),
-      fn?: () => Promise<T>,
-    ): Promise<T> {
-      if (typeof channelOrFn === 'function') {
-        return createReactiveLoader<T>({
+    query<TArgs, TResult>(
+      fn: (args: TArgs) => Promise<TResult>,
+    ): ReactiveQueryFn<TArgs, TResult> {
+      const callable = (args: TArgs): Promise<ReactiveQueryResult<TResult>> =>
+        createReactiveLoader<TResult>({
           subscriptionManager: mgr,
-          channel: undefined,
-          query: channelOrFn,
-        }).load()
-      }
-      return createReactiveLoader<T>({
-        subscriptionManager: mgr,
-        channel: channelOrFn,
-        query: fn!,
-      }).load()
-    },
-
-    queryWithChannel<T>(
-      channelOrFn: QueryKey | string | (() => Promise<T>),
-      fn?: () => Promise<T>,
-    ): Promise<ReactiveQueryResult<T>> {
-      if (typeof channelOrFn === 'function') {
-        return createReactiveLoader<T>({
-          subscriptionManager: mgr,
-          channel: undefined,
-          query: channelOrFn,
+          query: () => fn(args),
         }).loadWithChannel()
-      }
-      return createReactiveLoader<T>({
-        subscriptionManager: mgr,
-        channel: channelOrFn,
-        query: fn!,
-      }).loadWithChannel()
+      return callable as unknown as ReactiveQueryFn<TArgs, TResult>
     },
 
-    mutate<T>(
-      fn: () => Promise<T>,
-      opts?: { writes?: ReadonlyArray<WriteDescriptor> },
-    ): Promise<T> {
-      return createReactiveMutation<unknown, T>({
-        subscriptionManager: mgr,
-        mutation: (_input: unknown) => fn(),
-        writes: opts?.writes ? (_result: T) => opts.writes! : undefined,
-      }).mutate(undefined)
+    mutation<TArgs, TResult>(
+      fn: (args: TArgs) => Promise<TResult>,
+    ): ReactiveMutationFn<TArgs, TResult> {
+      const callable = (args: TArgs): Promise<TResult> =>
+        createReactiveMutation<TArgs, TResult>({
+          subscriptionManager: mgr,
+          mutation: fn,
+        }).mutate(args)
+      return callable as unknown as ReactiveMutationFn<TArgs, TResult>
     },
 
     invalidate(writes: ReadonlyArray<WriteDescriptor>): Promise<void> {
