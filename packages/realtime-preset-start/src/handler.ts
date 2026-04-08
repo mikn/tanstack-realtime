@@ -4,8 +4,8 @@ import {
   REALTIME_BATCH_CHANNEL,
   createSubscriptionManager,
 } from './subscription-manager.js'
-import { createReactiveLoader } from './reactive-loader.js'
-import { createReactiveMutation } from './reactive-mutation.js'
+import { createLoader } from './reactive-loader.js'
+import { createMutationHandler } from './reactive-mutation.js'
 import type {
   PublishFn,
   QueryKey,
@@ -463,7 +463,7 @@ export function createStartHandler(
       fn: (args: TArgs) => Promise<TResult>,
     ): ReactiveQueryFn<TArgs, TResult> {
       const callable = (args: TArgs): Promise<ReactiveQueryResult<TResult>> =>
-        createReactiveLoader<TResult>({
+        createLoader<TResult>({
           subscriptionManager: mgr,
           query: () => fn(args),
         }).loadWithChannel()
@@ -474,7 +474,7 @@ export function createStartHandler(
       fn: (args: TArgs) => Promise<TResult>,
     ): ReactiveMutationFn<TArgs, TResult> {
       const callable = (args: TArgs): Promise<TResult> =>
-        createReactiveMutation<TArgs, TResult>({
+        createMutationHandler<TArgs, TResult>({
           subscriptionManager: mgr,
           mutation: fn,
         }).mutate(args)

@@ -2,7 +2,7 @@
  * Tests for the reactive layer:
  * compilePredicate, extractEqualityConditions, deriveChannelKey,
  * wrapReactiveDb, runInReactiveContext, SubscriptionManager,
- * createReactiveLoader, createReactiveMutation, createStartHandler (integration)
+ * createLoader, createMutationHandler (internal helpers), createStartHandler (integration)
  */
 
 import { describe, expect, it, vi } from 'vitest'
@@ -18,8 +18,8 @@ import {
   runInReactiveContext,
   wrapReactiveDb,
 } from '@tanstack/realtime-preset-start'
-import { createReactiveLoader } from '../realtime-preset-start/src/reactive-loader.js'
-import { createReactiveMutation } from '../realtime-preset-start/src/reactive-mutation.js'
+import { createLoader } from '../realtime-preset-start/src/reactive-loader.js'
+import { createMutationHandler } from '../realtime-preset-start/src/reactive-mutation.js'
 import type { SubscriptionEntry } from '@tanstack/realtime-preset-start'
 
 // ---------------------------------------------------------------------------
@@ -579,10 +579,10 @@ describe('deriveChannelKey', () => {
 })
 
 // ---------------------------------------------------------------------------
-// createReactiveLoader
+// createLoader
 // ---------------------------------------------------------------------------
 
-describe('createReactiveLoader', () => {
+describe('createLoader', () => {
   function makeMockMgr() {
     return {
       register: vi.fn(),
@@ -604,7 +604,7 @@ describe('createReactiveLoader', () => {
     const rawDb: any = { select: () => ({ from: (_t: any) => fakeBuilder }) }
     const wrappedDb = wrapReactiveDb(rawDb)
 
-    const loader = createReactiveLoader({
+    const loader = createLoader({
       subscriptionManager: mockMgr,
       query: async () => await wrappedDb.select().from(fakeTable),
     })
@@ -628,7 +628,7 @@ describe('createReactiveLoader', () => {
     const rawDb: any = { select: () => ({ from: (_t: any) => fakeBuilder }) }
     const wrappedDb = wrapReactiveDb(rawDb)
 
-    const loader = createReactiveLoader({
+    const loader = createLoader({
       subscriptionManager: mockMgr,
       query: async () => await wrappedDb.select().from(fakeTable),
     })
@@ -650,7 +650,7 @@ describe('createReactiveLoader', () => {
     const rawDb: any = { select: () => ({ from: (_t: any) => fakeBuilder }) }
     const wrappedDb = wrapReactiveDb(rawDb)
 
-    const loader = createReactiveLoader({
+    const loader = createLoader({
       subscriptionManager: mockMgr,
       channel: 'my-explicit-channel',
       query: async () => await wrappedDb.select().from(fakeTable),
@@ -666,7 +666,7 @@ describe('createReactiveLoader', () => {
     const mockMgr = makeMockMgr()
     const matchesFn = vi.fn().mockReturnValue(true)
 
-    const loader = createReactiveLoader({
+    const loader = createLoader({
       subscriptionManager: mockMgr,
       channel: 'explicit-ch',
       query: async () => [{ id: 1 }],
@@ -691,7 +691,7 @@ describe('createReactiveLoader', () => {
       }),
     }
 
-    const loader = createReactiveLoader({
+    const loader = createLoader({
       subscriptionManager: mockMgr,
       channel: 'explicit-where-ch',
       query: async () => [{ id: 1 }],
@@ -723,7 +723,7 @@ describe('createReactiveLoader', () => {
       }),
     }
 
-    const loader = createReactiveLoader({
+    const loader = createLoader({
       subscriptionManager: mockMgr,
       query: async () => [{ id: 1 }],
       predicate: {
@@ -750,7 +750,7 @@ describe('createReactiveLoader', () => {
     const rawDb: any = { select: () => ({ from: (_t: any) => fakeBuilder }) }
     const wrappedDb = wrapReactiveDb(rawDb)
 
-    const loader = createReactiveLoader({
+    const loader = createLoader({
       subscriptionManager: mockMgr,
       query: async () => await wrappedDb.select().from(fakeTable),
     })
@@ -771,7 +771,7 @@ describe('createReactiveLoader', () => {
   it('throws when no predicate available and query does not use reactive proxy', async () => {
     const mockMgr = makeMockMgr()
 
-    const loader = createReactiveLoader({
+    const loader = createLoader({
       subscriptionManager: mockMgr,
       query: async () => [{ id: 1 }], // plain query, no wrapReactiveDb
     })
@@ -791,7 +791,7 @@ describe('createReactiveLoader', () => {
     const rawDb: any = { select: () => ({ from: (_t: any) => fakeBuilder }) }
     const wrappedDb = wrapReactiveDb(rawDb)
 
-    const loader = createReactiveLoader({
+    const loader = createLoader({
       subscriptionManager: mockMgr,
       query: async () => await wrappedDb.select().from(fakeTable),
     })
@@ -802,10 +802,10 @@ describe('createReactiveLoader', () => {
 })
 
 // ---------------------------------------------------------------------------
-// createReactiveMutation
+// createMutationHandler
 // ---------------------------------------------------------------------------
 
-describe('createReactiveMutation', () => {
+describe('createMutationHandler', () => {
   function makeMockMgr() {
     return {
       register: vi.fn(),
@@ -835,7 +835,7 @@ describe('createReactiveMutation', () => {
     }
     const wrappedDb = wrapReactiveDb(rawDb)
 
-    const mutation = createReactiveMutation({
+    const mutation = createMutationHandler({
       subscriptionManager: mockMgr,
       mutation: async (_input: void) => {
         return await wrappedDb
@@ -859,7 +859,7 @@ describe('createReactiveMutation', () => {
 
     const explicitWrites = [{ table: 'projects', affectedRows: [{ id: 99 }] }]
 
-    const mutation = createReactiveMutation({
+    const mutation = createMutationHandler({
       subscriptionManager: mockMgr,
       mutation: async (_input: void) => ({ success: true }),
       writes: (_result) => explicitWrites,

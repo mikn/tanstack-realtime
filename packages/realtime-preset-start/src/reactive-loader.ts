@@ -32,7 +32,7 @@ interface ReactiveLoaderOptions<TResult> {
     | { table: string; matches: (row: Record<string, unknown>) => boolean }
 }
 
-export function createReactiveLoader<TResult>(
+export function createLoader<TResult>(
   options: ReactiveLoaderOptions<TResult>,
 ): {
   load: () => Promise<TResult>
@@ -121,7 +121,7 @@ export function createReactiveLoader<TResult>(
           : deriveChannelKey(pred.table, undefined, [], {})
     } else {
       throw new Error(
-        "createReactiveLoader: no read set captured — use wrapReactiveDb() or provide 'predicate'",
+        "createLoader: no read set captured — use wrapReactiveDb() or provide 'predicate'",
       )
     }
 

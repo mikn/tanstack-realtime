@@ -10,7 +10,7 @@ interface ReactiveMutationOptions<TInput, TResult> {
   writes?: (result: TResult) => ReadonlyArray<WriteDescriptor>
 }
 
-export function createReactiveMutation<TInput, TResult>(
+export function createMutationHandler<TInput, TResult>(
   options: ReactiveMutationOptions<TInput, TResult>,
 ): { mutate: (input: TInput) => Promise<TResult> } {
   return {

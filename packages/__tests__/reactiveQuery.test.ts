@@ -418,10 +418,10 @@ const initialMutationState = <T>(): MutationState<T> => ({
 })
 
 // ---------------------------------------------------------------------------
-// 5. useReactiveQuery: initial load shows isPending=true, then resolves
+// 5. useQuery: initial load shows isPending=true, then resolves
 // ---------------------------------------------------------------------------
 
-describe('useReactiveQuery logic — initial load', () => {
+describe('useQuery logic — initial load', () => {
   it('isPending=true immediately after FETCH_START with no data yet', () => {
     let state = initialQueryState<Array<string>>()
     expect(isPending(state)).toBe(false)
@@ -468,10 +468,10 @@ describe('useReactiveQuery logic — initial load', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 6. useReactiveQuery: server SSE update triggers SERVER_UPDATE
+// 6. useQuery: server SSE update triggers SERVER_UPDATE
 // ---------------------------------------------------------------------------
 
-describe('useReactiveQuery logic — SSE server update', () => {
+describe('useQuery logic — SSE server update', () => {
   it('SERVER_UPDATE replaces data without affecting channel or error', () => {
     let state = initialQueryState<Array<{ id: number }>>()
     state = queryReducer(state, { type: 'FETCH_START' })
@@ -523,10 +523,10 @@ describe('useReactiveQuery logic — SSE server update', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 7. useReactiveQuery: when args change, a new fetch is triggered
+// 7. useQuery: when args change, a new fetch is triggered
 // ---------------------------------------------------------------------------
 
-describe('useReactiveQuery logic — args change triggers re-fetch', () => {
+describe('useQuery logic — args change triggers re-fetch', () => {
   it('serializing different args produces different keys (causing re-fetch)', () => {
     const argsA = { teamId: 'A' }
     const argsB = { teamId: 'B' }
@@ -577,10 +577,10 @@ describe('useReactiveQuery logic — args change triggers re-fetch', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 8. useReactiveQuery: enabled=false skips fetching
+// 8. useQuery: enabled=false skips fetching
 // ---------------------------------------------------------------------------
 
-describe('useReactiveQuery logic — enabled flag', () => {
+describe('useQuery logic — enabled flag', () => {
   it('when enabled=false, fetch should not be triggered (serverFn not called)', () => {
     const serverFn = vi.fn().mockResolvedValue({ data: [], channel: 'ch' })
     // Simulate the enabled=false guard in the hook — serverFn is never called
@@ -603,10 +603,10 @@ describe('useReactiveQuery logic — enabled flag', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 9. useReactiveQuery: error state when serverFn throws
+// 9. useQuery: error state when serverFn throws
 // ---------------------------------------------------------------------------
 
-describe('useReactiveQuery logic — error state', () => {
+describe('useQuery logic — error state', () => {
   it('FETCH_ERROR sets error and clears isFetching', () => {
     let state = initialQueryState<Array<string>>()
     state = queryReducer(state, { type: 'FETCH_START' })
@@ -661,10 +661,10 @@ describe('useReactiveQuery logic — error state', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 10. useReactiveQuery: refetch() re-runs the server function
+// 10. useQuery: refetch() re-runs the server function
 // ---------------------------------------------------------------------------
 
-describe('useReactiveQuery logic — refetch', () => {
+describe('useQuery logic — refetch', () => {
   it('incrementing refetchTick causes a new fetch cycle', async () => {
     // Simulate the refetchTick counter the hook uses
     let refetchTick = 0
@@ -726,10 +726,10 @@ describe('useReactiveQuery logic — refetch', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 11. useReactiveMutation: isPending transitions correctly
+// 11. useMutation: isPending transitions correctly
 // ---------------------------------------------------------------------------
 
-describe('useReactiveMutation logic — isPending transitions', () => {
+describe('useMutation logic — isPending transitions', () => {
   it('starts with isPending=false', () => {
     const state = initialMutationState<string>()
     expect(state.isPending).toBe(false)
@@ -789,10 +789,10 @@ describe('useReactiveMutation logic — isPending transitions', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 12. useReactiveMutation: onSuccess called with result
+// 12. useMutation: onSuccess called with result
 // ---------------------------------------------------------------------------
 
-describe('useReactiveMutation logic — onSuccess callback', () => {
+describe('useMutation logic — onSuccess callback', () => {
   it('onSuccess is called with the mutation result and original args', async () => {
     const onSuccess = vi.fn()
     const serverFn = vi.fn().mockResolvedValue({ id: 42, title: 'New todo' })
@@ -834,10 +834,10 @@ describe('useReactiveMutation logic — onSuccess callback', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 13. useReactiveMutation: onError called on throw
+// 13. useMutation: onError called on throw
 // ---------------------------------------------------------------------------
 
-describe('useReactiveMutation logic — onError callback', () => {
+describe('useMutation logic — onError callback', () => {
   it('onError is called with the thrown error and original args', async () => {
     const onError = vi.fn()
     const err = new Error('server error')
@@ -898,10 +898,10 @@ describe('useReactiveMutation logic — onError callback', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 14. useReactiveMutation: reset() clears state
+// 14. useMutation: reset() clears state
 // ---------------------------------------------------------------------------
 
-describe('useReactiveMutation logic — reset', () => {
+describe('useMutation logic — reset', () => {
   it('RESET after success clears data and error, sets isPending=false', () => {
     let state = initialMutationState<string>()
     state = mutationReducer(state, { type: 'MUTATE_START' })
@@ -967,9 +967,9 @@ describe('useReactiveMutation logic — reset', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 15. useReactiveQuery — optimistic updates (reducer tests)
+// 15. useQuery — optimistic updates (reducer tests)
 //
-// The `reducer` function in useReactiveQuery.ts is NOT exported, so we inline
+// The `reducer` function in useQuery.ts is not exported, so we inline
 // the same logic here.  This matches the approach used in groups 5–14 above
 // where `queryReducer` and `mutationReducer` are also inlined.
 // ---------------------------------------------------------------------------
@@ -1045,7 +1045,7 @@ const initialOptimisticState = <T>(): OptimisticState<T> => ({
   isOptimistic: false,
 })
 
-describe('useReactiveQuery — optimistic updates (reducer)', () => {
+describe('useQuery — optimistic updates (reducer)', () => {
   // 15.1
   it('OPTIMISTIC_UPDATE applies transform immediately and sets isOptimistic=true', () => {
     let state = initialOptimisticState<Array<string>>()
@@ -1235,10 +1235,10 @@ describe('useReactiveQuery — optimistic updates (reducer)', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 16. useReactiveQuery — reconnect refetch (integration test with mock)
+// 16. useQuery — reconnect refetch (integration test with mock)
 // ---------------------------------------------------------------------------
 
-describe('useReactiveQuery logic — reconnect refetch', () => {
+describe('useQuery logic — reconnect refetch', () => {
   // 16.1
   it('fetches on initial mount (serverFn is called once for first load)', async () => {
     const serverFn = vi
@@ -1354,9 +1354,9 @@ describe('useReactiveQuery logic — reconnect refetch', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 17. useReactivePaginatedQuery — pagination reducer + integration tests
+// 17. usePaginatedQuery — pagination reducer + integration tests
 //
-// The `paginatedReducer` in useReactivePaginatedQuery.ts is NOT exported, so
+// The `paginatedReducer` in usePaginatedQuery.ts is not exported, so
 // we inline the same logic here, following the same pattern as groups 5–16.
 // ---------------------------------------------------------------------------
 
@@ -1472,7 +1472,7 @@ const paginatedItems = <TItem>(state: PaginatedState<TItem>): Array<TItem> =>
 const paginatedIsPending = <TItem>(state: PaginatedState<TItem>): boolean =>
   state.pages.length === 0 && state.isFetching
 
-describe('useReactivePaginatedQuery — pagination reducer', () => {
+describe('usePaginatedQuery — pagination reducer', () => {
   // 17.1
   it('FETCH_START sets isFetching=true', () => {
     let state = initialPaginatedState<string>()
