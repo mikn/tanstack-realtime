@@ -5,7 +5,7 @@ import { getTableColumns, getTableName } from 'drizzle-orm'
 // Keys are JS field names, values have a `.name` property (DB column name)
 export type ColumnMap = Record<string, { name: string }>
 
-export interface ReadEntry {
+interface ReadEntry {
   table: string // DB table name (from getTableName)
   sql: string // full SQL string from toSQL() including WHERE clause
   params: Array<unknown> // positional params $1, $2... from toSQL()
@@ -18,7 +18,7 @@ export interface WriteDescriptor {
   affectedRows: ReadonlyArray<Record<string, unknown>> // [] = table-level fallback
 }
 
-export interface ReactiveQueryContext {
+interface ReactiveQueryContext {
   reads: Array<ReadEntry>
   writes: Array<WriteDescriptor>
 }

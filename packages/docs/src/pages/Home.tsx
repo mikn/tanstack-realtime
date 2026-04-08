@@ -10,19 +10,21 @@ function Hero() {
           Your app, but <span className="gradient-text">live</span>
         </h1>
         <p className="hero-sub">
-          Live dashboards, multiplayer cursors, collaborative lists, typing
-          indicators &mdash; without ripping out your stack. Add a{' '}
-          <code>channel</code> and your existing collections update in realtime.
-          No new database. No vendor lock-in.
+          Wrap your server function in <code>realtime.query()</code>, call{' '}
+          <code>useQuery()</code> on the client &mdash; data stays live. No
+          manual channels, no cache invalidation, no new database. Optimistic
+          mutations, presence, CRDTs, and pub/sub when you need them.
         </p>
 
         <div className="hero-code">
           <CodeBlock
-            code={`// Before — polling
-const todos = useQuery({ queryKey: ['todos'], queryFn: fetchTodos, refetchInterval: 5000 })
+            code={`// Server — one line makes any query reactive
+export const getTodos = realtime.query(async ({ teamId }) =>
+  db.select().from(todos).where(eq(todos.teamId, teamId))
+)
 
-// After — live
-const todos = useCollection(todosCollection)  // updates the instant any client mutates`}
+// Client — data arrives live, shared across components
+const { data, isPending } = useQuery(getTodos, { teamId })`}
           />
         </div>
 
@@ -119,23 +121,25 @@ function Spectrum() {
 function WhatYouCanBuild() {
   const useCases = [
     {
-      title: 'Live collections',
-      desc: 'Todos, kanban boards, inventory — any list that should update the instant someone adds, edits, or removes an item.',
-      code: `const todosCollection = createCollection(
-  realtimeCollectionOptions({
-    ...withRest({ url: '/api/todos', getKey: (t) => t.id }),
-    client,
-    channel: ['todos'],
-  })
-)`,
+      title: 'Reactive server queries',
+      desc: 'Wrap any server function with realtime.query() — clients subscribe automatically. Mutations invalidate affected queries and update all subscribers in one render.',
+      code: `// Server
+export const getTodos = realtime.query(async ({ teamId }) =>
+  db.select().from(todos).where(eq(todos.teamId, teamId))
+)
+
+// Client — live, shared across components
+const { data, isPending } = useQuery(getTodos, { teamId })`,
     },
     {
-      title: 'Chat & activity feeds',
-      desc: 'Append-only event streams with history replay. Messages arrive in order across all connected clients.',
-      code: `const chatOptions = liveChannelOptions({
-  client,
-  channel: ['chat', { roomId }],
-  history: 50,
+      title: 'Optimistic mutations',
+      desc: 'Declare optimistic updates alongside your mutation. Cache updates instantly, rolls back automatically on error.',
+      code: `const { mutate } = useMutation(createTodo, {
+  optimistic: (cache, args) => {
+    cache.update(getTodos, { teamId: args.teamId }, prev => [
+      ...(prev ?? []), { id: crypto.randomUUID(), ...args },
+    ])
+  },
 })`,
     },
     {
@@ -245,8 +249,8 @@ function Features() {
       label: 'Core',
       features: [
         {
-          title: 'Live collections',
-          desc: 'Server-managed rows with insert/update/delete semantics that sync across all connected clients.',
+          title: 'Reactive queries & mutations',
+          desc: 'Wrap server functions with realtime.query(). Channels derived automatically. Optimistic mutations with declarative rollback.',
         },
         {
           title: 'Presence & pub/sub',
@@ -363,23 +367,21 @@ function App() {
 
           <div className="qs-step">
             <div className="qs-number">3</div>
-            <h3>Add a channel to any collection</h3>
+            <h3>Make a query reactive</h3>
             <CodeBlock
-              code={`import { createCollection } from '@tanstack/db'
-import { realtimeCollectionOptions, withRest } from '@tanstack/realtime'
-import { useCollection } from '@tanstack/react-db'
-
-const todosCollection = createCollection(
-  realtimeCollectionOptions({
-    ...withRest({ url: '/api/todos', getKey: (t: Todo) => t.id }),
-    client,
-    channel: ['todos'],
-  })
+              code={`// Server — wrap with realtime.query()
+export const getTodos = realtime.query(async ({ teamId }: { teamId: string }) =>
+  db.select().from(todos).where(eq(todos.teamId, teamId))
 )
 
-function TodoList() {
-  const todos = useCollection(todosCollection)
-  return <ul>{todos.map(t => <li key={t.id}>{t.title}</li>)}</ul>
+// Client — useQuery subscribes automatically
+import { useQuery } from '@tanstack/react-realtime'
+import { getTodos } from '../server/todos'
+
+function TodoList({ teamId }: { teamId: string }) {
+  const { data, isPending } = useQuery(getTodos, { teamId })
+  if (isPending) return <p>Loading…</p>
+  return <ul>{data?.map(t => <li key={t.id}>{t.title}</li>)}</ul>
 }`}
             />
           </div>

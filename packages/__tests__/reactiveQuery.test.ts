@@ -17,16 +17,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createStartHandler,
-  createSubscriptionManager,
   wrapReactiveDb,
 } from '@tanstack/realtime-preset-start'
 import {
-  REALTIME_BATCH_CHANNEL,
-  clearRegistry,
   deriveCacheKey,
   getOrCreateQueryCollection,
   serializeKey,
 } from '@tanstack/realtime'
+import { createSubscriptionManager } from '../realtime-preset-start/src/subscription-manager.js'
+import {
+  REALTIME_BATCH_CHANNEL,
+  clearRegistry,
+} from '../realtime/src/queryCollectionRegistry.js'
 
 // ---------------------------------------------------------------------------
 // Drizzle-compatible fake table objects (same pattern as reactiveLayer.test.ts)

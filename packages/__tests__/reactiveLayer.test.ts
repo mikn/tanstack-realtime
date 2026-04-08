@@ -8,19 +8,23 @@
 import { describe, expect, it, vi } from 'vitest'
 import { serializeKey } from '@tanstack/realtime'
 import {
-  REALTIME_BATCH_CHANNEL,
-  ReactivePredicateParseError,
-  compilePredicate,
   createStartHandler,
-  createSubscriptionManager,
-  deriveChannelKey,
-  extractEqualityConditions,
-  runInReactiveContext,
   wrapReactiveDb,
 } from '@tanstack/realtime-preset-start'
+import {
+  REALTIME_BATCH_CHANNEL,
+  createSubscriptionManager,
+} from '../realtime-preset-start/src/subscription-manager.js'
+import {
+  ReactivePredicateParseError,
+  compilePredicate,
+  deriveChannelKey,
+  extractEqualityConditions,
+} from '../realtime-preset-start/src/compile-predicate.js'
+import { runInReactiveContext } from '../realtime-preset-start/src/reactive-db.js'
 import { createLoader } from '../realtime-preset-start/src/reactive-loader.js'
 import { createMutationHandler } from '../realtime-preset-start/src/reactive-mutation.js'
-import type { SubscriptionEntry } from '@tanstack/realtime-preset-start'
+import type { SubscriptionEntry } from '../realtime-preset-start/src/subscription-manager.js'
 
 // ---------------------------------------------------------------------------
 // Drizzle-compatible fake table objects

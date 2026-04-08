@@ -168,72 +168,151 @@ provideRealtimeClient(realtimeClient)
         </p>
       </div>
 
-      <h2 id="first-collection">Your first live collection</h2>
+      <h2 id="reactive-queries">Your first reactive query</h2>
       <p>
-        Use <code>useRealtimeCollection</code> with a <code>url</code> to
-        connect your existing REST endpoints to a realtime collection. The hook
-        generates <code>queryFn</code> and CRUD callbacks automatically, and
-        derives the channel name from the URL. Each mutation is broadcast to the
-        channel &mdash; no changes to your server routes required.
+        The fastest path to live data: wrap your server function with{' '}
+        <code>realtime.query()</code> and call <code>useQuery()</code> on the
+        client. Channels are derived automatically from the SQL WHERE clause
+        &mdash; no manual wiring required.
       </p>
       <CodeBlock
-        title="app/features/todos/TodoList.tsx"
+        title="app/server/todos.ts"
+        code={`import { realtime } from './realtime'
+import { eq } from 'drizzle-orm'
+import { db } from '../db'
+import { todos } from '../../db/schema'
+
+export const getTodos = realtime.query(
+  async ({ teamId }: { teamId: string }) =>
+    db.select().from(todos).where(eq(todos.teamId, teamId))
+)
+
+export const createTodo = realtime.mutation(
+  async ({ teamId, title }: { teamId: string; title: string }) => {
+    const [todo] = await db.insert(todos).values({ teamId, title, done: false }).returning()
+    return todo
+  }
+)`}
+      />
+      <FrameworkTabs
+        react={{
+          title: 'app/features/todos/TodoList.tsx',
+          code: `import { useQuery, useMutation } from '@tanstack/react-realtime'
+import { getTodos, createTodo } from '../../server/todos'
+
+function TodoList({ teamId }: { teamId: string }) {
+  const { data, isPending } = useQuery(getTodos, { teamId })
+  const { mutate } = useMutation(createTodo, {
+    optimistic: (cache, args) => {
+      cache.update(getTodos, { teamId: args.teamId }, prev => [
+        ...(prev ?? []),
+        { id: crypto.randomUUID(), title: args.title, done: false },
+      ])
+    },
+  })
+
+  if (isPending) return <p>Loading…</p>
+  return (
+    <>
+      <ul>{data?.map(t => <li key={t.id}>{t.title}</li>)}</ul>
+      <button onClick={() => mutate({ teamId, title: 'New' })}>Add</button>
+    </>
+  )
+}`,
+        }}
+        solid={{
+          title: 'app/features/todos/TodoList.tsx',
+          code: `import { createQuery, createMutation } from '@tanstack/solid-realtime'
+import { getTodos, createTodo } from '../../server/todos'
+
+function TodoList(props: { teamId: string }) {
+  const { data, isPending } = createQuery(getTodos, () => ({ teamId: props.teamId }))
+  const { mutate } = createMutation(createTodo, {
+    optimistic: (cache, args) => {
+      cache.update(getTodos, { teamId: args.teamId }, prev => [
+        ...(prev ?? []),
+        { id: crypto.randomUUID(), title: args.title, done: false },
+      ])
+    },
+  })
+
+  return (
+    <Show when={!isPending()} fallback={<p>Loading…</p>}>
+      <ul><For each={data()}>{t => <li>{t.title}</li>}</For></ul>
+      <button onClick={() => mutate({ teamId: props.teamId, title: 'New' })}>Add</button>
+    </Show>
+  )
+}`,
+        }}
+        vue={{
+          title: 'app/features/todos/TodoList.vue',
+          code: `<script setup lang="ts">
+import { useQuery, useMutation } from '@tanstack/vue-realtime'
+import { getTodos, createTodo } from '../../server/todos'
+
+const props = defineProps<{ teamId: string }>()
+const { data, isPending } = useQuery(getTodos, { teamId: props.teamId })
+const { mutate } = useMutation(createTodo, {
+  optimistic: (cache, args) => {
+    cache.update(getTodos, { teamId: args.teamId }, prev => [
+      ...(prev ?? []),
+      { id: crypto.randomUUID(), title: args.title, done: false },
+    ])
+  },
+})
+</script>
+
+<template>
+  <p v-if="isPending">Loading…</p>
+  <template v-else>
+    <ul><li v-for="t in data" :key="t.id">{{ t.title }}</li></ul>
+    <button @click="mutate({ teamId: props.teamId, title: 'New' })">Add</button>
+  </template>
+</template>`,
+        }}
+      />
+      <p>
+        Multiple components using the same{' '}
+        <code>(getTodos, {'{ teamId }'})</code> share one fetch, one SSE
+        subscription, and one cache. Optimistic updates propagate instantly; the
+        server confirms via a batched SSE message.
+      </p>
+
+      <h2 id="first-collection">Alternative: REST-based live collections</h2>
+      <p>
+        If you don&rsquo;t use server functions or Drizzle, connect your
+        existing REST endpoints with <code>useRealtimeCollection</code>:
+      </p>
+      <CodeBlock
         code={`import { useRealtimeCollection } from '@tanstack/react-realtime'
 import { useLiveQuery } from '@tanstack/react-db'
 
 function TodoList() {
-  // url generates GET/POST/PATCH/DELETE handlers automatically
-  // channel derived from url: '/api/todos' → 'todos'
   const todos = useRealtimeCollection<Todo>({
     url: '/api/todos',
     getKey: (t) => t.id,
   })
-
-  // Reactive query — re-renders when data changes
   const { data } = useLiveQuery((q) => q.from({ todos }))
-
-  return (
-    <ul>
-      {data.map((t) => (
-        <li key={t.id}>{t.title}</li>
-      ))}
-    </ul>
-  )
+  return <ul>{data.map(t => <li key={t.id}>{t.title}</li>)}</ul>
 }`}
-      />
-      <p>Need filtering or sorting? Change the query, not the collection:</p>
-      <CodeBlock
-        code={`// Same collection, filtered view
-const { data: active } = useLiveQuery((q) =>
-  q.from({ todos }).where('done', '=', false)
-)`}
       />
 
       <h2 id="next-steps">Next steps</h2>
-      <p>
-        You now have a live collection. From here you can add capabilities one
-        config key at a time &mdash; the{' '}
-        <a href="#/docs/collections">progressive spectrum</a>:
-      </p>
-      <ol>
-        <li>
-          <strong>Basic query</strong> &mdash; <code>queryFn</code> alone
-          fetches data on mount (what you built above).
-        </li>
-        <li>
-          <strong>Add realtime</strong> &mdash; add <code>channel</code> and
-          mutations broadcast to all subscribers instantly.
-        </li>
-        <li>
-          <strong>Add CRDTs</strong> &mdash; add <code>fields</code> and
-          concurrent edits merge automatically (LWW, PN-Counter, OR-Set).
-        </li>
-      </ol>
-      <h3>Explore further</h3>
       <ul>
         <li>
+          <a href="#/docs/reactive-queries">Reactive Queries</a> &mdash; full
+          guide to <code>useQuery</code>, <code>useMutation</code>,{' '}
+          <code>usePaginatedQuery</code>, optimistic updates, and batched
+          consistency
+        </li>
+        <li>
+          <a href="#/docs/server-functions">Server Functions</a> &mdash;{' '}
+          <code>realtime.query()</code> and <code>realtime.mutation()</code>{' '}
+          with TanStack Start + Drizzle
+        </li>
+        <li>
           <a href="#/docs/collections">Collections</a> &mdash; custom callbacks,
-          server push, conflict detection, optimistic updates
+          server push, conflict detection
         </li>
         <li>
           <a href="#/docs/crdts">CRDTs</a> &mdash; conflict-free concurrent
@@ -248,17 +327,8 @@ const { data: active } = useLiveQuery((q) =>
           user lists, typing indicators
         </li>
         <li>
-          <a href="#/docs/ephemeral">Ephemeral Channels</a> &mdash; reactions,
-          toasts, confetti, and short-lived events
-        </li>
-        <li>
-          <a href="#/docs/transports">Transports</a> &mdash; Centrifugo (fan-out
-          included), PublishBackend for multi-instance SSE, offline queue,
-          multi-tab coordination
-        </li>
-        <li>
-          <a href="#/docs/server-functions">TanStack Start + Drizzle</a> &mdash;
-          full-stack guide with server functions as collection callbacks
+          <a href="#/docs/transports">Transports</a> &mdash; SSE, Centrifugo,
+          offline queue, multi-tab coordination
         </li>
       </ul>
     </article>

@@ -244,11 +244,9 @@ export type {
 
 // Query collection registry — shared cache for useQuery
 export {
-  clearRegistry,
   deriveCacheKey,
   getOrCreateQueryCollection,
   subscribeToRealtimeBatch,
-  REALTIME_BATCH_CHANNEL,
 } from './queryCollectionRegistry.js'
 export type {
   QueryEntry,

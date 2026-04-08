@@ -123,24 +123,53 @@ React adapter. Provides a context provider and hooks that integrate with the cor
 npm install @tanstack/realtime @tanstack/react-realtime
 ```
 
-### Quick start
+### Quick start — reactive queries
+
+The fastest path to live data: wrap a server function, call `useQuery` on the client.
+
+```ts
+// Server — realtime.query() derives channels automatically
+export const getTodos = realtime.query(async ({ teamId }: { teamId: string }) =>
+  db.select().from(todos).where(eq(todos.teamId, teamId)),
+)
+```
 
 ```tsx
-// 1. Wrap your app
-import { RealtimeProvider } from '@tanstack/react-realtime'
-import { client } from './client'
+// Client — data stays live, shared across components
+import { useQuery, useMutation } from '@tanstack/react-realtime'
+import { getTodos, createTodo } from '../server/todos'
 
-export function App() {
+function TodoList({ teamId }: { teamId: string }) {
+  const { data, isPending } = useQuery(getTodos, { teamId })
+  const { mutate } = useMutation(createTodo, {
+    optimistic: (cache, args) => {
+      cache.update(getTodos, { teamId: args.teamId }, (prev) => [
+        ...(prev ?? []),
+        { id: crypto.randomUUID(), title: args.title, done: false },
+      ])
+    },
+  })
+
+  if (isPending) return <Spinner />
   return (
-    <RealtimeProvider client={client}>
-      <MyApp />
-    </RealtimeProvider>
+    <>
+      <ul>
+        {data?.map((t) => (
+          <li key={t.id}>{t.title}</li>
+        ))}
+      </ul>
+      <button onClick={() => mutate({ teamId, title: 'New todo' })}>Add</button>
+    </>
   )
 }
 ```
 
+### Pub/sub, presence & more
+
+For use cases beyond server queries (chat, cursors, typing indicators):
+
 ```tsx
-// 2. Subscribe to a channel
+// Subscribe to a channel
 import { useSubscribe } from '@tanstack/react-realtime'
 
 function Chat({ roomId }: { roomId: string }) {
@@ -161,7 +190,7 @@ function Chat({ roomId }: { roomId: string }) {
 ```
 
 ```tsx
-// 3. Publish to a channel
+// Publish to a channel
 import { usePublish } from '@tanstack/react-realtime'
 
 function ChatInput({ roomId }: { roomId: string }) {
