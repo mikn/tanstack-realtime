@@ -9,7 +9,7 @@ import type { ColumnMap } from './reactive-db.js'
 import type { QueryKey } from '@tanstack/realtime'
 import type { SubscriptionManager } from './subscription-manager.js'
 
-export interface ReactiveLoaderOptions<TResult> {
+interface ReactiveLoaderOptions<TResult> {
   subscriptionManager: SubscriptionManager
   /**
    * Optional channel key. When omitted, auto-derived from WHERE equality conditions.

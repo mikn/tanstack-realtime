@@ -2,7 +2,7 @@ import { runInReactiveContext } from './reactive-db.js'
 import type { WriteDescriptor } from './reactive-db.js'
 import type { SubscriptionManager } from './subscription-manager.js'
 
-export interface ReactiveMutationOptions<TInput, TResult> {
+interface ReactiveMutationOptions<TInput, TResult> {
   subscriptionManager: SubscriptionManager
   /** Mutation function. Should use wrapReactiveDb() db for automatic write set capture. */
   mutation: (input: TInput) => Promise<TResult>

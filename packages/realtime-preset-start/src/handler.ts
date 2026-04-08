@@ -9,10 +9,10 @@ import type { SubscriptionManager } from './subscription-manager.js'
 import type { WriteDescriptor } from './reactive-db.js'
 
 // ---------------------------------------------------------------------------
-// ReactiveQueryResult — returned by queryWithChannel (internal)
+// ReactiveQueryResult — returned by query() calls (internal)
 // ---------------------------------------------------------------------------
 
-export type ReactiveQueryResult<T> = {
+type ReactiveQueryResult<T> = {
   data: T
   channel: string
 }
