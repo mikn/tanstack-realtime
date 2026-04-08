@@ -5,14 +5,44 @@ export function ChoosingAPattern() {
     <article className="doc-article">
       <h1>Choosing a Pattern</h1>
       <p className="doc-lead">
-        TanStack Realtime has several collection patterns. This page helps you
-        pick the right one for your use case.
+        TanStack Realtime has several patterns for different use cases. Start
+        with reactive queries for most applications &mdash; they require the
+        least configuration and compose naturally with TanStack DB.
       </p>
 
-      <h2 id="decision-tree">Decision tree</h2>
+      <h2 id="start-here">Start here: reactive queries</h2>
       <p>
-        Answer the questions from top to bottom. The first match is your
-        pattern.
+        If you have a server function that queries a database,{' '}
+        <code>useQuery</code> is the right choice. Wrap the function with{' '}
+        <code>realtime.query()</code> on the server and the hook handles
+        channels, caching, and batched updates automatically.
+      </p>
+      <CodeBlock
+        code={`// Server — one annotation, data is live
+export const getTodos = realtime.query(async ({ teamId }) =>
+  db.select().from(todos).where(eq(todos.teamId, teamId))
+)
+
+// Client — all components sharing this pair share one connection
+const { data, collection } = useQuery(getTodos, { teamId }, {
+  getKey: (t) => t.id,
+})
+
+// Filter client-side without touching the server
+const { data: active } = useLiveQuery(
+  (q) => q.from({ todos: collection }).where('done', '=', false),
+  [collection],
+)`}
+      />
+      <p>
+        See the <a href="#/docs/reactive-queries">Reactive Queries</a> guide for
+        the full API including optimistic mutations and batched consistency.
+      </p>
+
+      <h2 id="decision-tree">Other patterns</h2>
+      <p>
+        When reactive queries don&rsquo;t fit your use case, use this table to
+        find the right pattern.
       </p>
 
       <table className="api-table">
@@ -25,22 +55,13 @@ export function ChoosingAPattern() {
         <tbody>
           <tr>
             <td>
-              Do you need raw channel events without a collection abstraction?
-            </td>
-            <td>
-              <a href="#/docs/channels">
-                <code>useSubscribe</code> / <code>usePublish</code>
-              </a>
-            </td>
-          </tr>
-          <tr>
-            <td>
-              Are you syncing CRUD data from a database (rows with
-              insert/update/delete)?
+              Do you have existing REST endpoints and want live CRUD without
+              server functions?
             </td>
             <td>
               <a href="#/docs/collections">
-                <code>realtimeCollectionOptions</code>
+                <code>realtimeCollectionOptions</code> /{' '}
+                <code>useRealtimeCollection</code>
               </a>
             </td>
           </tr>
@@ -77,7 +98,7 @@ export function ChoosingAPattern() {
             </td>
           </tr>
           <tr>
-            <td>Do you need to show who is currently online (who is here)?</td>
+            <td>Do you need to show who is currently online?</td>
             <td>
               <a href="#/docs/presence">
                 <code>presenceChannelOptions</code>
@@ -91,6 +112,16 @@ export function ChoosingAPattern() {
             <td>
               <a href="#/docs/tick">
                 <code>tickCollectionOptions</code>
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              Do you need raw channel events without a collection abstraction?
+            </td>
+            <td>
+              <a href="#/docs/channels">
+                <code>useSubscribe</code> / <code>usePublish</code>
               </a>
             </td>
           </tr>
@@ -112,17 +143,35 @@ export function ChoosingAPattern() {
         <tbody>
           <tr>
             <td>
-              <code>realtimeCollectionOptions</code>
+              <strong>
+                <a href="#/docs/reactive-queries">
+                  <code>useQuery</code>
+                </a>
+              </strong>
+            </td>
+            <td>via useMutation</td>
+            <td>yes</td>
+            <td>no</td>
+            <td>no</td>
+            <td>Server function queries</td>
+          </tr>
+          <tr>
+            <td>
+              <a href="#/docs/collections">
+                <code>realtimeCollectionOptions</code>
+              </a>
             </td>
             <td>insert/update/delete</td>
             <td>yes</td>
             <td>no</td>
             <td>yes</td>
-            <td>Database tables</td>
+            <td>REST/custom CRUD</td>
           </tr>
           <tr>
             <td>
-              <code>liveChannelOptions</code>
+              <a href="#/docs/channels">
+                <code>liveChannelOptions</code>
+              </a>
             </td>
             <td>read-only (append)</td>
             <td>yes</td>
@@ -132,7 +181,9 @@ export function ChoosingAPattern() {
           </tr>
           <tr>
             <td>
-              <code>ephemeralLiveOptions</code>
+              <a href="#/docs/ephemeral">
+                <code>ephemeralLiveOptions</code>
+              </a>
             </td>
             <td>read-only (append)</td>
             <td>yes</td>
@@ -142,7 +193,9 @@ export function ChoosingAPattern() {
           </tr>
           <tr>
             <td>
-              <code>streamChannelOptions</code>
+              <a href="#/docs/streaming">
+                <code>streamChannelOptions</code>
+              </a>
             </td>
             <td>reduce only</td>
             <td>single item</td>
@@ -152,7 +205,9 @@ export function ChoosingAPattern() {
           </tr>
           <tr>
             <td>
-              <code>presenceChannelOptions</code>
+              <a href="#/docs/presence">
+                <code>presenceChannelOptions</code>
+              </a>
             </td>
             <td>read-only</td>
             <td>yes</td>
@@ -162,7 +217,9 @@ export function ChoosingAPattern() {
           </tr>
           <tr>
             <td>
-              <code>tickCollectionOptions</code>
+              <a href="#/docs/tick">
+                <code>tickCollectionOptions</code>
+              </a>
             </td>
             <td>batch overwrite</td>
             <td>yes</td>
@@ -178,8 +235,8 @@ export function ChoosingAPattern() {
 
       <h3>SaaS dashboard</h3>
       <CodeBlock
-        code={`// Synced data from your database
-realtimeCollectionOptions({ ...withRest({ url: '/api/issues' }), ... })
+        code={`// Live data from your server functions
+useQuery(getIssues, { projectId }, { getKey: (i) => i.id })
 
 // Who is viewing this board right now
 presenceChannelOptions({ channel: ['board', { id }], ... })`}
@@ -199,19 +256,18 @@ presenceChannelOptions({ channel: ['room', { id }], ... })`}
 
       <h3>AI assistant</h3>
       <CodeBlock
-        code={`// Conversation history (CRUD)
-realtimeCollectionOptions({ ...withRest({ url: '/api/messages' }), ... })
+        code={`// Conversation history — live from server function
+useQuery(getMessages, { sessionId }, { getKey: (m) => m.id })
 
 // Token stream for the current response
 streamChannelOptions({ channel: ['stream', { sessionId }], ... })`}
       />
 
-      <h2 id="start-simple">Start simple: useRealtimeCollection</h2>
+      <h2 id="rest-collections">Already have REST endpoints?</h2>
       <p>
-        If you are building a React app, <code>useRealtimeCollection</code>{' '}
-        paired with <code>useLiveQuery</code> is the recommended pattern. Pass a{' '}
-        <code>url</code> to get REST CRUD automatically, or pass{' '}
-        <code>queryFn</code> for custom data sources.
+        If you are not using server functions, connect your existing REST API
+        with <code>useRealtimeCollection</code>. Pass a <code>url</code> and get
+        CRUD automatically:
       </p>
       <CodeBlock
         code={`import { useRealtimeCollection } from '@tanstack/react-realtime'
@@ -234,11 +290,11 @@ function TodoList() {
       />
       <p>
         The two-hook pattern is intentional: the collection manages sync, the
-        query manages rendering. When you need filtering, sorting, or joins,
-        change the query &mdash; not the collection:
+        query manages rendering. Change the query for filtering or sorting
+        &mdash; not the collection:
       </p>
       <CodeBlock
-        code={`// Same collection, different views
+        code={`// Same collection, different views — no extra fetches
 const { data: active } = useLiveQuery((q) =>
   q.from({ todos }).where('done', '=', false)
 )
@@ -250,9 +306,8 @@ const { data: sorted } = useLiveQuery((q) =>
 
       <h3 id="tanstack-query-escape-hatch">Already using TanStack Query?</h3>
       <p>
-        Pass <code>queryFn</code> that delegates to your existing query client.
-        No new API needed &mdash; you keep your cache, deduplication, and
-        devtools:
+        Pass a <code>queryFn</code> that delegates to your existing query
+        client. You keep your cache, deduplication, and devtools:
       </p>
       <CodeBlock
         code={`const todos = useRealtimeCollection<Todo>({
@@ -267,6 +322,10 @@ const { data: sorted } = useLiveQuery((q) =>
 
       <h2 id="see-also">See also</h2>
       <ul>
+        <li>
+          <a href="#/docs/reactive-queries">Reactive Queries</a> &mdash; full
+          guide to <code>useQuery</code> and <code>useMutation</code>
+        </li>
         <li>
           <a href="#/docs/collections">Collections</a> &mdash; full
           documentation for <code>realtimeCollectionOptions</code>

@@ -7,24 +7,28 @@ function Hero() {
       <div className="container">
         <span className="badge">v0.1 &middot; Alpha</span>
         <h1>
-          Your app, but <span className="gradient-text">live</span>
+          Live queries from the backend{' '}
+          <span className="gradient-text">you already have.</span>
         </h1>
         <p className="hero-sub">
-          Wrap your server function in <code>realtime.query()</code>, call{' '}
-          <code>useQuery()</code> on the client &mdash; data stays live. No
-          manual channels, no cache invalidation, no new database. Optimistic
-          mutations, presence, CRDTs, and pub/sub when you need them.
+          Add <code>realtime.query()</code> to any server function &mdash; every
+          subscriber updates when data changes. Your Postgres, your Drizzle,
+          your deploy. No new database. No managed service.
         </p>
 
         <div className="hero-code">
           <CodeBlock
-            code={`// Server — one line makes any query reactive
-export const getTodos = realtime.query(async ({ teamId }) =>
+            code={`// Before — your existing server function, unchanged
+export const getTodos = async ({ teamId }: { teamId: string }) =>
+  db.select().from(todos).where(eq(todos.teamId, teamId))
+
+// After — prefix with realtime.query(), data is now live everywhere
+export const getTodos = realtime.query(async ({ teamId }: { teamId: string }) =>
   db.select().from(todos).where(eq(todos.teamId, teamId))
 )
 
-// Client — data arrives live, shared across components
-const { data, isPending } = useQuery(getTodos, { teamId })`}
+// Client — one hook, all components share one connection and one cache
+const { data, collection } = useQuery(getTodos, { teamId }, { getKey: (t) => t.id })`}
           />
         </div>
 
@@ -32,8 +36,8 @@ const { data, isPending } = useQuery(getTodos, { teamId })`}
           <a href="#/docs/getting-started" className="btn btn-primary">
             Get Started
           </a>
-          <a href="#/docs/collections" className="btn btn-secondary">
-            Read the Docs
+          <a href="#/docs/reactive-queries" className="btn btn-secondary">
+            See the API
           </a>
         </div>
         <div className="hero-install">
@@ -42,6 +46,74 @@ const { data, isPending } = useQuery(getTodos, { teamId })`}
             Also available for <a href="#/docs/solid-primitives">Solid</a> and{' '}
             <a href="#/docs/vue-composables">Vue</a>
           </p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function WhatYouCanBuild() {
+  const useCases = [
+    {
+      title: 'Reactive server queries',
+      desc: 'One annotation makes any server function live. Every component sharing the same query shares one fetch, one connection, and one cache. The returned collection composes with useLiveQuery for client-side filtering and sorting.',
+      code: `const { data, collection } = useQuery(getTodos, { teamId }, {
+  getKey: (t) => t.id,
+})
+
+// Filter client-side — no new server request needed
+const { data: active } = useLiveQuery(
+  (q) => q.from({ todos: collection }).where('done', '=', false),
+  [collection],
+)`,
+    },
+    {
+      title: 'Optimistic mutations',
+      desc: 'Declare optimistic updates alongside your mutation. The cache updates instantly and rolls back automatically on error — no manual state management.',
+      code: `const { mutate } = useMutation(createTodo, {
+  optimistic: (cache, args) => {
+    cache.update(getTodos, { teamId: args.teamId }, prev => [
+      ...(prev ?? []), { id: crypto.randomUUID(), ...args },
+    ])
+  },
+})`,
+    },
+    {
+      title: 'Presence & cursors',
+      desc: "Show who's online, share cursor positions, and display live user activity — all over the same transport connection.",
+      code: `const presenceOptions = presenceChannelOptions({
+  client,
+  channel: ['room', { roomId }],
+  initialData: { cursor: { x: 0, y: 0 }, name: userName },
+})`,
+    },
+    {
+      title: 'AI token streaming',
+      desc: 'Stream AI-generated content token-by-token with reduce-based state and resumable checkpoints.',
+      code: `const streamOptions = streamChannelOptions({
+  client,
+  channel: ['ai', { promptId }],
+  reduce: (state, token) => state + token,
+  initial: '',
+})`,
+    },
+  ]
+
+  return (
+    <section id="use-cases" className="section">
+      <div className="container">
+        <h2>What you can build</h2>
+        <p className="section-sub">
+          Concrete patterns, each a few lines of config.
+        </p>
+        <div className="use-cases-grid">
+          {useCases.map((uc) => (
+            <div key={uc.title} className="use-case-card">
+              <h3>{uc.title}</h3>
+              <p>{uc.desc}</p>
+              <CodeBlock code={uc.code} />
+            </div>
+          ))}
         </div>
       </div>
     </section>
@@ -118,87 +190,26 @@ function Spectrum() {
   )
 }
 
-function WhatYouCanBuild() {
-  const useCases = [
-    {
-      title: 'Reactive server queries',
-      desc: 'Wrap any server function with realtime.query() — clients subscribe automatically. Mutations invalidate affected queries and update all subscribers in one render.',
-      code: `// Server
-export const getTodos = realtime.query(async ({ teamId }) =>
-  db.select().from(todos).where(eq(todos.teamId, teamId))
-)
-
-// Client — live, shared across components
-const { data, isPending } = useQuery(getTodos, { teamId })`,
-    },
-    {
-      title: 'Optimistic mutations',
-      desc: 'Declare optimistic updates alongside your mutation. Cache updates instantly, rolls back automatically on error.',
-      code: `const { mutate } = useMutation(createTodo, {
-  optimistic: (cache, args) => {
-    cache.update(getTodos, { teamId: args.teamId }, prev => [
-      ...(prev ?? []), { id: crypto.randomUUID(), ...args },
-    ])
-  },
-})`,
-    },
-    {
-      title: 'Presence & cursors',
-      desc: "Show who's online, share cursor positions, and display live user status.",
-      code: `const presenceOptions = presenceChannelOptions({
-  client,
-  channel: ['room', { roomId }],
-  initialData: { cursor: { x: 0, y: 0 }, name: userName },
-})`,
-    },
-    {
-      title: 'AI token streaming',
-      desc: 'Stream AI-generated content token-by-token with reduce-based state and resumable checkpoints.',
-      code: `const streamOptions = streamChannelOptions({
-  client,
-  channel: ['ai', { promptId }],
-  reduce: (state, token) => state + token,
-  initial: '',
-})`,
-    },
-  ]
-
-  return (
-    <section id="use-cases" className="section">
-      <div className="container">
-        <h2>What you can build</h2>
-        <p className="section-sub">
-          Concrete patterns, each a few lines of config.
-        </p>
-        <div className="use-cases-grid">
-          {useCases.map((uc) => (
-            <div key={uc.title} className="use-case-card">
-              <h3>{uc.title}</h3>
-              <p>{uc.desc}</p>
-              <CodeBlock code={uc.code} />
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
-
 function Positioning() {
   return (
-    <section id="when-to-use" className="section section-alt">
+    <section id="when-to-use" className="section">
       <div className="container">
-        <h2>When to use</h2>
+        <h2>Own your stack, keep the magic</h2>
         <p className="section-sub">
-          For teams that already have a backend they like and want realtime
-          without vendor lock-in. Not a database, CDC pipeline, or rich-text
-          editing engine.
+          The reactive query experience of hosted solutions &mdash; live
+          updates, optimistic mutations, batched consistency &mdash; without
+          handing over your data or deployment to a third party. Your database.
+          Your auth. Your infrastructure.
         </p>
 
         <div className="positioning-grid">
           <div className="positioning-card positioning-good">
             <h3>Good fit</h3>
             <ul>
+              <li>
+                <strong>Full ownership</strong> &mdash; your database, auth, and
+                deploy stay under your control
+              </li>
               <li>Live updates without polling</li>
               <li>
                 Reactive collections that update when any client mutates data
@@ -216,12 +227,13 @@ function Positioning() {
             <h3>Look elsewhere</h3>
             <ul>
               <li>
-                <strong>Postgres sync</strong> &mdash; ElectricSQL and PowerSync
-                sync Postgres directly to client collections
+                <strong>Postgres-to-client sync</strong> &mdash; ElectricSQL and
+                PowerSync sync Postgres tables directly to client collections
+                (different architectural model)
               </li>
               <li>
-                <strong>Rich text editing</strong> &mdash; Yjs/Hocuspocus or
-                Automerge are purpose-built; see our{' '}
+                <strong>Rich text editing</strong> &mdash; Yjs/Hocuspocus are
+                purpose-built; see our{' '}
                 <a href="#/docs/rich-text-crdts">Y.js integration guide</a> for
                 pairing with TanStack Realtime as the transport
               </li>
@@ -231,9 +243,9 @@ function Positioning() {
                 is not required
               </li>
               <li>
-                <strong>Managed services</strong> &mdash; Ably, Pusher, and
-                Liveblocks handle infrastructure for you; TanStack Realtime is
-                for teams that want to own the transport layer
+                <strong>Fully managed realtime</strong> &mdash; Ably, Pusher,
+                and Liveblocks handle infrastructure for you; TanStack Realtime
+                is for teams that want to own the transport layer
               </li>
             </ul>
           </div>
@@ -251,6 +263,10 @@ function Features() {
         {
           title: 'Reactive queries & mutations',
           desc: 'Wrap server functions with realtime.query(). Channels derived automatically. Optimistic mutations with declarative rollback.',
+        },
+        {
+          title: 'Composable collections',
+          desc: 'useQuery returns a live TanStack DB Collection. Pass it to useLiveQuery for client-side filtering, sorting, and joining — no extra server requests.',
         },
         {
           title: 'Presence & pub/sub',
@@ -287,8 +303,8 @@ function Features() {
           desc: 'SSE or Centrifugo (WebSocket). Swap transports without changing application code.',
         },
         {
-          title: 'Type-safe channels',
-          desc: 'Full TypeScript from channel keys to CRDT field definitions to presence data shapes.',
+          title: 'Type-safe end to end',
+          desc: 'TypeScript flows from server function signature through channel keys to CRDT field definitions — no codegen needed.',
         },
         {
           title: 'Offline & multi-tab',
@@ -307,7 +323,7 @@ function Features() {
   ]
 
   return (
-    <section id="features" className="section">
+    <section id="features" className="section section-alt">
       <div className="container">
         <h2>Features</h2>
         {groups.map((group) => (
@@ -330,7 +346,7 @@ function Features() {
 
 function QuickStart() {
   return (
-    <section id="quickstart" className="section section-alt">
+    <section id="quickstart" className="section">
       <div className="container">
         <h2>Quick start</h2>
 
@@ -369,19 +385,21 @@ function App() {
             <div className="qs-number">3</div>
             <h3>Make a query reactive</h3>
             <CodeBlock
-              code={`// Server — wrap with realtime.query()
+              code={`// Server — wrap your existing query with realtime.query()
 export const getTodos = realtime.query(async ({ teamId }: { teamId: string }) =>
   db.select().from(todos).where(eq(todos.teamId, teamId))
 )
 
-// Client — useQuery subscribes automatically
+// Client — useQuery keeps data live automatically
 import { useQuery } from '@tanstack/react-realtime'
 import { getTodos } from '../server/todos'
 
 function TodoList({ teamId }: { teamId: string }) {
-  const { data, isPending } = useQuery(getTodos, { teamId })
+  const { data, isPending } = useQuery(getTodos, { teamId }, {
+    getKey: (t) => t.id,
+  })
   if (isPending) return <p>Loading…</p>
-  return <ul>{data?.map(t => <li key={t.id}>{t.title}</li>)}</ul>
+  return <ul>{data.map(t => <li key={t.id}>{t.title}</li>)}</ul>
 }`}
             />
           </div>
@@ -393,7 +411,7 @@ function TodoList({ teamId }: { teamId: string }) {
 
 function Ecosystem() {
   return (
-    <section className="section">
+    <section className="section section-alt">
       <div className="container ecosystem-section">
         <h2>Fits right in</h2>
         <p className="section-sub">
@@ -403,15 +421,16 @@ function Ecosystem() {
           <div className="eco-card">
             <h3>TanStack DB</h3>
             <p>
-              Collections with optimistic mutations, derived views, and reactive
-              queries.
+              Each <code>useQuery</code> collection is a live TanStack DB
+              Collection &mdash; composable with <code>useLiveQuery</code> for
+              client-side filtering, sorting, and multi-collection joins.
             </p>
           </div>
           <div className="eco-card">
             <h3>TanStack Query</h3>
             <p>
               Use alongside Realtime for data that doesn&rsquo;t need a live
-              channel.
+              channel. Both can coexist in the same app.
             </p>
           </div>
           <div className="eco-card">
@@ -436,7 +455,7 @@ function Ecosystem() {
 
 function Community() {
   return (
-    <section className="section section-alt">
+    <section className="section">
       <div className="container">
         <h2>Built for the community</h2>
         <p className="section-sub">
@@ -529,8 +548,8 @@ export function Home() {
   return (
     <>
       <Hero />
-      <Spectrum />
       <WhatYouCanBuild />
+      <Spectrum />
       <Positioning />
       <Features />
       <QuickStart />

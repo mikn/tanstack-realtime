@@ -585,7 +585,9 @@ function TagEditor({ postId }: { postId: string }) {
 
       <h2 id="useQuery">useQuery</h2>
       <p>
-        Subscribes to a reactive server query and keeps the result live. See the{' '}
+        Subscribes to a reactive server query and keeps the result live. Returns
+        a typed item array plus a composable <code>collection</code> for
+        client-side filtering with <code>useLiveQuery</code>. See the{' '}
         <a href="#/docs/reactive-queries">Reactive Queries</a> guide for full
         examples.
       </p>
@@ -595,30 +597,30 @@ function TagEditor({ postId }: { postId: string }) {
 import { getTodos } from '../server/todos'
 
 function TodoList({ teamId }: { teamId: string }) {
-  const { data, isPending, error, optimisticUpdate } =
-    useQuery(getTodos, { teamId })
+  const { data, collection, isPending, error } =
+    useQuery(getTodos, { teamId }, { getKey: (t) => t.id })
 
   if (isPending) return <p>Loading…</p>
   if (error)     return <p>Error: {String(error)}</p>
-  return <ul>{data?.map((t) => <li key={t.id}>{t.title}</li>)}</ul>
+  return <ul>{data.map((t) => <li key={t.id}>{t.title}</li>)}</ul>
 }`}
       />
       <h3>Signature</h3>
       <CodeBlock
-        code={`function useQuery<TArgs, TResult>(
-  serverFn: ReactiveQueryFn<TArgs, TResult>,
+        code={`function useQuery<TArgs, TItem extends Record<string, unknown>>(
+  serverFn: ReactiveQueryFn<TArgs, Array<TItem>>,
   args: TArgs,
-  options?: {
-    enabled?: boolean            // default: true
-    refetchOnReconnect?: boolean // default: true
+  options: {
+    getKey: (item: TItem) => string    // required — stable key per item
+    enabled?: boolean                   // default: true
+    refetchOnReconnect?: boolean        // default: true
   }
 ): {
-  data: TResult | undefined
+  data: Array<TItem>                    // live array from the server
+  collection: Collection<TItem, string> | null  // pass to useLiveQuery for client-side views
   isPending: boolean
   isFetching: boolean
   error: unknown
-  isOptimistic: boolean
-  optimisticUpdate: (transform: (prev: TResult | undefined) => TResult) => () => void
   refetch: () => void
 }`}
       />

@@ -5,26 +5,27 @@ export function ReactiveQueries() {
     <article className="doc-article">
       <h1>Reactive Queries</h1>
       <p className="doc-lead">
-        Reactive queries let you declare a server query once and have every
-        component that calls it share one fetch, one SSE subscription, and one
-        set of propagated optimistic updates — all without manually wiring
-        channels or collections.
+        Declare a server query once. Every component that calls it shares one
+        fetch, one SSE subscription, and one cache &mdash; automatically. When
+        data changes, all subscribers update in the same render pass.
       </p>
 
       <h2 id="concept">How it works</h2>
       <p>
-        The server wraps a query function with <code>realtime.query(fn)</code>.
-        The returned function is callable on both server and client. When a
-        client calls it, the server returns the initial data and a channel name
-        derived from the query arguments. The client hooks subscribe to that
-        channel automatically and keep the data live.
+        <code>realtime.query(fn)</code> wraps your server function and returns a{' '}
+        <code>ReactiveQueryFn</code>. When a client calls it via{' '}
+        <code>useQuery</code>, the server returns the initial data along with a
+        channel name derived from the query arguments. The client subscribes to
+        that channel automatically and keeps the data live.
       </p>
       <p>
-        Multiple components that call <code>useQuery</code> with the same{' '}
-        <code>(serverFn, args)</code> pair deduplicate everything — a single
-        network request, a single SSE connection, and a single{' '}
-        <a href="#/docs/collections">TanStack DB Collection</a> that all
-        components read from.
+        Multiple components calling <code>useQuery</code> with the same{' '}
+        <code>(serverFn, args)</code> pair deduplicate everything &mdash; one
+        network request, one SSE connection, one{' '}
+        <a href="https://tanstack.com/db" target="_blank" rel="noopener">
+          TanStack DB Collection
+        </a>{' '}
+        that all components read from.
       </p>
       <div className="doc-callout">
         <p>
@@ -33,52 +34,44 @@ export function ReactiveQueries() {
           The server function encodes the channel into the response and the
           client hooks decode it transparently. When a mutation invalidates
           multiple queries, a single SSE batch message updates all of them in
-          the same render pass.
+          the same render pass &mdash; no torn state.
         </p>
       </div>
 
-      <h2 id="server-setup">Server setup — realtime.query()</h2>
+      <h2 id="server-setup">Server — realtime.query()</h2>
       <p>
-        Import the <code>realtime</code> handler you already created for{' '}
-        <a href="#/docs/server-functions">TanStack Start</a> and wrap your query
-        function with <code>realtime.query()</code>.
+        Import the <code>realtime</code> handler created in your server setup
+        and wrap your query function. The wrapped function is callable on both
+        server and client.
       </p>
       <CodeBlock
         title="app/server/todos.ts"
-        code={`import { createServerFn } from '@tanstack/start'
+        code={`import { realtime } from './realtime'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { todos } from '../../db/schema'
-import { realtime } from '../realtime'
 
-// realtime.query() wraps the query — channels are derived automatically
+// realtime.query() wraps the function — channels derived automatically
 export const getTodos = realtime.query(
   async ({ teamId }: { teamId: string }) =>
     db.select().from(todos).where(eq(todos.teamId, teamId))
-)
-
-// Expose it as a TanStack Start server function
-export const fetchTodos = createServerFn().handler(getTodos)`}
+)`}
       />
       <p>
-        The wrapped function returns{' '}
-        <code>{'ReactiveQueryFn<TArgs, TResult>'}</code>. Channels are derived
-        from the SQL WHERE clause automatically — no configuration needed. The
-        branded type carries TypeScript phantom fields so <code>useQuery</code>{' '}
-        can infer <code>TArgs</code> and <code>TResult</code> without explicit
-        generics.
+        The branded <code>ReactiveQueryFn</code> type carries TypeScript phantom
+        fields so <code>useQuery</code> infers <code>TArgs</code> and{' '}
+        <code>TItem</code> without explicit generics.
       </p>
 
-      <h2 id="server-mutation">Server setup — realtime.mutation()</h2>
+      <h2 id="server-mutation">Server — realtime.mutation()</h2>
       <p>
         Wrap write operations with <code>realtime.mutation()</code>. The library
-        captures which rows were written and publishes a batch invalidation
-        message to all affected query subscribers.
+        captures which rows were written and publishes a batch invalidation to
+        all affected query subscribers.
       </p>
       <CodeBlock
         title="app/server/todos.ts (continued)"
-        code={`// realtime.mutation() wraps the mutation — invalidation is automatic
-export const createTodo = realtime.mutation(
+        code={`export const createTodo = realtime.mutation(
   async ({ teamId, title }: { teamId: string; title: string }) => {
     const [todo] = await db
       .insert(todos)
@@ -86,20 +79,14 @@ export const createTodo = realtime.mutation(
       .returning()
     return todo
   }
-)
-
-export const addTodo = createServerFn().handler(createTodo)`}
+)`}
       />
 
       <h2 id="useQuery">useQuery</h2>
       <p>
-        Subscribe to a reactive server query and keep the result live. The hook
-        fetches the initial data from the server, subscribes to the returned
-        channel, and re-renders whenever the server publishes an update.
-      </p>
-      <p>
-        See also the <a href="#/docs/hooks">React Hooks</a> reference for the
-        full signature.
+        Subscribe to a reactive server query and keep the result live. Returns
+        an array of typed items plus a composable <code>collection</code> for
+        client-side filtering and sorting.
       </p>
       <CodeBlock
         title="TodoList.tsx"
@@ -109,47 +96,95 @@ import { getTodos } from '../server/todos'
 export function TodoList({ teamId }: { teamId: string }) {
   const {
     data,
+    collection,
     isPending,
     isFetching,
     error,
-    isOptimistic,
-    optimisticUpdate,
     refetch,
-  } = useQuery(getTodos, { teamId })
+  } = useQuery(getTodos, { teamId }, { getKey: (t) => t.id })
 
   if (isPending) return <p>Loading…</p>
   if (error)     return <p>Error: {String(error)}</p>
 
   return (
-    <>
-      {isOptimistic && <span className="saving">Saving…</span>}
-      <ul>
-        {data?.map((todo) => (
-          <li key={todo.id}>{todo.title}</li>
-        ))}
-      </ul>
-    </>
+    <ul>
+      {data.map((todo) => (
+        <li key={todo.id}>{todo.title}</li>
+      ))}
+    </ul>
   )
 }`}
       />
       <h3>Signature</h3>
       <CodeBlock
-        code={`function useQuery<TArgs, TResult>(
-  serverFn: ReactiveQueryFn<TArgs, TResult>,
+        code={`function useQuery<TArgs, TItem extends Record<string, unknown>>(
+  serverFn: ReactiveQueryFn<TArgs, Array<TItem>>,
   args: TArgs,
-  options?: {
-    enabled?: boolean            // default: true — set false to skip initial fetch
-    refetchOnReconnect?: boolean // default: true
+  options: {
+    getKey: (item: TItem) => string   // required — extracts a stable key per item
+    enabled?: boolean                  // default: true — set false to skip initial fetch
+    refetchOnReconnect?: boolean       // default: true
   }
 ): {
-  data: TResult | undefined
-  isPending: boolean
-  isFetching: boolean
+  data: Array<TItem>                   // live array of items from the server
+  collection: Collection<TItem, string> | null  // TanStack DB collection for useLiveQuery
+  isPending: boolean                   // true until first data arrives
+  isFetching: boolean                  // true during background refetch
   error: unknown
-  isOptimistic: boolean
-  optimisticUpdate: (transform: (prev: TResult | undefined) => TResult) => () => void
   refetch: () => void
 }`}
+      />
+
+      <h2 id="collection-composability">
+        Client-side filtering with collection
+      </h2>
+      <p>
+        The <code>collection</code> returned by <code>useQuery</code> is a live{' '}
+        <a href="https://tanstack.com/db" target="_blank" rel="noopener">
+          TanStack DB Collection
+        </a>
+        . Pass it to <code>useLiveQuery</code> to filter, sort, or join
+        client-side &mdash; no extra server requests needed.
+      </p>
+      <CodeBlock
+        title="ActiveTodos.tsx"
+        code={`import { useQuery } from '@tanstack/react-realtime'
+import { useLiveQuery } from '@tanstack/react-db'
+import { getTodos } from '../server/todos'
+
+export function ActiveTodos({ teamId }: { teamId: string }) {
+  const { collection } = useQuery(getTodos, { teamId }, { getKey: (t) => t.id })
+
+  // Client-side filter — reactive, no network request
+  const { data: active } = useLiveQuery(
+    (q) => q.from({ todos: collection }).where('done', '=', false),
+    [collection],
+  )
+
+  return <ul>{active.map(t => <li key={t.id}>{t.title}</li>)}</ul>
+}`}
+      />
+      <p>
+        Multiple components can call <code>useQuery</code> with the same pair
+        and each apply a different <code>useLiveQuery</code> filter &mdash; all
+        reading from the same underlying collection, zero duplicate fetches.
+      </p>
+      <CodeBlock
+        code={`// Component A — shows done items, sorted by completion time
+const { data: done } = useLiveQuery(
+  (q) => q.from({ todos: collection })
+          .where('done', '=', true)
+          .orderBy('completedAt', 'desc'),
+  [collection],
+)
+
+// Component B — shows active items assigned to current user
+const { data: mine } = useLiveQuery(
+  (q) => q.from({ todos: collection })
+          .where('done', '=', false)
+          .where('assigneeId', '=', currentUserId),
+  [collection],
+)`}
       />
 
       <h2 id="useMutation">useMutation</h2>
@@ -157,10 +192,6 @@ export function TodoList({ teamId }: { teamId: string }) {
         Wraps a reactive mutation function with loading state and error
         handling. The <code>optimistic</code> option provides declarative
         optimistic updates that are automatically rolled back on error.
-      </p>
-      <p>
-        See also the <a href="#/docs/hooks">React Hooks</a> reference for the
-        full signature.
       </p>
       <CodeBlock
         title="AddTodoForm.tsx"
@@ -221,10 +252,6 @@ export function AddTodoForm({ teamId }: { teamId: string }) {
         Paginated variant of <code>useQuery</code>. Accumulates pages as you
         call <code>fetchNextPage</code> and keeps the first page live via the
         shared SSE subscription.
-      </p>
-      <p>
-        See also the <a href="#/docs/hooks">React Hooks</a> reference for the
-        full signature.
       </p>
       <CodeBlock
         title="FeedList.tsx"
@@ -288,18 +315,19 @@ export function FeedList({ teamId }: { teamId: string }) {
         <code>useQuery</code> with the same pair and they will all:
       </p>
       <ul>
-        <li>Share the initial HTTP request — only one fetch fires.</li>
+        <li>Share the initial HTTP request &mdash; only one fetch fires.</li>
         <li>
-          Share the SSE subscription — one connection services all components.
+          Share the SSE subscription &mdash; one connection services all
+          components.
         </li>
         <li>
-          See optimistic updates from <em>any</em> of the sibling components
+          Reflect optimistic updates from <em>any</em> sibling component
           instantly, with no prop drilling.
         </li>
       </ul>
       <p>
         The collection is torn down and garbage-collected once all components
-        using it unmount, so there is no global leak.
+        using it unmount.
       </p>
 
       <h2 id="batched-consistency">Batched consistency</h2>
@@ -310,16 +338,16 @@ export function FeedList({ teamId }: { teamId: string }) {
         <code>__realtime_batch__</code> SSE message containing every update.
       </p>
       <p>
-        The client fans these out synchronously inside the{' '}
-        <code>RealtimeProvider</code>. React 18 automatic batching then merges
-        all resulting state updates into a single render — no torn state, no
+        The client fans these out synchronously inside{' '}
+        <code>RealtimeProvider</code>. React 18 automatic batching merges all
+        resulting state updates into a single render &mdash; no torn state, no
         partial updates.
       </p>
       <div className="doc-callout">
         <p>
           <strong>Zero configuration.</strong> Batched consistency is enabled
           automatically by <code>RealtimeProvider</code>. No changes to your
-          query or mutation code are needed.
+          query or mutation code are required.
         </p>
       </div>
 
@@ -339,11 +367,11 @@ export function FeedList({ teamId }: { teamId: string }) {
       <CodeBlock
         code={`// ✅ consistent — always same cache key
 const args = { projectId, teamId } as const
-useQuery(getTodos, args)
+useQuery(getTodos, args, { getKey: (t) => t.id })
 
 // ⚠️  may produce two cache entries if callers differ in key order
-useQuery(getTodos, { teamId, projectId })
-useQuery(getTodos, { projectId, teamId })  // different key!`}
+useQuery(getTodos, { teamId, projectId }, { getKey: (t) => t.id })
+useQuery(getTodos, { projectId, teamId }, { getKey: (t) => t.id })  // different key!`}
       />
       <p>
         A future version of the library will normalise key order automatically.
