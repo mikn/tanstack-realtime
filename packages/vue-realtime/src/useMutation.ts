@@ -1,6 +1,5 @@
 import { ref } from 'vue'
 import { createOptimisticCache } from '@tanstack/realtime'
-import { useRealtimeClient } from './context.js'
 import type { OptimisticCache, ReactiveMutationFn } from '@tanstack/realtime'
 import type { Ref } from 'vue'
 
@@ -43,7 +42,6 @@ export function useMutation<TArgs, TResult>(
   serverFn: ReactiveMutationFn<TArgs, TResult>,
   options: UseMutationOptions<TArgs, TResult> = {},
 ): UseMutationResult<TArgs, TResult> {
-  const client = useRealtimeClient('useMutation')
   const isPending = ref(false)
   const error = ref<unknown>(null)
   const data = ref<TResult | undefined>(undefined) as Ref<TResult | undefined>

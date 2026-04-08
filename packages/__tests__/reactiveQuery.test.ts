@@ -162,8 +162,9 @@ describe('query factory — registers subscription', () => {
   it('registered subscription is invalidated when matching write occurs', async () => {
     const published: Array<{ ch: string; data: unknown }> = []
     const backend = {
-      publish: vi.fn(async (ch: string, data: unknown) => {
+      publish: vi.fn((ch: string, data: unknown) => {
         published.push({ ch, data })
+        return Promise.resolve()
       }),
     }
     const handler = createStartHandler({
@@ -193,8 +194,9 @@ describe('query factory — registers subscription', () => {
   it('non-matching invalidation does NOT publish to the channel', async () => {
     const published: Array<{ ch: string; data: unknown }> = []
     const backend = {
-      publish: vi.fn(async (ch: string, data: unknown) => {
+      publish: vi.fn((ch: string, data: unknown) => {
         published.push({ ch, data })
+        return Promise.resolve()
       }),
     }
     const handler = createStartHandler({
@@ -285,8 +287,9 @@ describe('query factory — table-level channel (no WHERE)', () => {
   it('table-level subscription is triggered by affectedRows:[] invalidation', async () => {
     const published: Array<{ ch: string; data: unknown }> = []
     const backend = {
-      publish: vi.fn(async (ch: string, data: unknown) => {
+      publish: vi.fn((ch: string, data: unknown) => {
         published.push({ ch, data })
+        return Promise.resolve()
       }),
     }
     const handler = createStartHandler({
@@ -1736,7 +1739,7 @@ describe('shared cache — deduplication (deriveCacheKey & getOrCreateQueryColle
   })
 
   // 18.4
-  it('getOrCreateQueryCollection: same key called twice → returns same collection reference', async () => {
+  it('getOrCreateQueryCollection: same key called twice → returns same collection reference', () => {
     const serverFn = vi.fn().mockResolvedValue({
       data: [{ id: '1', text: 'item' }],
       channel: 'ch-18-4',

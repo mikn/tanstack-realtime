@@ -84,7 +84,7 @@ export function clearRegistry(): void {
 }
 
 /** WeakMap to assign stable string identifiers to server function references. */
-const fnIds = new WeakMap<Function, string>()
+const fnIds = new WeakMap<object, string>()
 let counter = 0
 
 // ---------------------------------------------------------------------------
@@ -97,7 +97,7 @@ let counter = 0
  * Server functions are identified by object identity (via WeakMap). Args are
  * serialised with `JSON.stringify`, so they must be JSON-serialisable.
  */
-export function deriveCacheKey(fn: Function, args: unknown): string {
+export function deriveCacheKey(fn: object, args: unknown): string {
   if (!fnIds.has(fn)) fnIds.set(fn, `fn_${counter++}`)
   return `${fnIds.get(fn)!}::${JSON.stringify(args)}`
 }
@@ -257,6 +257,10 @@ export function getOrCreateQueryCollection<
   })
 
   const entry: RegistryEntry<TItem> = {
+    // createCollection returns Collection<TItem, string, UtilsRecord, never, TItem> (TSchema=never
+    // since no schema is provided). RegistryEntry uses Collection<TItem, string> whose TSchema
+    // defaults to StandardSchemaV1 — a type parameter that affects no runtime behaviour here.
+    // The double cast bridges this nominal schema type mismatch safely.
     collection: collection as unknown as Collection<TItem, string>,
     getKey,
     currentItems,

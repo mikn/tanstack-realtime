@@ -51,7 +51,7 @@ export function createOptimisticCache(): {
       args: TArgs,
       transform: (prev: Array<TItem>) => Array<TItem>,
     ): void {
-      const key = deriveCacheKey(queryFn as unknown as Function, args)
+      const key = deriveCacheKey(queryFn, args)
       const entry = lookupQueryCollection<TItem>(key)
       if (entry == null) {
         // Query not currently mounted — skip silently.
@@ -81,7 +81,7 @@ export function createOptimisticCache(): {
         const k = entry.getKey(item)
         if (prevKeys.has(k)) {
           entry.collection.update(k, (draft) => {
-            Object.assign(draft as object, item)
+            Object.assign(draft, item)
           })
         } else {
           entry.collection.insert(item)
@@ -106,7 +106,7 @@ export function createOptimisticCache(): {
             entry.collection.insert(item)
           } else {
             entry.collection.update(k, (draft) => {
-              Object.assign(draft as object, item)
+              Object.assign(draft, item)
             })
           }
         }

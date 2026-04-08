@@ -673,7 +673,7 @@ describe('createLoader', () => {
     const loader = createLoader({
       subscriptionManager: mockMgr,
       channel: 'explicit-ch',
-      query: async () => [{ id: 1 }],
+      query: () => Promise.resolve([{ id: 1 }]),
       predicate: { table: 'todos', matches: matchesFn },
     })
 
@@ -698,7 +698,7 @@ describe('createLoader', () => {
     const loader = createLoader({
       subscriptionManager: mockMgr,
       channel: 'explicit-where-ch',
-      query: async () => [{ id: 1 }],
+      query: () => Promise.resolve([{ id: 1 }]),
       predicate: {
         table: 'todos',
         where: fakeWhere,
@@ -729,7 +729,7 @@ describe('createLoader', () => {
 
     const loader = createLoader({
       subscriptionManager: mockMgr,
-      query: async () => [{ id: 1 }],
+      query: () => Promise.resolve([{ id: 1 }]),
       predicate: {
         table: 'todos',
         where: fakeWhere,
@@ -777,7 +777,7 @@ describe('createLoader', () => {
 
     const loader = createLoader({
       subscriptionManager: mockMgr,
-      query: async () => [{ id: 1 }], // plain query, no wrapReactiveDb
+      query: () => Promise.resolve([{ id: 1 }]), // plain query, no wrapReactiveDb
     })
 
     await expect(loader.load()).rejects.toThrow(/no read set captured/)
@@ -865,7 +865,7 @@ describe('createMutationHandler', () => {
 
     const mutation = createMutationHandler({
       subscriptionManager: mockMgr,
-      mutation: async (_input: void) => ({ success: true }),
+      mutation: (_input: void) => Promise.resolve({ success: true }),
       writes: (_result) => explicitWrites,
     })
 
@@ -942,8 +942,9 @@ describe('createStartHandler — reactive integration', () => {
   it('affectedRows:[] write invalidates all subscriptions on that table', async () => {
     const published: Array<{ ch: string; data: unknown }> = []
     const backend = {
-      publish: vi.fn(async (ch: string, data: unknown) => {
+      publish: vi.fn((ch: string, data: unknown) => {
         published.push({ ch, data })
+        return Promise.resolve()
       }),
     }
     const realtime2 = createStartHandler({ backend })

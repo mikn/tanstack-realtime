@@ -1,6 +1,5 @@
 import { createSignal } from 'solid-js'
 import { createOptimisticCache } from '@tanstack/realtime'
-import { useRealtimeClient } from './context.js'
 import type { OptimisticCache, ReactiveMutationFn } from '@tanstack/realtime'
 
 export interface CreateMutationOptions<TArgs, TResult> {
@@ -34,8 +33,6 @@ export function createMutation<TArgs, TResult>(
   serverFn: ReactiveMutationFn<TArgs, TResult>,
   options: CreateMutationOptions<TArgs, TResult> = {},
 ) {
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const client = useRealtimeClient('createMutation')
   const [isPending, setIsPending] = createSignal(false)
   const [error, setError] = createSignal<unknown>(null)
   const [data, setData] = createSignal<TResult | undefined>(undefined)
