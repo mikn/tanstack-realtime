@@ -85,7 +85,7 @@ export function useQuery<TArgs, TResult>(
   const snapshotRef = useRef<TResult | undefined>(undefined)
   const optimisticValueRef = useRef<TResult | undefined>(undefined)
 
-  const typedEntry = entry as QueryEntry<TResult> | undefined
+  const typedEntry = entry
   const entryValue = typedEntry?.value
 
   useEffect(() => {
@@ -112,7 +112,7 @@ export function useQuery<TArgs, TResult>(
     (transform: (prev: TResult | undefined) => TResult) => {
       if (collection == null) return () => undefined
 
-      snapshotRef.current = (entry as QueryEntry<TResult> | undefined)?.value
+      snapshotRef.current = entry?.value
       const newValue = transform(snapshotRef.current)
       optimisticValueRef.current = newValue
       setIsOptimistic(true)
