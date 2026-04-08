@@ -3,48 +3,19 @@ import { createServerStream, serializeKey } from '@tanstack/realtime'
 import { createSubscriptionManager } from './subscription-manager.js'
 import { createReactiveLoader } from './reactive-loader.js'
 import { createReactiveMutation } from './reactive-mutation.js'
-import type { PublishFn, QueryKey, ServerStream } from '@tanstack/realtime'
+import type {
+  PublishFn,
+  QueryKey,
+  ReactiveMutationFn,
+  ReactiveQueryFn,
+  ReactiveQueryResult,
+  ServerStream,
+} from '@tanstack/realtime'
 import type { SseHandlerOptions } from '@tanstack/realtime-adapter-sse'
 import type { SubscriptionManager } from './subscription-manager.js'
 import type { WriteDescriptor } from './reactive-db.js'
 
-// ---------------------------------------------------------------------------
-// ReactiveQueryResult — returned by query() calls (internal)
-// ---------------------------------------------------------------------------
-
-type ReactiveQueryResult<T> = {
-  data: T
-  channel: string
-}
-
-// ---------------------------------------------------------------------------
-// Branded function types for the factory API
-// ---------------------------------------------------------------------------
-
-/**
- * A reactive server query function created by `realtime.query()`.
- * The phantom fields `_tag`, `_args`, `_result` are never set at runtime —
- * they exist only for TypeScript inference in client hooks like `useQuery`.
- */
-export type ReactiveQueryFn<TArgs, TResult> = ((
-  args: TArgs,
-) => Promise<ReactiveQueryResult<TResult>>) & {
-  readonly _tag: 'ReactiveQuery'
-  readonly _args: TArgs
-  readonly _result: TResult
-}
-
-/**
- * A reactive server mutation function created by `realtime.mutation()`.
- * The phantom fields exist only for TypeScript inference in `useMutation`.
- */
-export type ReactiveMutationFn<TArgs, TResult> = ((
-  args: TArgs,
-) => Promise<TResult>) & {
-  readonly _tag: 'ReactiveMutation'
-  readonly _args: TArgs
-  readonly _result: TResult
-}
+export type { ReactiveQueryFn, ReactiveMutationFn }
 
 // ---------------------------------------------------------------------------
 // PublishBackend — pluggable pub/sub storage interface

@@ -26,6 +26,32 @@ export type ReactiveQueryResult<T> = {
   channel: string
 }
 
+/**
+ * A reactive server query function created by `realtime.query()`.
+ * The phantom fields `_tag`, `_args`, `_result` are never set at runtime —
+ * they exist only for TypeScript inference in client hooks like `useQuery`.
+ */
+export type ReactiveQueryFn<TArgs, TResult> = ((
+  args: TArgs,
+) => Promise<ReactiveQueryResult<TResult>>) & {
+  readonly _tag: 'ReactiveQuery'
+  readonly _args: TArgs
+  readonly _result: TResult
+}
+
+/**
+ * A reactive server mutation function created by `realtime.mutation()`.
+ * The phantom fields `_tag`, `_args`, `_result` are never set at runtime —
+ * they exist only for TypeScript inference in client hooks like `useMutation`.
+ */
+export type ReactiveMutationFn<TArgs, TResult> = ((
+  args: TArgs,
+) => Promise<TResult>) & {
+  readonly _tag: 'ReactiveMutation'
+  readonly _args: TArgs
+  readonly _result: TResult
+}
+
 // Internal registry entry shape — not exported
 type RegistryEntry = {
   collection: Collection<QueryEntry<unknown>, string>

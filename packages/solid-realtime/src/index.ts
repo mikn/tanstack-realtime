@@ -70,20 +70,17 @@ export type { UseChannelStatsResult } from './useChannelStats.js'
 
 export { useOnReconnect } from './useOnReconnect.js'
 
-export { createReactiveQuery } from './createReactiveQuery.js'
-export type {
-  CreateReactiveQueryOptions,
-  ReactiveQueryResult,
-} from './createReactiveQuery.js'
+export { createQuery } from './createQuery.js'
+export type { CreateQueryOptions } from './createQuery.js'
 
-export { createReactivePaginatedQuery } from './createReactivePaginatedQuery.js'
+export { createPaginatedQuery } from './createPaginatedQuery.js'
 export type {
-  CreateReactivePaginatedQueryOptions,
+  CreatePaginatedQueryOptions,
   PaginatedPage,
-} from './createReactivePaginatedQuery.js'
+} from './createPaginatedQuery.js'
 
-export { createReactiveMutation } from './createReactiveMutation.js'
-export type { CreateReactiveMutationOptions } from './createReactiveMutation.js'
+export { createMutation } from './createMutation.js'
+export type { CreateMutationOptions } from './createMutation.js'
 
 // CRDT standalone primitives
 export { useSyncedCounter } from './useSyncedCounter.js'

@@ -250,6 +250,8 @@ export {
 } from './queryCollectionRegistry.js'
 export type {
   QueryEntry,
+  ReactiveQueryFn,
+  ReactiveMutationFn,
   ReactiveQueryResult,
 } from './queryCollectionRegistry.js'
 
