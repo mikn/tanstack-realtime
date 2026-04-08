@@ -69,25 +69,25 @@ function App() {
           <code>useSyncedSet</code>
         </li>
         <li>
-          <code>useReactiveQuery</code>, <code>useReactiveMutation</code>,{' '}
-          <code>useReactivePaginatedQuery</code>
+          <code>createQuery</code>, <code>createMutation</code>,{' '}
+          <code>createPaginatedQuery</code>
         </li>
       </ul>
 
-      <h2 id="createReactiveQuery">createReactiveQuery</h2>
+      <h2 id="createQuery">createQuery</h2>
       <p>
-        Solid alias for <code>useReactiveQuery</code>. Subscribes to a reactive
+        Solid primitive for reactive server queries. Subscribes to a reactive
         server query and keeps the result live via a shared SSE connection. See
         the <a href="#/docs/reactive-queries">Reactive Queries</a> guide for
         full examples.
       </p>
       <CodeBlock
         title="TodoList.tsx"
-        code={`import { createReactiveQuery } from '@tanstack/solid-realtime'
-import { fetchTodos } from '../server/todos'
+        code={`import { createQuery } from '@tanstack/solid-realtime'
+import { getTodos } from '../server/todos'
 
 function TodoList(props: { teamId: string }) {
-  const query = createReactiveQuery(fetchTodos, () => ({ teamId: props.teamId }))
+  const query = createQuery(getTodos, () => ({ teamId: props.teamId }))
 
   return (
     <Show when={!query.isPending} fallback={<p>Loading…</p>}>
@@ -100,8 +100,8 @@ function TodoList(props: { teamId: string }) {
       />
       <h3>Signature</h3>
       <CodeBlock
-        code={`function createReactiveQuery<TResult, TArgs>(
-  serverFn: (args: TArgs) => Promise<ReactiveQueryResult<TResult>>,
+        code={`function createQuery<TArgs, TResult>(
+  serverFn: ReactiveQueryFn<TArgs, TResult>,
   args: () => TArgs,          // reactive accessor — reruns when args change
   options?: {
     enabled?: boolean
@@ -118,32 +118,32 @@ function TodoList(props: { teamId: string }) {
 }`}
       />
 
-      <h2 id="createReactiveMutation">createReactiveMutation</h2>
+      <h2 id="createMutation">createMutation</h2>
       <p>
-        Solid alias for <code>useReactiveMutation</code>. Wraps an async
-        mutation function with loading state and error handling. See the{' '}
-        <a href="#/docs/reactive-queries">Reactive Queries</a> guide for full
-        examples.
+        Solid primitive for reactive mutations. Wraps an async mutation function
+        with loading state, error handling, and declarative optimistic updates.
+        See the <a href="#/docs/reactive-queries">Reactive Queries</a> guide for
+        full examples.
       </p>
       <CodeBlock
         title="AddTodoForm.tsx"
-        code={`import { createReactiveMutation } from '@tanstack/solid-realtime'
-import { createTodo } from '../server/todos'
+        code={`import { createMutation } from '@tanstack/solid-realtime'
+import { getTodos, createTodo } from '../server/todos'
 
 function AddTodoForm(props: { teamId: string }) {
-  const mutation = createReactiveMutation(createTodo)
+  const mutation = createMutation(createTodo, {
+    optimistic: (cache, args) => {
+      cache.update(getTodos, { teamId: args.teamId }, (prev) => [
+        ...(prev ?? []),
+        { id: crypto.randomUUID(), title: args.title, done: false },
+      ])
+    },
+  })
 
   return (
     <button
       disabled={mutation.isPending}
-      onClick={() =>
-        mutation.mutate({
-          id: crypto.randomUUID(),
-          teamId: props.teamId,
-          title: 'New todo',
-          done: false,
-        })
-      }
+      onClick={() => mutation.mutate({ teamId: props.teamId, title: 'New todo' })}
     >
       {mutation.isPending ? 'Saving…' : 'Add'}
     </button>
@@ -152,11 +152,12 @@ function AddTodoForm(props: { teamId: string }) {
       />
       <h3>Signature</h3>
       <CodeBlock
-        code={`function createReactiveMutation<TArgs, TResult = unknown>(
-  mutateFn: (args: TArgs) => Promise<TResult>,
+        code={`function createMutation<TArgs, TResult>(
+  serverFn: ReactiveMutationFn<TArgs, TResult>,
   options?: {
-    onSuccess?: (data: TResult) => void
-    onError?: (error: unknown) => void
+    optimistic?: (cache: OptimisticCache, args: TArgs) => void
+    onSuccess?: (data: TResult, args: TArgs) => void
+    onError?: (error: unknown, args: TArgs) => void
   }
 ): {
   mutate: (args: TArgs) => Promise<TResult>
@@ -167,21 +168,21 @@ function AddTodoForm(props: { teamId: string }) {
 }`}
       />
 
-      <h2 id="createReactivePaginatedQuery">createReactivePaginatedQuery</h2>
+      <h2 id="createPaginatedQuery">createPaginatedQuery</h2>
       <p>
-        Solid alias for <code>useReactivePaginatedQuery</code>. Paginated
-        variant that accumulates pages and keeps each page live. See the{' '}
+        Paginated variant of <code>createQuery</code>. Accumulates pages and
+        keeps the first page live. See the{' '}
         <a href="#/docs/reactive-queries">Reactive Queries</a> guide for full
         examples.
       </p>
       <CodeBlock
         title="FeedList.tsx"
-        code={`import { createReactivePaginatedQuery } from '@tanstack/solid-realtime'
-import { fetchFeedPage } from '../server/feed'
+        code={`import { createPaginatedQuery } from '@tanstack/solid-realtime'
+import { getFeedPage } from '../server/feed'
 
 function FeedList(props: { teamId: string }) {
-  const query = createReactivePaginatedQuery(
-    fetchFeedPage,
+  const query = createPaginatedQuery(
+    getFeedPage,
     () => ({ teamId: props.teamId }),
   )
 
@@ -201,24 +202,22 @@ function FeedList(props: { teamId: string }) {
       />
       <h3>Signature</h3>
       <CodeBlock
-        code={`function createReactivePaginatedQuery<TItem, TArgs>(
-  serverFn: (args: TArgs & { cursor?: string }) => Promise<ReactiveQueryResult<{
-    items: TItem[]
-    nextCursor?: string
-  }>>,
-  args: () => TArgs,
+        code={`function createPaginatedQuery<TItem, TArgs extends { cursor?: string | number | null; limit?: number }>(
+  serverFn: ReactiveQueryFn<TArgs, PaginatedPage<TItem>>,
+  args: () => Omit<TArgs, 'cursor' | 'limit'>,
   options?: {
+    pageSize?: number
     enabled?: boolean
     refetchOnReconnect?: boolean
   }
 ): {
   items: TItem[]
   isPending: boolean
-  isFetching: boolean
-  error: unknown
-  hasNextPage: boolean
   isFetchingNextPage: boolean
-  fetchNextPage: () => void
+  hasNextPage: boolean
+  error: unknown
+  fetchNextPage: () => Promise<void>
+  refetch: () => void
 }`}
       />
 

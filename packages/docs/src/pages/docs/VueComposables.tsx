@@ -69,12 +69,12 @@ import { client } from './client'
           <code>useSyncedSet</code>
         </li>
         <li>
-          <code>useReactiveQuery</code>, <code>useReactiveMutation</code>,{' '}
-          <code>useReactivePaginatedQuery</code>
+          <code>useQuery</code>, <code>useMutation</code>,{' '}
+          <code>usePaginatedQuery</code>
         </li>
       </ul>
 
-      <h2 id="useReactiveQuery">useReactiveQuery</h2>
+      <h2 id="useQuery">useQuery</h2>
       <p>
         Subscribes to a reactive server query and keeps the result live. The{' '}
         <code>args</code> parameter accepts a plain object or a{' '}
@@ -87,13 +87,13 @@ import { client } from './client'
         title="TodoList.vue"
         code={`<script setup lang="ts">
 import { toRef } from 'vue'
-import { useReactiveQuery } from '@tanstack/vue-realtime'
-import { fetchTodos } from '../server/todos'
+import { useQuery } from '@tanstack/vue-realtime'
+import { getTodos } from '../server/todos'
 
 const props = defineProps<{ teamId: string }>()
 
-const { data, isPending, error, optimisticUpdate } = useReactiveQuery(
-  fetchTodos,
+const { data, isPending, error } = useQuery(
+  getTodos,
   toRef(props, 'teamId').value ? { teamId: props.teamId } : { teamId: '' },
 )
 </script>
@@ -108,8 +108,8 @@ const { data, isPending, error, optimisticUpdate } = useReactiveQuery(
       />
       <h3>Signature</h3>
       <CodeBlock
-        code={`function useReactiveQuery<TResult, TArgs>(
-  serverFn: (args: TArgs) => Promise<ReactiveQueryResult<TResult>>,
+        code={`function useQuery<TArgs, TResult>(
+  serverFn: ReactiveQueryFn<TArgs, TResult>,
   args: MaybeRef<TArgs>,      // plain object or ref — reactive refs are tracked
   options?: {
     enabled?: boolean
@@ -126,29 +126,34 @@ const { data, isPending, error, optimisticUpdate } = useReactiveQuery(
 }`}
       />
 
-      <h2 id="useReactiveMutation">useReactiveMutation</h2>
+      <h2 id="useMutation">useMutation</h2>
       <p>
-        Mutation composable with loading state and error handling. Pair it with{' '}
-        <code>optimisticUpdate</code> from <code>useReactiveQuery</code> for
-        full optimistic UI. See the{' '}
+        Mutation composable with loading state, error handling, and declarative
+        optimistic updates. See the{' '}
         <a href="#/docs/reactive-queries">Reactive Queries</a> guide for full
         examples.
       </p>
       <CodeBlock
         title="AddTodoForm.vue"
         code={`<script setup lang="ts">
-import { useReactiveMutation } from '@tanstack/vue-realtime'
-import { createTodo } from '../server/todos'
+import { useMutation } from '@tanstack/vue-realtime'
+import { getTodos, createTodo } from '../server/todos'
 
 const props = defineProps<{ teamId: string }>()
 
-const { mutate, isPending, error, reset } = useReactiveMutation(createTodo, {
+const { mutate, isPending, error, reset } = useMutation(createTodo, {
+  optimistic: (cache, args) => {
+    cache.update(getTodos, { teamId: args.teamId }, (prev) => [
+      ...(prev ?? []),
+      { id: crypto.randomUUID(), title: args.title, done: false },
+    ])
+  },
   onSuccess: (todo) => console.log('Created:', todo.id),
   onError:   (err) => console.error('Failed:', err),
 })
 
 function handleAdd() {
-  mutate({ id: crypto.randomUUID(), teamId: props.teamId, title: 'New', done: false })
+  mutate({ teamId: props.teamId, title: 'New todo' })
 }
 </script>
 
@@ -161,11 +166,12 @@ function handleAdd() {
       />
       <h3>Signature</h3>
       <CodeBlock
-        code={`function useReactiveMutation<TArgs, TResult = unknown>(
-  mutateFn: (args: TArgs) => Promise<TResult>,
+        code={`function useMutation<TArgs, TResult>(
+  serverFn: ReactiveMutationFn<TArgs, TResult>,
   options?: {
-    onSuccess?: (data: TResult) => void
-    onError?: (error: unknown) => void
+    optimistic?: (cache: OptimisticCache, args: TArgs) => void
+    onSuccess?: (data: TResult, args: TArgs) => void
+    onError?: (error: unknown, args: TArgs) => void
   }
 ): {
   mutate: (args: TArgs) => Promise<TResult>
@@ -176,10 +182,10 @@ function handleAdd() {
 }`}
       />
 
-      <h2 id="useReactivePaginatedQuery">useReactivePaginatedQuery</h2>
+      <h2 id="usePaginatedQuery">usePaginatedQuery</h2>
       <p>
-        Paginated variant of <code>useReactiveQuery</code>. Accumulates pages as
-        you call <code>fetchNextPage</code> and keeps each page live. The{' '}
+        Paginated variant of <code>useQuery</code>. Accumulates pages as you
+        call <code>fetchNextPage</code> and keeps the first page live. The{' '}
         <code>args</code> parameter accepts <code>MaybeRef&lt;TArgs&gt;</code>.
         See the <a href="#/docs/reactive-queries">Reactive Queries</a> guide for
         full examples.
@@ -187,13 +193,13 @@ function handleAdd() {
       <CodeBlock
         title="FeedList.vue"
         code={`<script setup lang="ts">
-import { useReactivePaginatedQuery } from '@tanstack/vue-realtime'
-import { fetchFeedPage } from '../server/feed'
+import { usePaginatedQuery } from '@tanstack/vue-realtime'
+import { getFeedPage } from '../server/feed'
 
 const props = defineProps<{ teamId: string }>()
 
 const { items, isPending, hasNextPage, isFetchingNextPage, fetchNextPage } =
-  useReactivePaginatedQuery(fetchFeedPage, { teamId: props.teamId })
+  usePaginatedQuery(getFeedPage, { teamId: props.teamId })
 </script>
 
 <template>
@@ -208,24 +214,22 @@ const { items, isPending, hasNextPage, isFetchingNextPage, fetchNextPage } =
       />
       <h3>Signature</h3>
       <CodeBlock
-        code={`function useReactivePaginatedQuery<TItem, TArgs>(
-  serverFn: (args: TArgs & { cursor?: string }) => Promise<ReactiveQueryResult<{
-    items: TItem[]
-    nextCursor?: string
-  }>>,
-  args: MaybeRef<TArgs>,
+        code={`function usePaginatedQuery<TItem, TArgs extends { cursor?: string | number | null; limit?: number }>(
+  serverFn: ReactiveQueryFn<TArgs, PaginatedPage<TItem>>,
+  args: MaybeRef<Omit<TArgs, 'cursor' | 'limit'>>,
   options?: {
+    pageSize?: number
     enabled?: boolean
     refetchOnReconnect?: boolean
   }
 ): {
   items: Ref<TItem[]>
   isPending: Ref<boolean>
-  isFetching: Ref<boolean>
-  error: Ref<unknown>
-  hasNextPage: Ref<boolean>
   isFetchingNextPage: Ref<boolean>
-  fetchNextPage: () => void
+  hasNextPage: Ref<boolean>
+  error: Ref<unknown>
+  fetchNextPage: () => Promise<void>
+  refetch: () => void
 }`}
       />
 

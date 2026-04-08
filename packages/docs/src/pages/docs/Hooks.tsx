@@ -583,7 +583,7 @@ function TagEditor({ postId }: { postId: string }) {
         ephemeral animations with persistent CRDT counters.
       </p>
 
-      <h2 id="useReactiveQuery">useReactiveQuery</h2>
+      <h2 id="useQuery">useQuery</h2>
       <p>
         Subscribes to a reactive server query and keeps the result live. See the{' '}
         <a href="#/docs/reactive-queries">Reactive Queries</a> guide for full
@@ -591,12 +591,12 @@ function TagEditor({ postId }: { postId: string }) {
       </p>
       <CodeBlock
         title="TodoList.tsx"
-        code={`import { useReactiveQuery } from '@tanstack/react-realtime'
-import { fetchTodos } from '../server/todos'
+        code={`import { useQuery } from '@tanstack/react-realtime'
+import { getTodos } from '../server/todos'
 
 function TodoList({ teamId }: { teamId: string }) {
   const { data, isPending, error, optimisticUpdate } =
-    useReactiveQuery(fetchTodos, { teamId })
+    useQuery(getTodos, { teamId })
 
   if (isPending) return <p>Loading…</p>
   if (error)     return <p>Error: {String(error)}</p>
@@ -605,8 +605,8 @@ function TodoList({ teamId }: { teamId: string }) {
       />
       <h3>Signature</h3>
       <CodeBlock
-        code={`function useReactiveQuery<TResult, TArgs>(
-  serverFn: (args: TArgs) => Promise<ReactiveQueryResult<TResult>>,
+        code={`function useQuery<TArgs, TResult>(
+  serverFn: ReactiveQueryFn<TArgs, TResult>,
   args: TArgs,
   options?: {
     enabled?: boolean            // default: true
@@ -623,24 +623,32 @@ function TodoList({ teamId }: { teamId: string }) {
 }`}
       />
 
-      <h2 id="useReactiveMutation">useReactiveMutation</h2>
+      <h2 id="useMutation">useMutation</h2>
       <p>
-        Mutation hook with loading state and error handling. See the{' '}
+        Mutation hook with loading state, error handling, and declarative
+        optimistic updates. See the{' '}
         <a href="#/docs/reactive-queries">Reactive Queries</a> guide for full
         examples.
       </p>
       <CodeBlock
         title="AddTodoForm.tsx"
-        code={`import { useReactiveMutation } from '@tanstack/react-realtime'
-import { createTodo } from '../server/todos'
+        code={`import { useMutation } from '@tanstack/react-realtime'
+import { getTodos, createTodo } from '../server/todos'
 
 function AddTodoForm({ teamId }: { teamId: string }) {
-  const { mutate, isPending, error } = useReactiveMutation(createTodo)
+  const { mutate, isPending, error } = useMutation(createTodo, {
+    optimistic: (cache, args) => {
+      cache.update(getTodos, { teamId: args.teamId }, (prev) => [
+        ...(prev ?? []),
+        { id: crypto.randomUUID(), title: args.title, done: false },
+      ])
+    },
+  })
 
   return (
     <button
       disabled={isPending}
-      onClick={() => mutate({ id: crypto.randomUUID(), teamId, title: 'New', done: false })}
+      onClick={() => mutate({ teamId, title: 'New todo' })}
     >
       {isPending ? 'Saving…' : 'Add'}
     </button>
@@ -649,11 +657,12 @@ function AddTodoForm({ teamId }: { teamId: string }) {
       />
       <h3>Signature</h3>
       <CodeBlock
-        code={`function useReactiveMutation<TArgs, TResult = unknown>(
-  mutateFn: (args: TArgs) => Promise<TResult>,
+        code={`function useMutation<TArgs, TResult>(
+  serverFn: ReactiveMutationFn<TArgs, TResult>,
   options?: {
-    onSuccess?: (data: TResult) => void
-    onError?: (error: unknown) => void
+    optimistic?: (cache: OptimisticCache, args: TArgs) => void
+    onSuccess?: (data: TResult, args: TArgs) => void
+    onError?: (error: unknown, args: TArgs) => void
   }
 ): {
   mutate: (args: TArgs) => Promise<TResult>
@@ -664,21 +673,21 @@ function AddTodoForm({ teamId }: { teamId: string }) {
 }`}
       />
 
-      <h2 id="useReactivePaginatedQuery">useReactivePaginatedQuery</h2>
+      <h2 id="usePaginatedQuery">usePaginatedQuery</h2>
       <p>
-        Paginated variant of <code>useReactiveQuery</code>. Accumulates pages
-        and keeps each page live. See the{' '}
+        Paginated variant of <code>useQuery</code>. Accumulates pages and keeps
+        the first page live. See the{' '}
         <a href="#/docs/reactive-queries">Reactive Queries</a> guide for full
         examples.
       </p>
       <CodeBlock
         title="FeedList.tsx"
-        code={`import { useReactivePaginatedQuery } from '@tanstack/react-realtime'
-import { fetchFeedPage } from '../server/feed'
+        code={`import { usePaginatedQuery } from '@tanstack/react-realtime'
+import { getFeedPage } from '../server/feed'
 
 function FeedList({ teamId }: { teamId: string }) {
   const { items, isPending, hasNextPage, fetchNextPage } =
-    useReactivePaginatedQuery(fetchFeedPage, { teamId })
+    usePaginatedQuery(getFeedPage, { teamId })
 
   return (
     <>
@@ -690,24 +699,22 @@ function FeedList({ teamId }: { teamId: string }) {
       />
       <h3>Signature</h3>
       <CodeBlock
-        code={`function useReactivePaginatedQuery<TItem, TArgs>(
-  serverFn: (args: TArgs & { cursor?: string }) => Promise<ReactiveQueryResult<{
-    items: TItem[]
-    nextCursor?: string
-  }>>,
-  args: TArgs,
+        code={`function usePaginatedQuery<TItem, TArgs extends { cursor?: string | number | null; limit?: number }>(
+  serverFn: ReactiveQueryFn<TArgs, PaginatedPage<TItem>>,
+  args: Omit<TArgs, 'cursor' | 'limit'>,
   options?: {
+    pageSize?: number
     enabled?: boolean
     refetchOnReconnect?: boolean
   }
 ): {
   items: TItem[]
   isPending: boolean
-  isFetching: boolean
-  error: unknown
-  hasNextPage: boolean
   isFetchingNextPage: boolean
-  fetchNextPage: () => void
+  hasNextPage: boolean
+  error: unknown
+  fetchNextPage: () => Promise<void>
+  refetch: () => void
 }`}
       />
     </article>
