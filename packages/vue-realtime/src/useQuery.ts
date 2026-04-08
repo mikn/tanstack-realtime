@@ -13,7 +13,7 @@ export interface UseQueryOptions<TItem> {
   refetchOnReconnect?: MaybeRef<boolean>
 }
 
-export interface UseQueryResult<TItem> {
+export interface UseQueryResult<TItem extends Record<string, unknown>> {
   /** The live array of items from the server, or `[]` before the first fetch. */
   data: Ref<Array<TItem>>
   /** The TanStack DB collection — pass to `useLiveQuery` for client-side queries. */
@@ -54,7 +54,7 @@ export interface UseQueryResult<TItem> {
  *   { getKey: (t) => t.id },
  * )
  */
-export function useQuery<TArgs, TItem>(
+export function useQuery<TArgs, TItem extends Record<string, unknown>>(
   serverFn: ReactiveQueryFn<TArgs, Array<TItem>>,
   args: MaybeRef<TArgs>,
   options: UseQueryOptions<TItem>,

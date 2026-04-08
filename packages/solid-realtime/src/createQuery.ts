@@ -3,7 +3,6 @@ import { deriveCacheKey, getOrCreateQueryCollection } from '@tanstack/realtime'
 import { useRealtimeClient } from './context.js'
 import { useOnReconnect } from './useOnReconnect.js'
 import type { Accessor } from 'solid-js'
-import type { Collection } from '@tanstack/db'
 import type { ReactiveQueryFn } from '@tanstack/realtime'
 
 export interface CreateQueryOptions<TItem> {
@@ -38,7 +37,7 @@ export interface CreateQueryOptions<TItem> {
  *   { getKey: (t) => t.id },
  * )
  */
-export function createQuery<TArgs, TItem>(
+export function createQuery<TArgs, TItem extends Record<string, unknown>>(
   serverFn: ReactiveQueryFn<TArgs, Array<TItem>>,
   args: Accessor<TArgs>,
   options: CreateQueryOptions<TItem>,
@@ -104,21 +103,19 @@ export function createQuery<TArgs, TItem>(
     re.dataListeners.add(onData)
 
     // Subscribe to collection changes to keep itemsMap reactive
-    const sub = (re.collection as Collection<TItem, string>).subscribeChanges(
-      (changes) => {
-        setItemsMap((prev) => {
-          const next = new Map(prev)
-          for (const change of changes) {
-            if (change.type === 'delete') {
-              next.delete(String(change.key))
-            } else {
-              next.set(String(change.key), change.value)
-            }
+    const sub = re.collection.subscribeChanges((changes) => {
+      setItemsMap((prev) => {
+        const next = new Map(prev)
+        for (const change of changes) {
+          if (change.type === 'delete') {
+            next.delete(String(change.key))
+          } else {
+            next.set(String(change.key), change.value)
           }
-          return next
-        })
-      },
-    )
+        }
+        return next
+      })
+    })
 
     onCleanup(() => {
       re.readyListeners.delete(onReady)
@@ -139,10 +136,7 @@ export function createQuery<TArgs, TItem>(
 
   const data = createMemo(() => Array.from(itemsMap().values()))
 
-  const collection = createMemo(
-    () =>
-      (registryEntry()?.collection ?? null) as Collection<TItem, string> | null,
-  )
+  const collection = createMemo(() => registryEntry()?.collection ?? null)
 
   const isPending = createMemo(() => {
     const enabled = options.enabled?.() ?? true

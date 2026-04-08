@@ -22,7 +22,7 @@ import type { ReactiveQueryFn } from './queryCollectionRegistry.js'
  * })
  */
 export interface OptimisticCache {
-  update: <TArgs, TItem>(
+  update: <TArgs, TItem extends Record<string, unknown>>(
     queryFn: ReactiveQueryFn<TArgs, Array<TItem>>,
     args: TArgs,
     transform: (prev: Array<TItem>) => Array<TItem>,
@@ -46,7 +46,7 @@ export function createOptimisticCache(): {
   const rollbacks: Array<() => void> = []
 
   const cache: OptimisticCache = {
-    update<TArgs, TItem>(
+    update<TArgs, TItem extends Record<string, unknown>>(
       queryFn: ReactiveQueryFn<TArgs, Array<TItem>>,
       args: TArgs,
       transform: (prev: Array<TItem>) => Array<TItem>,
@@ -84,7 +84,7 @@ export function createOptimisticCache(): {
             Object.assign(draft as object, item)
           })
         } else {
-          entry.collection.insert(item as unknown as Record<string, unknown>)
+          entry.collection.insert(item)
         }
         entry.currentItems.set(k, item)
       }
@@ -103,7 +103,7 @@ export function createOptimisticCache(): {
         // Restore items that were updated or removed.
         for (const [k, item] of snapshot) {
           if (!currentKeys.has(k)) {
-            entry.collection.insert(item as unknown as Record<string, unknown>)
+            entry.collection.insert(item)
           } else {
             entry.collection.update(k, (draft) => {
               Object.assign(draft as object, item)

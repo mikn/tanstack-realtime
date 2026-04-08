@@ -42,7 +42,7 @@ export interface UseQueryOptions<TItem> {
  *   [collection],
  * )
  */
-export function useQuery<TArgs, TItem>(
+export function useQuery<TArgs, TItem extends Record<string, unknown>>(
   serverFn: ReactiveQueryFn<TArgs, Array<TItem>>,
   args: TArgs,
   options: UseQueryOptions<TItem>,
@@ -81,10 +81,7 @@ export function useQuery<TArgs, TItem>(
     [cacheKey, client, enabled],
   )
 
-  const collection = (registryEntry?.collection ?? null) as Collection<
-    TItem,
-    string
-  > | null
+  const collection = registryEntry?.collection ?? null
 
   const { data: items, isLoading } = useLiveQuery(
     (q) => (collection != null ? q.from({ result: collection }) : null),

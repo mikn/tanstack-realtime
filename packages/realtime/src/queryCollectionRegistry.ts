@@ -43,7 +43,9 @@ export type ReactiveMutationFn<TArgs, TResult> = ((
 }
 
 // Internal registry entry shape — not exported
-type RegistryEntry<TItem = unknown> = {
+type RegistryEntry<
+  TItem extends Record<string, unknown> = Record<string, unknown>,
+> = {
   collection: Collection<TItem, string>
   getKey: (item: TItem) => string
   /** Live map of server-confirmed items, keyed by getKey(item). */
@@ -104,7 +106,7 @@ export function deriveCacheKey(fn: Function, args: unknown): string {
  * Look up an existing registry entry without creating one.
  * Used by `optimisticCache` to apply optimistic updates to already-mounted queries.
  */
-export function lookupQueryCollection<TItem>(
+export function lookupQueryCollection<TItem extends Record<string, unknown>>(
   key: string,
 ): RegistryEntry<TItem> | null {
   const entry = registry.get(key)
@@ -123,7 +125,9 @@ export function lookupQueryCollection<TItem>(
  * changed items are updated, and removed items are deleted — all in a single
  * synchronous batch so downstream reactive queries see a consistent snapshot.
  */
-export function getOrCreateQueryCollection<TItem>(
+export function getOrCreateQueryCollection<
+  TItem extends Record<string, unknown>,
+>(
   key: string,
   serverFn: (args: unknown) => Promise<ReactiveQueryResult<Array<TItem>>>,
   args: unknown,
@@ -168,14 +172,17 @@ export function getOrCreateQueryCollection<TItem>(
           // Delete items no longer in the result set
           for (const k of prevKeys) {
             if (!newKeys.has(k)) {
-              write({ type: 'delete', value: currentItems.get(k)! })
+              write({ type: 'delete', key: k })
             }
           }
 
           // Insert new items / update existing ones
           for (const item of data) {
             const k = getKey(item)
-            write({ type: prevKeys.has(k) ? 'update' : 'insert', value: item })
+            write({
+              type: prevKeys.has(k) ? 'update' : 'insert',
+              value: item,
+            })
             currentItems.set(k, item)
           }
 
@@ -262,7 +269,7 @@ export function getOrCreateQueryCollection<TItem>(
     errorListeners: new Set(),
     dataListeners: new Set(),
   }
-  registry.set(key, entry as RegistryEntry<unknown>)
+  registry.set(key, entry as RegistryEntry<Record<string, unknown>>)
   return entry
 }
 
