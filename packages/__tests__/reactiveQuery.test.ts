@@ -21,6 +21,7 @@ import {
   wrapReactiveDb,
 } from '@tanstack/realtime-preset-start'
 import {
+  REALTIME_BATCH_CHANNEL,
   clearRegistry,
   deriveCacheKey,
   getOrCreateQueryCollection,
@@ -157,10 +158,10 @@ describe('query factory — registers subscription', () => {
   })
 
   it('registered subscription is invalidated when matching write occurs', async () => {
-    const publishedChannels: Array<string> = []
+    const published: Array<{ ch: string; data: unknown }> = []
     const backend = {
-      publish: vi.fn(async (ch: string, _data: unknown) => {
-        publishedChannels.push(ch)
+      publish: vi.fn(async (ch: string, data: unknown) => {
+        published.push({ ch, data })
       }),
     }
     const handler = createStartHandler({
@@ -178,12 +179,21 @@ describe('query factory — registers subscription', () => {
       { table: 'todos', affectedRows: [{ teamId: 'A' }] },
     ])
 
-    expect(publishedChannels).toContain(channel)
+    // Server now publishes a single batch message to __realtime_batch__
+    const batchMsg = published.find((p) => p.ch === REALTIME_BATCH_CHANNEL)
+    expect(batchMsg).toBeDefined()
+    const updates = (
+      batchMsg!.data as { type: string; updates: Array<{ channel: string }> }
+    ).updates
+    expect(updates.some((u) => u.channel === channel)).toBe(true)
   })
 
   it('non-matching invalidation does NOT publish to the channel', async () => {
+    const published: Array<{ ch: string; data: unknown }> = []
     const backend = {
-      publish: vi.fn(async (_ch: string, _data: unknown) => {}),
+      publish: vi.fn(async (ch: string, data: unknown) => {
+        published.push({ ch, data })
+      }),
     }
     const handler = createStartHandler({
       backend,
@@ -200,8 +210,17 @@ describe('query factory — registers subscription', () => {
       { table: 'todos', affectedRows: [{ teamId: 'B' }] },
     ])
 
-    const publishCallChannels = backend.publish.mock.calls.map((c) => c[0])
-    expect(publishCallChannels).not.toContain(channel)
+    // No batch message should have been published for a non-matching invalidation.
+    // If a batch IS sent (edge case), it must not contain the team-A channel.
+    const allPublishedChannels = published.flatMap((p) => {
+      if (p.ch !== REALTIME_BATCH_CHANNEL) return [p.ch]
+      const msg = p.data as {
+        type: string
+        updates: Array<{ channel: string }>
+      }
+      return msg.updates.map((u) => u.channel)
+    })
+    expect(allPublishedChannels).not.toContain(channel)
   })
 
   it('two query calls with the same manager both register the same channel for same query', async () => {
@@ -262,10 +281,10 @@ describe('query factory — table-level channel (no WHERE)', () => {
   })
 
   it('table-level subscription is triggered by affectedRows:[] invalidation', async () => {
-    const published: Array<{ channel: string; data: unknown }> = []
+    const published: Array<{ ch: string; data: unknown }> = []
     const backend = {
       publish: vi.fn(async (ch: string, data: unknown) => {
-        published.push({ channel: ch, data })
+        published.push({ ch, data })
       }),
     }
     const handler = createStartHandler({
@@ -281,8 +300,13 @@ describe('query factory — table-level channel (no WHERE)', () => {
     // Table-level invalidation (no specific rows)
     await handler.invalidate([{ table: 'todos', affectedRows: [] }])
 
-    const publishedChannels = published.map((p) => p.channel)
-    expect(publishedChannels).toContain(channel)
+    // Server now publishes a single batch message to __realtime_batch__
+    const batchMsg = published.find((p) => p.ch === REALTIME_BATCH_CHANNEL)
+    expect(batchMsg).toBeDefined()
+    const updates = (
+      batchMsg!.data as { type: string; updates: Array<{ channel: string }> }
+    ).updates
+    expect(updates.some((u) => u.channel === channel)).toBe(true)
   })
 })
 

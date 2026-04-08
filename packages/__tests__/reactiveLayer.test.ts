@@ -8,6 +8,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { serializeKey } from '@tanstack/realtime'
 import {
+  REALTIME_BATCH_CHANNEL,
   ReactivePredicateParseError,
   compilePredicate,
   createStartHandler,
@@ -415,7 +416,12 @@ describe('SubscriptionManager', () => {
     await mgr.invalidate([{ table: 'todos', affectedRows: [{ teamId: 'A' }] }])
 
     expect(entry.requery).toHaveBeenCalledTimes(1)
-    expect(publishFn).toHaveBeenCalledWith('ch-A', { data: 'fresh' })
+    // Server now publishes a single batch message to __realtime_batch__
+    // data is the raw result of entry.requery() = { data: 'fresh' }
+    expect(publishFn).toHaveBeenCalledWith(REALTIME_BATCH_CHANNEL, {
+      type: 'realtime_batch',
+      updates: [{ channel: 'ch-A', data: { data: 'fresh' } }],
+    })
   })
 
   it('invalidate with non-matching row: requery not called', async () => {
@@ -930,8 +936,11 @@ describe('createStartHandler — reactive integration', () => {
   })
 
   it('affectedRows:[] write invalidates all subscriptions on that table', async () => {
+    const published: Array<{ ch: string; data: unknown }> = []
     const backend = {
-      publish: vi.fn(async (_ch: string, _data: unknown) => {}),
+      publish: vi.fn(async (ch: string, data: unknown) => {
+        published.push({ ch, data })
+      }),
     }
     const realtime2 = createStartHandler({ backend })
     const wrappedDb2 = makeReactiveDb([{ id: 1, teamId: 'A' }], [])
@@ -942,11 +951,14 @@ describe('createStartHandler — reactive integration', () => {
 
     await realtime2.invalidate([{ table: 'todos', affectedRows: [] }])
 
-    // The channel should have been published
-    expect(backend.publish).toHaveBeenCalledWith(
-      expect.stringContaining('todos'),
-      expect.anything(),
-    )
+    // Server now publishes a single batch message to __realtime_batch__
+    const batchMsg = published.find((p) => p.ch === REALTIME_BATCH_CHANNEL)
+    expect(batchMsg).toBeDefined()
+    const updates = (
+      batchMsg!.data as { type: string; updates: Array<{ channel: string }> }
+    ).updates
+    // The update channel should contain 'todos'
+    expect(updates.some((u) => u.channel.includes('todos'))).toBe(true)
   })
 
   it('realtime.invalidate([{ table, affectedRows }]) works directly', async () => {

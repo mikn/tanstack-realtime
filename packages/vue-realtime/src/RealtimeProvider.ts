@@ -1,4 +1,5 @@
 import { defineComponent, onMounted, onUnmounted, provide, watch } from 'vue'
+import { subscribeToRealtimeBatch } from '@tanstack/realtime'
 import { REALTIME_CONTEXT_KEY } from './context.js'
 import { useStoreRef } from './useStoreRef.js'
 import type { PropType } from 'vue'
@@ -59,7 +60,14 @@ export const RealtimeProvider = defineComponent({
       }
     })
 
+    // Subscribe to the batch channel for consistent cross-query snapshots.
+    let unsubBatch: (() => void) | null = null
+    onMounted(() => {
+      unsubBatch = subscribeToRealtimeBatch(props.client)
+    })
+
     onUnmounted(() => {
+      unsubBatch?.()
       props.client.destroy()
     })
 

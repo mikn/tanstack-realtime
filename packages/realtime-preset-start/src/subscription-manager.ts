@@ -1,6 +1,13 @@
 import type { PublishFn } from '@tanstack/realtime'
 import type { ColumnMap, WriteDescriptor } from './reactive-db.js'
 
+/**
+ * The SSE channel name used to deliver all invalidation updates as a single
+ * atomic message. The client fans them out synchronously to guarantee that
+ * all affected queries update in the same React/Vue/Solid render pass.
+ */
+export const REALTIME_BATCH_CHANNEL = '__realtime_batch__'
+
 export interface QueryPredicate {
   table: string
   sql: string
@@ -72,19 +79,34 @@ export class SubscriptionManager {
       }
     }
 
-    for (const [channel, entry] of toInvalidate) {
-      try {
-        const data = await entry.requery()
-        await this.publishFn(channel, data)
-      } catch (err) {
+    // Run all re-queries in parallel, collect results
+    const results = await Promise.allSettled(
+      Array.from(toInvalidate.entries()).map(async ([channel, entry]) => ({
+        channel,
+        data: await entry.requery(),
+      })),
+    )
+
+    const updates: Array<{ channel: string; data: unknown }> = []
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        updates.push(result.value)
+      } else {
         console.error(
           '[realtime:reactive] channel invalidation error',
-          channel,
-          err,
+          result.reason,
         )
-        // per-channel errors must never propagate
       }
     }
+
+    if (updates.length === 0) return
+
+    // Publish ONE atomic batch message so the client can fan out synchronously.
+    // React 18 / Vue / Solid will batch the resulting state updates into one render.
+    await this.publishFn(REALTIME_BATCH_CHANNEL, {
+      type: 'realtime_batch',
+      updates,
+    })
   }
 
   /**

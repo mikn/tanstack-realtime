@@ -64,6 +64,7 @@ export {
 export {
   createSubscriptionManager,
   SubscriptionManager,
+  REALTIME_BATCH_CHANNEL,
 } from './subscription-manager.js'
 export type {
   QueryPredicate,

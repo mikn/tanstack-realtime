@@ -242,11 +242,13 @@ export type {
   ChannelDefCheckpointConfig,
 } from './server/index.js'
 
-// Query collection registry — shared cache for useReactiveQuery
+// Query collection registry — shared cache for useQuery
 export {
   clearRegistry,
   deriveCacheKey,
   getOrCreateQueryCollection,
+  subscribeToRealtimeBatch,
+  REALTIME_BATCH_CHANNEL,
 } from './queryCollectionRegistry.js'
 export type {
   QueryEntry,

@@ -1,6 +1,9 @@
 import { createSseHandler } from '@tanstack/realtime-adapter-sse'
 import { createServerStream, serializeKey } from '@tanstack/realtime'
-import { createSubscriptionManager } from './subscription-manager.js'
+import {
+  REALTIME_BATCH_CHANNEL,
+  createSubscriptionManager,
+} from './subscription-manager.js'
 import { createReactiveLoader } from './reactive-loader.js'
 import { createReactiveMutation } from './reactive-mutation.js'
 import type {
@@ -394,7 +397,10 @@ export function createStartHandler(
   // Mutable ref lets onChannelEmpty close over mgr without a `let` reassignment
   const mgrRef: { current: SubscriptionManager | null } = { current: null }
   sseOptions.onChannelEmpty = (channel: string) => {
-    mgrRef.current?.unregister(channel)
+    // Never unregister the batch channel — it's always needed for invalidation
+    if (channel !== REALTIME_BATCH_CHANNEL) {
+      mgrRef.current?.unregister(channel)
+    }
     existingOnChannelEmpty?.(channel)
   }
 
