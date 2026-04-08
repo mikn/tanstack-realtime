@@ -1,5 +1,7 @@
-import { useCallback, useReducer } from 'react'
-import type { ReactiveMutationFn } from '@tanstack/realtime'
+import { use, useCallback, useReducer } from 'react'
+import { createOptimisticCache } from '@tanstack/realtime'
+import { RealtimeContext } from './context.js'
+import type { OptimisticCache, ReactiveMutationFn } from '@tanstack/realtime'
 
 type MutationState<TResult> = {
   isPending: boolean
@@ -34,6 +36,12 @@ function mutationReducer<TResult>(
 export interface UseMutationOptions<TArgs, TResult> {
   onSuccess?: (result: TResult, args: TArgs) => void
   onError?: (error: unknown, args: TArgs) => void
+  /**
+   * Declarative optimistic update. Called synchronously before the server
+   * request fires. Use `cache.update(queryFn, args, transform)` to speculatively
+   * mutate any reactive query's cached data. Automatically rolled back on error.
+   */
+  optimistic?: (cache: OptimisticCache, args: TArgs) => void
 }
 
 /**
@@ -65,7 +73,8 @@ export function useMutation<TArgs, TResult>(
   data: TResult | undefined
   reset: () => void
 } {
-  const { onSuccess, onError } = options
+  const client = use(RealtimeContext)
+  const { onSuccess, onError, optimistic } = options
 
   const [state, dispatch] = useReducer(
     mutationReducer as (
@@ -78,18 +87,27 @@ export function useMutation<TArgs, TResult>(
   const mutate = useCallback(
     async (args: TArgs): Promise<TResult> => {
       dispatch({ type: 'MUTATE_START' })
+
+      let rollback: (() => void) | null = null
+      if (optimistic != null && client != null) {
+        const { cache, rollback: rb } = createOptimisticCache(client)
+        optimistic(cache, args)
+        rollback = rb
+      }
+
       try {
         const result = await serverFn(args)
         dispatch({ type: 'MUTATE_SUCCESS', data: result })
         onSuccess?.(result, args)
         return result
       } catch (error) {
+        rollback?.()
         dispatch({ type: 'MUTATE_ERROR', error })
         onError?.(error, args)
         throw error
       }
     },
-    [serverFn, onSuccess, onError],
+    [serverFn, onSuccess, onError, optimistic, client],
   )
 
   const reset = useCallback(() => dispatch({ type: 'RESET' }), [])

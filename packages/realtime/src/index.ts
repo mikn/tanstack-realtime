@@ -255,6 +255,10 @@ export type {
   ReactiveQueryResult,
 } from './queryCollectionRegistry.js'
 
+// Optimistic cache for useMutation
+export { createOptimisticCache } from './optimisticCache.js'
+export type { OptimisticCache } from './optimisticCache.js'
+
 // Testing utilities
 export {
   createMockTransport,

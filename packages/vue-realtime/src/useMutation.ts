@@ -1,10 +1,18 @@
 import { ref } from 'vue'
-import type { ReactiveMutationFn } from '@tanstack/realtime'
+import { createOptimisticCache } from '@tanstack/realtime'
+import { useRealtimeClient } from './context.js'
+import type { OptimisticCache, ReactiveMutationFn } from '@tanstack/realtime'
 import type { Ref } from 'vue'
 
 export interface UseMutationOptions<TArgs, TResult> {
   onSuccess?: (result: TResult, args: TArgs) => void
   onError?: (error: unknown, args: TArgs) => void
+  /**
+   * Declarative optimistic update. Called synchronously before the server
+   * request fires. Use `cache.update(queryFn, args, transform)` to speculatively
+   * mutate any reactive query's cached data. Automatically rolled back on error.
+   */
+  optimistic?: (cache: OptimisticCache, args: TArgs) => void
 }
 
 export interface UseMutationResult<TArgs, TResult> {
@@ -35,6 +43,7 @@ export function useMutation<TArgs, TResult>(
   serverFn: ReactiveMutationFn<TArgs, TResult>,
   options: UseMutationOptions<TArgs, TResult> = {},
 ): UseMutationResult<TArgs, TResult> {
+  const client = useRealtimeClient('useMutation')
   const isPending = ref(false)
   const error = ref<unknown>(null)
   const data = ref<TResult | undefined>(undefined) as Ref<TResult | undefined>
@@ -42,12 +51,21 @@ export function useMutation<TArgs, TResult>(
   async function mutate(args: TArgs): Promise<TResult> {
     isPending.value = true
     error.value = null
+
+    let rollback: (() => void) | null = null
+    if (options.optimistic != null) {
+      const { cache, rollback: rb } = createOptimisticCache(client)
+      options.optimistic(cache, args)
+      rollback = rb
+    }
+
     try {
       const result = await serverFn(args)
       data.value = result as TResult
       options.onSuccess?.(result, args)
       return result
     } catch (e) {
+      rollback?.()
       error.value = e
       options.onError?.(e, args)
       throw e

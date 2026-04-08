@@ -1,9 +1,17 @@
 import { createSignal } from 'solid-js'
-import type { ReactiveMutationFn } from '@tanstack/realtime'
+import { createOptimisticCache } from '@tanstack/realtime'
+import { useRealtimeClient } from './context.js'
+import type { OptimisticCache, ReactiveMutationFn } from '@tanstack/realtime'
 
 export interface CreateMutationOptions<TArgs, TResult> {
   onSuccess?: (result: TResult, args: TArgs) => void
   onError?: (error: unknown, args: TArgs) => void
+  /**
+   * Declarative optimistic update. Called synchronously before the server
+   * request fires. Use `cache.update(queryFn, args, transform)` to speculatively
+   * mutate any reactive query's cached data. Automatically rolled back on error.
+   */
+  optimistic?: (cache: OptimisticCache, args: TArgs) => void
 }
 
 /**
@@ -26,6 +34,8 @@ export function createMutation<TArgs, TResult>(
   serverFn: ReactiveMutationFn<TArgs, TResult>,
   options: CreateMutationOptions<TArgs, TResult> = {},
 ) {
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const client = useRealtimeClient('createMutation')
   const [isPending, setIsPending] = createSignal(false)
   const [error, setError] = createSignal<unknown>(null)
   const [data, setData] = createSignal<TResult | undefined>(undefined)
@@ -33,12 +43,21 @@ export function createMutation<TArgs, TResult>(
   async function mutate(args: TArgs): Promise<TResult> {
     setIsPending(true)
     setError(null)
+
+    let rollback: (() => void) | null = null
+    if (options.optimistic != null) {
+      const { cache, rollback: rb } = createOptimisticCache(client)
+      options.optimistic(cache, args)
+      rollback = rb
+    }
+
     try {
       const result = await serverFn(args)
       setData(() => result)
       options.onSuccess?.(result, args)
       return result
     } catch (e) {
+      rollback?.()
       setError(e)
       options.onError?.(e, args)
       throw e
