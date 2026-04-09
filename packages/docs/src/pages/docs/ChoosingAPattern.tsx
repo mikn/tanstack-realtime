@@ -5,12 +5,24 @@ export function ChoosingAPattern() {
     <article className="doc-article">
       <h1>Choosing a Pattern</h1>
       <p className="doc-lead">
-        TanStack Realtime has several patterns for different use cases. Start
-        with reactive queries for most applications &mdash; they require the
-        least configuration and compose naturally with TanStack DB.
+        TanStack Realtime has several patterns for different use cases. Most
+        apps only need one or two.
       </p>
 
-      <h2 id="start-here">Start here: reactive queries</h2>
+      <div className="doc-callout">
+        <p>
+          <strong>Short answer:</strong> start with{' '}
+          <a href="#/docs/reactive-queries">
+            <code>useQuery</code> + <code>useMutation</code>
+          </a>
+          . This covers 80% of use cases &mdash; live data, optimistic updates,
+          automatic cache invalidation. Add other patterns only when you hit a
+          specific need (chat feeds, presence, AI streaming). You can always
+          combine patterns in the same app.
+        </p>
+      </div>
+
+      <h2 id="start-here">The default: reactive queries</h2>
       <p>
         If you have a server function that queries a database,{' '}
         <code>useQuery</code> is the right choice. Wrap the function with{' '}

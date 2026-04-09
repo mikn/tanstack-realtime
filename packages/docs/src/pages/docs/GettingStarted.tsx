@@ -6,9 +6,19 @@ export function GettingStarted() {
     <article className="doc-article">
       <h1>Getting Started</h1>
       <p className="doc-lead">
-        In five minutes: a server function that keeps every subscribed component
-        in sync, with optimistic mutations and automatic rollback.
+        Build a live todo list with optimistic mutations in five minutes.
+        You&rsquo;ll write a server function, wrap it with one annotation, and
+        see every subscriber update automatically.
       </p>
+
+      <div className="doc-callout">
+        <p>
+          <strong>What you&rsquo;ll have at the end:</strong> a server function
+          that queries your database, a client that stays in sync in real time,
+          and instant optimistic mutations &mdash; the same reactive experience
+          as fully managed platforms, on your own stack.
+        </p>
+      </div>
 
       <h2 id="installation">Installation</h2>
       <FrameworkTabs
@@ -28,32 +38,25 @@ export function GettingStarted() {
 
       <h2 id="server-setup">Server setup</h2>
       <p>
-        Add a <code>createStartHandler</code> API route. It manages SSE
-        connections, authenticates users, and enforces your{' '}
-        <code>authorize</code> function before accepting any subscriptions or
-        publishes.
+        Create a realtime handler. This is the server-side entry point that
+        manages SSE connections and coordinates live updates.
       </p>
       <CodeBlock
         title="app/server/realtime.ts"
         code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
-import { getSession } from '../auth'
 
-export const realtime = createStartHandler({
-  getUser: async (req) => {
-    const session = await getSession(req)
-    return session ? { userId: session.userId } : null
-  },
-  authorize: async (userId) => ({
-    subscribe: !!userId,
-    publish:   !!userId,
-    presence:  true,
-  }),
-})
-
-// For multi-instance fan-out, add a PublishBackend:
-// import { createUpstashBackend } from '@tanstack/realtime-backend-upstash'
-// backend: createUpstashBackend({ url: env.UPSTASH_URL, token: env.UPSTASH_TOKEN }),`}
+// Minimal setup — no auth required to get started
+export const realtime = createStartHandler({})`}
       />
+      <div className="doc-callout">
+        <p>
+          <strong>Adding auth later:</strong> pass <code>getUser</code> and{' '}
+          <code>authorize</code> callbacks to lock down subscriptions and
+          publishes. See the{' '}
+          <a href="#/docs/authentication">Authentication guide</a> for the full
+          pattern. For now, let&rsquo;s get data on screen first.
+        </p>
+      </div>
       <CodeBlock
         title="app/routes/api/realtime.ts"
         code={`import { createAPIFileRoute } from '@tanstack/start/api'
@@ -295,39 +298,102 @@ function TodoList() {
         </p>
       </div>
 
-      <h2 id="next-steps">Next steps</h2>
+      <h2 id="what-just-happened">What just happened</h2>
+      <p>
+        In roughly 30 lines of code across server and client, you now have:
+      </p>
       <ul>
         <li>
-          <a href="#/docs/reactive-queries">Reactive Queries</a> &mdash; full
-          guide to <code>useQuery</code>, <code>useMutation</code>, optimistic
-          updates, batched consistency, and client-side filtering
+          <strong>Live queries</strong> &mdash; every component calling{' '}
+          <code>useQuery(getTodos, {'{'} teamId {'}'})</code> with the same args
+          shares one connection and one cache. When any client mutates, all
+          subscribers see the update instantly.
         </li>
         <li>
-          <a href="#/docs/server-functions">Server Functions</a> &mdash;{' '}
-          <code>realtime.query()</code> and <code>realtime.mutation()</code>{' '}
-          with TanStack Start + Drizzle
+          <strong>Optimistic mutations</strong> &mdash; the UI updates before
+          the server responds and rolls back automatically on error.
         </li>
         <li>
-          <a href="#/docs/collections">Collections</a> &mdash; custom callbacks,
-          server push, conflict detection
+          <strong>Automatic channels</strong> &mdash; channels are derived from
+          query arguments. No manual wiring, no channel strings to keep in
+          sync.
         </li>
         <li>
-          <a href="#/docs/crdts">CRDTs</a> &mdash; conflict-free concurrent
-          edits with LWW, PN-Counter, and OR-Set
-        </li>
-        <li>
-          <a href="#/docs/channels">Channels &amp; Pub/Sub</a> &mdash; live
-          feeds, validated publishing, append-only channels
-        </li>
-        <li>
-          <a href="#/docs/presence">Presence</a> &mdash; live cursors, online
-          user lists, typing indicators
-        </li>
-        <li>
-          <a href="#/docs/transports">Transports</a> &mdash; SSE, Centrifugo,
-          offline queue, multi-tab coordination
+          <strong>Client-side queries</strong> &mdash; the returned{' '}
+          <code>collection</code> works with <code>useLiveQuery</code> for
+          filtering and sorting without extra server requests.
         </li>
       </ul>
+      <p>
+        This is the same reactive developer experience you get from fully
+        managed platforms &mdash; live queries, optimistic mutations, automatic
+        cache invalidation &mdash; running on your database, your ORM, your
+        server.
+      </p>
+
+      <h2 id="next-steps">Next steps</h2>
+      <p>
+        You have a working reactive app. Here&rsquo;s where to go depending on
+        what you&rsquo;re building:
+      </p>
+      <table className="api-table">
+        <thead>
+          <tr>
+            <th>I want to&hellip;</th>
+            <th>Read this</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Understand reactive queries deeply (batching, consistency, pagination)</td>
+            <td>
+              <a href="#/docs/reactive-queries">Reactive Queries</a>
+            </td>
+          </tr>
+          <tr>
+            <td>Show who&rsquo;s online, share cursors</td>
+            <td>
+              <a href="#/docs/presence">Presence</a>
+            </td>
+          </tr>
+          <tr>
+            <td>Build a chat or activity feed</td>
+            <td>
+              <a href="#/docs/channels">Channels &amp; Pub/Sub</a>
+            </td>
+          </tr>
+          <tr>
+            <td>Handle concurrent edits without conflicts</td>
+            <td>
+              <a href="#/docs/crdts">CRDTs</a>
+            </td>
+          </tr>
+          <tr>
+            <td>Stream AI tokens to the client</td>
+            <td>
+              <a href="#/docs/streaming">Streaming</a>
+            </td>
+          </tr>
+          <tr>
+            <td>Add authentication and per-channel authorization</td>
+            <td>
+              <a href="#/docs/authentication">Authentication</a>
+            </td>
+          </tr>
+          <tr>
+            <td>Choose the right pattern for my use case</td>
+            <td>
+              <a href="#/docs/choosing-a-pattern">Choosing a Pattern</a>
+            </td>
+          </tr>
+          <tr>
+            <td>Prepare for multi-instance production deployment</td>
+            <td>
+              <a href="#/docs/scaling">Scaling to Production</a>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </article>
   )
 }
