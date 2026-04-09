@@ -198,10 +198,9 @@ function Positioning() {
       <div className="container">
         <h2>Own your stack, keep the magic</h2>
         <p className="section-sub">
-          Server functions that keep every subscriber in sync &mdash; live
-          updates, optimistic mutations, batched consistency &mdash; without
-          handing your data or deployment to a third party. Your Postgres. Your
-          ORM. Your infrastructure.
+          The reactive-query developer experience &mdash; live updates,
+          optimistic mutations, automatic invalidation &mdash; on a stack
+          that&rsquo;s entirely yours.
         </p>
 
         <div className="positioning-grid">
