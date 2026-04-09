@@ -123,24 +123,53 @@ React adapter. Provides a context provider and hooks that integrate with the cor
 npm install @tanstack/realtime @tanstack/react-realtime
 ```
 
-### Quick start
+### Quick start — reactive queries
+
+The fastest path to live data: wrap a server function, call `useQuery` on the client.
+
+```ts
+// Server — realtime.query() derives channels automatically
+export const getTodos = realtime.query(async ({ teamId }: { teamId: string }) =>
+  db.select().from(todos).where(eq(todos.teamId, teamId)),
+)
+```
 
 ```tsx
-// 1. Wrap your app
-import { RealtimeProvider } from '@tanstack/react-realtime'
-import { client } from './client'
+// Client — data stays live, shared across components
+import { useQuery, useMutation } from '@tanstack/react-realtime'
+import { getTodos, createTodo } from '../server/todos'
 
-export function App() {
+function TodoList({ teamId }: { teamId: string }) {
+  const { data, isPending } = useQuery(getTodos, { teamId })
+  const { mutate } = useMutation(createTodo, {
+    optimistic: (cache, args) => {
+      cache.update(getTodos, { teamId: args.teamId }, (prev) => [
+        ...(prev ?? []),
+        { id: crypto.randomUUID(), title: args.title, done: false },
+      ])
+    },
+  })
+
+  if (isPending) return <Spinner />
   return (
-    <RealtimeProvider client={client}>
-      <MyApp />
-    </RealtimeProvider>
+    <>
+      <ul>
+        {data?.map((t) => (
+          <li key={t.id}>{t.title}</li>
+        ))}
+      </ul>
+      <button onClick={() => mutate({ teamId, title: 'New todo' })}>Add</button>
+    </>
   )
 }
 ```
 
+### Pub/sub, presence & more
+
+For use cases beyond server queries (chat, cursors, typing indicators):
+
 ```tsx
-// 2. Subscribe to a channel
+// Subscribe to a channel
 import { useSubscribe } from '@tanstack/react-realtime'
 
 function Chat({ roomId }: { roomId: string }) {
@@ -161,7 +190,7 @@ function Chat({ roomId }: { roomId: string }) {
 ```
 
 ```tsx
-// 3. Publish to a channel
+// Publish to a channel
 import { usePublish } from '@tanstack/react-realtime'
 
 function ChatInput({ roomId }: { roomId: string }) {
@@ -217,28 +246,33 @@ function StatusBar() {
 
 ### Hooks
 
-| Hook                                | Description                                                                      |
-| ----------------------------------- | -------------------------------------------------------------------------------- |
-| `useRealtime()`                     | Returns `{ status, connect, disconnect, client }`                                |
-| `useSubscribe(channel, onMessage)`  | Subscribe to raw channel messages for the component lifetime                     |
-| `usePublish(channel)`               | Returns a stable publish function for a channel                                  |
-| `useChannel(channel, onMessage?)`   | Combined subscribe + publish; returns `{ publish }`                              |
-| `usePresence(channelDef, options)`  | Join a presence channel; returns `{ others, updatePresence }`                    |
-| `useStream(channelDef, options)`    | Subscribe to a reduce-based stream; returns `{ state, status, error }`           |
-| `useRealtimeCollection(config)`     | Returns a TanStack DB `Collection` backed by a realtime channel                  |
-| `useLiveChannel(config)`            | Returns a TanStack DB `Collection` for append-only event streams                 |
-| `useConnectionStatus()`             | Returns reactive `ConnectionStatus` value                                        |
-| `useIsConnected()`                  | Returns `boolean` — `true` when connected                                        |
-| `useLatestMessage(channel)`         | Returns the most recent message on a channel                                     |
-| `useChannelHistory(channel, opts)`  | Accumulates channel messages into an array with configurable max length          |
-| `useTypingIndicator(channel, opts)` | Typing indicator with auto-expire; returns `{ typing, startTyping, stopTyping }` |
-| `useChannelStats(channel)`          | Returns `{ messageCount, lastMessageAt }` for a channel                          |
-| `useOnReconnect(callback)`          | Fires a callback whenever the client reconnects                                  |
-| `useSyncedCounter(def, options)`    | Standalone CRDT counter; returns `{ value, increment, decrement }`               |
-| `useSyncedValue(def, options)`      | Standalone CRDT LWW value; returns `{ value, set }`                              |
-| `useSyncedSet(def, options)`        | Standalone CRDT OR-set; returns `{ values, add, remove, has }`                   |
+| Hook                                       | Description                                                                                                        |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `useRealtime()`                            | Returns `{ status, connect, disconnect, client }`                                                                  |
+| `useSubscribe(channel, onMessage)`         | Subscribe to raw channel messages for the component lifetime                                                       |
+| `usePublish(channel)`                      | Returns a stable publish function for a channel                                                                    |
+| `useChannel(channel, onMessage?)`          | Combined subscribe + publish; returns `{ publish }`                                                                |
+| `usePresence(channelDef, options)`         | Join a presence channel; returns `{ others, updatePresence }`                                                      |
+| `useStream(channelDef, options)`           | Subscribe to a reduce-based stream; returns `{ state, status, error }`                                             |
+| `useRealtimeCollection(config)`            | Returns a TanStack DB `Collection` backed by a realtime channel                                                    |
+| `useLiveChannel(config)`                   | Returns a TanStack DB `Collection` for append-only event streams                                                   |
+| `useConnectionStatus()`                    | Returns reactive `ConnectionStatus` value                                                                          |
+| `useIsConnected()`                         | Returns `boolean` — `true` when connected                                                                          |
+| `useLatestMessage(channel)`                | Returns the most recent message on a channel                                                                       |
+| `useChannelHistory(channel, opts)`         | Accumulates channel messages into an array with configurable max length                                            |
+| `useTypingIndicator(channel, opts)`        | Typing indicator with auto-expire; returns `{ typing, startTyping, stopTyping }`                                   |
+| `useChannelStats(channel)`                 | Returns `{ messageCount, lastMessageAt }` for a channel                                                            |
+| `useOnReconnect(callback)`                 | Fires a callback whenever the client reconnects                                                                    |
+| `useSyncedCounter(def, options)`           | Standalone CRDT counter; returns `{ value, increment, decrement }`                                                 |
+| `useSyncedValue(def, options)`             | Standalone CRDT LWW value; returns `{ value, set }`                                                                |
+| `useSyncedSet(def, options)`               | Standalone CRDT OR-set; returns `{ values, add, remove, has }`                                                     |
+| `useQuery(serverFn, args, opts?)`          | Fetches + subscribes to a reactive server query; auto-refetches on reconnect; shared query cache across components |
+| `useMutation(serverFn, opts?)`             | Wraps a reactive server mutation with `isPending`/`error`/`data` state and declarative `optimistic` updates        |
+| `usePaginatedQuery(serverFn, args, opts?)` | Paginated variant of `useQuery`; `fetchNextPage`, `hasNextPage`, live first-page updates                           |
 
-> **Solid and Vue** — `@tanstack/solid-realtime` and `@tanstack/vue-realtime` export the same hooks/composables with identical signatures. Replace `useX` → `useX` in Solid (signals-based) or Vue (composables with `ref`/`computed`).
+> **Vue** (`@tanstack/vue-realtime`) exports the same composables with identical names and signatures. Args may be `MaybeRef<T>` — pass reactive refs and the composable will watch them.
+>
+> **Solid** (`@tanstack/solid-realtime`) exports the same primitives as `createQuery`, `createMutation`, and `createPaginatedQuery` (Solid `create*` convention). Remaining hooks keep the `use*` name.
 
 ---
 
@@ -271,7 +305,7 @@ function App() {
 }
 ```
 
-All hooks from the React adapter are available: `useSubscribe`, `usePublish`, `useChannel`, `usePresence`, `useStream`, `useRealtimeCollection`, `useLiveChannel`, `useConnectionStatus`, `useIsConnected`, `useLatestMessage`, `useChannelHistory`, `useTypingIndicator`, `useChannelStats`, `useOnReconnect`, `useSyncedCounter`, `useSyncedValue`, `useSyncedSet`.
+All hooks from the React adapter are available: `useSubscribe`, `usePublish`, `useChannel`, `usePresence`, `useStream`, `useRealtimeCollection`, `useLiveChannel`, `useConnectionStatus`, `useIsConnected`, `useLatestMessage`, `useChannelHistory`, `useTypingIndicator`, `useChannelStats`, `useOnReconnect`, `useSyncedCounter`, `useSyncedValue`, `useSyncedSet`, `createQuery`, `createMutation`, `createPaginatedQuery`.
 
 Testing utilities (`createTestRealtimeProvider`, `createTestRealtimeProviderWithPresence`) are also exported.
 
@@ -472,6 +506,32 @@ export const Route = createAPIFileRoute('/api/realtime')({
 
 For the client side, pair with `sseTransport` from `@tanstack/realtime-adapter-sse`.
 
+### `realtime.query()` and `realtime.mutation()`
+
+Wrap server functions to make them reactive. Channels are derived automatically — no manual channel wiring required.
+
+```ts
+import { realtime } from './realtime'
+
+// Reactive query — channel derived from args
+export const getTodos = realtime.query(async ({ teamId }: { teamId: string }) =>
+  db.select().from(todos).where(eq(todos.teamId, teamId)),
+)
+
+// Reactive mutation — invalidates affected queries automatically
+export const createTodo = realtime.mutation(
+  async ({ teamId, title }: { teamId: string; title: string }) => {
+    const [todo] = await db
+      .insert(todos)
+      .values({ teamId, title, done: false })
+      .returning()
+    return todo
+  },
+)
+```
+
+Pair with `useQuery` / `useMutation` on the client.
+
 ---
 
 ## DevTools
@@ -663,6 +723,81 @@ export const generationCollection = createCollection(
   }),
 )
 ```
+
+---
+
+## Reactive Server Queries
+
+`realtime.query()` + `useQuery` make server data live with zero channel wiring. Wrap your server function once; every component that calls it shares one fetch, one SSE subscription, and propagated optimistic updates.
+
+### Server: `realtime.query()` and `realtime.mutation()`
+
+```ts
+import { realtime } from './realtime' // createStartHandler result
+import { eq } from 'drizzle-orm'
+import { db } from '../db'
+import { todos } from '../../db/schema'
+
+// realtime.query() — channels derived automatically from args
+export const getTodos = realtime.query(async ({ teamId }: { teamId: string }) =>
+  db.select().from(todos).where(eq(todos.teamId, teamId)),
+)
+
+// realtime.mutation() — invalidates affected query subscribers automatically
+export const createTodo = realtime.mutation(
+  async ({ teamId, title }: { teamId: string; title: string }) => {
+    const [todo] = await db
+      .insert(todos)
+      .values({ teamId, title, done: false })
+      .returning()
+    return todo
+  },
+)
+```
+
+### Client: `useQuery` and `useMutation`
+
+```tsx
+import { useQuery, useMutation } from '@tanstack/react-realtime'
+import { getTodos, createTodo } from '../server/todos'
+
+function TodoList({ teamId }: { teamId: string }) {
+  const { data, isPending, error } = useQuery(getTodos, { teamId })
+
+  if (isPending) return <Spinner />
+  if (error) return <Error error={error} />
+  return <List items={data} />
+}
+
+function AddTodoForm({ teamId }: { teamId: string }) {
+  const { mutate, isPending } = useMutation(createTodo, {
+    // Declarative optimistic update — rolled back automatically on error
+    optimistic: (cache, args) => {
+      cache.update(getTodos, { teamId: args.teamId }, (prev) => [
+        ...(prev ?? []),
+        { id: crypto.randomUUID(), title: args.title, done: false },
+      ])
+    },
+  })
+
+  return (
+    <button
+      disabled={isPending}
+      onClick={() => mutate({ teamId, title: 'New todo' })}
+    >
+      {isPending ? 'Saving…' : 'Add'}
+    </button>
+  )
+}
+```
+
+### Shared query cache
+
+Multiple components using the same `(serverFn, args)` share one TanStack DB `Collection` — one fetch, one SSE subscription, and automatically propagated optimistic updates. The cache is keyed by function identity + `JSON.stringify(args)`.
+
+**Batched consistency:** when a mutation invalidates multiple queries, the server publishes a single SSE message with all updates. React 18 automatic batching merges all resulting state changes into one render — no torn state.
+
+**Arg serialisation note:** args must be JSON-serialisable. Property insertion order matters for the cache key (`{a:1,b:2}` ≠ `{b:2,a:1}`), so use a consistent arg shape.
 
 ---
 

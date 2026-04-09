@@ -582,6 +582,143 @@ function TagEditor({ postId }: { postId: string }) {
         behavior, <a href="#/docs/ephemeral">Ephemeral Channels</a> for pairing
         ephemeral animations with persistent CRDT counters.
       </p>
+
+      <h2 id="useQuery">useQuery</h2>
+      <p>
+        Subscribes to a reactive server query and keeps the result live. Returns
+        a typed item array plus a composable <code>collection</code> for
+        client-side filtering with <code>useLiveQuery</code>. See the{' '}
+        <a href="#/docs/reactive-queries">Reactive Queries</a> guide for full
+        examples.
+      </p>
+      <CodeBlock
+        title="TodoList.tsx"
+        code={`import { useQuery } from '@tanstack/react-realtime'
+import { getTodos } from '../server/todos'
+
+function TodoList({ teamId }: { teamId: string }) {
+  const { data, collection, isPending, error } =
+    useQuery(getTodos, { teamId }, { getKey: (t) => t.id })
+
+  if (isPending) return <p>Loading…</p>
+  if (error)     return <p>Error: {String(error)}</p>
+  return <ul>{data.map((t) => <li key={t.id}>{t.title}</li>)}</ul>
+}`}
+      />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function useQuery<TArgs, TItem extends Record<string, unknown>>(
+  serverFn: ReactiveQueryFn<TArgs, Array<TItem>>,
+  args: TArgs,
+  options: {
+    getKey: (item: TItem) => string    // required — stable key per item
+    enabled?: boolean                   // default: true
+    refetchOnReconnect?: boolean        // default: true
+  }
+): {
+  data: Array<TItem>                    // live array from the server
+  collection: Collection<TItem, string> | null  // pass to useLiveQuery for client-side views
+  isPending: boolean
+  isFetching: boolean
+  error: unknown
+  refetch: () => void
+}`}
+      />
+
+      <h2 id="useMutation">useMutation</h2>
+      <p>
+        Mutation hook with loading state, error handling, and declarative
+        optimistic updates. See the{' '}
+        <a href="#/docs/reactive-queries">Reactive Queries</a> guide for full
+        examples.
+      </p>
+      <CodeBlock
+        title="AddTodoForm.tsx"
+        code={`import { useMutation } from '@tanstack/react-realtime'
+import { getTodos, createTodo } from '../server/todos'
+
+function AddTodoForm({ teamId }: { teamId: string }) {
+  const { mutate, isPending, error } = useMutation(createTodo, {
+    optimistic: (cache, args) => {
+      cache.update(getTodos, { teamId: args.teamId }, (prev) => [
+        ...(prev ?? []),
+        { id: crypto.randomUUID(), title: args.title, done: false },
+      ])
+    },
+  })
+
+  return (
+    <button
+      disabled={isPending}
+      onClick={() => mutate({ teamId, title: 'New todo' })}
+    >
+      {isPending ? 'Saving…' : 'Add'}
+    </button>
+  )
+}`}
+      />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function useMutation<TArgs, TResult>(
+  serverFn: ReactiveMutationFn<TArgs, TResult>,
+  options?: {
+    optimistic?: (cache: OptimisticCache, args: TArgs) => void
+    onSuccess?: (data: TResult, args: TArgs) => void
+    onError?: (error: unknown, args: TArgs) => void
+  }
+): {
+  mutate: (args: TArgs) => Promise<TResult>
+  isPending: boolean
+  error: unknown
+  data: TResult | undefined
+  reset: () => void
+}`}
+      />
+
+      <h2 id="usePaginatedQuery">usePaginatedQuery</h2>
+      <p>
+        Paginated variant of <code>useQuery</code>. Accumulates pages and keeps
+        the first page live. See the{' '}
+        <a href="#/docs/reactive-queries">Reactive Queries</a> guide for full
+        examples.
+      </p>
+      <CodeBlock
+        title="FeedList.tsx"
+        code={`import { usePaginatedQuery } from '@tanstack/react-realtime'
+import { getFeedPage } from '../server/feed'
+
+function FeedList({ teamId }: { teamId: string }) {
+  const { items, isPending, hasNextPage, fetchNextPage } =
+    usePaginatedQuery(getFeedPage, { teamId })
+
+  return (
+    <>
+      <ul>{items.map((i) => <li key={i.id}>{i.text}</li>)}</ul>
+      {hasNextPage && <button onClick={() => fetchNextPage()}>Load more</button>}
+    </>
+  )
+}`}
+      />
+      <h3>Signature</h3>
+      <CodeBlock
+        code={`function usePaginatedQuery<TItem, TArgs extends { cursor?: string | number | null; limit?: number }>(
+  serverFn: ReactiveQueryFn<TArgs, PaginatedPage<TItem>>,
+  args: Omit<TArgs, 'cursor' | 'limit'>,
+  options?: {
+    pageSize?: number
+    enabled?: boolean
+    refetchOnReconnect?: boolean
+  }
+): {
+  items: TItem[]
+  isPending: boolean
+  isFetchingNextPage: boolean
+  hasNextPage: boolean
+  error: unknown
+  fetchNextPage: () => Promise<void>
+  refetch: () => void
+}`}
+      />
     </article>
   )
 }

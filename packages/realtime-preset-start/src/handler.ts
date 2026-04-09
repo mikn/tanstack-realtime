@@ -1,7 +1,24 @@
 import { createSseHandler } from '@tanstack/realtime-adapter-sse'
 import { createServerStream, serializeKey } from '@tanstack/realtime'
-import type { PublishFn, QueryKey, ServerStream } from '@tanstack/realtime'
+import {
+  REALTIME_BATCH_CHANNEL,
+  createSubscriptionManager,
+} from './subscription-manager.js'
+import { createLoader } from './reactive-loader.js'
+import { createMutationHandler } from './reactive-mutation.js'
+import type {
+  PublishFn,
+  QueryKey,
+  ReactiveMutationFn,
+  ReactiveQueryFn,
+  ReactiveQueryResult,
+  ServerStream,
+} from '@tanstack/realtime'
 import type { SseHandlerOptions } from '@tanstack/realtime-adapter-sse'
+import type { SubscriptionManager } from './subscription-manager.js'
+import type { WriteDescriptor } from './reactive-db.js'
+
+export type { ReactiveQueryFn, ReactiveMutationFn }
 
 // ---------------------------------------------------------------------------
 // PublishBackend — pluggable pub/sub storage interface
@@ -135,6 +152,12 @@ export interface StartHandlerOptions extends SseHandlerOptions {
    * the message to their own local SSE connections.
    */
   backend?: PublishBackend
+
+  /**
+   * An existing subscription manager to use instead of creating a new one.
+   * When omitted, a new subscription manager is created automatically.
+   */
+  subscriptionManager?: SubscriptionManager
 }
 
 /**
@@ -230,6 +253,53 @@ export interface StartRealtimeHandler {
    * on server shutdown or during hot-module replacement.
    */
   dispose: () => void
+
+  /**
+   * The subscription manager. Auto-created if not passed in options.
+   */
+  subscriptionManager: SubscriptionManager
+
+  /**
+   * Wraps an async server function to make it reactive. The returned function,
+   * when called, fetches data AND registers an SSE subscription so the client
+   * receives live updates whenever the underlying data changes.
+   *
+   * Use with `useQuery` on the client:
+   * ```ts
+   * export const getTodos = createServerFn().handler(
+   *   realtime.query(async (args: { teamId: string }) =>
+   *     db.select().from(todos).where(eq(todos.teamId, args.teamId))
+   *   )
+   * )
+   * ```
+   */
+  query: <TArgs, TResult>(
+    fn: (args: TArgs) => Promise<TResult>,
+  ) => ReactiveQueryFn<TArgs, TResult>
+
+  /**
+   * Wraps an async mutation function to run in a reactive context.
+   * After the mutation runs, any subscriptions whose predicates match the
+   * affected rows are automatically invalidated and clients receive fresh data.
+   *
+   * Use with `useMutation` on the client:
+   * ```ts
+   * export const createTodo = createServerFn().handler(
+   *   realtime.mutation(async (args: { teamId: string; title: string }) => {
+   *     await db.insert(todos).values(args)
+   *   })
+   * )
+   * ```
+   */
+  mutation: <TArgs, TResult>(
+    fn: (args: TArgs) => Promise<TResult>,
+  ) => ReactiveMutationFn<TArgs, TResult>
+
+  /**
+   * Directly invalidate channels by write descriptors.
+   * Use affectedRows:[] for table-level invalidation.
+   */
+  invalidate: (writes: ReadonlyArray<WriteDescriptor>) => Promise<void>
 }
 
 // ---------------------------------------------------------------------------
@@ -319,7 +389,21 @@ export interface StartRealtimeHandler {
 export function createStartHandler(
   options: StartHandlerOptions = {},
 ): StartRealtimeHandler {
-  const { backend, ...sseOptions } = options
+  const { backend, subscriptionManager: passedManager, ...sseOptions } = options
+
+  // Save the user-provided onChannelEmpty before we wrap it
+  const existingOnChannelEmpty = sseOptions.onChannelEmpty
+
+  // Mutable ref lets onChannelEmpty close over mgr without a `let` reassignment
+  const mgrRef: { current: SubscriptionManager | null } = { current: null }
+  sseOptions.onChannelEmpty = (channel: string) => {
+    // Never unregister the batch channel — it's always needed for invalidation
+    if (channel !== REALTIME_BATCH_CHANNEL) {
+      mgrRef.current?.unregister(channel)
+    }
+    existingOnChannelEmpty?.(channel)
+  }
+
   const sse = createSseHandler(sseOptions)
 
   // If the backend provides a subscribe hook, wire it up so messages arriving
@@ -348,6 +432,9 @@ export function createStartHandler(
     }
   }
 
+  const mgr = passedManager ?? createSubscriptionManager(publish)
+  mgrRef.current = mgr
+
   return {
     handle: (req: Request) => sse.handle(req),
 
@@ -368,6 +455,34 @@ export function createStartHandler(
 
     dispose() {
       unsubscribeBackend?.()
+    },
+
+    subscriptionManager: mgr,
+
+    query<TArgs, TResult>(
+      fn: (args: TArgs) => Promise<TResult>,
+    ): ReactiveQueryFn<TArgs, TResult> {
+      const callable = (args: TArgs): Promise<ReactiveQueryResult<TResult>> =>
+        createLoader<TResult>({
+          subscriptionManager: mgr,
+          query: () => fn(args),
+        }).loadWithChannel()
+      return callable as unknown as ReactiveQueryFn<TArgs, TResult>
+    },
+
+    mutation<TArgs, TResult>(
+      fn: (args: TArgs) => Promise<TResult>,
+    ): ReactiveMutationFn<TArgs, TResult> {
+      const callable = (args: TArgs): Promise<TResult> =>
+        createMutationHandler<TArgs, TResult>({
+          subscriptionManager: mgr,
+          mutation: fn,
+        }).mutate(args)
+      return callable as unknown as ReactiveMutationFn<TArgs, TResult>
+    },
+
+    invalidate(writes: ReadonlyArray<WriteDescriptor>): Promise<void> {
+      return mgr.invalidate(writes)
     },
   }
 }

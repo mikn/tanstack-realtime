@@ -8,5 +8,5 @@ export default defineConfig({
   target: 'es2022',
   splitting: false,
   clean: true,
-  external: ['@standard-schema/spec'],
+  external: ['@standard-schema/spec', '@tanstack/db', '@tanstack/store'],
 })

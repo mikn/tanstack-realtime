@@ -350,6 +350,62 @@ export const realtimePublish = realtime.publish`}
         No changes needed in the server functions or the collection — the
         backend is transparent to the rest of the stack.
       </p>
+
+      <h2 id="reactive-query">realtime.query()</h2>
+      <p>
+        <code>realtime.query(fn)</code> wraps a server query function and
+        returns a <code>ReactiveQueryFn</code> — a branded callable that carries
+        TypeScript phantom type fields so the client-side{' '}
+        <a href="#/docs/reactive-queries">reactive query hooks</a> can infer{' '}
+        <code>TArgs</code> and <code>TResult</code> without explicit generics.
+        Channels are derived automatically from the SQL WHERE clause.
+      </p>
+      <CodeBlock
+        title="app/server/todos.ts"
+        code={`import { createServerFn } from '@tanstack/start'
+import { eq } from 'drizzle-orm'
+import { db } from '../db'
+import { todos } from '../../db/schema'
+import { realtime } from '../realtime'
+
+export const getTodos = realtime.query(
+  async ({ teamId }: { teamId: string }) =>
+    db.select().from(todos).where(eq(todos.teamId, teamId))
+)
+
+export const fetchTodos = createServerFn().handler(getTodos)`}
+      />
+
+      <h2 id="reactive-mutation">realtime.mutation()</h2>
+      <p>
+        <code>realtime.mutation(fn)</code> wraps a write operation and returns a{' '}
+        <code>ReactiveMutationFn</code>. After the mutation completes, it
+        captures which rows were written and publishes a single batch
+        invalidation message to all affected query subscribers.
+      </p>
+      <CodeBlock
+        title="app/server/todos.ts (continued)"
+        code={`export const createTodo = realtime.mutation(
+  async ({ teamId, title }: { teamId: string; title: string }) => {
+    const [todo] = await db
+      .insert(todos)
+      .values({ teamId, title, done: false })
+      .returning()
+    return todo
+  }
+)
+
+export const addTodo = createServerFn().handler(createTodo)`}
+      />
+      <p>
+        The channel name is derived automatically from the query arguments, so
+        different argument values subscribe to different channels. You never
+        need to define a channel key manually.
+      </p>
+      <p>
+        See <a href="#/docs/reactive-queries">Reactive Queries</a> for the
+        complete client-side usage guide.
+      </p>
     </article>
   )
 }

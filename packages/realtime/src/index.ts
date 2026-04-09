@@ -242,6 +242,23 @@ export type {
   ChannelDefCheckpointConfig,
 } from './server/index.js'
 
+// Query collection registry — shared cache for useQuery
+export {
+  deriveCacheKey,
+  getOrCreateQueryCollection,
+  lookupQueryCollection,
+  subscribeToRealtimeBatch,
+} from './queryCollectionRegistry.js'
+export type {
+  ReactiveQueryFn,
+  ReactiveMutationFn,
+  ReactiveQueryResult,
+} from './queryCollectionRegistry.js'
+
+// Optimistic cache for useMutation
+export { createOptimisticCache } from './optimisticCache.js'
+export type { OptimisticCache } from './optimisticCache.js'
+
 // Testing utilities
 export {
   createMockTransport,

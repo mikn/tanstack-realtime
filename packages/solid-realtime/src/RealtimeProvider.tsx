@@ -1,4 +1,5 @@
 import { createEffect, onCleanup } from 'solid-js'
+import { subscribeToRealtimeBatch } from '@tanstack/realtime'
 import { RealtimeContext } from './context.js'
 import { createStoreSignal } from './createStoreSignal.js'
 import type { ParentComponent } from 'solid-js'
@@ -53,6 +54,12 @@ export const RealtimeProvider: ParentComponent<RealtimeProviderProps> = (
     onCleanup(() => {
       props.client.destroy()
     })
+  })
+
+  // Subscribe to the batch channel for consistent cross-query snapshots.
+  createEffect(() => {
+    const unsub = subscribeToRealtimeBatch(props.client)
+    onCleanup(unsub)
   })
 
   // Dev-mode warning: if the client remains disconnected for more than 2 seconds

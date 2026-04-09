@@ -11,6 +11,7 @@ const sections = [
     title: 'Guides',
     items: [
       { label: 'TanStack Start + Drizzle', hash: '#/docs/server-functions' },
+      { label: 'Reactive Queries', hash: '#/docs/reactive-queries' },
       { label: 'Authentication', hash: '#/docs/authentication' },
       { label: 'Rich Text (Y.js)', hash: '#/docs/rich-text-crdts' },
       { label: 'Centrifugo Guide', hash: '#/docs/centrifugo' },
@@ -58,6 +59,7 @@ const pageMap: Record<string, string> = {
   '#/docs/collections': 'Collections.tsx',
   '#/docs/choosing-a-pattern': 'ChoosingAPattern.tsx',
   '#/docs/server-functions': 'ServerFunctions.tsx',
+  '#/docs/reactive-queries': 'ReactiveQueries.tsx',
   '#/docs/authentication': 'Authentication.tsx',
   '#/docs/rich-text-crdts': 'RichTextCRDTs.tsx',
   '#/docs/centrifugo': 'Centrifugo.tsx',

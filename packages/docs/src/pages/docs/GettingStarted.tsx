@@ -6,37 +6,9 @@ export function GettingStarted() {
     <article className="doc-article">
       <h1>Getting Started</h1>
       <p className="doc-lead">
-        Install the packages, wire up a TanStack Start handler, and turn any
-        collection live in minutes.
+        In five minutes: a server function that keeps every subscribed component
+        in sync, with optimistic mutations and automatic rollback.
       </p>
-
-      <h2 id="how-it-works">Connection vs. fan-out</h2>
-      <div className="doc-callout">
-        <p>Every realtime system must solve two separate problems:</p>
-        <ul>
-          <li>
-            <strong>Connection</strong> &mdash; how clients stay open and
-            receive pushes
-          </li>
-          <li>
-            <strong>Fan-out</strong> &mdash; how a publish on one server
-            instance reaches clients connected to <em>other</em> instances
-          </li>
-        </ul>
-        <p>
-          <strong>SSE</strong> handles connection. For multi-instance
-          deployments (Cloudflare Workers, serverless, multiple Nitro nodes),
-          add a <code>PublishBackend</code> (e.g. Upstash Redis) so publishes
-          route across instances. A single-instance deployment works without
-          one.
-        </p>
-        <p>
-          <strong>Centrifugo</strong> solves both in one service: clients
-          connect directly to it, and it handles all fan-out natively. Your app
-          just issues channel tokens and publishes via its HTTP API. See the{' '}
-          <a href="#/docs/transports">Transports</a> guide.
-        </p>
-      </div>
 
       <h2 id="installation">Installation</h2>
       <FrameworkTabs
@@ -54,21 +26,11 @@ export function GettingStarted() {
         }}
       />
 
-      <div className="doc-callout">
-        <p>
-          <strong>Which transport?</strong> SSE is the default for most apps.
-          Use Centrifugo when you need built-in fan-out across multiple server
-          instances. See the{' '}
-          <a href="#/docs/transports">Transport decision matrix</a> for a full
-          comparison.
-        </p>
-      </div>
-
       <h2 id="server-setup">Server setup</h2>
       <p>
-        Add a <code>createStartHandler</code> API route to your TanStack Start
-        app. It manages SSE connections, authenticates users, and calls your{' '}
-        <code>authorize</code> function before accepting subscriptions or
+        Add a <code>createStartHandler</code> API route. It manages SSE
+        connections, authenticates users, and enforces your{' '}
+        <code>authorize</code> function before accepting any subscriptions or
         publishes.
       </p>
       <CodeBlock
@@ -88,7 +50,7 @@ export const realtime = createStartHandler({
   }),
 })
 
-// For multi-instance fan-out, pass a PublishBackend in the config above:
+// For multi-instance fan-out, add a PublishBackend:
 // import { createUpstashBackend } from '@tanstack/realtime-backend-upstash'
 // backend: createUpstashBackend({ url: env.UPSTASH_URL, token: env.UPSTASH_TOKEN }),`}
       />
@@ -168,72 +130,186 @@ provideRealtimeClient(realtimeClient)
         </p>
       </div>
 
-      <h2 id="first-collection">Your first live collection</h2>
+      <h2 id="reactive-queries">Your first reactive query</h2>
       <p>
-        Use <code>useRealtimeCollection</code> with a <code>url</code> to
-        connect your existing REST endpoints to a realtime collection. The hook
-        generates <code>queryFn</code> and CRUD callbacks automatically, and
-        derives the channel name from the URL. Each mutation is broadcast to the
-        channel &mdash; no changes to your server routes required.
+        Wrap your server function with <code>realtime.query()</code> and call{' '}
+        <code>useQuery()</code> on the client. The channel is derived
+        automatically from the query arguments &mdash; no manual wiring. Every
+        component sharing the same <code>(serverFn, args)</code> pair shares one
+        fetch, one connection, and one cache.
       </p>
       <CodeBlock
-        title="app/features/todos/TodoList.tsx"
+        title="app/server/todos.ts"
+        code={`import { realtime } from './realtime'
+import { eq } from 'drizzle-orm'
+import { db } from '../db'
+import { todos } from '../../db/schema'
+
+// realtime.query() wraps your existing function — one annotation, data is now live
+export const getTodos = realtime.query(
+  async ({ teamId }: { teamId: string }) =>
+    db.select().from(todos).where(eq(todos.teamId, teamId))
+)
+
+export const createTodo = realtime.mutation(
+  async ({ teamId, title }: { teamId: string; title: string }) => {
+    const [todo] = await db.insert(todos).values({ teamId, title, done: false }).returning()
+    return todo
+  }
+)`}
+      />
+      <FrameworkTabs
+        react={{
+          title: 'app/features/todos/TodoList.tsx',
+          code: `import { useQuery, useMutation } from '@tanstack/react-realtime'
+import { getTodos, createTodo } from '../../server/todos'
+
+function TodoList({ teamId }: { teamId: string }) {
+  const { data, isPending } = useQuery(getTodos, { teamId }, {
+    getKey: (t) => t.id,
+  })
+  const { mutate } = useMutation(createTodo, {
+    optimistic: (cache, args) => {
+      cache.update(getTodos, { teamId: args.teamId }, prev => [
+        ...(prev ?? []),
+        { id: crypto.randomUUID(), title: args.title, done: false },
+      ])
+    },
+  })
+
+  if (isPending) return <p>Loading…</p>
+  return (
+    <>
+      <ul>{data.map(t => <li key={t.id}>{t.title}</li>)}</ul>
+      <button onClick={() => mutate({ teamId, title: 'New' })}>Add</button>
+    </>
+  )
+}`,
+        }}
+        solid={{
+          title: 'app/features/todos/TodoList.tsx',
+          code: `import { createQuery, createMutation } from '@tanstack/solid-realtime'
+import { getTodos, createTodo } from '../../server/todos'
+
+function TodoList(props: { teamId: string }) {
+  const { data, isPending } = createQuery(getTodos, () => ({ teamId: props.teamId }), {
+    getKey: (t) => t.id,
+  })
+  const { mutate } = createMutation(createTodo, {
+    optimistic: (cache, args) => {
+      cache.update(getTodos, { teamId: args.teamId }, prev => [
+        ...(prev ?? []),
+        { id: crypto.randomUUID(), title: args.title, done: false },
+      ])
+    },
+  })
+
+  return (
+    <Show when={!isPending()} fallback={<p>Loading…</p>}>
+      <ul><For each={data()}>{t => <li>{t.title}</li>}</For></ul>
+      <button onClick={() => mutate({ teamId: props.teamId, title: 'New' })}>Add</button>
+    </Show>
+  )
+}`,
+        }}
+        vue={{
+          title: 'app/features/todos/TodoList.vue',
+          code: `<script setup lang="ts">
+import { useQuery, useMutation } from '@tanstack/vue-realtime'
+import { getTodos, createTodo } from '../../server/todos'
+
+const props = defineProps<{ teamId: string }>()
+const { data, isPending } = useQuery(getTodos, { teamId: props.teamId }, {
+  getKey: (t) => t.id,
+})
+const { mutate } = useMutation(createTodo, {
+  optimistic: (cache, args) => {
+    cache.update(getTodos, { teamId: args.teamId }, prev => [
+      ...(prev ?? []),
+      { id: crypto.randomUUID(), title: args.title, done: false },
+    ])
+  },
+})
+</script>
+
+<template>
+  <p v-if="isPending">Loading…</p>
+  <template v-else>
+    <ul><li v-for="t in data" :key="t.id">{{ t.title }}</li></ul>
+    <button @click="mutate({ teamId: props.teamId, title: 'New' })">Add</button>
+  </template>
+</template>`,
+        }}
+      />
+      <p>
+        The returned <code>collection</code> is a live{' '}
+        <a href="https://tanstack.com/db" target="_blank" rel="noopener">
+          TanStack DB Collection
+        </a>
+        . Pass it to <code>useLiveQuery</code> for client-side filtering and
+        sorting without additional server requests:
+      </p>
+      <CodeBlock
+        code={`import { useLiveQuery } from '@tanstack/react-db'
+
+const { data, collection } = useQuery(getTodos, { teamId }, { getKey: (t) => t.id })
+
+// Filter entirely on the client — no extra fetch
+const { data: active } = useLiveQuery(
+  (q) => q.from({ todos: collection }).where('done', '=', false),
+  [collection],
+)`}
+      />
+
+      <h2 id="first-collection">Alternative: REST-based live collections</h2>
+      <p>
+        Not using TanStack Start or Drizzle? Connect any existing REST API with{' '}
+        <code>useRealtimeCollection</code>:
+      </p>
+      <CodeBlock
         code={`import { useRealtimeCollection } from '@tanstack/react-realtime'
 import { useLiveQuery } from '@tanstack/react-db'
 
 function TodoList() {
-  // url generates GET/POST/PATCH/DELETE handlers automatically
-  // channel derived from url: '/api/todos' → 'todos'
   const todos = useRealtimeCollection<Todo>({
     url: '/api/todos',
     getKey: (t) => t.id,
   })
-
-  // Reactive query — re-renders when data changes
   const { data } = useLiveQuery((q) => q.from({ todos }))
-
-  return (
-    <ul>
-      {data.map((t) => (
-        <li key={t.id}>{t.title}</li>
-      ))}
-    </ul>
-  )
+  return <ul>{data.map(t => <li key={t.id}>{t.title}</li>)}</ul>
 }`}
       />
-      <p>Need filtering or sorting? Change the query, not the collection:</p>
-      <CodeBlock
-        code={`// Same collection, filtered view
-const { data: active } = useLiveQuery((q) =>
-  q.from({ todos }).where('done', '=', false)
-)`}
-      />
+
+      <div className="doc-callout" id="how-it-works">
+        <p>
+          <strong>How it works &mdash; connection vs. fan-out.</strong> Every
+          realtime system solves two problems: <em>connection</em> (how clients
+          stay open and receive pushes) and <em>fan-out</em> (how a publish on
+          one server instance reaches clients on other instances). SSE handles
+          connection. For multi-instance deployments add a{' '}
+          <code>PublishBackend</code> like Upstash Redis. A single-instance
+          deployment works without one. Centrifugo solves both: clients connect
+          directly to it and it handles all fan-out natively. See the{' '}
+          <a href="#/docs/transports">Transports guide</a> for a full
+          comparison.
+        </p>
+      </div>
 
       <h2 id="next-steps">Next steps</h2>
-      <p>
-        You now have a live collection. From here you can add capabilities one
-        config key at a time &mdash; the{' '}
-        <a href="#/docs/collections">progressive spectrum</a>:
-      </p>
-      <ol>
-        <li>
-          <strong>Basic query</strong> &mdash; <code>queryFn</code> alone
-          fetches data on mount (what you built above).
-        </li>
-        <li>
-          <strong>Add realtime</strong> &mdash; add <code>channel</code> and
-          mutations broadcast to all subscribers instantly.
-        </li>
-        <li>
-          <strong>Add CRDTs</strong> &mdash; add <code>fields</code> and
-          concurrent edits merge automatically (LWW, PN-Counter, OR-Set).
-        </li>
-      </ol>
-      <h3>Explore further</h3>
       <ul>
         <li>
+          <a href="#/docs/reactive-queries">Reactive Queries</a> &mdash; full
+          guide to <code>useQuery</code>, <code>useMutation</code>, optimistic
+          updates, batched consistency, and client-side filtering
+        </li>
+        <li>
+          <a href="#/docs/server-functions">Server Functions</a> &mdash;{' '}
+          <code>realtime.query()</code> and <code>realtime.mutation()</code>{' '}
+          with TanStack Start + Drizzle
+        </li>
+        <li>
           <a href="#/docs/collections">Collections</a> &mdash; custom callbacks,
-          server push, conflict detection, optimistic updates
+          server push, conflict detection
         </li>
         <li>
           <a href="#/docs/crdts">CRDTs</a> &mdash; conflict-free concurrent
@@ -248,17 +324,8 @@ const { data: active } = useLiveQuery((q) =>
           user lists, typing indicators
         </li>
         <li>
-          <a href="#/docs/ephemeral">Ephemeral Channels</a> &mdash; reactions,
-          toasts, confetti, and short-lived events
-        </li>
-        <li>
-          <a href="#/docs/transports">Transports</a> &mdash; Centrifugo (fan-out
-          included), PublishBackend for multi-instance SSE, offline queue,
-          multi-tab coordination
-        </li>
-        <li>
-          <a href="#/docs/server-functions">TanStack Start + Drizzle</a> &mdash;
-          full-stack guide with server functions as collection callbacks
+          <a href="#/docs/transports">Transports</a> &mdash; SSE, Centrifugo,
+          offline queue, multi-tab coordination
         </li>
       </ul>
     </article>
