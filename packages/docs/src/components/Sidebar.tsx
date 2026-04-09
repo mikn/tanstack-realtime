@@ -2,7 +2,9 @@ const sections = [
   {
     title: 'Overview',
     items: [
+      { label: 'Why TanStack Realtime', hash: '#/docs/why' },
       { label: 'Getting Started', hash: '#/docs/getting-started' },
+      { label: 'Tutorial: Task Board', hash: '#/docs/tutorial' },
       { label: 'Collections', hash: '#/docs/collections' },
       { label: 'Choosing a Pattern', hash: '#/docs/choosing-a-pattern' },
     ],
@@ -55,7 +57,9 @@ const sections = [
 ]
 
 const pageMap: Record<string, string> = {
+  '#/docs/why': 'WhyTanstackRealtime.tsx',
   '#/docs/getting-started': 'GettingStarted.tsx',
+  '#/docs/tutorial': 'Tutorial.tsx',
   '#/docs/collections': 'Collections.tsx',
   '#/docs/choosing-a-pattern': 'ChoosingAPattern.tsx',
   '#/docs/server-functions': 'ServerFunctions.tsx',

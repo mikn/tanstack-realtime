@@ -31,6 +31,8 @@ import { SolidPrimitives } from './pages/docs/SolidPrimitives'
 import { VueComposables } from './pages/docs/VueComposables'
 import { Devtools } from './pages/docs/Devtools'
 import { Examples } from './pages/docs/Examples'
+import { Tutorial } from './pages/docs/Tutorial'
+import { WhyTanstackRealtime } from './pages/docs/WhyTanstackRealtime'
 
 // ---------------------------------------------------------------------------
 // Simple hash router
@@ -74,6 +76,8 @@ const docRoutes: Partial<Record<string, () => React.JSX.Element>> = {
   '#/docs/wire-protocol': WireProtocol,
   '#/docs/testing': Testing,
   '#/docs/choosing-a-pattern': ChoosingAPattern,
+  '#/docs/tutorial': Tutorial,
+  '#/docs/why': WhyTanstackRealtime,
   '#/docs/solid-primitives': SolidPrimitives,
   '#/docs/vue-composables': VueComposables,
   '#/docs/devtools': Devtools,
@@ -85,7 +89,9 @@ const docRoutes: Partial<Record<string, () => React.JSX.Element>> = {
 // ---------------------------------------------------------------------------
 
 const docOrder = [
+  { hash: '#/docs/why', label: 'Why TanStack Realtime' },
   { hash: '#/docs/getting-started', label: 'Getting Started' },
+  { hash: '#/docs/tutorial', label: 'Tutorial: Task Board' },
   { hash: '#/docs/collections', label: 'Collections' },
   { hash: '#/docs/choosing-a-pattern', label: 'Choosing a Pattern' },
   { hash: '#/docs/server-functions', label: 'TanStack Start + Drizzle' },
