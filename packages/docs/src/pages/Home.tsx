@@ -7,28 +7,30 @@ function Hero() {
       <div className="container">
         <span className="badge">v0.1 &middot; Alpha</span>
         <h1>
-          Live queries from the backend{' '}
-          <span className="gradient-text">you already have.</span>
+          Reactive queries.{' '}
+          <span className="gradient-text">Any backend. Full control.</span>
         </h1>
         <p className="hero-sub">
-          Add <code>realtime.query()</code> to any server function &mdash; every
-          subscriber updates when data changes. Your Postgres, your Drizzle,
-          your deploy. No new database. No managed service.
+          Wrap any server function with <code>realtime.query()</code> and every
+          subscriber updates automatically. Pick your database, your ORM, your
+          deployment. No lock-in, no new infrastructure.
         </p>
 
         <div className="hero-code">
           <CodeBlock
-            code={`// Before — your existing server function, unchanged
-export const getTodos = async ({ teamId }: { teamId: string }) =>
-  db.select().from(todos).where(eq(todos.teamId, teamId))
-
-// After — prefix with realtime.query(), data is now live everywhere
+            code={`// Server — any database, any ORM
 export const getTodos = realtime.query(async ({ teamId }: { teamId: string }) =>
   db.select().from(todos).where(eq(todos.teamId, teamId))
 )
 
-// Client — one hook, all components share one connection and one cache
-const { data, collection } = useQuery(getTodos, { teamId }, { getKey: (t) => t.id })`}
+// Client — live across all components, zero channel config
+const { data, collection } = useQuery(getTodos, { teamId }, { getKey: (t) => t.id })
+
+// Filter client-side — no extra request needed
+const { data: active } = useLiveQuery(
+  (q) => q.from({ todos: collection }).where('done', '=', false),
+  [collection],
+)`}
           />
         </div>
 
@@ -490,7 +492,7 @@ function Footer() {
         <div className="footer-brand">
           <span className="logo-tan">TanStack</span>{' '}
           <span className="logo-realtime">Realtime</span>
-          <p>Realtime for the stack you already have.</p>
+          <p>Reactive queries. Any backend. Full control.</p>
         </div>
         <div className="footer-links">
           <div>
