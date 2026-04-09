@@ -7,8 +7,7 @@ function Hero() {
       <div className="container">
         <span className="badge">v0.1 &middot; Alpha</span>
         <h1>
-          Reactive queries.{' '}
-          <span className="gradient-text">Any backend.</span>
+          Reactive queries. <span className="gradient-text">Any backend.</span>
         </h1>
         <p className="hero-sub">
           Wrap a server function with <code>realtime.query()</code> and every
@@ -207,9 +206,7 @@ function Positioning() {
                 You want live updates, optimistic mutations, and automatic cache
                 invalidation
               </li>
-              <li>
-                You need presence, pub/sub, or collaborative editing
-              </li>
+              <li>You need presence, pub/sub, or collaborative editing</li>
               <li>
                 You want to choose your own database, ORM, auth, and deploy
                 target

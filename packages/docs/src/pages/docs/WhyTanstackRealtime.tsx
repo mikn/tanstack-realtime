@@ -54,12 +54,12 @@ export const getTodos = realtime.query(async ({ teamId }: { teamId: string }) =>
           user lists.
         </li>
         <li>
-          <strong>CRDTs</strong> &mdash; LWW registers, PN-counters, OR-sets
-          at field granularity for conflict-free concurrent editing.
+          <strong>CRDTs</strong> &mdash; LWW registers, PN-counters, OR-sets at
+          field granularity for conflict-free concurrent editing.
         </li>
         <li>
-          <strong>Pub/sub</strong> &mdash; raw channel events, append-only
-          live channels, ephemeral channels with TTL.
+          <strong>Pub/sub</strong> &mdash; raw channel events, append-only live
+          channels, ephemeral channels with TTL.
         </li>
         <li>
           <strong>Streaming</strong> &mdash; reduce-based state from ordered
@@ -72,15 +72,22 @@ export const getTodos = realtime.query(async ({ teamId }: { teamId: string }) =>
       </ul>
 
       <h2 id="what-it-doesnt">What it doesn&rsquo;t do</h2>
-      <p>
-        TanStack Realtime is a sync layer. It does not provide:
-      </p>
+      <p>TanStack Realtime is a sync layer. It does not provide:</p>
       <ul>
-        <li>A database &mdash; bring Postgres, MySQL, SQLite, or anything else</li>
-        <li>Authentication &mdash; bring your own JWT, session, or API key system</li>
-        <li>File storage, cron jobs, or search &mdash; use purpose-built tools</li>
-        <li>Rich text CRDT &mdash; use{' '}
-          <a href="#/docs/rich-text-crdts">Y.js with TanStack Realtime as the transport</a>
+        <li>
+          A database &mdash; bring Postgres, MySQL, SQLite, or anything else
+        </li>
+        <li>
+          Authentication &mdash; bring your own JWT, session, or API key system
+        </li>
+        <li>
+          File storage, cron jobs, or search &mdash; use purpose-built tools
+        </li>
+        <li>
+          Rich text CRDT &mdash; use{' '}
+          <a href="#/docs/rich-text-crdts">
+            Y.js with TanStack Realtime as the transport
+          </a>
         </li>
       </ul>
       <p>

@@ -299,15 +299,15 @@ function TodoList() {
       </div>
 
       <h2 id="what-just-happened">What just happened</h2>
-      <p>
-        In roughly 30 lines of code across server and client, you now have:
-      </p>
+      <p>In roughly 30 lines of code across server and client, you now have:</p>
       <ul>
         <li>
           <strong>Live queries</strong> &mdash; every component calling{' '}
-          <code>useQuery(getTodos, {'{'} teamId {'}'})</code> with the same args
-          shares one connection and one cache. When any client mutates, all
-          subscribers see the update instantly.
+          <code>
+            useQuery(getTodos, {'{'} teamId {'}'})
+          </code>{' '}
+          with the same args shares one connection and one cache. When any
+          client mutates, all subscribers see the update instantly.
         </li>
         <li>
           <strong>Optimistic mutations</strong> &mdash; the UI updates before
@@ -315,8 +315,7 @@ function TodoList() {
         </li>
         <li>
           <strong>Automatic channels</strong> &mdash; channels are derived from
-          query arguments. No manual wiring, no channel strings to keep in
-          sync.
+          query arguments. No manual wiring, no channel strings to keep in sync.
         </li>
         <li>
           <strong>Client-side queries</strong> &mdash; the returned{' '}
@@ -345,7 +344,10 @@ function TodoList() {
         </thead>
         <tbody>
           <tr>
-            <td>Understand reactive queries deeply (batching, consistency, pagination)</td>
+            <td>
+              Understand reactive queries deeply (batching, consistency,
+              pagination)
+            </td>
             <td>
               <a href="#/docs/reactive-queries">Reactive Queries</a>
             </td>

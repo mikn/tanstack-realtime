@@ -12,14 +12,15 @@ export function Tutorial() {
       <h2 id="prerequisites">Prerequisites</h2>
       <ul>
         <li>Node.js 18+</li>
-        <li>A Postgres database (local or hosted &mdash; Neon, Supabase, Railway all work)</li>
+        <li>
+          A Postgres database (local or hosted &mdash; Neon, Supabase, Railway
+          all work)
+        </li>
         <li>Basic familiarity with React and TypeScript</li>
       </ul>
 
       <h2 id="step-1">Step 1: Create the project</h2>
-      <p>
-        Scaffold a TanStack Start app and install the realtime packages:
-      </p>
+      <p>Scaffold a TanStack Start app and install the realtime packages:</p>
       <CodeBlock
         code={`npx create-start-app@latest task-board
 cd task-board
@@ -62,12 +63,8 @@ import postgres from 'postgres'
 const client = postgres(process.env.DATABASE_URL!)
 export const db = drizzle(client)`}
       />
-      <p>
-        Run the migration:
-      </p>
-      <CodeBlock
-        code={`npx drizzle-kit push`}
-      />
+      <p>Run the migration:</p>
+      <CodeBlock code={`npx drizzle-kit push`} />
 
       <h2 id="step-3">Step 3: Set up the realtime server</h2>
       <p>
@@ -141,9 +138,7 @@ export const deleteTask = realtime.mutation(
       />
 
       <h2 id="step-5">Step 5: Connect the client</h2>
-      <p>
-        Create a realtime client and wrap your app with the provider.
-      </p>
+      <p>Create a realtime client and wrap your app with the provider.</p>
       <CodeBlock
         title="app/client/realtime.ts"
         code={`import { createRealtimeClient } from '@tanstack/realtime'
@@ -255,9 +250,7 @@ export function OnlineUsers({ projectId, userName }: {
       />
 
       <h2 id="step-8">Step 8: Run it</h2>
-      <CodeBlock
-        code={`npm run dev`}
-      />
+      <CodeBlock code={`npm run dev`} />
       <p>
         Open <code>http://localhost:3000</code> in two browser tabs. Add a task
         in one &mdash; it appears instantly in the other. Move a task to
@@ -277,8 +270,8 @@ export function OnlineUsers({ projectId, userName }: {
           <tr>
             <td>Handle concurrent title edits</td>
             <td>
-              Add <code>fields: {'{ title: \'lww\' }'}</code> for last-writer-wins merge.
-              See <a href="#/docs/crdts">CRDTs</a>.
+              Add <code>fields: {"{ title: 'lww' }"}</code> for last-writer-wins
+              merge. See <a href="#/docs/crdts">CRDTs</a>.
             </td>
           </tr>
           <tr>
@@ -298,15 +291,16 @@ export function OnlineUsers({ projectId, userName }: {
           <tr>
             <td>Scale to multiple server instances</td>
             <td>
-              Add a <code>PublishBackend</code> (Redis or Upstash).
-              See <a href="#/docs/scaling">Scaling to Production</a>.
+              Add a <code>PublishBackend</code> (Redis or Upstash). See{' '}
+              <a href="#/docs/scaling">Scaling to Production</a>.
             </td>
           </tr>
           <tr>
             <td>Work offline</td>
             <td>
               Add <code>useOfflineQueue()</code>. Mutations queue locally and
-              flush on reconnect. See <a href="#/docs/resilience">Resilience</a>.
+              flush on reconnect. See <a href="#/docs/resilience">Resilience</a>
+              .
             </td>
           </tr>
         </tbody>

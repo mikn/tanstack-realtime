@@ -15,7 +15,7 @@
 
   /* Single accent — TanStack orange, used sparingly */
   --accent: #f59e0b;
-  --accent-dim: rgba(245, 158, 11, 0.10);
+  --accent-dim: rgba(245, 158, 11, 0.1);
 
   --text-primary: #e8e9ed;
   --text-secondary: #9899b3;
