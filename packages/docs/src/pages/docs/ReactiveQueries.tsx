@@ -351,6 +351,70 @@ export function FeedList({ teamId }: { teamId: string }) {
         </p>
       </div>
 
+      <h2 id="invalidation">How invalidation is routed</h2>
+      <p>
+        When a <code>realtime.mutation()</code> writes to the database, the
+        server determines which subscriptions to re-run without broadcasting to
+        all of them. It works in two steps:
+      </p>
+      <ol>
+        <li>
+          The reactive DB proxy captures the WHERE clause from each{' '}
+          <code>realtime.query()</code> call and compiles it into a row-matching
+          function stored alongside the subscription.
+        </li>
+        <li>
+          On write, the <code>.returning()</code> rows are checked against every
+          active subscription&rsquo;s compiled predicate. Only matching
+          subscriptions are re-queried and pushed to clients.
+        </li>
+      </ol>
+      <p>
+        For <strong>UPDATE</strong> operations there is one additional step: if
+        the mutation&rsquo;s <code>.set(&#123;&hellip;&#125;)</code> changed a
+        column that is referenced by a subscription&rsquo;s predicate, that
+        subscription is re-run even when the post-update row no longer matches
+        it. This ensures subscribers see items <em>disappear</em> from filtered
+        result sets, not just appear.
+      </p>
+
+      <h3 id="invalidation-predicate-design">
+        Design predicates on stable fields
+      </h3>
+      <p>
+        Invalidation is most precise when server-side predicates filter on{' '}
+        <strong>stable fields</strong> (IDs, team membership, foreign keys) and{' '}
+        <strong>mutable field filtering happens client-side</strong> via{' '}
+        <code>useLiveQuery</code>. This is the recommended pattern:
+      </p>
+      <CodeBlock
+        code={`// ✅  Server predicate on stable field — precise invalidation
+export const getTodos = realtime.query(
+  async ({ teamId }: { teamId: string }) =>
+    db.select().from(todos).where(eq(todos.teamId, teamId))
+)
+
+// ✅  Client-side split on mutable field — no extra server request
+const { collection } = useQuery(getTodos, { teamId }, { getKey: (t) => t.id })
+
+const { data: active } = useLiveQuery(
+  (q) => q.from({ todos: collection }).where('done', '=', false),
+  [collection],
+)
+const { data: done } = useLiveQuery(
+  (q) => q.from({ todos: collection }).where('done', '=', true),
+  [collection],
+)`}
+      />
+      <p>
+        The alternative &mdash; separate server queries filtering on{' '}
+        <code>done = false</code> and <code>done = true</code> &mdash; works
+        correctly (the conservative UPDATE check handles it), but re-runs both
+        subscriptions on every toggle instead of just updating the shared
+        collection client-side. One server query, two client views is both more
+        efficient and simpler.
+      </p>
+
       <h2 id="arg-serialisation">Arg serialisation gotcha</h2>
       <p>
         The cache key is derived from <code>JSON.stringify(args)</code>.{' '}

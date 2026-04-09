@@ -198,10 +198,10 @@ function Positioning() {
       <div className="container">
         <h2>Own your stack, keep the magic</h2>
         <p className="section-sub">
-          The reactive query experience of hosted solutions &mdash; live
+          Server functions that keep every subscriber in sync &mdash; live
           updates, optimistic mutations, batched consistency &mdash; without
-          handing over your data or deployment to a third party. Your database.
-          Your auth. Your infrastructure.
+          handing your data or deployment to a third party. Your Postgres. Your
+          ORM. Your infrastructure.
         </p>
 
         <div className="positioning-grid">
@@ -212,16 +212,18 @@ function Positioning() {
                 <strong>Full ownership</strong> &mdash; your database, auth, and
                 deploy stay under your control
               </li>
-              <li>Live updates without polling</li>
               <li>
-                Reactive collections that update when any client mutates data
+                Reactive queries and optimistic mutations with the same
+                developer experience as fully managed solutions
               </li>
-              <li>Presence and lightweight pub/sub messaging</li>
               <li>
-                Concurrent edits on simple fields &mdash; counters, tag sets,
-                scalar values
+                Live updates without polling, manual channel wiring, or
+                infrastructure changes
               </li>
-              <li>Swappable transports without code changes</li>
+              <li>Presence, pub/sub, and collaborative features</li>
+              <li>
+                Swappable transports &mdash; SSE today, Centrifugo tomorrow
+              </li>
             </ul>
           </div>
 
@@ -229,25 +231,28 @@ function Positioning() {
             <h3>Look elsewhere</h3>
             <ul>
               <li>
-                <strong>Postgres-to-client sync</strong> &mdash; ElectricSQL and
-                PowerSync sync Postgres tables directly to client collections
-                (different architectural model)
+                <strong>Fully managed reactive backend</strong> &mdash; Convex
+                bundles reactive queries, mutations, and a hosted database in
+                one product. The trade-off is vendor lock-in and giving up your
+                own Postgres. If that trade-off works for you, Convex is
+                excellent. TanStack Realtime delivers the same reactive-query
+                model on your own infrastructure.
               </li>
               <li>
-                <strong>Rich text editing</strong> &mdash; Yjs/Hocuspocus are
-                purpose-built; see our{' '}
+                <strong>Postgres-to-client sync</strong> &mdash; ElectricSQL and
+                PowerSync sync Postgres change streams directly to client
+                collections (different architectural model)
+              </li>
+              <li>
+                <strong>Rich text collaboration</strong> &mdash; Yjs/Hocuspocus
+                are purpose-built; see our{' '}
                 <a href="#/docs/rich-text-crdts">Y.js integration guide</a> for
                 pairing with TanStack Realtime as the transport
               </li>
               <li>
-                <strong>Polling is enough</strong> &mdash; TanStack Query with a{' '}
+                <strong>Polling is fine</strong> &mdash; TanStack Query with a{' '}
                 <code>refetchInterval</code> is simpler when sub-second latency
                 is not required
-              </li>
-              <li>
-                <strong>Fully managed realtime</strong> &mdash; Ably, Pusher,
-                and Liveblocks handle infrastructure for you; TanStack Realtime
-                is for teams that want to own the transport layer
               </li>
             </ul>
           </div>
