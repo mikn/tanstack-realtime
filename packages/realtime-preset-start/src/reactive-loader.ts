@@ -4,6 +4,7 @@ import {
   ReactivePredicateParseError,
   compilePredicate,
   deriveChannelKey,
+  extractReferencedColumns,
 } from './compile-predicate.js'
 import type { ColumnMap } from './reactive-db.js'
 import type { QueryKey } from '@tanstack/realtime'
@@ -48,16 +49,19 @@ export function createLoader<TResult>(
       params: ReadonlyArray<unknown>
       columns: ColumnMap
       compiled: (row: Record<string, unknown>) => boolean
+      referencedColumns: ReadonlySet<string>
     }
 
     if (ctx.reads[0]) {
       // Auto path: predicate extracted from reactive context
       const read = ctx.reads[0]
       let compiled: (row: Record<string, unknown>) => boolean
+      let referencedColumns: Set<string>
       let autoChannel: string | undefined
 
       try {
         compiled = compilePredicate(read.sql, read.params, read.columns)
+        referencedColumns = extractReferencedColumns(read.sql, read.columns)
       } catch (err) {
         if (
           err instanceof ReactivePredicateParseError &&
@@ -65,6 +69,7 @@ export function createLoader<TResult>(
         ) {
           // Table-level subscription: query has no WHERE clause
           compiled = () => true
+          referencedColumns = new Set()
           autoChannel = serializeKey([read.table])
         } else {
           throw err
@@ -77,6 +82,7 @@ export function createLoader<TResult>(
         params: read.params,
         columns: read.columns,
         compiled,
+        referencedColumns,
       }
       channel =
         options.channel !== undefined
@@ -96,6 +102,7 @@ export function createLoader<TResult>(
         params,
         columns: pred.columns,
         compiled,
+        referencedColumns: extractReferencedColumns(sql, pred.columns),
       }
       channel =
         options.channel !== undefined
@@ -104,7 +111,7 @@ export function createLoader<TResult>(
             : serializeKey(options.channel)
           : deriveChannelKey(pred.table, sql, params, pred.columns)
     } else if (options.predicate && 'matches' in options.predicate) {
-      // Explicit matches path
+      // Explicit matches path — no SQL to parse, so referencedColumns is unknown
       const pred = options.predicate
       queryPredicate = {
         table: pred.table,
@@ -112,6 +119,7 @@ export function createLoader<TResult>(
         params: [],
         columns: {},
         compiled: pred.matches,
+        referencedColumns: new Set(),
       }
       channel =
         options.channel !== undefined

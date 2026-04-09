@@ -14,6 +14,14 @@ export interface QueryPredicate {
   params: ReadonlyArray<unknown>
   columns: ColumnMap
   compiled: (row: Record<string, unknown>) => boolean // pre-compiled at register()
+  /**
+   * JS field names referenced in the WHERE clause.
+   * Used for conservative UPDATE invalidation: if the mutation's .set({…})
+   * touched a column listed here but the post-update row no longer matches the
+   * predicate, the subscription is still invalidated (the row was *removed*
+   * from this result set and subscribers must see it disappear).
+   */
+  referencedColumns: ReadonlySet<string>
 }
 
 export interface SubscriptionEntry {
@@ -73,7 +81,20 @@ export class SubscriptionManager {
             entry.predicate.compiled(row),
           )
         ) {
-          // Predicate-level match
+          // Predicate-level match on post-write row values
+          toInvalidate.set(channel, entry)
+        } else if (
+          write.operation === 'update' &&
+          write.updatedColumns !== undefined &&
+          entry.predicate.referencedColumns.size > 0 &&
+          write.updatedColumns.some((col) =>
+            entry.predicate.referencedColumns.has(col),
+          )
+        ) {
+          // Conservative UPDATE invalidation: the mutation changed a column
+          // that this subscription's predicate references, but the post-update
+          // row no longer matches. This means the row was *removed* from this
+          // subscription's result set — re-run so subscribers see it disappear.
           toInvalidate.set(channel, entry)
         }
       }

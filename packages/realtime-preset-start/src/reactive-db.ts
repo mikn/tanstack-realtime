@@ -15,6 +15,18 @@ interface ReadEntry {
 // WriteDescriptor is defined here and re-exported from subscription-manager.
 export interface WriteDescriptor {
   table: string
+  /**
+   * The DML operation that produced this descriptor. Set automatically by wrapReactiveDb.
+   * Optional so manually-constructed WriteDescriptors stay backwards-compatible.
+   */
+  operation?: 'insert' | 'update' | 'delete'
+  /**
+   * For UPDATE operations: the JS field names passed to .set({…}).
+   * Used by SubscriptionManager to conservatively invalidate subscriptions whose
+   * predicates reference a mutated column even when the post-update row no longer
+   * matches (i.e. the row was *removed* from a filtered result set).
+   */
+  updatedColumns?: ReadonlyArray<string>
   affectedRows: ReadonlyArray<Record<string, unknown>> // [] = table-level fallback
 }
 
@@ -157,8 +169,16 @@ function wrapSelectFrom(builder: AnyBuilder): AnyBuilder {
  * Wraps a write (insert/update/delete) builder to intercept `.then()`.
  *
  * Same store-capture rationale as wrapQueryBuilder.
+ * For UPDATE operations, `.set({…})` is also intercepted to capture the JS
+ * field names being written — used by SubscriptionManager for conservative
+ * invalidation of subscriptions whose predicate column was mutated.
  */
-function wrapWrite(builder: AnyBuilder, tableName: string): AnyBuilder {
+function wrapWrite(
+  builder: AnyBuilder,
+  tableName: string,
+  operation: 'insert' | 'update' | 'delete',
+  updatedColumns?: ReadonlyArray<string>,
+): AnyBuilder {
   // Capture NOW — wrapWrite is called inside AsyncLocalStorage.run()
   const capturedStore = reactiveCtx.getStore()
   return new Proxy(builder, {
@@ -179,10 +199,15 @@ function wrapWrite(builder: AnyBuilder, tableName: string): AnyBuilder {
               const rows = Array.isArray(result)
                 ? (result as Array<Record<string, unknown>>)
                 : []
-              capturedStore.writes.push({
+              const descriptor: WriteDescriptor = {
                 table: tableName,
+                operation,
                 affectedRows: rows,
-              })
+              }
+              if (operation === 'update' && updatedColumns !== undefined) {
+                descriptor.updatedColumns = updatedColumns
+              }
+              capturedStore.writes.push(descriptor)
             }
             return onFulfilled ? onFulfilled(result) : result
           }
@@ -195,13 +220,21 @@ function wrapWrite(builder: AnyBuilder, tableName: string): AnyBuilder {
       const val = Reflect.get(target, prop, receiver)
       if (typeof val === 'function') {
         return (...args: Array<unknown>) => {
+          // For UPDATE, intercept .set({…}) to capture the mutated JS field names.
+          const cols: ReadonlyArray<string> | undefined =
+            prop === 'set' &&
+            operation === 'update' &&
+            args[0] !== null &&
+            typeof args[0] === 'object'
+              ? Object.keys(args[0] as Record<string, unknown>)
+              : updatedColumns
           const result: unknown = (
             val as (...a: Array<unknown>) => unknown
           ).apply(target, args)
           // Always re-wrap object results so intermediate builders
           // (e.g. .values() → .returning()) stay within the proxy chain.
           if (result !== null && typeof result === 'object') {
-            return wrapWrite(result as AnyBuilder, tableName)
+            return wrapWrite(result as AnyBuilder, tableName, operation, cols)
           }
           return result
         }
@@ -235,6 +268,7 @@ export function wrapReactiveDb<TDb extends object>(rawDb: TDb): TDb {
       }
 
       if (prop === 'insert' || prop === 'update' || prop === 'delete') {
+        const operation = prop // 'insert' | 'update' | 'delete'
         const val = Reflect.get(target, prop, receiver) as (
           table: unknown,
           ...args: Array<unknown>
@@ -245,7 +279,7 @@ export function wrapReactiveDb<TDb extends object>(rawDb: TDb): TDb {
             const tableName = getTableName(
               table as Parameters<typeof getTableName>[0],
             )
-            return wrapWrite(builder, tableName)
+            return wrapWrite(builder, tableName, operation)
           }
           return builder
         }

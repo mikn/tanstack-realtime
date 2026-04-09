@@ -20,6 +20,7 @@ import {
   compilePredicate,
   deriveChannelKey,
   extractEqualityConditions,
+  extractReferencedColumns,
 } from '../realtime-preset-start/src/compile-predicate.js'
 import { runInReactiveContext } from '../realtime-preset-start/src/reactive-db.js'
 import { createLoader } from '../realtime-preset-start/src/reactive-loader.js'
@@ -366,7 +367,48 @@ describe('wrapReactiveDb', () => {
 
     expect(ctx.writes).toHaveLength(1)
     expect(ctx.writes[0].table).toBe('todos')
+    expect(ctx.writes[0].operation).toBe('insert')
     expect(ctx.writes[0].affectedRows).toEqual(insertedRows)
+  })
+
+  it('UPDATE: operation=update and updatedColumns captured from .set()', async () => {
+    const updatedRows = [{ id: 1, done: true, teamId: 'A' }]
+    const returningBuilder: any = {
+      toSQL: () => ({
+        sql: 'UPDATE todos SET done=$1 WHERE id=$2 RETURNING *',
+        params: [],
+      }),
+      then: (res: any, _rej: any) =>
+        Promise.resolve(updatedRows).then(res, _rej),
+    }
+    const whereBuilder: any = {
+      then: (res: any, _rej: any) => Promise.resolve([]).then(res, _rej),
+      returning: () => returningBuilder,
+    }
+    const setBuilder: any = {
+      then: (res: any, _rej: any) => Promise.resolve([]).then(res, _rej),
+      where: () => whereBuilder,
+    }
+    const rawDb: any = {
+      update: (_t: any) => ({
+        set: (_vals: any) => setBuilder,
+      }),
+    }
+    const wrappedDb = wrapReactiveDb(rawDb)
+
+    const { ctx } = await runInReactiveContext(async () => {
+      return await wrappedDb
+        .update(fakeTable)
+        .set({ done: true })
+        .where('id = $1')
+        .returning()
+    })
+
+    expect(ctx.writes).toHaveLength(1)
+    expect(ctx.writes[0].table).toBe('todos')
+    expect(ctx.writes[0].operation).toBe('update')
+    expect(ctx.writes[0].updatedColumns).toEqual(['done'])
+    expect(ctx.writes[0].affectedRows).toEqual(updatedRows)
   })
 })
 
@@ -378,6 +420,7 @@ function makeEntry(
   channel: string,
   table: string,
   matchFn: (row: any) => boolean,
+  referencedColumns: ReadonlySet<string> = new Set(),
 ): SubscriptionEntry {
   return {
     channel,
@@ -387,6 +430,7 @@ function makeEntry(
       params: [],
       columns: {},
       compiled: matchFn,
+      referencedColumns,
     },
     requery: vi.fn().mockResolvedValue({ data: 'fresh' }),
   }
@@ -492,6 +536,118 @@ describe('SubscriptionManager', () => {
     expect(entryV2.requery).toHaveBeenCalledTimes(1)
     expect(entryV1.requery).not.toHaveBeenCalled()
   })
+
+  // ------- Conservative UPDATE invalidation -----------------------------------
+
+  it('UPDATE: non-matching post-update row still invalidates if predicate column was set', async () => {
+    // Scenario: toggling a todo from done=false to done=true.
+    // ch-active filters done=false; post-update row has done=true → predicate doesn't match.
+    // But because 'done' is in both updatedColumns and referencedColumns, we
+    // conservatively re-run to let subscribers see the item disappear.
+    const publishFn = vi.fn().mockResolvedValue(undefined)
+    const mgr = createSubscriptionManager(publishFn)
+
+    const activeEntry = makeEntry(
+      'ch-active',
+      'todos',
+      (row) => row.done === false,
+      new Set(['done']),
+    )
+    mgr.register(activeEntry)
+
+    await mgr.invalidate([
+      {
+        table: 'todos',
+        operation: 'update',
+        updatedColumns: ['done'],
+        affectedRows: [{ id: '1', done: true }], // post-update: done is now true
+      },
+    ])
+
+    expect(activeEntry.requery).toHaveBeenCalledTimes(1)
+  })
+
+  it('UPDATE: non-matching post-update row does NOT invalidate if predicate column was not set', async () => {
+    // Scenario: updating 'title' on a todo that is done=true.
+    // ch-active filters done=false; the row doesn't match. 'title' is NOT in referencedColumns.
+    // → no invalidation.
+    const publishFn = vi.fn().mockResolvedValue(undefined)
+    const mgr = createSubscriptionManager(publishFn)
+
+    const activeEntry = makeEntry(
+      'ch-active',
+      'todos',
+      (row) => row.done === false,
+      new Set(['done']),
+    )
+    mgr.register(activeEntry)
+
+    await mgr.invalidate([
+      {
+        table: 'todos',
+        operation: 'update',
+        updatedColumns: ['title'], // 'done' not changed
+        affectedRows: [{ id: '1', done: true, title: 'New title' }],
+      },
+    ])
+
+    expect(activeEntry.requery).not.toHaveBeenCalled()
+    expect(publishFn).not.toHaveBeenCalled()
+  })
+
+  it('INSERT: non-matching new row does NOT trigger conservative invalidation', async () => {
+    // Conservative check only applies to UPDATEs — a new insert with done=true
+    // should not invalidate the done=false subscription.
+    const publishFn = vi.fn().mockResolvedValue(undefined)
+    const mgr = createSubscriptionManager(publishFn)
+
+    const activeEntry = makeEntry(
+      'ch-active',
+      'todos',
+      (row) => row.done === false,
+      new Set(['done']),
+    )
+    mgr.register(activeEntry)
+
+    await mgr.invalidate([
+      {
+        table: 'todos',
+        operation: 'insert',
+        updatedColumns: undefined,
+        affectedRows: [{ id: '2', done: true }], // new row, done=true
+      },
+    ])
+
+    expect(activeEntry.requery).not.toHaveBeenCalled()
+    expect(publishFn).not.toHaveBeenCalled()
+  })
+
+  it('UPDATE without updatedColumns: falls back to predicate-only matching', async () => {
+    // When updatedColumns is absent (manually-constructed WriteDescriptor),
+    // only the compiled predicate match is used — no conservative invalidation.
+    const publishFn = vi.fn().mockResolvedValue(undefined)
+    const mgr = createSubscriptionManager(publishFn)
+
+    const activeEntry = makeEntry(
+      'ch-active',
+      'todos',
+      (row) => row.done === false,
+      new Set(['done']),
+    )
+    mgr.register(activeEntry)
+
+    await mgr.invalidate([
+      {
+        table: 'todos',
+        operation: 'update',
+        // updatedColumns intentionally absent
+        affectedRows: [{ id: '1', done: true }],
+      },
+    ])
+
+    expect(activeEntry.requery).not.toHaveBeenCalled()
+    expect(publishFn).not.toHaveBeenCalled()
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -579,6 +735,44 @@ describe('deriveChannelKey', () => {
   it('undefined whereSQL → serializeKey([table])', () => {
     const key = deriveChannelKey('todos', undefined, [], dkCols)
     expect(key).toBe(serializeKey(['todos']))
+  })
+})
+
+// ---------------------------------------------------------------------------
+// extractReferencedColumns
+// ---------------------------------------------------------------------------
+
+describe('extractReferencedColumns', () => {
+  const cols = {
+    teamId: { name: 'team_id' },
+    done: { name: 'done' },
+    title: { name: 'title' },
+  }
+
+  it('single equality → returns that column', () => {
+    const refs = extractReferencedColumns('"todos"."team_id" = $1', cols)
+    expect(refs).toEqual(new Set(['teamId']))
+  })
+
+  it('AND condition → returns both columns', () => {
+    const refs = extractReferencedColumns(
+      '"todos"."team_id" = $1 AND "todos"."done" = $2',
+      cols,
+    )
+    expect(refs).toEqual(new Set(['teamId', 'done']))
+  })
+
+  it('empty sql → returns empty set', () => {
+    const refs = extractReferencedColumns('', cols)
+    expect(refs).toEqual(new Set())
+  })
+
+  it('full SELECT sql → extracts refs from WHERE clause only', () => {
+    const refs = extractReferencedColumns(
+      'SELECT * FROM "todos" WHERE "todos"."done" = $1',
+      cols,
+    )
+    expect(refs).toEqual(new Set(['done']))
   })
 })
 

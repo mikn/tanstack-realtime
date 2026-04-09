@@ -335,6 +335,55 @@ function parseWhereClause(whereSQL: string): AstNode {
 // ---------------------------------------------------------------------------
 
 /**
+ * Collect all column references (as JS field names) reachable in an AST subtree.
+ */
+function collectRefs(
+  node: AstNode,
+  dbToJs: Record<string, string>,
+  refs: Set<string>,
+): void {
+  switch (node.type) {
+    case 'ref':
+      refs.add(dbToJs[node.name] ?? node.name)
+      break
+    case 'binary':
+      collectRefs(node.left, dbToJs, refs)
+      collectRefs(node.right, dbToJs, refs)
+      break
+    case 'unary':
+      collectRefs(node.operand, dbToJs, refs)
+      break
+    case 'list':
+      for (const expr of node.expressions) collectRefs(expr, dbToJs, refs)
+      break
+    default:
+      break
+  }
+}
+
+/**
+ * Return the set of JS field names referenced in the WHERE clause.
+ * Used by SubscriptionManager to conservatively invalidate subscriptions
+ * when an UPDATE changes a column that is part of the predicate.
+ * Returns an empty set when whereSQL is empty or cannot be parsed.
+ */
+export function extractReferencedColumns(
+  whereSQL: string,
+  columns: ColumnMap,
+): Set<string> {
+  if (!whereSQL) return new Set()
+  try {
+    const dbToJs = buildReverseMap(columns)
+    const whereNode = parseWhereClause(whereSQL)
+    const refs = new Set<string>()
+    collectRefs(whereNode, dbToJs, refs)
+    return refs
+  } catch {
+    return new Set()
+  }
+}
+
+/**
  * Compile a WHERE SQL clause into a row-matching function.
  * The compiled function is cached — call once at register() time.
  */
