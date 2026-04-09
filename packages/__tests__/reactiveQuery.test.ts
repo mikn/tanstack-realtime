@@ -179,7 +179,7 @@ describe('query factory — registers subscription', () => {
 
     // Trigger invalidation with a matching row
     await handler.invalidate([
-      { table: 'todos', affectedRows: [{ teamId: 'A' }] },
+      { table: 'todos', operation: 'insert', affectedRows: [{ teamId: 'A' }] },
     ])
 
     // Server now publishes a single batch message to __realtime_batch__
@@ -211,7 +211,7 @@ describe('query factory — registers subscription', () => {
 
     // Row belongs to team B — should not invalidate team A's subscription
     await handler.invalidate([
-      { table: 'todos', affectedRows: [{ teamId: 'B' }] },
+      { table: 'todos', operation: 'insert', affectedRows: [{ teamId: 'B' }] },
     ])
 
     // No batch message should have been published for a non-matching invalidation.
@@ -303,7 +303,9 @@ describe('query factory — table-level channel (no WHERE)', () => {
     )(undefined)
 
     // Table-level invalidation (no specific rows)
-    await handler.invalidate([{ table: 'todos', affectedRows: [] }])
+    await handler.invalidate([
+      { table: 'todos', operation: 'insert', affectedRows: [] },
+    ])
 
     // Server now publishes a single batch message to __realtime_batch__
     const batchMsg = published.find((p) => p.ch === REALTIME_BATCH_CHANNEL)

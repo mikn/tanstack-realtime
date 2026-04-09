@@ -461,7 +461,9 @@ describe('SubscriptionManager', () => {
     const entry = makeEntry('ch-A', 'todos', (row) => row.teamId === 'A')
     mgr.register(entry)
 
-    await mgr.invalidate([{ table: 'todos', affectedRows: [{ teamId: 'A' }] }])
+    await mgr.invalidate([
+      { table: 'todos', operation: 'insert', affectedRows: [{ teamId: 'A' }] },
+    ])
 
     expect(entry.requery).toHaveBeenCalledTimes(1)
     // Server now publishes a single batch message to __realtime_batch__
@@ -478,7 +480,9 @@ describe('SubscriptionManager', () => {
     const entry = makeEntry('ch-A', 'todos', (row) => row.teamId === 'A')
     mgr.register(entry)
 
-    await mgr.invalidate([{ table: 'todos', affectedRows: [{ teamId: 'B' }] }])
+    await mgr.invalidate([
+      { table: 'todos', operation: 'insert', affectedRows: [{ teamId: 'B' }] },
+    ])
 
     expect(entry.requery).not.toHaveBeenCalled()
     expect(publishFn).not.toHaveBeenCalled()
@@ -492,7 +496,9 @@ describe('SubscriptionManager', () => {
     mgr.register(entryA)
     mgr.register(entryB)
 
-    await mgr.invalidate([{ table: 'todos', affectedRows: [] }])
+    await mgr.invalidate([
+      { table: 'todos', operation: 'insert', affectedRows: [] },
+    ])
 
     expect(entryA.requery).toHaveBeenCalledTimes(1)
     expect(entryB.requery).toHaveBeenCalledTimes(1)
@@ -511,7 +517,9 @@ describe('SubscriptionManager', () => {
 
     // Should not throw
     await expect(
-      mgr.invalidate([{ table: 'todos', affectedRows: [] }]),
+      mgr.invalidate([
+        { table: 'todos', operation: 'insert', affectedRows: [] },
+      ]),
     ).resolves.toBeUndefined()
 
     // Success entry still processed
@@ -530,7 +538,11 @@ describe('SubscriptionManager', () => {
 
     // V2 matches NEW, V1 matched OLD
     await mgr.invalidate([
-      { table: 'todos', affectedRows: [{ teamId: 'NEW' }] },
+      {
+        table: 'todos',
+        operation: 'insert',
+        affectedRows: [{ teamId: 'NEW' }],
+      },
     ])
 
     expect(entryV2.requery).toHaveBeenCalledTimes(1)
@@ -613,7 +625,6 @@ describe('SubscriptionManager', () => {
       {
         table: 'todos',
         operation: 'insert',
-        updatedColumns: undefined,
         affectedRows: [{ id: '2', done: true }], // new row, done=true
       },
     ])
@@ -622,9 +633,10 @@ describe('SubscriptionManager', () => {
     expect(publishFn).not.toHaveBeenCalled()
   })
 
-  it('UPDATE without updatedColumns: falls back to predicate-only matching', async () => {
-    // When updatedColumns is absent (manually-constructed WriteDescriptor),
-    // only the compiled predicate match is used — no conservative invalidation.
+  it('UPDATE with empty updatedColumns: conservative check does not fire', async () => {
+    // updatedColumns: [] means we could not determine which columns changed
+    // (e.g. escape-hatch manual write). Conservative check is skipped because
+    // [].some(...) is always false — falls through to predicate-only matching.
     const publishFn = vi.fn().mockResolvedValue(undefined)
     const mgr = createSubscriptionManager(publishFn)
 
@@ -640,7 +652,7 @@ describe('SubscriptionManager', () => {
       {
         table: 'todos',
         operation: 'update',
-        // updatedColumns intentionally absent
+        updatedColumns: [],
         affectedRows: [{ id: '1', done: true }],
       },
     ])
@@ -1055,7 +1067,13 @@ describe('createMutationHandler', () => {
   it('options.writes override auto-captured writes', async () => {
     const mockMgr = makeMockMgr()
 
-    const explicitWrites = [{ table: 'projects', affectedRows: [{ id: 99 }] }]
+    const explicitWrites = [
+      {
+        table: 'projects',
+        operation: 'insert' as const,
+        affectedRows: [{ id: 99 }],
+      },
+    ]
 
     const mutation = createMutationHandler({
       subscriptionManager: mockMgr,
@@ -1148,7 +1166,9 @@ describe('createStartHandler — reactive integration', () => {
     )
     await getRows2(undefined)
 
-    await realtime2.invalidate([{ table: 'todos', affectedRows: [] }])
+    await realtime2.invalidate([
+      { table: 'todos', operation: 'insert', affectedRows: [] },
+    ])
 
     // Server now publishes a single batch message to __realtime_batch__
     const batchMsg = published.find((p) => p.ch === REALTIME_BATCH_CHANNEL)
@@ -1172,7 +1192,7 @@ describe('createStartHandler — reactive integration', () => {
     // Direct invalidation with matching rows
     const invalidateSpy = vi.spyOn(realtime.subscriptionManager, 'invalidate')
     await realtime.invalidate([
-      { table: 'todos', affectedRows: [{ teamId: 'A' }] },
+      { table: 'todos', operation: 'insert', affectedRows: [{ teamId: 'A' }] },
     ])
 
     expect(invalidateSpy).toHaveBeenCalledTimes(1)

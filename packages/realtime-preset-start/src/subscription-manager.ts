@@ -85,7 +85,6 @@ export class SubscriptionManager {
           toInvalidate.set(channel, entry)
         } else if (
           write.operation === 'update' &&
-          write.updatedColumns !== undefined &&
           entry.predicate.referencedColumns.size > 0 &&
           write.updatedColumns.some((col) =>
             entry.predicate.referencedColumns.has(col),

@@ -12,23 +12,32 @@ interface ReadEntry {
   columns: ColumnMap // from getTableColumns(table)
 }
 
+/**
+ * Describes a single DML write captured by wrapReactiveDb (or supplied
+ * manually via the `writes` escape hatch in createMutationHandler).
+ *
+ * The discriminated union enforces that UPDATE descriptors always carry
+ * `updatedColumns` — the JS field names from `.set({…})` — which
+ * SubscriptionManager uses for conservative invalidation of subscriptions
+ * whose predicate references a column that was mutated.
+ *
+ * `affectedRows: []` triggers table-level invalidation for any operation
+ * (i.e. when .returning() was not used).
+ */
 // WriteDescriptor is defined here and re-exported from subscription-manager.
-export interface WriteDescriptor {
-  table: string
-  /**
-   * The DML operation that produced this descriptor. Set automatically by wrapReactiveDb.
-   * Optional so manually-constructed WriteDescriptors stay backwards-compatible.
-   */
-  operation?: 'insert' | 'update' | 'delete'
-  /**
-   * For UPDATE operations: the JS field names passed to .set({…}).
-   * Used by SubscriptionManager to conservatively invalidate subscriptions whose
-   * predicates reference a mutated column even when the post-update row no longer
-   * matches (i.e. the row was *removed* from a filtered result set).
-   */
-  updatedColumns?: ReadonlyArray<string>
-  affectedRows: ReadonlyArray<Record<string, unknown>> // [] = table-level fallback
-}
+export type WriteDescriptor =
+  | {
+      table: string
+      operation: 'insert' | 'delete'
+      affectedRows: ReadonlyArray<Record<string, unknown>>
+    }
+  | {
+      table: string
+      operation: 'update'
+      /** JS field names passed to .set({…}). Empty array = conservatively invalidate all subscriptions on the table. */
+      updatedColumns: ReadonlyArray<string>
+      affectedRows: ReadonlyArray<Record<string, unknown>>
+    }
 
 interface ReactiveQueryContext {
   reads: Array<ReadEntry>
@@ -199,14 +208,15 @@ function wrapWrite(
               const rows = Array.isArray(result)
                 ? (result as Array<Record<string, unknown>>)
                 : []
-              const descriptor: WriteDescriptor = {
-                table: tableName,
-                operation,
-                affectedRows: rows,
-              }
-              if (operation === 'update' && updatedColumns !== undefined) {
-                descriptor.updatedColumns = updatedColumns
-              }
+              const descriptor: WriteDescriptor =
+                operation === 'update'
+                  ? {
+                      table: tableName,
+                      operation: 'update',
+                      updatedColumns: updatedColumns ?? [],
+                      affectedRows: rows,
+                    }
+                  : { table: tableName, operation, affectedRows: rows }
               capturedStore.writes.push(descriptor)
             }
             return onFulfilled ? onFulfilled(result) : result
