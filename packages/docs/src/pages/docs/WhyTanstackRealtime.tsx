@@ -5,300 +5,145 @@ export function WhyTanstackRealtime() {
     <article className="doc-article">
       <h1>Why TanStack Realtime</h1>
       <p className="doc-lead">
-        Managed platforms proved that reactive queries, optimistic mutations, and
-        automatic invalidation are the right developer experience. TanStack
-        Realtime brings that experience to the tools you already know &mdash;
-        without moving your data to someone else&rsquo;s database.
+        A sync layer that makes server functions reactive. You keep your
+        database, your ORM, and your deploy target.
       </p>
 
-      <h2 id="the-case">The case in 30 seconds</h2>
+      <h2 id="problem">The problem</h2>
       <p>
-        You shouldn&rsquo;t have to choose between &ldquo;great DX&rdquo; and
-        &ldquo;own your stack.&rdquo; TanStack Realtime is a sync layer. It
-        makes your existing server functions reactive and adds presence, CRDTs,
-        and pub/sub &mdash; without replacing your database, your ORM, your
-        auth, or your deploy target.
+        Making server data update in real time usually means either adopting a
+        managed platform (and its database, its query language, its pricing) or
+        wiring up WebSockets, channels, cache invalidation, and reconnection
+        logic yourself.
       </p>
-
-      <div className="doc-callout">
-        <p>
-          <strong>One annotation, live data:</strong>
-        </p>
-        <CodeBlock
-          code={`// This is a normal Drizzle query. Adding realtime.query() makes it live.
-export const getTasks = realtime.query(async ({ projectId }) =>
-  db.select().from(tasks).where(eq(tasks.projectId, projectId))
-)
-
-// Every component calling useQuery(getTasks, { projectId }) shares one
-// connection, one cache, and updates automatically when any client mutates.`}
-        />
-      </div>
-
-      <h2 id="vs-managed">Compared to managed platforms</h2>
       <p>
-        Convex, Firebase, and Supabase Realtime are excellent products. They
-        bundle a database, auth, storage, and realtime into one hosted platform.
-        The question is whether that bundle is the right trade-off for your
-        project.
+        TanStack Realtime is an alternative: annotate a server function, get
+        live queries. Everything else stays the same.
       </p>
 
-      <table className="api-table">
-        <thead>
-          <tr>
-            <th></th>
-            <th>Managed platform (e.g. Convex)</th>
-            <th>TanStack Realtime</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>Database</strong></td>
-            <td>Proprietary, hosted by the vendor</td>
-            <td>Your Postgres, MySQL, SQLite &mdash; any database</td>
-          </tr>
-          <tr>
-            <td><strong>Query language</strong></td>
-            <td>Vendor-specific API</td>
-            <td>Your ORM (Drizzle, Prisma, Kysely, raw SQL)</td>
-          </tr>
-          <tr>
-            <td><strong>Live queries</strong></td>
-            <td>Built-in, automatic</td>
-            <td>Built-in, automatic (one annotation on server functions)</td>
-          </tr>
-          <tr>
-            <td><strong>Optimistic mutations</strong></td>
-            <td>Built-in</td>
-            <td>Built-in, with declarative rollback</td>
-          </tr>
-          <tr>
-            <td><strong>Type safety</strong></td>
-            <td>End-to-end with codegen</td>
-            <td>End-to-end without codegen (phantom types)</td>
-          </tr>
-          <tr>
-            <td><strong>Auth</strong></td>
-            <td>Bundled (vendor-specific)</td>
-            <td>Bring your own (any JWT, session, or API key system)</td>
-          </tr>
-          <tr>
-            <td><strong>Presence</strong></td>
-            <td>Varies (some platforms, not all)</td>
-            <td>First-class: cursors, typing indicators, online lists</td>
-          </tr>
-          <tr>
-            <td><strong>CRDTs</strong></td>
-            <td>Not typically available</td>
-            <td>
-              Built-in: LWW registers, PN-counters, OR-sets at field
-              granularity
-            </td>
-          </tr>
-          <tr>
-            <td><strong>AI streaming</strong></td>
-            <td>Possible but not purpose-built</td>
-            <td>
-              Purpose-built: reduce-based streams with HMAC checkpoints
-            </td>
-          </tr>
-          <tr>
-            <td><strong>Deploy</strong></td>
-            <td>Vendor cloud only (or self-host if open source)</td>
-            <td>Anywhere: Vercel, Fly, Railway, Cloudflare, bare metal</td>
-          </tr>
-          <tr>
-            <td><strong>Pricing</strong></td>
-            <td>Per-function-call + storage + egress</td>
-            <td>Free (MIT). Pay only for your own infra</td>
-          </tr>
-          <tr>
-            <td><strong>Initial setup</strong></td>
-            <td>Fastest &mdash; zero infrastructure decisions</td>
-            <td>~5 minutes &mdash; you bring a database and a server</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <h2 id="same-dx">Same developer experience, your infrastructure</h2>
-      <p>
-        The features that make managed platforms feel magical are not unique to
-        managed platforms. Here&rsquo;s side-by-side code showing the same
-        reactive pattern:
-      </p>
-
-      <h3>Managed platform</h3>
       <CodeBlock
-        code={`// Convex-style: query defined in convex/ folder, proprietary DB
-export const getTasks = query({
-  args: { projectId: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("tasks")
-      .filter(q => q.eq(q.field("projectId"), args.projectId))
-      .collect()
-  },
-})
+        code={`// Before: a normal server function
+export async function getTodos({ teamId }: { teamId: string }) {
+  return db.select().from(todos).where(eq(todos.teamId, teamId))
+}
 
-// Client
-const tasks = useQuery(api.tasks.getTasks, { projectId })`}
-      />
-
-      <h3>TanStack Realtime</h3>
-      <CodeBlock
-        code={`// Your server function, your database, your ORM
-export const getTasks = realtime.query(
-  async ({ projectId }: { projectId: string }) =>
-    db.select().from(tasks).where(eq(tasks.projectId, projectId))
-)
-
-// Client — same reactive pattern, same automatic updates
-const { data } = useQuery(getTasks, { projectId }, { getKey: (t) => t.id })`}
-      />
-      <p>
-        The developer experience is comparable. The difference is what&rsquo;s
-        underneath: your Postgres, your Drizzle query, your server.
-      </p>
-
-      <h2 id="beyond">What TanStack Realtime adds beyond basic reactivity</h2>
-      <p>
-        Most managed platforms stop at live queries and mutations. TanStack
-        Realtime includes primitives that are typically separate products:
-      </p>
-
-      <h3>Conflict-free concurrent editing</h3>
-      <p>
-        Built-in CRDTs at the field level. Two users editing the same row
-        concurrently? Fields merge automatically &mdash; no conflict dialogs, no
-        last-write-wins-and-loses-data.
-      </p>
-      <CodeBlock
-        code={`realtimeCollectionOptions({
-  // ...
-  fields: {
-    title: 'lww',         // last-writer-wins with Lamport clocks
-    votes: 'pn-counter',  // concurrent votes add up correctly
-    tags:  'or-set',      // add always wins over concurrent remove
-  },
-})`}
-      />
-
-      <h3>Client-side queries on live data</h3>
-      <p>
-        Every live query returns a TanStack DB Collection. Filter, sort, and
-        join entirely on the client &mdash; zero extra server requests.
-      </p>
-      <CodeBlock
-        code={`// One server query, three filtered views
-const { collection } = useQuery(getTasks, { projectId }, { getKey: (t) => t.id })
-
-const { data: todo } = useLiveQuery(
-  (q) => q.from({ tasks: collection }).where('status', '=', 'todo'), [collection]
-)
-const { data: doing } = useLiveQuery(
-  (q) => q.from({ tasks: collection }).where('status', '=', 'in-progress'), [collection]
-)
-const { data: done } = useLiveQuery(
-  (q) => q.from({ tasks: collection }).where('status', '=', 'done'), [collection]
+// After: one wrapper, it's live
+export const getTodos = realtime.query(async ({ teamId }: { teamId: string }) =>
+  db.select().from(todos).where(eq(todos.teamId, teamId))
 )`}
       />
 
-      <h3>Transport flexibility</h3>
+      <h2 id="what-it-does">What it does</h2>
+      <ul>
+        <li>
+          <strong>Reactive queries</strong> &mdash; channels derive from
+          function arguments. Components sharing the same args share one
+          connection and one cache.
+        </li>
+        <li>
+          <strong>Optimistic mutations</strong> &mdash; declare cache updates
+          alongside the mutation. Automatic rollback on error.
+        </li>
+        <li>
+          <strong>Client-side queries</strong> &mdash; the returned collection
+          works with <code>useLiveQuery</code> for filtering, sorting, and
+          joining without extra server requests.
+        </li>
+        <li>
+          <strong>Presence</strong> &mdash; cursors, typing indicators, online
+          user lists.
+        </li>
+        <li>
+          <strong>CRDTs</strong> &mdash; LWW registers, PN-counters, OR-sets
+          at field granularity for conflict-free concurrent editing.
+        </li>
+        <li>
+          <strong>Pub/sub</strong> &mdash; raw channel events, append-only
+          live channels, ephemeral channels with TTL.
+        </li>
+        <li>
+          <strong>Streaming</strong> &mdash; reduce-based state from ordered
+          event streams with resumable HMAC checkpoints.
+        </li>
+        <li>
+          <strong>Resilience</strong> &mdash; offline queue, gap recovery,
+          multi-tab coordination via BroadcastChannel or SharedWorker.
+        </li>
+      </ul>
+
+      <h2 id="what-it-doesnt">What it doesn&rsquo;t do</h2>
       <p>
-        Start with SSE (zero infrastructure, works behind corporate proxies).
-        Upgrade to Centrifugo (WebSocket, multi-node clustering) when you need
-        it. Your application code doesn&rsquo;t change.
+        TanStack Realtime is a sync layer. It does not provide:
+      </p>
+      <ul>
+        <li>A database &mdash; bring Postgres, MySQL, SQLite, or anything else</li>
+        <li>Authentication &mdash; bring your own JWT, session, or API key system</li>
+        <li>File storage, cron jobs, or search &mdash; use purpose-built tools</li>
+        <li>Rich text CRDT &mdash; use{' '}
+          <a href="#/docs/rich-text-crdts">Y.js with TanStack Realtime as the transport</a>
+        </li>
+      </ul>
+      <p>
+        If you want all of those bundled together, a managed platform like
+        Convex is designed for that. The trade-off is coupling to its database,
+        query language, and pricing model. Both are reasonable choices depending
+        on what you value.
+      </p>
+
+      <h2 id="progressive">Progressive adoption</h2>
+      <p>
+        Features are additive. Start with a plain <code>queryFn</code>, add a{' '}
+        <code>channel</code> for live updates, add <code>fields</code> for
+        conflict resolution. Each step is one config key. Stop at any point.
       </p>
       <CodeBlock
-        code={`// Day one: SSE (zero infra)
-transport: sseTransport({ url: '/api/realtime' })
+        code={`// Step 1: just a query
+realtimeCollectionOptions({
+  queryFn: () => fetch('/api/todos').then(r => r.json()),
+  getKey: (t) => t.id,
+})
 
-// Later: Centrifugo (WebSocket, clustering, gap recovery)
-transport: centrifugoTransport({ url: 'wss://rt.yourapp.com/connection/websocket' })`}
+// Step 2: add a channel — it's live
+realtimeCollectionOptions({
+  queryFn: () => fetch('/api/todos').then(r => r.json()),
+  getKey: (t) => t.id,
+  client: realtimeClient,
+  channel: ['todos', { projectId }],
+})
+
+// Step 3: add CRDTs — concurrent edits merge
+realtimeCollectionOptions({
+  // ...everything above
+  fields: { title: 'lww', votes: 'pn-counter', tags: 'or-set' },
+})`}
       />
 
-      <h3>Resilience built in</h3>
+      <h2 id="transport">Transport-agnostic</h2>
       <p>
-        Offline queue, gap recovery on reconnect, multi-tab coordination &mdash;
-        these are not add-ons, they are part of the core.
+        Application code doesn&rsquo;t reference the transport. Swap SSE for
+        Centrifugo (or a custom WebSocket) by changing one import.
       </p>
+      <CodeBlock
+        code={`// SSE — zero infra, works behind corporate proxies
+transport: sseTransport({ url: '/api/realtime' })
 
-      <h2 id="greenfield">For greenfield projects specifically</h2>
-      <p>
-        If you&rsquo;re starting a new project and evaluating options, here is
-        the honest framing:
-      </p>
-      <ul>
-        <li>
-          <strong>A managed platform gets you to &ldquo;hello world&rdquo;
-          faster</strong> &mdash; there is no database to provision, no ORM to
-          configure. That&rsquo;s a real advantage for prototyping.
-        </li>
-        <li>
-          <strong>TanStack Realtime gets you to &ldquo;production&rdquo;
-          without ceilings</strong> &mdash; you never hit a moment where your
-          query is too complex for the vendor&rsquo;s API, your pricing tier
-          doesn&rsquo;t support your usage pattern, or your compliance
-          requirements conflict with hosted data.
-        </li>
-      </ul>
-      <p>
-        The initial ~5 minutes of setup (database + server handler + client
-        provider) buys you:
-      </p>
-      <ul>
-        <li>Full SQL access &mdash; window functions, CTEs, joins, subqueries</li>
-        <li>Your choice of hosting &mdash; no vendor region restrictions</li>
-        <li>Transparent pricing &mdash; pay for a database and a server, not per-function-call</li>
-        <li>Portable skills &mdash; Postgres and Drizzle are reusable everywhere</li>
-        <li>Composability &mdash; use any auth library, any file storage, any cron system</li>
-      </ul>
+// Centrifugo — WebSocket, multi-node clustering, gap recovery
+transport: centrifugoTransport({ url: 'wss://rt.example.com/connection/websocket' })`}
+      />
 
-      <h2 id="not-right-fit">When TanStack Realtime is not the right fit</h2>
-      <p>
-        We believe in being honest about trade-offs:
-      </p>
+      <h2 id="get-started">Get started</h2>
       <ul>
         <li>
-          <strong>You want zero server management</strong> &mdash; if you want
-          a single product that handles database, auth, storage, cron, and
-          realtime with no infrastructure decisions, a managed platform is
-          simpler. That simplicity has a real cost (vendor coupling, pricing
-          ceilings), but it&rsquo;s a valid trade-off.
+          <a href="#/docs/getting-started">Getting Started</a> &mdash; five
+          minute setup
         </li>
         <li>
-          <strong>Postgres change stream replication</strong> &mdash; if you
-          want WAL-level sync from Postgres to the client (not server
-          functions), see ElectricSQL or PowerSync. Different architecture,
-          complementary to TanStack Realtime.
+          <a href="#/docs/tutorial">Tutorial</a> &mdash; build a task board
+          end-to-end
         </li>
         <li>
-          <strong>Rich text collaboration</strong> &mdash; Yjs and Hocuspocus
-          are purpose-built for document editing. TanStack Realtime works as a{' '}
-          <a href="#/docs/rich-text-crdts">transport layer for Y.js</a>, but
-          doesn&rsquo;t replace it.
-        </li>
-      </ul>
-
-      <h2 id="get-started">Ready to try it?</h2>
-      <ul>
-        <li>
-          <a href="#/docs/tutorial">
-            <strong>Tutorial</strong>
-          </a>{' '}
-          &mdash; build a collaborative task board in 15 minutes
-        </li>
-        <li>
-          <a href="#/docs/getting-started">
-            <strong>Getting Started</strong>
-          </a>{' '}
-          &mdash; the minimal 5-minute setup
-        </li>
-        <li>
-          <a href="#/docs/choosing-a-pattern">
-            <strong>Choosing a Pattern</strong>
-          </a>{' '}
-          &mdash; which hooks to use for your use case
+          <a href="#/docs/choosing-a-pattern">Choosing a Pattern</a> &mdash;
+          which hooks to use
         </li>
       </ul>
     </article>

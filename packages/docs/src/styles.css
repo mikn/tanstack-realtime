@@ -228,23 +228,14 @@ code {
 
 .hero-glow {
   position: absolute;
-  top: -300px;
+  top: -250px;
   left: 50%;
   translate: -50% 0;
-  width: 900px;
-  height: 900px;
-  background:
-    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(249, 115, 22, 0.14) 0%, transparent 100%),
-    radial-gradient(ellipse 70% 50% at 40% 60%, rgba(245, 158, 11, 0.06) 0%, transparent 100%),
-    radial-gradient(ellipse 60% 40% at 60% 40%, rgba(239, 68, 68, 0.05) 0%, transparent 100%);
+  width: 700px;
+  height: 700px;
+  background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
   pointer-events: none;
   z-index: 0;
-  animation: hero-glow-pulse 8s ease-in-out infinite alternate;
-}
-
-@keyframes hero-glow-pulse {
-  0% { opacity: 0.8; transform: scale(1); }
-  100% { opacity: 1; transform: scale(1.05); }
 }
 
 .hero .container {
@@ -308,31 +299,22 @@ code {
 .btn-primary {
   background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
   color: #000;
-  box-shadow:
-    0 2px 12px rgba(249, 115, 22, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .btn-primary:hover {
   filter: brightness(1.1);
-  translate: 0 -2px;
-  box-shadow:
-    0 4px 20px rgba(249, 115, 22, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  translate: 0 -1px;
 }
 
 .btn-secondary {
   border: 1px solid var(--border-bright);
   color: var(--text-secondary);
-  background: color-mix(in srgb, var(--bg-card) 60%, transparent);
-  backdrop-filter: blur(8px);
 }
 
 .btn-secondary:hover {
   background: var(--bg-card);
   border-color: var(--text-muted);
   color: var(--text-primary);
-  translate: 0 -1px;
 }
 
 .hero-install {
@@ -416,38 +398,19 @@ code {
 .feature-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1.5rem;
-  transition: all var(--transition-mid);
-  position: relative;
-}
-
-.feature-card::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: 13px;
-  background: linear-gradient(135deg, var(--accent-1), var(--accent-2), var(--accent-3));
-  opacity: 0;
-  transition: opacity var(--transition-mid);
-  z-index: -1;
+  border-radius: 10px;
+  padding: 1.35rem;
+  transition: border-color var(--transition-fast);
 }
 
 .feature-card:hover {
-  border-color: transparent;
-  translate: 0 -3px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-}
-
-.feature-card:hover::before {
-  opacity: 1;
+  border-color: var(--border-bright);
 }
 
 .feature-card h3 {
   font-size: 0.95rem;
   font-weight: 700;
-  margin-bottom: 0.4rem;
-  color: var(--text-primary);
+  margin-bottom: 0.35rem;
 }
 
 .feature-card p {
@@ -483,15 +446,13 @@ code {
 .use-case-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1.5rem;
-  transition: all var(--transition-mid);
+  border-radius: 10px;
+  padding: 1.35rem;
+  transition: border-color var(--transition-fast);
 }
 
 .use-case-card:hover {
   border-color: var(--border-bright);
-  translate: 0 -2px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
 }
 
 .use-case-card h3 {
@@ -728,8 +689,6 @@ code {
 
 .eco-card:hover {
   border-color: var(--border-bright);
-  translate: 0 -2px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
 }
 
 .eco-card h3 {
@@ -768,13 +727,8 @@ code {
 }
 
 .positioning-card {
-  border-radius: 12px;
-  padding: 1.75rem;
-  transition: all var(--transition-mid);
-}
-
-.positioning-card:hover {
-  translate: 0 -2px;
+  border-radius: 10px;
+  padding: 1.5rem;
 }
 
 .positioning-card h3 {
@@ -861,19 +815,7 @@ code {
 .footer {
   background: var(--bg-deep);
   border-top: 1px solid var(--border);
-  padding: 3.5rem 0 2rem;
-  position: relative;
-}
-
-.footer::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 120px;
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--accent-2) 2%, transparent), transparent);
-  pointer-events: none;
+  padding: 3rem 0 1.5rem;
 }
 
 .footer-inner {
@@ -2232,8 +2174,6 @@ code {
 
 .example-card:hover {
   border-color: var(--border-bright);
-  translate: 0 -3px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
 }
 
 .example-card h3 {

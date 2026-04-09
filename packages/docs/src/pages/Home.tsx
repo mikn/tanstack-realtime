@@ -7,46 +7,35 @@ function Hero() {
       <div className="container">
         <span className="badge">v0.1 &middot; Alpha</span>
         <h1>
-          Ship real-time apps.{' '}
-          <span className="gradient-text">Keep your entire stack.</span>
+          Reactive queries.{' '}
+          <span className="gradient-text">Any backend.</span>
         </h1>
         <p className="hero-sub">
-          The fully managed DX &mdash; live queries, optimistic mutations,
-          presence &mdash; without giving up Postgres, your ORM, or where you
-          deploy. Add one annotation to a server function and every subscriber
-          updates automatically.
+          Wrap a server function with <code>realtime.query()</code> and every
+          subscriber updates automatically. Your database, your ORM, your
+          deployment target.
         </p>
 
         <div className="hero-code">
           <CodeBlock
-            code={`// 1. Write a normal server function — any database, any ORM
+            code={`// Server — wrap any query. Channels derive from args automatically.
 export const getTodos = realtime.query(async ({ teamId }: { teamId: string }) =>
   db.select().from(todos).where(eq(todos.teamId, teamId))
 )
 
-// 2. Use it on the client — that's it, it's live
-const { data } = useQuery(getTodos, { teamId }, { getKey: (t) => t.id })
-
-// 3. Mutate with instant optimistic UI
-const { mutate } = useMutation(createTodo, {
-  optimistic: (cache, args) => {
-    cache.update(getTodos, { teamId: args.teamId }, prev => [
-      ...(prev ?? []), { id: crypto.randomUUID(), ...args },
-    ])
-  },
+// Client — live. Components sharing the same args share one connection.
+const { data, collection } = useQuery(getTodos, { teamId }, {
+  getKey: (t) => t.id,
 })`}
           />
         </div>
 
         <div className="hero-actions">
-          <a href="#/docs/tutorial" className="btn btn-primary">
-            Build a Task Board
+          <a href="#/docs/getting-started" className="btn btn-primary">
+            Get Started
           </a>
-          <a href="#/docs/getting-started" className="btn btn-secondary">
-            Quick Start
-          </a>
-          <a href="#/docs/why" className="btn btn-secondary">
-            Why TanStack Realtime?
+          <a href="#/docs/tutorial" className="btn btn-secondary">
+            Tutorial
           </a>
         </div>
         <div className="hero-install">
@@ -64,49 +53,43 @@ const { mutate } = useMutation(createTodo, {
 function WhatYouCanBuild() {
   const useCases = [
     {
-      title: 'Dashboards that stay current',
-      desc: 'Turn any server function into a live query with one annotation. Every component sharing the same arguments shares one connection. Filter and sort client-side without extra server requests.',
-      code: `// Server: one annotation → live
-export const getIssues = realtime.query(async ({ projectId }) =>
-  db.select().from(issues).where(eq(issues.projectId, projectId))
-)
+      title: 'Reactive queries',
+      desc: 'One annotation makes a server function live. Components sharing the same args share one connection.',
+      code: `const { data, collection } = useQuery(getTodos, { teamId }, {
+  getKey: (t) => t.id,
+})
 
-// Client: always up to date
-const { data } = useQuery(getIssues, { projectId }, { getKey: (i) => i.id })`,
+// Client-side filter — no extra fetch
+const { data: active } = useLiveQuery(
+  (q) => q.from({ todos: collection }).where('done', '=', false),
+  [collection],
+)`,
     },
     {
-      title: 'Forms with instant feedback',
-      desc: 'Mutations update the UI before the server responds. On error, the optimistic update rolls back automatically. No manual state management.',
-      code: `const { mutate } = useMutation(createIssue, {
+      title: 'Optimistic mutations',
+      desc: 'Cache updates instantly, rolls back on error.',
+      code: `const { mutate } = useMutation(createTodo, {
   optimistic: (cache, args) => {
-    cache.update(getIssues, { projectId: args.projectId }, prev => [
+    cache.update(getTodos, { teamId: args.teamId }, prev => [
       ...(prev ?? []), { id: crypto.randomUUID(), ...args },
     ])
   },
-})
-// Click → instant UI update → server confirms → done`,
+})`,
     },
     {
-      title: 'Collaborative features',
-      desc: "Show who's viewing a document, share cursor positions, display typing indicators — all over the same connection, no extra infrastructure.",
-      code: `// Who is here right now?
-const { others } = usePresence(roomPresence, {
-  initialData: { cursor: { x: 0, y: 0 }, name: userName },
-})
-
-// Render live cursors
-{others.map(u => <Cursor key={u.id} position={u.data.cursor} name={u.data.name} />)}`,
+      title: 'Presence',
+      desc: 'Who is online, cursor positions, typing indicators. Same transport connection.',
+      code: `const { others } = usePresence(roomPresence, {
+  initialData: { cursor: { x: 0, y: 0 }, name },
+})`,
     },
     {
-      title: 'AI streaming & real-time feeds',
-      desc: 'Stream AI tokens, activity feeds, or progress updates with reduce-based state and resumable checkpoints.',
-      code: `// AI token stream — builds up the response incrementally
-const { state, status } = useStream(aiStream, {
+      title: 'Streaming',
+      desc: 'Reduce-based state from ordered event streams. Resumable with HMAC checkpoints.',
+      code: `const { state, status } = useStream(aiStream, {
   initial: '',
   reduce: (text, token) => text + token,
-})
-
-// state = "The answer is..." (growing in real time)`,
+})`,
     },
   ]
 
@@ -205,70 +188,57 @@ function Positioning() {
   return (
     <section id="when-to-use" className="section">
       <div className="container">
-        <h2>The managed DX, without the managed platform</h2>
+        <h2>What this is (and isn&rsquo;t)</h2>
         <p className="section-sub">
-          Platforms like Convex proved that reactive queries, optimistic
-          mutations, and automatic invalidation are the right developer
-          experience. TanStack Realtime brings that same experience to any
-          backend you already know.
+          TanStack Realtime is a sync layer. It makes server functions reactive
+          and adds presence, CRDTs, and pub/sub. It is not a database, not a
+          hosting platform, and not a full backend.
         </p>
 
         <div className="positioning-grid">
           <div className="positioning-card positioning-good">
-            <h3>What you get</h3>
+            <h3>Good fit</h3>
             <ul>
               <li>
-                <strong>Same reactive DX</strong> &mdash; live queries,
-                optimistic mutations, and automatic cache invalidation
-                &mdash; the features that make managed platforms feel magical
+                You have a database and want to make queries reactive without
+                changing your stack
               </li>
               <li>
-                <strong>Use what you know</strong> &mdash; Postgres, MySQL,
-                Drizzle, Prisma, any ORM, any auth. No new query language, no
-                proprietary database, no dashboard to learn
+                You want live updates, optimistic mutations, and automatic cache
+                invalidation
               </li>
               <li>
-                <strong>Deploy anywhere</strong> &mdash; Vercel, Fly, Railway,
-                your own VPS, edge runtimes. Your infra choices stay yours
+                You need presence, pub/sub, or collaborative editing
               </li>
               <li>
-                <strong>Grow without ceilings</strong> &mdash; no per-function
-                pricing, no opaque rate limits. Scale with the tools you already
-                understand
-              </li>
-              <li>
-                <strong>Collaborate live</strong> &mdash; presence, CRDTs,
-                pub/sub, AI streaming, and tick-based sync are all built in
+                You want to choose your own database, ORM, auth, and deploy
+                target
               </li>
             </ul>
           </div>
 
           <div className="positioning-card positioning-neutral">
-            <h3>Honest trade-offs</h3>
+            <h3>Look elsewhere</h3>
             <ul>
               <li>
-                <strong>More setup than a managed platform</strong> &mdash; you
-                bring a database and a server. This takes ~5 minutes with
-                TanStack Start + Drizzle, but it is not zero-config. The payoff
-                is that nothing is hidden from you.
+                <strong>Want a managed backend?</strong> Convex bundles a
+                database, auth, and realtime in one product. Less to configure,
+                more to give up. Both are valid.
               </li>
               <li>
-                <strong>Managed platforms bundle more</strong> &mdash; Convex
-                includes a database, file storage, cron jobs, and auth in one
-                product. TanStack Realtime is the sync layer &mdash; you compose
-                it with the tools you choose for everything else.
+                <strong>Postgres change streams?</strong> ElectricSQL and
+                PowerSync replicate at the WAL level. Different architecture.
               </li>
               <li>
-                <strong>Postgres-to-client sync</strong> &mdash; if you want
-                change-stream replication (not server functions), see ElectricSQL
-                or PowerSync &mdash; different architecture, different
-                trade-offs.
+                <strong>Rich text?</strong> Yjs is purpose-built. TanStack
+                Realtime works as a{' '}
+                <a href="#/docs/rich-text-crdts">transport for Y.js</a>, not a
+                replacement.
               </li>
               <li>
-                <strong>Rich text collaboration</strong> &mdash; Yjs is
-                purpose-built; see our{' '}
-                <a href="#/docs/rich-text-crdts">Y.js integration guide</a> for
-                pairing it with TanStack Realtime as the transport.
+                <strong>Polling is fine?</strong> TanStack Query with{' '}
+                <code>refetchInterval</code> is simpler when sub-second latency
+                isn&rsquo;t needed.
               </li>
             </ul>
           </div>
@@ -449,53 +419,38 @@ function Ecosystem() {
   return (
     <section className="section section-alt">
       <div className="container ecosystem-section">
-        <h2>Composable by design</h2>
+        <h2>Ecosystem</h2>
         <p className="section-sub">
-          TanStack Realtime is a sync layer, not a platform. It composes with
-          tools you already know &mdash; and with the TanStack ecosystem for
-          deeper integration.
+          Composes with the TanStack tools you already use.
         </p>
         <div className="ecosystem-grid">
           <div className="eco-card">
-            <h3>Client-side queries</h3>
+            <h3>TanStack DB</h3>
             <p>
-              Every live query returns a{' '}
-              <a href="https://tanstack.com/db" target="_blank" rel="noopener">
-                TanStack DB
-              </a>{' '}
-              Collection. Filter, sort, and join data on the client without extra
-              server requests &mdash; like a reactive in-memory database.
+              <code>useQuery</code> returns a live Collection. Compose with{' '}
+              <code>useLiveQuery</code> for client-side filtering, sorting, and
+              joins.
             </p>
           </div>
           <div className="eco-card">
-            <h3>Incremental adoption</h3>
+            <h3>TanStack Query</h3>
             <p>
-              Already using{' '}
-              <a href="https://tanstack.com/query" target="_blank" rel="noopener">
-                TanStack Query
-              </a>
-              ? Keep it for data that doesn&rsquo;t need live updates. Both
-              coexist in the same app &mdash; adopt Realtime for the queries
-              that matter.
+              Coexists in the same app. Use Realtime for live data, Query for
+              everything else.
             </p>
           </div>
           <div className="eco-card">
-            <h3>Full-stack type safety</h3>
+            <h3>TanStack Start</h3>
             <p>
-              With{' '}
-              <a href="https://tanstack.com/start" target="_blank" rel="noopener">
-                TanStack Start
-              </a>
-              , types flow from your database schema through server functions to
-              client hooks &mdash; no codegen, no manual interfaces.
+              Types flow from Drizzle schema through server functions to hooks.
+              No codegen.
             </p>
           </div>
           <div className="eco-card">
             <h3>Any backend</h3>
             <p>
-              Not using TanStack Start? Connect any REST API, any framework.
-              Realtime is transport-level &mdash; it works with Express, Hono,
-              Fastify, or plain fetch handlers.
+              Not using Start? Works with Express, Hono, Fastify, or any fetch
+              handler.
             </p>
           </div>
         </div>

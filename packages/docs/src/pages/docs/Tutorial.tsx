@@ -3,21 +3,11 @@ import { CodeBlock } from '../../components/CodeBlock'
 export function Tutorial() {
   return (
     <article className="doc-article">
-      <h1>Tutorial: Build a Collaborative Task Board</h1>
+      <h1>Tutorial: Task Board</h1>
       <p className="doc-lead">
-        Build a real-time task board from scratch in 15 minutes. Multiple users
-        can add, edit, and complete tasks simultaneously &mdash; every change
-        appears instantly across all connected browsers.
+        A real-time task board with live queries, optimistic mutations, and
+        presence. End to end, from schema to running app.
       </p>
-
-      <div className="doc-callout">
-        <p>
-          <strong>What you&rsquo;ll build:</strong> a project task board with
-          live queries, optimistic mutations, online presence, and typing
-          indicators. The same reactive experience you&rsquo;d get from a fully
-          managed platform &mdash; on your own Postgres database.
-        </p>
-      </div>
 
       <h2 id="prerequisites">Prerequisites</h2>
       <ul>
@@ -187,35 +177,29 @@ export function App() {
         title="app/features/board/TaskBoard.tsx"
         code={`import { useQuery, useMutation } from '@tanstack/react-realtime'
 import { useLiveQuery } from '@tanstack/react-db'
-import { getTasks, createTask, updateTask, deleteTask } from '../../server/tasks'
-import type { Task } from '../../../db/schema'
+import { getTasks, createTask, updateTask } from '../../server/tasks'
 
 export function TaskBoard({ projectId }: { projectId: string }) {
-  // Live query — all subscribers share one connection
+  // Live query — subscribers sharing the same args share one connection
   const { data, collection } = useQuery(getTasks, { projectId }, {
     getKey: (t) => t.id,
   })
 
-  // Client-side filtering — no extra server request
-  const { data: todoTasks } = useLiveQuery(
+  // Client-side filtering — three columns, one server query, zero extra fetches
+  const { data: todo } = useLiveQuery(
     (q) => q.from({ tasks: collection }).where('status', '=', 'todo'),
     [collection],
   )
-  const { data: inProgress } = useLiveQuery(
+  const { data: doing } = useLiveQuery(
     (q) => q.from({ tasks: collection }).where('status', '=', 'in-progress'),
     [collection],
   )
-  const { data: doneTasks } = useLiveQuery(
-    (q) => q.from({ tasks: collection }).where('status', '=', 'done'),
-    [collection],
-  )
 
-  // Mutations with optimistic updates
+  // Optimistic mutation — UI updates before the server responds
   const { mutate: addTask } = useMutation(createTask, {
     optimistic: (cache, args) => {
       cache.update(getTasks, { projectId }, prev => [
-        ...(prev ?? []),
-        { ...args, createdAt: new Date() } as Task,
+        ...(prev ?? []), { ...args, createdAt: new Date() },
       ])
     },
   })
@@ -228,82 +212,7 @@ export function TaskBoard({ projectId }: { projectId: string }) {
     },
   })
 
-  const { mutate: removeTask } = useMutation(deleteTask, {
-    optimistic: (cache, args) => {
-      cache.update(getTasks, { projectId }, prev =>
-        (prev ?? []).filter(t => t.id !== args.id)
-      )
-    },
-  })
-
-  const handleAdd = () => {
-    addTask({
-      id: crypto.randomUUID(),
-      projectId,
-      title: 'New task',
-      status: 'todo',
-      priority: 0,
-      assignee: null,
-      done: false,
-    })
-  }
-
-  return (
-    <div className="board">
-      <button onClick={handleAdd}>+ Add Task</button>
-      <div className="columns">
-        <Column
-          title="To Do"
-          tasks={todoTasks ?? []}
-          onStatusChange={(id, status) => editTask({ id, status })}
-          onDelete={(id) => removeTask({ id })}
-        />
-        <Column
-          title="In Progress"
-          tasks={inProgress ?? []}
-          onStatusChange={(id, status) => editTask({ id, status })}
-          onDelete={(id) => removeTask({ id })}
-        />
-        <Column
-          title="Done"
-          tasks={doneTasks ?? []}
-          onStatusChange={(id, status) => editTask({ id, status })}
-          onDelete={(id) => removeTask({ id })}
-        />
-      </div>
-    </div>
-  )
-}
-
-function Column({ title, tasks, onStatusChange, onDelete }: {
-  title: string
-  tasks: Task[]
-  onStatusChange: (id: string, status: Task['status']) => void
-  onDelete: (id: string) => void
-}) {
-  return (
-    <div className="column">
-      <h3>{title} ({tasks.length})</h3>
-      {tasks.map(task => (
-        <div key={task.id} className="task-card">
-          <span>{task.title}</span>
-          <div className="task-actions">
-            {task.status !== 'in-progress' && (
-              <button onClick={() => onStatusChange(task.id, 'in-progress')}>
-                Start
-              </button>
-            )}
-            {task.status !== 'done' && (
-              <button onClick={() => onStatusChange(task.id, 'done')}>
-                Done
-              </button>
-            )}
-            <button onClick={() => onDelete(task.id)}>Delete</button>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
+  // ... render columns using todo, doing, etc.
 }`}
       />
 
@@ -356,84 +265,7 @@ export function OnlineUsers({ projectId, userName }: {
         shows both tabs as online users.
       </p>
 
-      <h2 id="recap">What you built</h2>
-      <p>
-        In about 15 minutes and ~120 lines of application code, you have:
-      </p>
-      <table className="api-table">
-        <thead>
-          <tr>
-            <th>Feature</th>
-            <th>How it works</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Live queries</td>
-            <td>
-              <code>realtime.query()</code> on the server +{' '}
-              <code>useQuery()</code> on the client. Channels derived
-              automatically from args.
-            </td>
-          </tr>
-          <tr>
-            <td>Optimistic mutations</td>
-            <td>
-              <code>useMutation()</code> with an <code>optimistic</code>{' '}
-              callback. UI updates before the server responds; rolls back on
-              error.
-            </td>
-          </tr>
-          <tr>
-            <td>Client-side filtering</td>
-            <td>
-              <code>useLiveQuery()</code> filters the collection locally. Three
-              columns, one server query, zero extra fetches.
-            </td>
-          </tr>
-          <tr>
-            <td>Online presence</td>
-            <td>
-              <code>usePresence()</code> over the same SSE connection. No
-              WebSocket server, no Redis, no extra infrastructure.
-            </td>
-          </tr>
-          <tr>
-            <td>Full type safety</td>
-            <td>
-              Types flow from the Drizzle schema to server functions to React
-              hooks. No codegen, no manual interfaces.
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      <h2 id="your-stack">Your stack, your rules</h2>
-      <p>
-        Everything in this tutorial runs on infrastructure you control:
-      </p>
-      <ul>
-        <li>
-          <strong>Database:</strong> Your own Postgres. Switch to MySQL,
-          SQLite, or any database Drizzle supports.
-        </li>
-        <li>
-          <strong>Server:</strong> TanStack Start (Vite-based). Deploy to
-          Vercel, Fly, Railway, Cloudflare, or your own VPS.
-        </li>
-        <li>
-          <strong>Transport:</strong> SSE by default. Swap to Centrifugo for
-          WebSocket support with zero application code changes.
-        </li>
-        <li>
-          <strong>Auth:</strong> Bring whatever you use &mdash; add{' '}
-          <code>getUser</code> and <code>authorize</code> callbacks when
-          you&rsquo;re ready. See the{' '}
-          <a href="#/docs/authentication">Authentication guide</a>.
-        </li>
-      </ul>
-
-      <h2 id="next-level">Take it further</h2>
+      <h2 id="next-level">Next steps</h2>
       <table className="api-table">
         <thead>
           <tr>
