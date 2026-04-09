@@ -39,11 +39,14 @@ const { mutate } = useMutation(createTodo, {
         </div>
 
         <div className="hero-actions">
-          <a href="#/docs/getting-started" className="btn btn-primary">
-            Get Started
+          <a href="#/docs/tutorial" className="btn btn-primary">
+            Build a Task Board
           </a>
-          <a href="#/docs/reactive-queries" className="btn btn-secondary">
-            See the API
+          <a href="#/docs/getting-started" className="btn btn-secondary">
+            Quick Start
+          </a>
+          <a href="#/docs/why" className="btn btn-secondary">
+            Why TanStack Realtime?
           </a>
         </div>
         <div className="hero-install">
