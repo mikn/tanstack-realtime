@@ -91,7 +91,7 @@ export function Transports() {
         a WebSocket server with your own protocol and want to keep it. Implement
         the <code>RealtimeTransport</code> interface (and optionally{' '}
         <code>PresenceCapable</code>) to plug your server directly into the
-        TanStack Realtime client. See the{' '}
+        realtime.js client. See the{' '}
         <a href="#/docs/wire-protocol">Wire Protocol</a> page for a reference
         message format.
       </p>

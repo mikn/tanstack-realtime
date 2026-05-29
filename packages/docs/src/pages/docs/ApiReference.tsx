@@ -4,7 +4,7 @@ export function ApiReference() {
       <h1>API Reference</h1>
       <p className="doc-lead">
         Complete reference for all exported functions, hooks, types, and
-        utilities across the TanStack Realtime packages.
+        utilities across the realtime.js packages.
       </p>
 
       {/* ------------------------------------------------------------------ */}

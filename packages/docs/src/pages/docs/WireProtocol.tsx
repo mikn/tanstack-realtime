@@ -5,7 +5,7 @@ export function WireProtocol() {
     <article className="doc-article">
       <h1>Wire Protocol Reference</h1>
       <p className="doc-lead">
-        Message formats for every TanStack Realtime transport. Useful for custom
+        Message formats for every realtime.js transport. Useful for custom
         transport authors and debugging.
       </p>
 
@@ -82,9 +82,9 @@ export interface PresenceUser<T = unknown> {
 
       <h2 id="custom-websocket">Custom WebSocket transport</h2>
       <p>
-        TanStack Realtime does not ship a generic WebSocket transport. If you
-        want to connect over a plain WebSocket (without Centrifugo), implement
-        the <code>RealtimeTransport</code> interface yourself. The interface is
+        realtime.js does not ship a generic WebSocket transport. If you want to
+        connect over a plain WebSocket (without Centrifugo), implement the{' '}
+        <code>RealtimeTransport</code> interface yourself. The interface is
         intentionally small — you only need to wire up the five core methods
         plus, optionally, presence and hook support.
       </p>
@@ -379,8 +379,8 @@ const STREAM_HEARTBEAT = '__stream:heartbeat' as const
 
       <div className="doc-callout">
         <p>
-          You do not need to know the wire protocol to use TanStack Realtime.
-          This reference is for transport authors, debuggers, and advanced
+          You do not need to know the wire protocol to use realtime.js. This
+          reference is for transport authors, debuggers, and advanced
           integration scenarios.
         </p>
       </div>

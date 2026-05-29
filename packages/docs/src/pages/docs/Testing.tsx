@@ -94,10 +94,10 @@ function createMockTransportWithPresence(): RealtimeTransport & PresenceCapable 
 
       <h2 id="testing-collection">Testing a collection</h2>
       <p>
-        Collections are the core data primitive in TanStack Realtime. To test
-        one, create a mock transport, wire up a client, and drive the sync
-        handler manually. This example uses Vitest to verify that a server-side
-        insert event is received correctly.
+        Collections are the core data primitive in realtime.js. To test one,
+        create a mock transport, wire up a client, and drive the sync handler
+        manually. This example uses Vitest to verify that a server-side insert
+        event is received correctly.
       </p>
       <CodeBlock
         title="test/task-collection.test.ts"

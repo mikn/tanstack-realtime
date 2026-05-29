@@ -5,10 +5,10 @@ export function RichTextCRDTs() {
     <article className="doc-article">
       <h1>Rich Text Collaboration</h1>
       <p className="doc-lead">
-        TanStack Realtime's field-level CRDTs handle structured data (forms,
-        settings, counters). For character-level rich text editing &mdash;
-        Google Docs-style &mdash; pair TanStack Realtime as the transport with
-        Y.js as the CRDT engine.
+        realtime.js's field-level CRDTs handle structured data (forms, settings,
+        counters). For character-level rich text editing &mdash; Google
+        Docs-style &mdash; pair realtime.js as the transport with Y.js as the
+        CRDT engine.
       </p>
 
       {/* ----------------------------------------------------------------- */}
@@ -17,10 +17,10 @@ export function RichTextCRDTs() {
 
       <h2 id="when">When to use Y.js vs field CRDTs</h2>
       <p>
-        TanStack Realtime ships three built-in CRDT field types. They cover the
-        vast majority of structured, field-level collaboration. Y.js (or
-        Automerge) is only needed when you require character-level concurrent
-        editing inside a single text value.
+        realtime.js ships three built-in CRDT field types. They cover the vast
+        majority of structured, field-level collaboration. Y.js (or Automerge)
+        is only needed when you require character-level concurrent editing
+        inside a single text value.
       </p>
 
       <div className="doc-grid">
@@ -69,15 +69,15 @@ export function RichTextCRDTs() {
           </tr>
           <tr>
             <td>Collaborative rich text editor</td>
-            <td>Y.js + TanStack Realtime transport</td>
+            <td>Y.js + realtime.js transport</td>
           </tr>
           <tr>
             <td>Collaborative code editor</td>
-            <td>Y.js + TanStack Realtime transport</td>
+            <td>Y.js + realtime.js transport</td>
           </tr>
           <tr>
             <td>Shared whiteboard / drawing</td>
-            <td>Y.js + TanStack Realtime transport</td>
+            <td>Y.js + realtime.js transport</td>
           </tr>
         </tbody>
       </table>
@@ -94,7 +94,7 @@ export function RichTextCRDTs() {
 
       <div className="doc-grid">
         <div className="doc-grid-card">
-          <h3>TanStack Realtime</h3>
+          <h3>realtime.js</h3>
           <p>
             Handles transport (WebSocket/SSE), presence, reconnection, auth, and
             multi-tab coordination. Provides <code>subscribe</code> and{' '}
@@ -151,12 +151,12 @@ const ydoc = new Y.Doc()
 const yText = ydoc.getText('shared-text')`}
       />
 
-      <h3>3. Create a TanStack Realtime provider for Y.js</h3>
+      <h3>3. Create a realtime.js provider for Y.js</h3>
       <p>
-        The provider bridges Y.js document updates to TanStack Realtime's
-        pub/sub channels. When the local Y.Doc changes, it publishes the binary
-        update to a channel. When a message arrives from the channel, it applies
-        the update to the local Y.Doc.
+        The provider bridges Y.js document updates to realtime.js's pub/sub
+        channels. When the local Y.Doc changes, it publishes the binary update
+        to a channel. When a message arrives from the channel, it applies the
+        update to the local Y.Doc.
       </p>
       <CodeBlock
         title="realtime-yjs-provider.ts"
@@ -218,7 +218,7 @@ import { createRealtimeClient } from '@realtimejs/core'
 import { sseTransport } from '@realtimejs/adapter-sse'
 import { RealtimeYjsProvider } from './realtime-yjs-provider'
 
-// Create the TanStack Realtime client
+// Create the realtime.js client
 const client = createRealtimeClient({
   transport: sseTransport({ url: '/api/realtime' }),
 })
@@ -234,7 +234,7 @@ const provider = new RealtimeYjsProvider(client, 'doc:my-document', ydoc)
 await client.connect()
 provider.connect()
 
-// Now any editor bound to yText will sync through TanStack Realtime.
+// Now any editor bound to yText will sync through realtime.js.
 // For example, with Tiptap:
 //
 //   import { Editor } from '@tiptap/core'
@@ -256,8 +256,8 @@ provider.connect()
       </h2>
       <p>
         Collaborative editors show remote cursors and selections. Y.js provides
-        an Awareness protocol for this, and TanStack Realtime provides Presence.
-        They serve complementary roles:
+        an Awareness protocol for this, and realtime.js provides Presence. They
+        serve complementary roles:
       </p>
 
       <div className="doc-grid">
@@ -290,7 +290,7 @@ import type { RealtimeClient } from '@realtimejs/core'
 import type * as Y from 'yjs'
 
 /**
- * Bridge Y.js Awareness updates through TanStack Realtime channels,
+ * Bridge Y.js Awareness updates through realtime.js channels,
  * while using TanStack Presence for user metadata.
  */
 export function setupAwareness(
@@ -357,8 +357,8 @@ export function setupAwareness(
         <code>centrifugoTransport</code>). If your transport does not support
         presence natively (e.g. <code>sseTransport</code>), omit the presence
         calls and rely solely on Y.js Awareness for cursor sharing, or use
-        TanStack Realtime&rsquo;s <code>createPresenceChannel</code> with a
-        separate pub/sub channel instead.
+        realtime.js&rsquo;s <code>createPresenceChannel</code> with a separate
+        pub/sub channel instead.
       </div>
       <p>
         With this setup, the editor renders remote cursors from Y.js Awareness

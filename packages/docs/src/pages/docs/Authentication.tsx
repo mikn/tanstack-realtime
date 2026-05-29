@@ -6,13 +6,13 @@ export function Authentication() {
       <h1>Authentication</h1>
       <p className="doc-lead">
         Authentication is the first thing you configure when moving to
-        production. TanStack Realtime validates every connection and every
-        action &mdash; subscribe, publish, presence &mdash; so only authorized
-        users reach your channels.
+        production. realtime.js validates every connection and every action
+        &mdash; subscribe, publish, presence &mdash; so only authorized users
+        reach your channels.
       </p>
 
       <div className="doc-callout">
-        <p>Auth in TanStack Realtime is split into two layers:</p>
+        <p>Auth in realtime.js is split into two layers:</p>
         <ul>
           <li>
             <strong>Server-side</strong> &mdash; <code>getUser</code> identifies

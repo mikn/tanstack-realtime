@@ -5,7 +5,7 @@ import { CodeBlock } from '../../components/CodeBlock'
 // Interactive streaming demo
 // ---------------------------------------------------------------------------
 
-const SAMPLE_RESPONSE = `TanStack Realtime is a transport layer that adds live updates to your existing application. It plugs into whatever server and database you already have — no migration required. Start with a queryFn, add a channel to go live, and layer on CRDTs when you need conflict-free concurrent editing.`
+const SAMPLE_RESPONSE = `realtime.js is a transport layer that adds live updates to your existing application. It plugs into whatever server and database you already have — no migration required. Start with a queryFn, add a channel to go live, and layer on CRDTs when you need conflict-free concurrent editing.`
 
 function StreamDemo() {
   const [status, setStatus] = useState<

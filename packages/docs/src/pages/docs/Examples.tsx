@@ -5,9 +5,8 @@ export function Examples() {
     <article className="doc-article">
       <h1>Examples</h1>
       <p className="doc-lead">
-        Runnable example apps showing TanStack Realtime patterns end-to-end.
-        Each example is self-contained with a server handler, client setup, and
-        UI.
+        Runnable example apps showing realtime.js patterns end-to-end. Each
+        example is self-contained with a server handler, client setup, and UI.
       </p>
 
       <div className="examples-grid">

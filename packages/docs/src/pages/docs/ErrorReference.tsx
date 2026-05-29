@@ -5,8 +5,8 @@ export function ErrorReference() {
     <article className="doc-article">
       <h1>Error Reference</h1>
       <p className="doc-lead">
-        This page documents every error type in TanStack Realtime, what triggers
-        it, and how to handle it.
+        This page documents every error type in realtime.js, what triggers it,
+        and how to handle it.
       </p>
 
       {/* ------------------------------------------------------------------ */}

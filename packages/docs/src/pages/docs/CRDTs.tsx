@@ -695,8 +695,8 @@ function EditableTitle({ docId }: { docId: string }) {
         <p>
           <strong>Summary:</strong> Field-level CRDTs are designed for
           structured data (forms, settings, counters, tag sets). For rich text
-          collaboration with proper undo, pair TanStack Realtime as the
-          transport with Y.js as the CRDT engine.
+          collaboration with proper undo, pair realtime.js as the transport with
+          Y.js as the CRDT engine.
         </p>
       </div>
 

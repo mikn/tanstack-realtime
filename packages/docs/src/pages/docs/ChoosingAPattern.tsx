@@ -5,8 +5,8 @@ export function ChoosingAPattern() {
     <article className="doc-article">
       <h1>Choosing a Pattern</h1>
       <p className="doc-lead">
-        TanStack Realtime has several patterns for different use cases. Most
-        apps only need one or two.
+        realtime.js has several patterns for different use cases. Most apps only
+        need one or two.
       </p>
 
       <div className="doc-callout">

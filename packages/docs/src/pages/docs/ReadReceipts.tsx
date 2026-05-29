@@ -236,9 +236,9 @@ export function ReadReceipts() {
     <article className="doc-article">
       <h1>Read Receipts</h1>
       <p className="doc-lead">
-        Show users when their messages have been seen. TanStack Realtime
-        supports two approaches: <strong>presence-based</strong> for ephemeral
-        "last seen" state that lives only while users are connected, and{' '}
+        Show users when their messages have been seen. realtime.js supports two
+        approaches: <strong>presence-based</strong> for ephemeral "last seen"
+        state that lives only while users are connected, and{' '}
         <strong>collection-based</strong> for durable read receipts persisted to
         your database.
       </p>
