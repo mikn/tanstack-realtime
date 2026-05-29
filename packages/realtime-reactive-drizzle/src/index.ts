@@ -41,7 +41,19 @@ export type {
 } from './reactive-queries.js'
 
 export { wrapReactiveDb, runInReactiveContext } from './reactive-db.js'
-export type { WriteDescriptor, ColumnMap } from './reactive-db.js'
+export type { ColumnMap } from './reactive-db.js'
+
+// The Drizzle implementation of the neutral ReactiveQueryEngine seam.
+export { createDrizzleEngine, drizzleEngine } from './drizzle-engine.js'
+
+// Re-export the neutral engine seam types from core for convenience, so a
+// consumer can implement a custom engine without importing `@tanstack/realtime`
+// directly.
+export type {
+  ReactiveQueryEngine,
+  CapturedRead,
+  WriteDescriptor,
+} from '@tanstack/realtime'
 
 export {
   REALTIME_BATCH_CHANNEL,

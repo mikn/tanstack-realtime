@@ -1,16 +1,14 @@
-import {
-  REALTIME_BATCH_CHANNEL,
-  createSubscriptionManager,
-} from './subscription-manager.js'
-import { createLoader } from './reactive-loader.js'
-import { createMutationHandler } from './reactive-mutation.js'
+import { REALTIME_BATCH_CHANNEL } from '@tanstack/realtime'
+import { createSubscriptionManager } from './subscription-manager.js'
+import { createDrizzleEngine } from './drizzle-engine.js'
 import type { SubscriptionManager } from './subscription-manager.js'
-import type { WriteDescriptor } from './reactive-db.js'
 import type {
   PublishFn,
   ReactiveMutationFn,
+  ReactiveQueryEngine,
   ReactiveQueryFn,
   ReactiveQueryResult,
+  WriteDescriptor,
 } from '@tanstack/realtime'
 
 /**
@@ -33,6 +31,17 @@ export interface CreateReactiveQueriesOptions {
    * When omitted, a new subscription manager is created automatically.
    */
   subscriptionManager?: SubscriptionManager
+
+  /**
+   * The reactive query engine that captures reads/writes and compiles
+   * predicates + channels. When omitted, defaults to the Drizzle engine
+   * (`createDrizzleEngine()`), so existing Drizzle call sites keep working.
+   *
+   * Pass a custom {@link ReactiveQueryEngine} to plug in a non-Drizzle ORM,
+   * dialect, or transport — the orchestration here depends only on the
+   * interface and never on Drizzle/pgsql directly.
+   */
+  engine?: ReactiveQueryEngine
 }
 
 /**
@@ -118,6 +127,7 @@ export function createReactiveQueries(
   options: CreateReactiveQueriesOptions = {},
 ): ReactiveQueries {
   const mgr = options.subscriptionManager ?? createSubscriptionManager()
+  const engine = options.engine ?? createDrizzleEngine()
 
   if (options.publish) {
     mgr.setPublish(options.publish)
@@ -127,22 +137,49 @@ export function createReactiveQueries(
     query<TArgs, TResult>(
       fn: (args: TArgs) => Promise<TResult>,
     ): ReactiveQueryFn<TArgs, TResult> {
-      const callable = (args: TArgs): Promise<ReactiveQueryResult<TResult>> =>
-        createLoader<TResult>({
-          subscriptionManager: mgr,
-          query: () => fn(args),
-        }).loadWithChannel()
+      const callable = async (
+        args: TArgs,
+      ): Promise<ReactiveQueryResult<TResult>> => {
+        const requery = () => fn(args)
+        const { result, reads } = await engine.captureReads<TResult>(requery)
+
+        if (reads.length === 0) {
+          throw new Error(
+            'createReactiveQueries: engine captured no reads for query — ' +
+              'ensure the engine wraps its read source (e.g. wrapReactiveDb()).',
+          )
+        }
+
+        // Register a subscription for every captured read so multi-table
+        // queries (WP-C) invalidate on any of their tables. The query's
+        // primary channel — returned to the client — is reads[0].channel.
+        for (const read of reads) {
+          mgr.register({
+            channel: read.channel,
+            predicate: {
+              table: read.table,
+              compiled: read.compiled,
+              referencedColumns: read.referencedColumns,
+            },
+            requery,
+          })
+        }
+
+        return { data: result, channel: reads[0].channel }
+      }
       return callable as unknown as ReactiveQueryFn<TArgs, TResult>
     },
 
     mutation<TArgs, TResult>(
       fn: (args: TArgs) => Promise<TResult>,
     ): ReactiveMutationFn<TArgs, TResult> {
-      const callable = (args: TArgs): Promise<TResult> =>
-        createMutationHandler<TArgs, TResult>({
-          subscriptionManager: mgr,
-          mutation: fn,
-        }).mutate(args)
+      const callable = async (args: TArgs): Promise<TResult> => {
+        const { result, writes } = await engine.captureWrites<TResult>(() =>
+          fn(args),
+        )
+        await mgr.invalidate(writes)
+        return result
+      }
       return callable as unknown as ReactiveMutationFn<TArgs, TResult>
     },
 

@@ -242,6 +242,16 @@ export type {
   ChannelDefCheckpointConfig,
 } from './server/index.js'
 
+// Reactive engine seam — neutral types + pluggable engine interface
+export { REALTIME_BATCH_CHANNEL } from './reactive/engine.js'
+export type {
+  ReactiveQueryEngine,
+  CapturedRead,
+  WriteDescriptor,
+  QueryPredicate,
+  SubscriptionEntry,
+} from './reactive/engine.js'
+
 // Query collection registry — shared cache for useQuery
 export {
   deriveCacheKey,

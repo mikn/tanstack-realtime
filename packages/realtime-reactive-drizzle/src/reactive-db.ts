@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { getTableColumns, getTableName } from 'drizzle-orm'
+import type { WriteDescriptor } from '@tanstack/realtime'
 
 // ColumnMap: the shape returned by getTableColumns(table)
 // Keys are JS field names, values have a `.name` property (DB column name)
@@ -12,32 +13,9 @@ interface ReadEntry {
   columns: ColumnMap // from getTableColumns(table)
 }
 
-/**
- * Describes a single DML write captured by wrapReactiveDb (or supplied
- * manually via the `writes` escape hatch in createMutationHandler).
- *
- * The discriminated union enforces that UPDATE descriptors always carry
- * `updatedColumns` — the JS field names from `.set({…})` — which
- * SubscriptionManager uses for conservative invalidation of subscriptions
- * whose predicate references a column that was mutated.
- *
- * `affectedRows: []` triggers table-level invalidation for any operation
- * (i.e. when .returning() was not used).
- */
-// WriteDescriptor is defined here and re-exported from subscription-manager.
-export type WriteDescriptor =
-  | {
-      table: string
-      operation: 'insert' | 'delete'
-      affectedRows: ReadonlyArray<Record<string, unknown>>
-    }
-  | {
-      table: string
-      operation: 'update'
-      /** JS field names passed to .set({…}). Empty array = conservatively invalidate all subscriptions on the table. */
-      updatedColumns: ReadonlyArray<string>
-      affectedRows: ReadonlyArray<Record<string, unknown>>
-    }
+// WriteDescriptor is ORM-neutral and now lives in `@tanstack/realtime`
+// (imported above). It is re-exported from the package index for convenience.
+export type { WriteDescriptor }
 
 interface ReactiveQueryContext {
   reads: Array<ReadEntry>

@@ -1,6 +1,9 @@
 import { createCollection } from '@tanstack/db'
+import { REALTIME_BATCH_CHANNEL } from './reactive/engine.js'
 import type { Collection } from '@tanstack/db'
 import type { RealtimeClient } from './core/types.js'
+
+export { REALTIME_BATCH_CHANNEL }
 
 // ---------------------------------------------------------------------------
 // Types
@@ -276,13 +279,6 @@ export function getOrCreateQueryCollection<
   registry.set(key, entry as RegistryEntry<Record<string, unknown>>)
   return entry
 }
-
-/**
- * The SSE channel name used for batched invalidation messages.
- * Re-exported here so client packages can reference it without depending
- * on `@tanstack/realtime-preset-start`.
- */
-export const REALTIME_BATCH_CHANNEL = '__realtime_batch__'
 
 /**
  * Subscribes to the batch channel and synchronously fans out all updates

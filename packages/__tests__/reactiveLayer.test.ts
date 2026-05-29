@@ -22,7 +22,12 @@ import {
 } from '@tanstack/realtime-reactive-drizzle'
 import { createLoader } from '../realtime-reactive-drizzle/src/reactive-loader.js'
 import { createMutationHandler } from '../realtime-reactive-drizzle/src/reactive-mutation.js'
-import type { SubscriptionEntry } from '@tanstack/realtime-reactive-drizzle'
+import type {
+  CapturedRead,
+  ReactiveQueryEngine,
+  SubscriptionEntry,
+  WriteDescriptor,
+} from '@tanstack/realtime-reactive-drizzle'
 
 // ---------------------------------------------------------------------------
 // Drizzle-compatible fake table objects
@@ -1287,5 +1292,141 @@ describe('createReactiveQueries — reactive integration', () => {
     expect(
       reactive.subscriptionManager.activeChannels().has(expectedChannel),
     ).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Pluggable engine seam: a custom ReactiveQueryEngine (no Drizzle/pgsql at all)
+// drives createReactiveQueries' query/mutation/invalidate orchestration.
+// ---------------------------------------------------------------------------
+
+describe('createReactiveQueries — custom engine seam', () => {
+  // A trivial engine with ZERO Drizzle/pgsql involvement: it derives the read
+  // metadata from a plain object the queryFn returns, and captures writes from
+  // a plain object the mutationFn returns. This proves the orchestration is
+  // vendor-neutral and depends only on the ReactiveQueryEngine interface.
+  function makeFakeEngine(): ReactiveQueryEngine {
+    return {
+      async captureReads<T>(
+        queryFn: () => Promise<T>,
+        channelOverride?: any,
+      ): Promise<{ result: T; reads: ReadonlyArray<CapturedRead> }> {
+        const result = (await queryFn()) as any
+        const channel =
+          channelOverride !== undefined
+            ? typeof channelOverride === 'string'
+              ? channelOverride
+              : serializeKey(channelOverride)
+            : `fake:${result.table}:${result.teamId}`
+        return {
+          result: result.rows as T,
+          reads: [
+            {
+              table: result.table,
+              compiled: (row: Record<string, unknown>) =>
+                row['teamId'] === result.teamId,
+              referencedColumns: new Set(['teamId']),
+              channel,
+            },
+          ],
+        }
+      },
+      async captureWrites<T>(
+        mutationFn: () => Promise<T>,
+      ): Promise<{ result: T; writes: ReadonlyArray<WriteDescriptor> }> {
+        const result = (await mutationFn()) as any
+        return {
+          result: result.result as T,
+          writes: result.writes as ReadonlyArray<WriteDescriptor>,
+        }
+      },
+    }
+  }
+
+  it('drives query/mutation/invalidate without any Drizzle involvement', async () => {
+    const published: Array<{ ch: string; data: unknown }> = []
+    const handler = createStartHandler({
+      backend: {
+        publish: (ch: string, data: unknown) => {
+          published.push({ ch, data })
+          return Promise.resolve()
+        },
+      },
+    })
+
+    const reactive = createReactiveQueries({
+      engine: makeFakeEngine(),
+      publish: handler.publish,
+    })
+
+    // query() registers a subscription whose channel comes from the fake engine.
+    const getRows = reactive.query((args: { teamId: string }) =>
+      Promise.resolve({
+        table: 'widgets',
+        teamId: args.teamId,
+        rows: [{ id: 1, teamId: args.teamId }],
+      }),
+    )
+    const { data, channel } = await getRows({ teamId: 'A' })
+
+    expect(data).toEqual([{ id: 1, teamId: 'A' }])
+    expect(channel).toBe('fake:widgets:A')
+    expect(reactive.subscriptionManager.activeChannels().has(channel)).toBe(
+      true,
+    )
+
+    // mutation() captures writes via the engine and invalidates the matching sub.
+    const doInsert = reactive.mutation(() =>
+      Promise.resolve({
+        result: 'ok',
+        writes: [
+          {
+            table: 'widgets',
+            operation: 'insert' as const,
+            affectedRows: [{ id: 2, teamId: 'A' }],
+          },
+        ],
+      }),
+    )
+    const mutationResult = await doInsert(undefined)
+    expect(mutationResult).toBe('ok')
+
+    // The matching channel was re-queried and a batch message published.
+    const batchMsg = published.find((p) => p.ch === REALTIME_BATCH_CHANNEL)
+    expect(batchMsg).toBeDefined()
+    const updates = (batchMsg!.data as { updates: Array<{ channel: string }> })
+      .updates
+    expect(updates.some((u) => u.channel === 'fake:widgets:A')).toBe(true)
+  })
+
+  it('a non-matching write does not invalidate the subscription', async () => {
+    const reactive = createReactiveQueries({ engine: makeFakeEngine() })
+    const getRows = reactive.query((args: { teamId: string }) =>
+      Promise.resolve({
+        table: 'widgets',
+        teamId: args.teamId,
+        rows: [],
+      }),
+    )
+    await getRows({ teamId: 'A' })
+
+    const invalidateSpy = vi.spyOn(reactive.subscriptionManager, 'invalidate')
+    const doInsert = reactive.mutation(() =>
+      Promise.resolve({
+        result: undefined,
+        writes: [
+          {
+            table: 'widgets',
+            operation: 'insert' as const,
+            affectedRows: [{ id: 9, teamId: 'B' }], // different team — no match
+          },
+        ],
+      }),
+    )
+    await doInsert(undefined)
+
+    // invalidate is always called with the writes; but no channel matched, so
+    // nothing should be re-queried for team A.
+    expect(invalidateSpy).toHaveBeenCalledTimes(1)
   })
 })

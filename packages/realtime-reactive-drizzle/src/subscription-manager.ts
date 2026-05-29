@@ -1,34 +1,15 @@
-import type { PublishFn } from '@tanstack/realtime'
-import type { ColumnMap, WriteDescriptor } from './reactive-db.js'
+import { REALTIME_BATCH_CHANNEL } from '@tanstack/realtime'
+import type {
+  PublishFn,
+  QueryPredicate,
+  SubscriptionEntry,
+  WriteDescriptor,
+} from '@tanstack/realtime'
 
-/**
- * The SSE channel name used to deliver all invalidation updates as a single
- * atomic message. The client fans them out synchronously to guarantee that
- * all affected queries update in the same React/Vue/Solid render pass.
- */
-export const REALTIME_BATCH_CHANNEL = '__realtime_batch__'
-
-export interface QueryPredicate {
-  table: string
-  sql: string
-  params: ReadonlyArray<unknown>
-  columns: ColumnMap
-  compiled: (row: Record<string, unknown>) => boolean // pre-compiled at register()
-  /**
-   * JS field names referenced in the WHERE clause.
-   * Used for conservative UPDATE invalidation: if the mutation's .set({…})
-   * touched a column listed here but the post-update row no longer matches the
-   * predicate, the subscription is still invalidated (the row was *removed*
-   * from this result set and subscribers must see it disappear).
-   */
-  referencedColumns: ReadonlySet<string>
-}
-
-export interface SubscriptionEntry {
-  channel: string
-  predicate: QueryPredicate
-  requery: () => Promise<unknown>
-}
+// REALTIME_BATCH_CHANNEL, QueryPredicate and SubscriptionEntry are ORM-neutral
+// and now live in `@tanstack/realtime`. Re-export for convenience / back-compat.
+export { REALTIME_BATCH_CHANNEL }
+export type { QueryPredicate, SubscriptionEntry }
 
 export class SubscriptionManager {
   // Inverted index: tableName → (channel → SubscriptionEntry)
