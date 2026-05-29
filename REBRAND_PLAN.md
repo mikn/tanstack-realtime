@@ -46,6 +46,64 @@ tie-in" is mostly packaging + positioning, not a rewrite.
 
 ---
 
+## Development methodology — TPM + 3-agent relay
+
+I act as **Technical Program Manager**: I never write feature code myself. I
+decompose the work into **work packages (WPs)**, write each as a ticket with an
+explicit spec + acceptance criteria, then drive every WP through a fixed
+three-stage relay of delegated agents. I own sequencing, the green gate, and
+the final commit/push decision.
+
+**The relay (per work package):**
+
+1. **Implementation agent** (`general-purpose`, runs in a `worktree`). Input:
+   the WP ticket + spec + acceptance criteria. Output: the implementation +
+   tests, with all local gates (`lint`, `typecheck`, `test`, `build`) passing,
+   plus a written summary of what changed and any deviations from spec.
+2. **Adversarial review agent** (`Explore` / `general-purpose`, read-only).
+   Input: the WP spec + the diff from stage 1. Mandate: **try to break it.**
+   Hunt correctness bugs, missed edge cases, regressions, weak/oversized tests,
+   API-vs-docs drift, security issues, and any place the implementation quietly
+   fails the spec. Output: a prioritized findings list tagged
+   `blocking` / `non-blocking` / `nit`. It does **not** edit code.
+3. **Fixer agent** (`general-purpose`, same worktree). Input: the findings list.
+   Resolves every `blocking` finding (and `non-blocking` where cheap),
+   re-runs the gates, and returns what it fixed plus any finding it
+   **disputes** (with rationale) back to me.
+
+**TPM adjudication (me):** I review the dispute list and the final diff. I
+either (a) accept → commit + push, (b) send back for another adversarial pass
+if findings remain unresolved, or (c) escalate a genuine product decision to
+you via a question. A WP is "done" only when the full repo gate is green and
+the adversarial agent has no remaining `blocking` findings.
+
+**Context handoff:** agents share no memory, so I pass the spec, the unified
+diff, and the findings list explicitly between stages. Each WP is small enough
+to review in one pass. The 935-test suite is the regression backstop on every
+stage.
+
+---
+
+## Work packages
+
+Phase 1 is done. Each WP below runs the full 3-agent relay above.
+
+| WP   | Scope                                                                                                                                                      | Phase |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| WP-A | Extract reactive engine (3 files) into new optional `@realtimejs/reactive-drizzle`; preset-start composes it optionally; core + preset carry zero ORM deps | 2     |
+| WP-B | Introduce pluggable `ReactiveQueryEngine` seam; Drizzle/PG impl becomes the first adapter behind it                                                        | 2     |
+| WP-C | Fix silent multi-table under-invalidation (per-table predicates or explicit throw/warn); test + document the AND-equality / table-level contracts          | 2     |
+| WP-D | Scripted rename codemod → `@realtimejs/*` scope + `realtime.js` meta-package + directory renames                                                           | 3     |
+| WP-E | 3 runnable examples (one deliberately ORM-free) + examples build/typecheck CI job                                                                          | 4     |
+| WP-F | Docs rebrand: name, tagline, "Why" reframe, honest "needs Drizzle+PG vs. doesn't" matrix                                                                   | 4     |
+| WP-G | Release engineering: changesets for the new scope + meta-package, `0.1.0`, `publishConfig`, badges/OG                                                      | 5     |
+
+Order: **A → B → C** (correct + freestanding under current names) → **D**
+(rename in one shot) → **E, F** (prove + reposition) → **G** (ship). I pause for
+your go between phases; WPs within a phase run back-to-back.
+
+---
+
 ## Phase 1 — Make the gate green ✅ (done)
 
 - [x] Fix the 8 committed `pnpm typecheck` errors (WriteDescriptor union
