@@ -230,7 +230,7 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@tanstack/store':
-        specifier: '*'
+        specifier: ^0.9.1
         version: 0.9.1
 
   packages/adapter-sse:
@@ -239,7 +239,7 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@tanstack/store':
-        specifier: '*'
+        specifier: ^0.9.1
         version: 0.9.1
 
   packages/core:
@@ -248,10 +248,10 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0
       '@tanstack/db':
-        specifier: '*'
+        specifier: ^0.5.29
         version: 0.5.29(typescript@5.9.3)
       '@tanstack/store':
-        specifier: '*'
+        specifier: ^0.9.1
         version: 0.9.1
 
   packages/docs:
@@ -381,10 +381,10 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@tanstack/db':
-        specifier: '*'
+        specifier: ^0.5.29
         version: 0.5.29(typescript@5.9.3)
       '@tanstack/react-db':
-        specifier: '*'
+        specifier: ^0.1.73
         version: 0.1.73(react@19.2.4)(typescript@5.9.3)
       '@tanstack/react-store':
         specifier: '>=0.0.0'
@@ -410,7 +410,7 @@ importers:
         version: 19.2.4
     devDependencies:
       '@tanstack/react-store':
-        specifier: '*'
+        specifier: ^0.9.1
         version: 0.9.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
 
   packages/reactive-drizzle:
@@ -431,7 +431,7 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@tanstack/db':
-        specifier: '*'
+        specifier: ^0.5.29
         version: 0.5.29(typescript@5.9.3)
       solid-js:
         specifier: '>=1.0.0'
@@ -459,7 +459,7 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@tanstack/db':
-        specifier: '*'
+        specifier: ^0.5.29
         version: 0.5.29(typescript@5.9.3)
       vue:
         specifier: '>=3.0.0'

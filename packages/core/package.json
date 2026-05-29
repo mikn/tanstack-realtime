@@ -5,13 +5,13 @@
   "type": "module",
   "license": "MIT",
   "author": "mikn",
-  "homepage": "https://github.com/mikn/realtime.js#readme",
+  "homepage": "https://github.com/mikn/tanstack-realtime#readme",
   "bugs": {
-    "url": "https://github.com/mikn/realtime.js/issues"
+    "url": "https://github.com/mikn/tanstack-realtime/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mikn/realtime.js.git",
+    "url": "git+https://github.com/mikn/tanstack-realtime.git",
     "directory": "packages/core"
   },
   "keywords": [
@@ -65,7 +65,7 @@
   },
   "devDependencies": {
     "@standard-schema/spec": "^1.1.0",
-    "@tanstack/db": "*",
-    "@tanstack/store": "*"
+    "@tanstack/db": "^0.5.29",
+    "@tanstack/store": "^0.9.1"
   }
 }

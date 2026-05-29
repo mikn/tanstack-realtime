@@ -5,13 +5,13 @@
   "type": "module",
   "license": "MIT",
   "author": "mikn",
-  "homepage": "https://github.com/mikn/realtime.js#readme",
+  "homepage": "https://github.com/mikn/tanstack-realtime#readme",
   "bugs": {
-    "url": "https://github.com/mikn/realtime.js/issues"
+    "url": "https://github.com/mikn/tanstack-realtime/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mikn/realtime.js.git",
+    "url": "git+https://github.com/mikn/tanstack-realtime.git",
     "directory": "packages/vue-devtools"
   },
   "keywords": [

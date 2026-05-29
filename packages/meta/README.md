@@ -1,6 +1,6 @@
 # realtime.js
 
-The one-install "kitchen sink" for [realtime.js](https://github.com/).
+The one-install "kitchen sink" for [realtime.js](https://github.com/mikn/tanstack-realtime).
 
 This meta-package bundles:
 
