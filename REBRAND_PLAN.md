@@ -3,6 +3,36 @@
 > Working plan to take this from an experimental TanStack-adjacent repo to a
 > freestanding, vendor-neutral realtime/sync library.
 
+## Status: COMPLETE ✅
+
+All phases delivered via the TPM + 3-agent relay (implementation → adversarial
+review → fixer), each committed green and pushed to
+`claude/experimental-repo-review-Zm5BV`:
+
+| Phase                           | Commit(s)            | Result                                                                   |
+| ------------------------------- | -------------------- | ------------------------------------------------------------------------ |
+| Phase 1 — green gate            | `71117b3`            | Fixed 8 typecheck errors; CI now runs `pnpm typecheck`                   |
+| WP-A — extract reactive engine  | `ddb6527`            | `@realtimejs/reactive-drizzle`; preset/core ORM-dep-free                 |
+| WP-B — pluggable seam           | `7f8d274`            | `ReactiveQueryEngine` interface; single-source `REALTIME_BATCH_CHANNEL`  |
+| WP-C — multi-table invalidation | `78d63fb`            | Silent under-invalidation closed end-to-end                              |
+| WP-D — rename + meta            | `dfd6cce`, `4e74ab9` | `@realtimejs/*` + `realtime.js`; codemod over-match reverted             |
+| WP-E — examples                 | `8fa2b37`, `fc4585f` | 3 runnable examples; CRDT/presence defects fixed + verified              |
+| WP-F — docs rebrand             | `a1de831`, `817ebb1` | "Bring your own backend"; honest capability matrix                       |
+| WP-G — release prep             | `381cf2c`, `203b60a` | `0.1.0`, publishConfig, metadata; core `/server` build + repo URLs fixed |
+
+Final gate state: lint 0 errors, typecheck 0, **945 tests pass**, build 16
+projects, size within limits, knip clean, docs build OK, `changeset status` clean.
+
+### Deferred follow-ups (logged, not blocking 0.1.0)
+
+- Distinct reactive queries that derive the SAME channel key collide in the 1:1
+  `channelIndex` / server registry (pre-existing; candidate fix `Map<channel, Set<cacheKey>>`).
+- Per-package READMEs (only `realtime.js` meta has one) — npm pages otherwise blank.
+- Additional `ReactiveQueryEngine` adapters beyond Drizzle/Postgres (Kysely, Prisma, raw SQL).
+- Consider moving framework packages' TanStack deps to `peerDependencies` to mirror core.
+- Create/rename the GitHub repo to `mikn/realtime.js` (today it is `mikn/tanstack-realtime`;
+  package metadata + badges currently point at the real `tanstack-realtime` slug).
+
 ## Identity
 
 - **Name:** `realtime.js`
