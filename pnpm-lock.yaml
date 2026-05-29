@@ -101,6 +101,129 @@ importers:
         specifier: ^8.18.0
         version: 8.19.0
 
+  examples/ai-streaming:
+    dependencies:
+      '@realtimejs/adapter-sse':
+        specifier: workspace:*
+        version: link:../../packages/adapter-sse
+      '@realtimejs/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@realtimejs/react':
+        specifier: workspace:*
+        version: link:../../packages/react
+      react:
+        specifier: ^19.2.4
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.2.4
+        version: 19.2.4(react@19.2.4)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.10
+        version: 22.19.12
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.14)
+      '@vitejs/plugin-react':
+        specifier: ^4.3.4
+        version: 4.7.0(vite@7.3.1(@types/node@22.19.12)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite:
+        specifier: ^7.0.0
+        version: 7.3.1(@types/node@22.19.12)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
+
+  examples/chat:
+    dependencies:
+      '@realtimejs/adapter-sse':
+        specifier: workspace:*
+        version: link:../../packages/adapter-sse
+      '@realtimejs/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@realtimejs/react':
+        specifier: workspace:*
+        version: link:../../packages/react
+      '@tanstack/db':
+        specifier: ^0.5.28
+        version: 0.5.29(typescript@5.9.3)
+      '@tanstack/react-db':
+        specifier: ^0.1.72
+        version: 0.1.73(react@19.2.4)(typescript@5.9.3)
+      react:
+        specifier: ^19.2.4
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.2.4
+        version: 19.2.4(react@19.2.4)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.10
+        version: 22.19.12
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.14)
+      '@vitejs/plugin-react':
+        specifier: ^4.3.4
+        version: 4.7.0(vite@7.3.1(@types/node@22.19.12)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite:
+        specifier: ^7.0.0
+        version: 7.3.1(@types/node@22.19.12)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
+
+  examples/collaborative-todos:
+    dependencies:
+      '@realtimejs/adapter-sse':
+        specifier: workspace:*
+        version: link:../../packages/adapter-sse
+      '@realtimejs/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@realtimejs/react':
+        specifier: workspace:*
+        version: link:../../packages/react
+      '@tanstack/db':
+        specifier: ^0.5.28
+        version: 0.5.29(typescript@5.9.3)
+      '@tanstack/react-db':
+        specifier: ^0.1.72
+        version: 0.1.73(react@19.2.4)(typescript@5.9.3)
+      react:
+        specifier: ^19.2.4
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.2.4
+        version: 19.2.4(react@19.2.4)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.10
+        version: 22.19.12
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.14)
+      '@vitejs/plugin-react':
+        specifier: ^4.3.4
+        version: 4.7.0(vite@7.3.1(@types/node@22.19.12)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite:
+        specifier: ^7.0.0
+        version: 7.3.1(@types/node@22.19.12)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
+
   packages/adapter-centrifugo:
     dependencies:
       '@realtimejs/core':

@@ -36,6 +36,21 @@
 
 ---
 
+## Examples
+
+Runnable React + Vite example apps live in [`examples/`](./examples). Each pairs a
+Vite client with a minimal in-memory SSE server (run as Vite dev middleware — no
+database, no ORM, "bring your own backend"). Run any with
+`pnpm --filter @realtimejs-example/<name> dev`.
+
+| Example                                                 | What it shows                                                                                         |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| [`collaborative-todos`](./examples/collaborative-todos) | Optimistic updates + CRDT convergence with `useRealtimeCollection` and `fields` (`lww`, `pn-counter`) |
+| [`chat`](./examples/chat)                               | Append-only `useLiveChannel` with `usePresence` (online users) and `useTypingIndicator`               |
+| [`ai-streaming`](./examples/ai-streaming)               | Server-pushed mock LLM tokens via `createStreamChannel` + `useStream` (pending → streaming → done)    |
+
+---
+
 ## `@realtimejs/core`
 
 Framework-agnostic core. Exposes `createRealtimeClient`, collection helpers (`realtimeCollectionOptions`, `liveChannelOptions`, `presenceChannelOptions`, `streamChannelOptions`), CRDT primitives, channel-key serialization, and all shared types.

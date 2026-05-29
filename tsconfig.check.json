@@ -33,5 +33,5 @@
     "packages/meta/src",
     "packages/__tests__"
   ],
-  "exclude": ["node_modules", "dist", "packages/docs"]
+  "exclude": ["node_modules", "dist", "packages/docs", "examples"]
 }

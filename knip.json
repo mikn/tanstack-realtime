@@ -39,7 +39,10 @@
         "app-vue/src/**/*.{ts,vue}",
         "tests/**/*.spec.ts"
       ]
-    }
+    },
+    "examples/collaborative-todos": {},
+    "examples/chat": {},
+    "examples/ai-streaming": {}
   },
   "ignore": ["packages/docs/**", "scripts/rename-to-realtimejs.mjs"]
 }
