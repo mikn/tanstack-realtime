@@ -449,7 +449,7 @@ describe('realtimeCollectionOptions — optimistic mode', () => {
       channel: 'docs',
       getKey: (d) => d.id,
       optimistic: true,
-      onInsert: () => {
+      onInsert: async () => {
         insertCall++
         if (insertCall === 1) {
           return { id: '1', title: 'first' }

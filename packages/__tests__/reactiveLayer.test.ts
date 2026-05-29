@@ -405,10 +405,13 @@ describe('wrapReactiveDb', () => {
     })
 
     expect(ctx.writes).toHaveLength(1)
-    expect(ctx.writes[0].table).toBe('todos')
-    expect(ctx.writes[0].operation).toBe('update')
-    expect(ctx.writes[0].updatedColumns).toEqual(['done'])
-    expect(ctx.writes[0].affectedRows).toEqual(updatedRows)
+    const write = ctx.writes[0]
+    expect(write.table).toBe('todos')
+    expect(write.operation).toBe('update')
+    expect(
+      write.operation === 'update' ? write.updatedColumns : undefined,
+    ).toEqual(['done'])
+    expect(write.affectedRows).toEqual(updatedRows)
   })
 })
 
