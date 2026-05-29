@@ -1400,7 +1400,19 @@ describe('createReactiveQueries — custom engine seam', () => {
   })
 
   it('a non-matching write does not invalidate the subscription', async () => {
-    const reactive = createReactiveQueries({ engine: makeFakeEngine() })
+    const published: Array<{ ch: string; data: unknown }> = []
+    const handler = createStartHandler({
+      backend: {
+        publish: (ch: string, data: unknown) => {
+          published.push({ ch, data })
+          return Promise.resolve()
+        },
+      },
+    })
+    const reactive = createReactiveQueries({
+      engine: makeFakeEngine(),
+      publish: handler.publish,
+    })
     const getRows = reactive.query((args: { teamId: string }) =>
       Promise.resolve({
         table: 'widgets',
@@ -1408,7 +1420,7 @@ describe('createReactiveQueries — custom engine seam', () => {
         rows: [],
       }),
     )
-    await getRows({ teamId: 'A' })
+    const { channel } = await getRows({ teamId: 'A' })
 
     const invalidateSpy = vi.spyOn(reactive.subscriptionManager, 'invalidate')
     const doInsert = reactive.mutation(() =>
@@ -1428,5 +1440,141 @@ describe('createReactiveQueries — custom engine seam', () => {
     // invalidate is always called with the writes; but no channel matched, so
     // nothing should be re-queried for team A.
     expect(invalidateSpy).toHaveBeenCalledTimes(1)
+
+    // Crucially: NO batch message must be published on a non-matching write.
+    // Capturing published messages (like the matching seam test) means this
+    // would actually catch an erroneous invalidation, not just a spy count.
+    expect(published.some((p) => p.ch === REALTIME_BATCH_CHANNEL)).toBe(false)
+    const allPublishedChannels = published.flatMap((p) => {
+      if (p.ch !== REALTIME_BATCH_CHANNEL) return [p.ch]
+      const msg = p.data as { updates: Array<{ channel: string }> }
+      return msg.updates.map((u) => u.channel)
+    })
+    expect(allPublishedChannels).not.toContain(channel)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Multi-table reactive query (WP-C): a query that reads TWO tables in separate
+// select().from() calls must register/return BOTH channels and stay live to
+// writes on either table — but not to writes on an unrelated table.
+// ---------------------------------------------------------------------------
+
+describe('createReactiveQueries — multi-table query (WP-C)', () => {
+  const projectsColumns = { teamId: { name: 'team_id' } }
+  const fakeProjects = makeFakeTable('projects', projectsColumns)
+
+  // A wrapped db whose select().from(table) returns a builder whose SQL
+  // matches the table passed in. The reactive proxy reads the table name from
+  // the table object (getTableName), and the WHERE SQL from toSQL().
+  function makeMultiTableDb() {
+    const rawDb: any = {
+      select: () => ({
+        from: (t: any) => {
+          const name = t[DRIZZLE_NAME_SYM] as string
+          return makeFakeBuilder(
+            `SELECT * FROM "${name}" WHERE "${name}"."team_id" = $1`,
+            ['A'],
+            [{ id: 1, teamId: 'A', _from: name }],
+          )
+        },
+      }),
+    }
+    return wrapReactiveDb(rawDb)
+  }
+
+  function makeMultiTableQuery(
+    reactive: ReturnType<typeof createReactiveQueries>,
+  ) {
+    const db = makeMultiTableDb()
+    return reactive.query(async () => {
+      const todos = await db.select().from(fakeTable)
+      const projects = await db.select().from(fakeProjects)
+      return { todos, projects }
+    })
+  }
+
+  it('returns and registers BOTH channels', async () => {
+    const reactive = createReactiveQueries({})
+    const { channel, channels } = await makeMultiTableQuery(reactive)(undefined)
+
+    const todosChannel = serializeKey(['todos', { teamId: 'A' }])
+    const projectsChannel = serializeKey(['projects', { teamId: 'A' }])
+
+    // channel is back-compat (channels[0]); channels lists every read.
+    expect(channel).toBe(todosChannel)
+    expect(channels).toEqual([todosChannel, projectsChannel])
+
+    const active = reactive.subscriptionManager.activeChannels()
+    expect(active.has(todosChannel)).toBe(true)
+    expect(active.has(projectsChannel)).toBe(true)
+  })
+
+  it('a write to the FIRST table invalidates the query', async () => {
+    const handler = createStartHandler({})
+    const reactive = createReactiveQueries({ publish: handler.publish })
+    await makeMultiTableQuery(reactive)(undefined)
+
+    const invalidateSpy = vi.spyOn(reactive.subscriptionManager, 'invalidate')
+    await reactive.invalidate([
+      { table: 'todos', operation: 'insert', affectedRows: [{ teamId: 'A' }] },
+    ])
+    expect(invalidateSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('a write to the SECOND table ALSO invalidates the query (the bug WP-C fixes)', async () => {
+    const published: Array<{ ch: string; data: unknown }> = []
+    const handler = createStartHandler({
+      backend: {
+        publish: (ch: string, data: unknown) => {
+          published.push({ ch, data })
+          return Promise.resolve()
+        },
+      },
+    })
+    const reactive = createReactiveQueries({ publish: handler.publish })
+    await makeMultiTableQuery(reactive)(undefined)
+
+    await reactive.invalidate([
+      {
+        table: 'projects',
+        operation: 'insert',
+        affectedRows: [{ teamId: 'A' }],
+      },
+    ])
+
+    const batchMsg = published.find((p) => p.ch === REALTIME_BATCH_CHANNEL)
+    expect(batchMsg).toBeDefined()
+    const updates = (batchMsg!.data as { updates: Array<{ channel: string }> })
+      .updates
+    expect(
+      updates.some(
+        (u) => u.channel === serializeKey(['projects', { teamId: 'A' }]),
+      ),
+    ).toBe(true)
+  })
+
+  it('a write to an UNRELATED table does not invalidate the query', async () => {
+    const published: Array<{ ch: string; data: unknown }> = []
+    const handler = createStartHandler({
+      backend: {
+        publish: (ch: string, data: unknown) => {
+          published.push({ ch, data })
+          return Promise.resolve()
+        },
+      },
+    })
+    const reactive = createReactiveQueries({ publish: handler.publish })
+    await makeMultiTableQuery(reactive)(undefined)
+
+    await reactive.invalidate([
+      {
+        table: 'widgets',
+        operation: 'insert',
+        affectedRows: [{ teamId: 'A' }],
+      },
+    ])
+
+    expect(published.some((p) => p.ch === REALTIME_BATCH_CHANNEL)).toBe(false)
   })
 })

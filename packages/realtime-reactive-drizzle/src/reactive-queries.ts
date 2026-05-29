@@ -165,7 +165,11 @@ export function createReactiveQueries(
           })
         }
 
-        return { data: result, channel: reads[0].channel }
+        return {
+          data: result,
+          channel: reads[0].channel,
+          channels: reads.map((r) => r.channel),
+        }
       }
       return callable as unknown as ReactiveQueryFn<TArgs, TResult>
     },

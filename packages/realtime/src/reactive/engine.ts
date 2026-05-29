@@ -105,8 +105,16 @@ export interface ReactiveQueryEngine {
    * Run `queryFn` capturing its read(s); return the result plus how to
    * invalidate. `channelOverride` forces the channel when provided.
    *
-   * Returns an ARRAY of reads to support multi-table queries. Today the Drizzle
-   * engine returns exactly one read; the array shape future-proofs the seam.
+   * Returns an ARRAY with one {@link CapturedRead} per DISTINCT table read, so
+   * a query that reads multiple tables (several separate `select().from(...)`
+   * calls) stays live to writes on ALL of them. Each read carries its own
+   * predicate and channel; the caller registers a subscription per read and
+   * propagates every channel to the client.
+   *
+   * **JOIN limitation:** auto-capture only covers SEPARATE `select().from()`
+   * calls. A SQL JOIN captures only the primary table; for JOINs (or other
+   * unsupported shapes) use the engine's `channelOverride` / predicate escape
+   * hatch to take manual control.
    */
   captureReads: <T>(
     queryFn: () => Promise<T>,

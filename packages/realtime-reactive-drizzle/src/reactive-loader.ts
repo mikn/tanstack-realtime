@@ -1,11 +1,10 @@
-import { serializeKey } from '@tanstack/realtime'
 import { runInReactiveContext } from './reactive-db.js'
 import {
-  ReactivePredicateParseError,
   compilePredicate,
   deriveChannelKey,
   extractReferencedColumns,
 } from './compile-predicate.js'
+import { deriveCapturedRead, resolveChannelOverride } from './derive-read.js'
 import type { ColumnMap } from './reactive-db.js'
 import type { QueryKey } from '@tanstack/realtime'
 import type { SubscriptionManager } from './subscription-manager.js'
@@ -53,44 +52,23 @@ export function createLoader<TResult>(
     }
 
     if (ctx.reads[0]) {
-      // Auto path: predicate extracted from reactive context
+      // Auto path: predicate + channel extracted from the reactive context via
+      // the shared derivation helper (single source of truth with the engine).
       const read = ctx.reads[0]
-      let compiled: (row: Record<string, unknown>) => boolean
-      let referencedColumns: Set<string>
-      let autoChannel: string | undefined
-
-      try {
-        compiled = compilePredicate(read.sql, read.params, read.columns)
-        referencedColumns = extractReferencedColumns(read.sql, read.columns)
-      } catch (err) {
-        if (
-          err instanceof ReactivePredicateParseError &&
-          err.message.includes('No WHERE clause')
-        ) {
-          // Table-level subscription: query has no WHERE clause
-          compiled = () => true
-          referencedColumns = new Set()
-          autoChannel = serializeKey([read.table])
-        } else {
-          throw err
-        }
-      }
+      const captured = deriveCapturedRead(
+        read,
+        resolveChannelOverride(options.channel),
+      )
 
       queryPredicate = {
         table: read.table,
         sql: read.sql,
         params: read.params,
         columns: read.columns,
-        compiled,
-        referencedColumns,
+        compiled: captured.compiled,
+        referencedColumns: captured.referencedColumns,
       }
-      channel =
-        options.channel !== undefined
-          ? typeof options.channel === 'string'
-            ? options.channel
-            : serializeKey(options.channel)
-          : (autoChannel ??
-            deriveChannelKey(read.table, read.sql, read.params, read.columns))
+      channel = captured.channel
     } else if (options.predicate && 'where' in options.predicate) {
       // Explicit where path
       const pred = options.predicate
@@ -105,11 +83,8 @@ export function createLoader<TResult>(
         referencedColumns: extractReferencedColumns(sql, pred.columns),
       }
       channel =
-        options.channel !== undefined
-          ? typeof options.channel === 'string'
-            ? options.channel
-            : serializeKey(options.channel)
-          : deriveChannelKey(pred.table, sql, params, pred.columns)
+        resolveChannelOverride(options.channel) ??
+        deriveChannelKey(pred.table, sql, params, pred.columns)
     } else if (options.predicate && 'matches' in options.predicate) {
       // Explicit matches path — no SQL to parse, so referencedColumns is unknown
       const pred = options.predicate
@@ -122,11 +97,8 @@ export function createLoader<TResult>(
         referencedColumns: new Set(),
       }
       channel =
-        options.channel !== undefined
-          ? typeof options.channel === 'string'
-            ? options.channel
-            : serializeKey(options.channel)
-          : deriveChannelKey(pred.table, undefined, [], {})
+        resolveChannelOverride(options.channel) ??
+        deriveChannelKey(pred.table, undefined, [], {})
     } else {
       throw new Error(
         "createLoader: no read set captured — use wrapReactiveDb() or provide 'predicate'",

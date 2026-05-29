@@ -11,12 +11,27 @@ export { REALTIME_BATCH_CHANNEL }
 
 /**
  * The shape returned by a reactive server function.
- * The server function returns the initial data plus a channel name to
+ * The server function returns the initial data plus the channel name(s) to
  * subscribe to for live updates.
+ *
+ * A query that reads multiple tables (multiple `db.select().from(...)` calls)
+ * is reactive to writes on ALL of them, so it carries one channel per read in
+ * `channels`. `channel` is kept as `channels[0]` for back-compat with single-
+ * table consumers; new code should fan out over `channels`.
  */
 export type ReactiveQueryResult<T> = {
   data: T
+  /**
+   * The primary channel — always `channels[0]`. Retained for back-compat;
+   * prefer `channels` so multi-table queries stay live on every read.
+   */
   channel: string
+  /**
+   * Every channel this query reads from. A single-table query has one entry
+   * equal to `channel`. May be absent on results produced by older server
+   * functions, in which case consumers fall back to `[channel]`.
+   */
+  channels?: ReadonlyArray<string>
 }
 
 /**
@@ -54,8 +69,13 @@ type RegistryEntry<
   /** Live map of server-confirmed items, keyed by getKey(item). */
   currentItems: Map<string, TItem>
   refetch: () => void
-  /** Current subscribed channel, set after initial fetch resolves. */
-  channel: string | null
+  /**
+   * Current subscribed channels, set after initial fetch resolves. A single-
+   * table query has one entry; a multi-table query has one per read. Every
+   * channel is mapped to this entry's cache key in `channelIndex` so a batch
+   * update on ANY of them refreshes the query.
+   */
+  channels: ReadonlyArray<string>
   /** Apply a data update directly (used by batch fan-out). */
   applyUpdate: ((data: unknown) => void) | null
   /** Whether the first fetch has completed (markReady called). */
@@ -162,7 +182,7 @@ export function getOrCreateQueryCollection<
 
       sync({ begin, write, commit, markReady }) {
         let stopped = false
-        let channelUnsub: (() => void) | null = null
+        let channelUnsubs: Array<() => void> = []
         let hasCalledMarkReady = false
 
         function applyData(rawData: unknown): void {
@@ -202,7 +222,7 @@ export function getOrCreateQueryCollection<
 
         function runFetch(): void {
           serverFn(args)
-            .then(({ data, channel }) => {
+            .then(({ data, channel, channels }) => {
               if (stopped) return
 
               applyData(data)
@@ -215,21 +235,33 @@ export function getOrCreateQueryCollection<
                 for (const l of entry.readyListeners) l()
               }
 
-              // Register channel in the reverse index
-              if (entry.channel !== channel) {
-                if (entry.channel != null) channelIndex.delete(entry.channel)
-                entry.channel = channel
+              // A multi-table query is reactive to writes on ALL its tables, so
+              // every channel must map back to this query. Fall back to the
+              // single `channel` for older server functions that omit `channels`.
+              const nextChannels =
+                channels != null && channels.length > 0 ? channels : [channel]
+
+              // Re-index only when the set actually changed (e.g. args-driven
+              // refetch produced different channels). Drop stale entries first.
+              const changed =
+                nextChannels.length !== entry.channels.length ||
+                nextChannels.some((c, i) => c !== entry.channels[i])
+              if (changed) {
+                for (const prev of entry.channels) channelIndex.delete(prev)
+                entry.channels = nextChannels
                 entry.applyUpdate = applyData
-                channelIndex.set(channel, key)
+                for (const c of nextChannels) channelIndex.set(c, key)
               }
 
-              // Subscribe to the individual channel as fallback for direct
-              // realtime.publish() calls that don't go through batch.
-              channelUnsub?.()
-              channelUnsub = client.subscribe(channel, (msg: unknown) => {
-                if (stopped) return
-                applyData(msg)
-              })
+              // Subscribe to each individual channel as a fallback for direct
+              // realtime.publish() calls that don't go through the batch.
+              for (const unsub of channelUnsubs) unsub()
+              channelUnsubs = nextChannels.map((c) =>
+                client.subscribe(c, (msg: unknown) => {
+                  if (stopped) return
+                  applyData(msg)
+                }),
+              )
             })
             .catch((e: unknown) => {
               if (stopped) return
@@ -249,9 +281,11 @@ export function getOrCreateQueryCollection<
 
         return () => {
           stopped = true
-          channelUnsub?.()
+          for (const unsub of channelUnsubs) unsub()
+          channelUnsubs = []
           triggerRefetch = null
-          if (entry.channel != null) channelIndex.delete(entry.channel)
+          // Clean up ALL of this query's channel index entries, not just one.
+          for (const c of entry.channels) channelIndex.delete(c)
           registry.delete(key)
           currentItems.clear()
         }
@@ -268,7 +302,7 @@ export function getOrCreateQueryCollection<
     getKey,
     currentItems,
     refetch: () => triggerRefetch?.(),
-    channel: null,
+    channels: [],
     applyUpdate: null,
     isReady: false,
     readyListeners: new Set(),
@@ -300,9 +334,19 @@ export function subscribeToRealtimeBatch(client: RealtimeClient): () => void {
 
     // Synchronous fan-out — React 18 / Vue / Solid batch the resulting
     // state updates into a single render.
+    //
+    // DEDUPE by cache key: a single mutation can touch multiple tables that a
+    // multi-table query reads, producing several updates that all map to the
+    // SAME query. Each update carries the full fresh result, so applying the
+    // last one per query is sufficient — apply once to avoid redundant
+    // re-renders / double application.
+    const latestByKey = new Map<string, unknown>()
     for (const { channel, data } of batch.updates) {
       const cacheKey = channelIndex.get(channel)
       if (cacheKey == null) continue
+      latestByKey.set(cacheKey, data)
+    }
+    for (const [cacheKey, data] of latestByKey) {
       registry.get(cacheKey)?.applyUpdate?.(data)
     }
   })

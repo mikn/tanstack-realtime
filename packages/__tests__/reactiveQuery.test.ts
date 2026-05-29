@@ -24,11 +24,13 @@ import {
 import {
   deriveCacheKey,
   getOrCreateQueryCollection,
+  lookupQueryCollection,
   serializeKey,
 } from '@tanstack/realtime'
 import {
   REALTIME_BATCH_CHANNEL,
   clearRegistry,
+  subscribeToRealtimeBatch,
 } from '../realtime/src/queryCollectionRegistry.js'
 
 // ---------------------------------------------------------------------------
@@ -2421,5 +2423,119 @@ describe('Adversarial / race conditions', () => {
     expect(
       ((collection as any).state as Map<string, any>).get('item')?.score,
     ).toBe(100)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 22. Multi-table queries — client batch fan-out across ALL channels (WP-C)
+//
+// A query whose server function returns multiple `channels` must update when a
+// __realtime_batch__ update arrives on ANY of them, and exactly ONCE when a
+// single batch carries updates for several of its channels (dedupe). This is
+// the client side of closing the multi-table silent-drop.
+// ---------------------------------------------------------------------------
+
+describe('multi-table query — client batch fan-out (WP-C)', () => {
+  beforeEach(() => {
+    clearRegistry()
+  })
+
+  /**
+   * A mock client whose `subscribe` captures the batch-channel callback so the
+   * test can drive __realtime_batch__ messages directly. Per-query channel
+   * subscriptions are no-ops here (we exercise the batch path).
+   */
+  function makeBatchClient() {
+    const client = makeMockClient()
+    let batchCb: ((msg: unknown) => void) | null = null
+    client.subscribe = vi
+      .fn()
+      .mockImplementation((ch: string, cb: (msg: unknown) => void) => {
+        if (ch === REALTIME_BATCH_CHANNEL) batchCb = cb
+        return () => {}
+      })
+    return {
+      client,
+      emitBatch: (updates: Array<{ channel: string; data: unknown }>) => {
+        batchCb?.({ type: 'realtime_batch', updates })
+      },
+    }
+  }
+
+  it('updates the query when a batch arrives on EITHER of its channels', async () => {
+    const { client, emitBatch } = makeBatchClient()
+    subscribeToRealtimeBatch(client)
+
+    const chA = 'todos:teamId=A'
+    const chB = 'projects:teamId=A'
+    const serverFn = vi.fn().mockResolvedValue({
+      data: [{ id: 'item', n: 0 }],
+      channel: chA,
+      channels: [chA, chB],
+    })
+    const getKey = (item: { id: string }) => item.id
+    const { collection } = getOrCreateQueryCollection<{
+      id: string
+      n: number
+    }>('test-group-22::either', serverFn, {}, getKey, client)
+    await (collection as any).stateWhenReady()
+
+    const getN = () =>
+      ((collection as any).state as Map<string, any>).get('item')?.n
+
+    // A batch on the FIRST channel updates the query.
+    emitBatch([{ channel: chA, data: [{ id: 'item', n: 1 }] }])
+    await new Promise((r) => setTimeout(r, 0))
+    expect(getN()).toBe(1)
+
+    // A batch on the SECOND channel ALSO updates the query.
+    emitBatch([{ channel: chB, data: [{ id: 'item', n: 2 }] }])
+    await new Promise((r) => setTimeout(r, 0))
+    expect(getN()).toBe(2)
+  })
+
+  it('applies the query refresh ONCE when a single batch carries both its channels', async () => {
+    const { client, emitBatch } = makeBatchClient()
+    subscribeToRealtimeBatch(client)
+
+    const chA = 'todos:teamId=A'
+    const chB = 'projects:teamId=A'
+
+    const key = 'test-group-22::dedupe'
+    const serverFn = vi.fn().mockResolvedValue({
+      data: [{ id: 'item', n: 0 }],
+      channel: chA,
+      channels: [chA, chB],
+    })
+    const getKey = (item: { id: string }) => item.id
+    const { collection } = getOrCreateQueryCollection<{
+      id: string
+      n: number
+    }>(key, serverFn, {}, getKey, client)
+    await (collection as any).stateWhenReady()
+
+    // Wrap the registry entry's applyUpdate to count how many times the batch
+    // fan-out applies a refresh for this query. Without dedupe this would be
+    // called twice (once per channel in the batch); with dedupe, exactly once.
+    const entry = lookupQueryCollection<{ id: string; n: number }>(key)!
+    const realApply = entry.applyUpdate!
+    let applyCount = 0
+    entry.applyUpdate = (data: unknown) => {
+      applyCount++
+      realApply(data)
+    }
+
+    // One batch carrying updates for BOTH of the query's channels — the same
+    // fresh result on each. Must apply once, not twice.
+    emitBatch([
+      { channel: chA, data: [{ id: 'item', n: 9 }] },
+      { channel: chB, data: [{ id: 'item', n: 9 }] },
+    ])
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(((collection as any).state as Map<string, any>).get('item')?.n).toBe(
+      9,
+    )
+    expect(applyCount).toBe(1)
   })
 })

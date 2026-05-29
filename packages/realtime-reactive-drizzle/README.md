@@ -64,6 +64,39 @@ export const createTodo = createServerFn().handler(
 )
 ```
 
+## Multi-table queries and the JOIN limitation
+
+A reactive query that reads **several tables in separate `select().from()`
+calls** stays live to writes on **all** of them. Each read derives its own
+channel, every channel is propagated to the client, and a write to any of those
+tables re-runs the query:
+
+```ts
+export const getDashboard = createServerFn().handler(
+  query(async (args: { teamId: string }) => {
+    const todos = await db
+      .select()
+      .from(todosTable)
+      .where(eq(todosTable.teamId, args.teamId))
+    const projects = await db
+      .select()
+      .from(projectsTable)
+      .where(eq(projectsTable.teamId, args.teamId))
+    return { todos, projects } // invalidated by writes to EITHER table
+  }),
+)
+```
+
+**Limitation — SQL JOINs are not covered.** A single statement that JOINs
+tables (`db.select().from(a).leftJoin(b, ...)`) only captures the **primary**
+table `a`; the joined table `b` is not intercepted, so writes to `b` will **not**
+invalidate the query. Multi-table reactivity works only for **separate**
+`select().from()` calls.
+
+For a JOIN (or any shape the auto-capture cannot see), take manual control with
+the explicit `channel` override / `predicate` escape hatch so you decide exactly
+which channel(s) the query subscribes to and how rows are matched.
+
 ## Composing your own `onChannelEmpty`
 
 `reactive.onChannelEmpty` unregisters a channel's subscription when its last SSE
@@ -92,6 +125,7 @@ import type {
   ReactiveQueryEngine,
   CapturedRead,
   WriteDescriptor,
+  QueryKey,
 } from '@tanstack/realtime'
 
 interface ReactiveQueryEngine {

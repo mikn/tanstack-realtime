@@ -1,11 +1,5 @@
-import { serializeKey } from '@tanstack/realtime'
 import { runInReactiveContext } from './reactive-db.js'
-import {
-  ReactivePredicateParseError,
-  compilePredicate,
-  deriveChannelKey,
-  extractReferencedColumns,
-} from './compile-predicate.js'
+import { deriveCapturedRead, resolveChannelOverride } from './derive-read.js'
 import type {
   CapturedRead,
   QueryKey,
@@ -18,12 +12,23 @@ import type {
  * seam.
  *
  * `captureReads` runs the query inside an AsyncLocalStorage reactive context
- * (via {@link runInReactiveContext}), takes the first captured read
- * (`ctx.reads[0]`), compiles its WHERE clause into a row predicate
- * (via `pgsql-ast-parser`), and derives the SSE channel — including the
- * no-WHERE table-level fallback and the explicit channel override. It returns
- * an array with a single {@link CapturedRead}; multi-table fan-out is future
- * work (WP-C).
+ * (via {@link runInReactiveContext}), then compiles EVERY distinct read the
+ * query performed — each separate `db.select().from(...)` call — into its own
+ * {@link CapturedRead}. For each read it compiles the WHERE clause into a row
+ * predicate (via `pgsql-ast-parser`) and derives the SSE channel, including the
+ * no-WHERE table-level fallback. Reads that derive the same channel (the same
+ * table + predicate read twice) are collapsed to one. This is what keeps a
+ * query that reads multiple tables live to writes on ALL of them.
+ *
+ * **Channel override:** when `channelOverride` is supplied the user is taking
+ * manual control, so a SINGLE {@link CapturedRead} is returned using the
+ * override channel and the FIRST read's predicate. (Auto multi-table capture is
+ * only used when no override is given.)
+ *
+ * **JOIN limitation:** multi-table capture works for SEPARATE
+ * `select().from()` calls. A SQL JOIN (`.from(a).leftJoin(b)`) only captures
+ * the primary table `a` — the joined table is not intercepted. For JOINs use
+ * the explicit `channel` override / `predicate` escape hatch.
  *
  * `captureWrites` runs the mutation in the same kind of context and returns the
  * captured write descriptors verbatim.
@@ -44,48 +49,29 @@ export function createDrizzleEngine(): ReactiveQueryEngine {
           'createDrizzleEngine: no read set captured — use wrapReactiveDb() for the query',
         )
       }
-      const read = ctx.reads[0]
 
-      let compiled: (row: Record<string, unknown>) => boolean
-      let referencedColumns: ReadonlySet<string>
-      let autoChannel: string | undefined
+      const override = resolveChannelOverride(channelOverride)
 
-      try {
-        compiled = compilePredicate(read.sql, read.params, read.columns)
-        referencedColumns = extractReferencedColumns(read.sql, read.columns)
-      } catch (err) {
-        if (
-          err instanceof ReactivePredicateParseError &&
-          err.message.includes('No WHERE clause')
-        ) {
-          // Table-level subscription: query has no WHERE clause
-          compiled = () => true
-          referencedColumns = new Set<string>()
-          autoChannel = serializeKey([read.table])
-        } else {
-          throw err
+      // Explicit override = manual control: collapse to a single read using the
+      // override channel and the first read's predicate.
+      if (override !== undefined) {
+        return {
+          result,
+          reads: [deriveCapturedRead(ctx.reads[0], override)],
         }
       }
 
-      const channel =
-        channelOverride !== undefined
-          ? typeof channelOverride === 'string'
-            ? channelOverride
-            : serializeKey(channelOverride)
-          : (autoChannel ??
-            deriveChannelKey(read.table, read.sql, read.params, read.columns))
-
-      return {
-        result,
-        reads: [
-          {
-            table: read.table,
-            compiled,
-            referencedColumns,
-            channel,
-          },
-        ],
+      // Auto path: one CapturedRead per DISTINCT read, deduped by derived
+      // channel so the same table+predicate read twice collapses to one.
+      const byChannel = new Map<string, CapturedRead>()
+      for (const read of ctx.reads) {
+        const captured = deriveCapturedRead(read)
+        if (!byChannel.has(captured.channel)) {
+          byChannel.set(captured.channel, captured)
+        }
       }
+
+      return { result, reads: Array.from(byChannel.values()) }
     },
 
     async captureWrites<T>(
