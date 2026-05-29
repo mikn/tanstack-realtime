@@ -32,8 +32,8 @@ import {
   serializeKey,
   tickClock,
   useTickBatching,
-} from '@tanstack/realtime'
-import type { LamportClock, OrState } from '@tanstack/realtime'
+} from '@realtimejs/core'
+import type { LamportClock, OrState } from '@realtimejs/core'
 
 // ===========================================================================
 // S1: Wire protocol validation
@@ -521,8 +521,7 @@ describe('C1: /server subpath export', () => {
     const fs = await import('node:fs')
     const pkg = JSON.parse(
       fs.readFileSync(
-        new URL('../../packages/realtime/package.json', import.meta.url)
-          .pathname,
+        new URL('../../packages/core/package.json', import.meta.url).pathname,
         'utf-8',
       ),
     )
@@ -541,8 +540,7 @@ describe('C2+C3: Package dependency configuration', () => {
     const fs = await import('node:fs')
     const pkg = JSON.parse(
       fs.readFileSync(
-        new URL('../../packages/realtime/package.json', import.meta.url)
-          .pathname,
+        new URL('../../packages/core/package.json', import.meta.url).pathname,
         'utf-8',
       ),
     )
@@ -560,8 +558,7 @@ describe('C2+C3: Package dependency configuration', () => {
     const fs = await import('node:fs')
     const pkg = JSON.parse(
       fs.readFileSync(
-        new URL('../../packages/realtime/package.json', import.meta.url)
-          .pathname,
+        new URL('../../packages/core/package.json', import.meta.url).pathname,
         'utf-8',
       ),
     )

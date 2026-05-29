@@ -3,7 +3,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { throttle } from '@tanstack/realtime'
+import { throttle } from '@realtimejs/core'
 
 describe('throttle', () => {
   beforeEach(() => {

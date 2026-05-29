@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { createDedup } from '@tanstack/realtime'
+import { createDedup } from '@realtimejs/core'
 
 describe('createDedup', () => {
   it('returns false for the first occurrence of an id', () => {

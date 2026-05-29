@@ -2,7 +2,7 @@
  * StatusBar — shows the current connection status and active user ID.
  * data-testid="status" carries the raw status string for Playwright assertions.
  */
-import { useConnectionStatus } from '@tanstack/solid-realtime'
+import { useConnectionStatus } from '@realtimejs/solid'
 import { userId } from '../transport.js'
 
 export function StatusBar() {

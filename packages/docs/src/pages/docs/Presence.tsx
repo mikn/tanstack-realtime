@@ -167,7 +167,7 @@ export function Presence() {
       <h2 id="define-channel">Define a presence channel</h2>
       <CodeBlock
         title="presence/channel.ts"
-        code={`import { createPresenceChannel } from '@tanstack/realtime'
+        code={`import { createPresenceChannel } from '@realtimejs/core'
 
 export const docPresence = createPresenceChannel({
   id: 'doc-presence',
@@ -178,7 +178,7 @@ export const docPresence = createPresenceChannel({
       <h2 id="use-presence">Use in a component</h2>
       <CodeBlock
         title="presence/DocumentPage.tsx"
-        code={`import { usePresence } from '@tanstack/react-realtime'
+        code={`import { usePresence } from '@realtimejs/react'
 import { docPresence } from './channel'
 
 function DocumentPage({ docId }: { docId: string }) {
@@ -238,8 +238,8 @@ function DocumentPage({ docId }: { docId: string }) {
       </p>
       <CodeBlock
         title="features/spreadsheet/CellPresence.tsx"
-        code={`import { usePresence } from '@tanstack/react-realtime'
-import { createPresenceChannel } from '@tanstack/realtime'
+        code={`import { usePresence } from '@realtimejs/react'
+import { createPresenceChannel } from '@realtimejs/core'
 import { useState } from 'react'
 
 // One presence channel per cell -- join when focused, leave on blur.
@@ -303,8 +303,8 @@ function Cell({ sheetId, cellId }: { sheetId: string; cellId: string }) {
       </p>
       <CodeBlock
         title="features/Canvas.tsx"
-        code={`import { throttle } from '@tanstack/realtime'
-import { usePresence } from '@tanstack/react-realtime'
+        code={`import { throttle } from '@realtimejs/core'
+import { usePresence } from '@realtimejs/react'
 import { useMemo, useCallback } from 'react'
 
 function Canvas({ docId }: { docId: string }) {

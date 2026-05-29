@@ -65,7 +65,7 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 > Professional teams can't adopt without a testing story.
 
-- [x] Create `@tanstack/realtime/testing` entry point (or `@tanstack/realtime-testing` package)
+- [x] Create `@realtimejs/core/testing` entry point (or `@tanstack/realtime-testing` package)
 - [x] Implement `createMockTransport()` — controllable fake transport
   - [x] Methods: `simulateMessage(channel, data)`, `simulateDisconnect()`, `simulateReconnect()`
   - [x] Observable message log for assertions
@@ -117,7 +117,7 @@ Each section is a self-contained project. Tasks are ordered by dependency within
 
 > TanStack brand promise: framework-agnostic.
 
-- [ ] **`@tanstack/vue-realtime`** — Vue composables
+- [ ] **`@realtimejs/vue`** — Vue composables
   - [ ] `useRealtimeCollection` composable
   - [ ] `useLiveChannel` composable
   - [ ] `usePresence` composable
@@ -125,7 +125,7 @@ Each section is a self-contained project. Tasks are ordered by dependency within
   - [ ] `useSubscribe` composable
   - [ ] `RealtimeProvider` as provide/inject
   - [ ] Tests mirroring React adapter test coverage
-- [ ] **`@tanstack/solid-realtime`** — Solid signals
+- [ ] **`@realtimejs/solid`** — Solid signals
   - [ ] `createRealtimeCollection` signal
   - [ ] `createLiveChannel` signal
   - [ ] `createPresence` signal

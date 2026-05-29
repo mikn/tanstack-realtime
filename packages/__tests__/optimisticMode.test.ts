@@ -14,12 +14,12 @@ import { Store } from '@tanstack/store'
 import {
   createRealtimeClient,
   realtimeCollectionOptions,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 import type {
   ConnectionStatus,
   RealtimeChannelMessage,
   RealtimeTransport,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 import type { CollectionConfig } from '@tanstack/db'
 
 // ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for suggesting an improvement! Before filing, please check if a similar request already exists in [Discussions](https://github.com/TanStack/realtime/discussions) or [Issues](https://github.com/TanStack/realtime/issues).
+        Thanks for suggesting an improvement! Before filing, please check if a similar request already exists in [Discussions](https://github.com/TanStack/core/discussions) or [Issues](https://github.com/TanStack/core/issues).
 
   - type: textarea
     id: problem
@@ -37,10 +37,10 @@ body:
       label: Affected package(s)
       multiple: true
       options:
-        - '@tanstack/realtime'
-        - '@tanstack/react-realtime'
-        - '@tanstack/realtime-adapter-sse'
-        - '@tanstack/realtime-adapter-centrifugo'
+        - '@realtimejs/core'
+        - '@realtimejs/react'
+        - '@realtimejs/adapter-sse'
+        - '@realtimejs/adapter-centrifugo'
         - 'new package'
     validations:
       required: true

@@ -3,7 +3,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createEphemeralMap } from '@tanstack/realtime'
+import { createEphemeralMap } from '@realtimejs/core'
 
 describe('createEphemeralMap', () => {
   beforeEach(() => {

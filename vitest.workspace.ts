@@ -7,46 +7,40 @@ const root = fileURLToPath(new URL('.', import.meta.url))
 // Source aliases so tests run against TypeScript source without a prior build.
 const sourceAliases = [
   {
-    find: /^@tanstack\/react-realtime$/,
-    replacement: resolve(root, 'packages/react-realtime/src/index.ts'),
+    find: /^@realtimejs\/react$/,
+    replacement: resolve(root, 'packages/react/src/index.ts'),
   },
   {
-    find: /^@tanstack\/realtime$/,
-    replacement: resolve(root, 'packages/realtime/src/index.ts'),
+    find: /^@realtimejs\/core$/,
+    replacement: resolve(root, 'packages/core/src/index.ts'),
   },
   {
-    find: /^@tanstack\/realtime-adapter-centrifugo$/,
-    replacement: resolve(
-      root,
-      'packages/realtime-adapter-centrifugo/src/index.ts',
-    ),
+    find: /^@realtimejs\/adapter-centrifugo$/,
+    replacement: resolve(root, 'packages/adapter-centrifugo/src/index.ts'),
   },
   {
-    find: /^@tanstack\/realtime-adapter-sse$/,
-    replacement: resolve(root, 'packages/realtime-adapter-sse/src/index.ts'),
+    find: /^@realtimejs\/adapter-sse$/,
+    replacement: resolve(root, 'packages/adapter-sse/src/index.ts'),
   },
   {
-    find: /^@tanstack\/realtime-preset-start$/,
-    replacement: resolve(root, 'packages/realtime-preset-start/src/index.ts'),
+    find: /^@realtimejs\/preset-start$/,
+    replacement: resolve(root, 'packages/preset-start/src/index.ts'),
   },
   {
-    find: /^@tanstack\/realtime-reactive-drizzle$/,
-    replacement: resolve(
-      root,
-      'packages/realtime-reactive-drizzle/src/index.ts',
-    ),
+    find: /^@realtimejs\/reactive-drizzle$/,
+    replacement: resolve(root, 'packages/reactive-drizzle/src/index.ts'),
   },
   {
-    find: /^@tanstack\/react-realtime-devtools$/,
-    replacement: resolve(root, 'packages/react-realtime-devtools/src/index.ts'),
+    find: /^@realtimejs\/react-devtools$/,
+    replacement: resolve(root, 'packages/react-devtools/src/index.ts'),
   },
   {
-    find: /^@tanstack\/vue-realtime$/,
-    replacement: resolve(root, 'packages/vue-realtime/src/index.ts'),
+    find: /^@realtimejs\/vue$/,
+    replacement: resolve(root, 'packages/vue/src/index.ts'),
   },
   {
-    find: /^@tanstack\/vue-realtime-devtools$/,
-    replacement: resolve(root, 'packages/vue-realtime-devtools/src/index.ts'),
+    find: /^@realtimejs\/vue-devtools$/,
+    replacement: resolve(root, 'packages/vue-devtools/src/index.ts'),
   },
 ]
 

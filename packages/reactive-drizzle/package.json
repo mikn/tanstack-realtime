@@ -1,0 +1,30 @@
+{
+  "name": "@realtimejs/reactive-drizzle",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Drizzle/Postgres reactive-query engine for @realtimejs/core — auto-derived channels, predicate matching, and invalidation",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup"
+  },
+  "dependencies": {
+    "@realtimejs/core": "workspace:*",
+    "drizzle-orm": "^0.36.0",
+    "pgsql-ast-parser": "^12.0.0"
+  }
+}

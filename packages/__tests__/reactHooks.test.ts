@@ -1,5 +1,5 @@
 /**
- * Tests for the @tanstack/react-realtime hook behavior.
+ * Tests for the @realtimejs/react hook behavior.
  *
  * These tests verify the underlying logic that each React hook encapsulates
  * using the core framework-agnostic API directly. They serve as a contract
@@ -34,7 +34,7 @@ import {
   pnIncrement,
   pnValue,
   tickClock,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -46,7 +46,7 @@ export function ReactiveQueries() {
       </p>
       <CodeBlock
         title="app/server/todos.ts"
-        code={`import { realtime } from './realtime'
+        code={`import { realtime } from './core'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { todos } from '../../db/schema'
@@ -90,7 +90,7 @@ export const getTodos = realtime.query(
       </p>
       <CodeBlock
         title="TodoList.tsx"
-        code={`import { useQuery } from '@tanstack/react-realtime'
+        code={`import { useQuery } from '@realtimejs/react'
 import { getTodos } from '../server/todos'
 
 export function TodoList({ teamId }: { teamId: string }) {
@@ -148,7 +148,7 @@ export function TodoList({ teamId }: { teamId: string }) {
       </p>
       <CodeBlock
         title="ActiveTodos.tsx"
-        code={`import { useQuery } from '@tanstack/react-realtime'
+        code={`import { useQuery } from '@realtimejs/react'
 import { useLiveQuery } from '@tanstack/react-db'
 import { getTodos } from '../server/todos'
 
@@ -195,7 +195,7 @@ const { data: mine } = useLiveQuery(
       </p>
       <CodeBlock
         title="AddTodoForm.tsx"
-        code={`import { useMutation } from '@tanstack/react-realtime'
+        code={`import { useMutation } from '@realtimejs/react'
 import { getTodos, createTodo } from '../server/todos'
 
 export function AddTodoForm({ teamId }: { teamId: string }) {
@@ -255,7 +255,7 @@ export function AddTodoForm({ teamId }: { teamId: string }) {
       </p>
       <CodeBlock
         title="FeedList.tsx"
-        code={`import { usePaginatedQuery } from '@tanstack/react-realtime'
+        code={`import { usePaginatedQuery } from '@realtimejs/react'
 import { getFeedPage } from '../server/feed'
 
 export function FeedList({ teamId }: { teamId: string }) {

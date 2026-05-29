@@ -6,8 +6,8 @@
  * withPresence wraps sseTransport to add presence over pub/sub channels.
  * All window accesses are guarded for SSR safety.
  */
-import { createRealtimeClient } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+import { createRealtimeClient } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 import { withPresence } from './withPresence.js'
 
 const params =
@@ -23,7 +23,7 @@ const myConnectionId =
 export const client = createRealtimeClient({
   transport: withPresence(
     sseTransport({
-      url: '/api/realtime',
+      url: '/api/core',
       initialDelay: 50,
       maxDelay: 200,
       jitter: 0,

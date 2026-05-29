@@ -60,10 +60,10 @@ body:
       label: Affected package(s)
       multiple: true
       options:
-        - '@tanstack/realtime'
-        - '@tanstack/react-realtime'
-        - '@tanstack/realtime-adapter-sse'
-        - '@tanstack/realtime-adapter-centrifugo'
+        - '@realtimejs/core'
+        - '@realtimejs/react'
+        - '@realtimejs/adapter-sse'
+        - '@realtimejs/adapter-centrifugo'
     validations:
       required: true
 

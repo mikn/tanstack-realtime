@@ -34,14 +34,14 @@ export function ServerHooks() {
       <ul>
         <li>
           <strong>
-            <code>@tanstack/realtime-adapter-sse</code>
+            <code>@realtimejs/adapter-sse</code>
           </strong>{' '}
           — <code>createSseHandler</code>. Fetch-API compatible. Mount on any
           edge runtime, Hono, or bare Node.js.
         </li>
         <li>
           <strong>
-            <code>@tanstack/realtime-preset-start</code>
+            <code>@realtimejs/preset-start</code>
           </strong>{' '}
           — <code>createStartHandler</code>. Wraps <code>createSseHandler</code>{' '}
           and adds a first-class <code>publish</code> function plus optional{' '}
@@ -85,7 +85,7 @@ export function ServerHooks() {
       </p>
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
 import { verifyJwt } from './auth'
 
 export const realtime = createStartHandler({
@@ -107,7 +107,7 @@ export const realtimePublish = realtime.publish`}
       <h3>Session cookie</h3>
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
 import { getSession } from './auth'
 
 export const realtime = createStartHandler({
@@ -154,7 +154,7 @@ export const realtime = createStartHandler({
 
       <h3>Signature</h3>
       <CodeBlock
-        code={`import type { AuthorizeFn, ChannelPermissions, ParsedChannel } from '@tanstack/realtime'
+        code={`import type { AuthorizeFn, ChannelPermissions, ParsedChannel } from '@realtimejs/core'
 
 type AuthorizeFn = (
   userId: string,
@@ -183,8 +183,8 @@ interface ParsedChannel {
       <h3>Basic role check</h3>
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
-import type { AuthorizeFn } from '@tanstack/realtime'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
+import type { AuthorizeFn } from '@realtimejs/core'
 
 const authorize: AuthorizeFn = async (userId, channel) => {
   if (channel.namespace === 'admin') {
@@ -259,7 +259,7 @@ authorize: (userId, channel) => {
 
       <h3>Signature</h3>
       <CodeBlock
-        code={`import type { LifecycleHooks } from '@tanstack/realtime'
+        code={`import type { LifecycleHooks } from '@realtimejs/core'
 
 interface LifecycleHooks {
   /** Fires after getUser succeeds and the SSE stream is established. */
@@ -279,7 +279,7 @@ interface LifecycleHooks {
       <h3>Metrics and resource management</h3>
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
 
 export const realtime = createStartHandler({
   getUser: async (req) => resolveUser(req),
@@ -329,7 +329,7 @@ export const realtime = createStartHandler({
         payload.
       </p>
       <p>
-        Imported from <code>@tanstack/realtime</code>.
+        Imported from <code>@realtimejs/core</code>.
       </p>
 
       <h3>Signature</h3>
@@ -337,7 +337,7 @@ export const realtime = createStartHandler({
         code={`import {
   createValidatedPublish,
   PublishValidationError,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 
 // ValidatePublishFn signature
 type ValidatePublishFn = (params: {
@@ -356,8 +356,8 @@ type PublishValidationResult =
       <h3>Schema validation with Zod</h3>
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
-import { createValidatedPublish } from '@tanstack/realtime'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
+import { createValidatedPublish } from '@realtimejs/core'
 import { z } from 'zod'
 
 const TodoEvent = z.object({
@@ -420,7 +420,7 @@ export const realtimePublish = createValidatedPublish({
       <CodeBlock
         title="app/server/functions/todos.ts"
         code={`import { createServerFn } from '@tanstack/start'
-import { realtimePublish } from '../realtime'
+import { realtimePublish } from '../core'
 import { db } from '../db'
 
 export const updateTodo = createServerFn({ method: 'POST' })
@@ -448,7 +448,7 @@ export const updateTodo = createServerFn({ method: 'POST' })
       </p>
 
       <CodeBlock
-        code={`import { createSseHandler } from '@tanstack/realtime-adapter-sse'
+        code={`import { createSseHandler } from '@realtimejs/adapter-sse'
 
 const sse = createSseHandler({
   pingInterval: 15_000,  // ping every 15 s (default: 30 000 ms)
@@ -469,7 +469,7 @@ const sse = createSseHandler({
 
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
 import { redisBackend } from './redisBackend'
 
 export const realtime = createStartHandler({
@@ -523,7 +523,7 @@ if (import.meta.hot) {
       <CodeBlock
         title="app/routes/api/health.ts"
         code={`import { createAPIFileRoute } from '@tanstack/start/api'
-import { sseHandler } from '../../server/realtime'
+import { sseHandler } from '../../server/core'
 
 export const Route = createAPIFileRoute('/api/health')({
   GET: () =>
@@ -545,9 +545,9 @@ export const Route = createAPIFileRoute('/api/health')({
       <h3 id="pattern-auth">Full authentication + authorization setup</h3>
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
-import { createValidatedPublish } from '@tanstack/realtime'
-import type { AuthorizeFn } from '@tanstack/realtime'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
+import { createValidatedPublish } from '@realtimejs/core'
+import type { AuthorizeFn } from '@realtimejs/core'
 import { verifyJwt } from './auth'
 import { db } from './db'
 import { z } from 'zod'

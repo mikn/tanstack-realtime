@@ -43,7 +43,7 @@ export function ServerFunctions() {
       </p>
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
 import { getSession } from './auth'
 
 export const realtime = createStartHandler({
@@ -61,9 +61,9 @@ export const realtime = createStartHandler({
       <CodeBlock
         title="app/routes/api/realtime.ts"
         code={`import { createAPIFileRoute } from '@tanstack/start/api'
-import { realtime } from '../../server/realtime'
+import { realtime } from '../../server/core'
 
-export const Route = createAPIFileRoute('/api/realtime')({
+export const Route = createAPIFileRoute('/api/core')({
   GET:     ({ request }) => realtime.handle(request),
   POST:    ({ request }) => realtime.handle(request),
   OPTIONS: ({ request }) => realtime.handle(request),
@@ -77,17 +77,17 @@ export const Route = createAPIFileRoute('/api/realtime')({
       </p>
       <CodeBlock
         title="app/client/realtime.ts"
-        code={`import { createRealtimeClient } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+        code={`import { createRealtimeClient } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
 export const realtimeClient = createRealtimeClient({
-  transport: sseTransport({ url: '/api/realtime' }),
+  transport: sseTransport({ url: '/api/core' }),
 })`}
       />
       <CodeBlock
         title="app/root.tsx"
-        code={`import { RealtimeProvider } from '@tanstack/react-realtime'
-import { realtimeClient } from './client/realtime'
+        code={`import { RealtimeProvider } from '@realtimejs/react'
+import { realtimeClient } from './client/core'
 
 export function App() {
   return (
@@ -173,8 +173,8 @@ export const deleteTodo = createServerFn({ method: 'POST' })
       </p>
       <CodeBlock
         title="app/features/todos/collection.ts"
-        code={`import { withServerFns, realtimeCollectionOptions } from '@tanstack/realtime'
-import { realtimeClient } from '../../client/realtime'
+        code={`import { withServerFns, realtimeCollectionOptions } from '@realtimejs/core'
+import { realtimeClient } from '../../client/core'
 import {
   fetchTodos, createTodo, updateTodo, deleteTodo,
 } from '../../server/todos'
@@ -290,7 +290,7 @@ export function TodoList({ projectId }: { projectId: string }) {
       />
       <CodeBlock
         title="app/server/todos.ts (manual publish variant)"
-        code={`import { realtime } from '../realtime'
+        code={`import { realtime } from '../core'
 
 export const updateTodo = createServerFn({ method: 'POST' })
   .handler(async ({ data }: { data: Todo }) => {
@@ -323,7 +323,7 @@ export const updateTodo = createServerFn({ method: 'POST' })
       </p>
       <CodeBlock
         title="app/server/realtime.ts (Redis backend)"
-        code={`import { createStartHandler, type PublishBackend } from '@tanstack/realtime-preset-start'
+        code={`import { createStartHandler, type PublishBackend } from '@realtimejs/preset-start'
 import Redis from 'ioredis'
 
 const pub = new Redis(process.env.REDIS_URL!)
@@ -366,7 +366,7 @@ export const realtimePublish = realtime.publish`}
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { todos } from '../../db/schema'
-import { realtime } from '../realtime'
+import { realtime } from '../core'
 
 export const getTodos = realtime.query(
   async ({ teamId }: { teamId: string }) =>

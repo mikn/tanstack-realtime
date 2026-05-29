@@ -35,7 +35,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build docs site
-        run: pnpm --filter @tanstack/realtime-docs build
+        run: pnpm --filter @realtimejs/docs build
 
       - name: Add .nojekyll
         run: touch packages/docs/dist/.nojekyll

@@ -9,10 +9,10 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { normalizePermissions } from '@tanstack/realtime'
-import { createSseHandler } from '@tanstack/realtime-adapter-sse'
-import { createStartHandler } from '@tanstack/realtime-preset-start'
-import type { ChannelPermissions, ParsedChannel } from '@tanstack/realtime'
+import { normalizePermissions } from '@realtimejs/core'
+import { createSseHandler } from '@realtimejs/adapter-sse'
+import { createStartHandler } from '@realtimejs/preset-start'
+import type { ChannelPermissions, ParsedChannel } from '@realtimejs/core'
 
 // ---------------------------------------------------------------------------
 // Helpers

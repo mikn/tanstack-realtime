@@ -13,7 +13,7 @@
  */
 
 import { useEffect } from 'react'
-import { usePresence, useSyncedValue } from '@tanstack/react-realtime'
+import { usePresence, useSyncedValue } from '@realtimejs/react'
 import { roomPresence, sharedValue } from '../defs.js'
 import { userId } from '../transport.js'
 

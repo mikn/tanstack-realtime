@@ -3,7 +3,7 @@
  * Pattern: reduce-based stream accumulation.
  */
 import { Show } from 'solid-js'
-import { useStream } from '@tanstack/solid-realtime'
+import { useStream } from '@realtimejs/solid'
 import { textStream } from '../defs.js'
 import { client } from '../transport.js'
 

@@ -1,5 +1,5 @@
 /**
- * Integration tests for @tanstack/realtime-adapter-centrifugo.
+ * Integration tests for @realtimejs/adapter-centrifugo.
  *
  * Runs a minimal Centrifugo-protocol WebSocket server in-process using the
  * `ws` package, then exercises centrifugoTransport against it.
@@ -15,8 +15,8 @@
 import { createServer } from 'node:http'
 import { WebSocketServer, WebSocket as WsWebSocket } from 'ws'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
-import { createRealtimeClient } from '@tanstack/realtime'
+import { centrifugoTransport } from '@realtimejs/adapter-centrifugo'
+import { createRealtimeClient } from '@realtimejs/core'
 import type { WebSocket as WsSocket } from 'ws'
 import type { Server as HttpServer } from 'node:http'
 

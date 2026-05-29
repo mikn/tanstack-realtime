@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
-import { createStartHandler } from '@tanstack/realtime-preset-start'
+import { createStartHandler } from '@realtimejs/preset-start'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 // packages/e2e/app is 3 levels below the repo root
@@ -11,22 +11,19 @@ const repoRoot = fileURLToPath(new URL('../../..', import.meta.url))
 
 // Resolve workspace packages from TypeScript source (no build step required).
 const sourceAliases = {
-  '@tanstack/react-realtime': resolve(
+  '@realtimejs/react': resolve(repoRoot, 'packages/react/src/index.ts'),
+  '@realtimejs/core': resolve(repoRoot, 'packages/core/src/index.ts'),
+  '@realtimejs/adapter-sse': resolve(
     repoRoot,
-    'packages/react-realtime/src/index.ts',
+    'packages/adapter-sse/src/index.ts',
   ),
-  '@tanstack/realtime': resolve(repoRoot, 'packages/realtime/src/index.ts'),
-  '@tanstack/realtime-adapter-sse': resolve(
+  '@realtimejs/preset-start': resolve(
     repoRoot,
-    'packages/realtime-adapter-sse/src/index.ts',
+    'packages/preset-start/src/index.ts',
   ),
-  '@tanstack/realtime-preset-start': resolve(
+  '@realtimejs/react-devtools': resolve(
     repoRoot,
-    'packages/realtime-preset-start/src/index.ts',
-  ),
-  '@tanstack/react-realtime-devtools': resolve(
-    repoRoot,
-    'packages/react-realtime-devtools/src/index.ts',
+    'packages/react-devtools/src/index.ts',
   ),
 }
 
@@ -44,7 +41,7 @@ export default defineConfig({
       name: 'realtime-api',
       configureServer(server) {
         server.middlewares.use(
-          '/api/realtime',
+          '/api/core',
           async (req: IncomingMessage, res: ServerResponse) => {
             if (req.method === 'OPTIONS') {
               res.writeHead(204, {
@@ -67,7 +64,7 @@ export default defineConfig({
               }
 
               const webRequest = new Request(
-                `http://localhost:3000${req.url ?? '/api/realtime'}`,
+                `http://localhost:3000${req.url ?? '/api/core'}`,
                 {
                   method: req.method ?? 'GET',
                   headers: Object.fromEntries(

@@ -22,7 +22,7 @@ import type {
   PresenceCapable,
   PresenceUser,
   RealtimeTransport,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 
 // ---------------------------------------------------------------------------
 // Mock BroadcastChannel — simulates cross-tab messaging within a test
@@ -82,7 +82,7 @@ Object.defineProperty(crypto, 'randomUUID', {
 
 // Now import after mocks are in place
 const { createBroadcastChannelTransport, isBroadcastChannelSupported } =
-  await import('@tanstack/realtime')
+  await import('@realtimejs/core')
 
 // ---------------------------------------------------------------------------
 // Test helpers — create mock inner transports

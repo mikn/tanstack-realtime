@@ -95,10 +95,10 @@ jobs:
         run: pnpm build
 
       - name: Install Playwright browsers
-        run: pnpm --filter @tanstack/realtime-e2e exec playwright install --with-deps chromium
+        run: pnpm --filter @realtimejs/e2e exec playwright install --with-deps chromium
 
       - name: Run E2E tests
-        run: pnpm --filter @tanstack/realtime-e2e test
+        run: pnpm --filter @realtimejs/e2e test
 
   typecheck:
     name: Typecheck
@@ -174,4 +174,4 @@ jobs:
         run: pnpm build
 
       - name: Publish previews
-        run: npx pkg-pr-new publish './packages/realtime' './packages/realtime-adapter-centrifugo' './packages/realtime-adapter-sse' './packages/react-realtime'
+        run: npx pkg-pr-new publish './packages/core' './packages/adapter-centrifugo' './packages/adapter-sse' './packages/react'

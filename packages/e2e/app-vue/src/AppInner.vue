@@ -4,7 +4,7 @@
  * Must be a child of <RealtimeProvider> so useConnectionStatus() resolves.
  */
 import { ref, watchEffect } from 'vue'
-import { useConnectionStatus } from '@tanstack/vue-realtime'
+import { useConnectionStatus } from '@realtimejs/vue'
 import StatusBar from './panels/StatusBar.vue'
 import RealtimeCollectionPanel from './panels/RealtimeCollectionPanel.vue'
 import LiveChannelPanel from './panels/LiveChannelPanel.vue'

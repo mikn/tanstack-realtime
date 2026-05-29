@@ -19,7 +19,7 @@ export function Collections() {
       </p>
       <CodeBlock
         title="features/tasks/TaskList.tsx"
-        code={`import { useRealtimeCollection } from '@tanstack/react-realtime'
+        code={`import { useRealtimeCollection } from '@realtimejs/react'
 import { useLiveQuery } from '@tanstack/react-db'
 
 function TaskList({ projectId }: { projectId: string }) {
@@ -46,7 +46,7 @@ function TaskList({ projectId }: { projectId: string }) {
       </p>
       <CodeBlock
         title="features/tasks/collection.ts"
-        code={`import { withRest, realtimeCollectionOptions } from '@tanstack/realtime'
+        code={`import { withRest, realtimeCollectionOptions } from '@realtimejs/core'
 
 const tasksOptions = (projectId: string) =>
   realtimeCollectionOptions({
@@ -115,8 +115,8 @@ router.delete('/api/tasks/:id', async (req) => {
       </p>
       <CodeBlock
         title="server/jobs/inventorySync.ts"
-        code={`import { sseHandler } from '../realtime'
-import { serializeKey } from '@tanstack/realtime'
+        code={`import { sseHandler } from '../core'
+import { serializeKey } from '@realtimejs/core'
 
 export async function syncInventory(productId: string) {
   const latestStock = await warehouseApi.getStock(productId)
@@ -161,7 +161,7 @@ export async function syncInventory(productId: string) {
         including conflicts detected by the server.
       </p>
       <CodeBlock
-        code={`import { isConflictError } from '@tanstack/realtime'
+        code={`import { isConflictError } from '@realtimejs/core'
 
 realtimeCollectionOptions({
   // ...
@@ -201,10 +201,10 @@ realtimeCollectionOptions({
         code={`// The transport logs subscribe rejections as console.warn messages.
 // To react programmatically, observe the client's connection status:
 
-import { createRealtimeClient } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+import { createRealtimeClient } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
-const baseTransport = sseTransport({ url: '/api/realtime' })
+const baseTransport = sseTransport({ url: '/api/core' })
 
 // Listen for connection status changes
 const client = createRealtimeClient({ transport: baseTransport })
@@ -236,7 +236,7 @@ function SyncBanner() {
         flush.
       </p>
       <CodeBlock
-        code={`import { useOfflineQueue, createLocalStorageAdapter } from '@tanstack/realtime'
+        code={`import { useOfflineQueue, createLocalStorageAdapter } from '@realtimejs/core'
 
 const queue = useOfflineQueue(baseTransport, {
   maxSize: 500,

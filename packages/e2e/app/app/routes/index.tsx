@@ -4,7 +4,7 @@
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
-import { useRealtime } from '@tanstack/react-realtime'
+import { useRealtime } from '@realtimejs/react'
 import { StatusBar } from '../panels/StatusBar.js'
 import { RealtimeCollectionPanel } from '../panels/RealtimeCollectionPanel.js'
 import { LiveChannelPanel } from '../panels/LiveChannelPanel.js'

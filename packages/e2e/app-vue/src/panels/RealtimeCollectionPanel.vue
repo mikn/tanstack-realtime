@@ -4,7 +4,7 @@
  * Pattern: server-synced collection with insert / delete semantics.
  */
 import { ref } from 'vue'
-import { realtimeCollectionOptions } from '@tanstack/vue-realtime'
+import { realtimeCollectionOptions } from '@realtimejs/vue'
 import { client, userId } from '../transport.js'
 import { useCollectionSync } from '../useCollectionSync.js'
 

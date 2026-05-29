@@ -12,14 +12,14 @@ import { Store } from '@tanstack/store'
 import {
   createSharedWorkerCoordinator,
   createSharedWorkerTransport,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 import type {
   ConnectionStatus,
   PresenceCapable,
   PresenceUser,
   RealtimeTransport,
   SharedWorkerCoordinatorOptions,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 
 // ---------------------------------------------------------------------------
 // MessagePort mock — synchronous bidirectional pair

@@ -4,8 +4,8 @@
  * Pattern: game-state batch updates via the tick transport.
  */
 import { onMounted, onUnmounted, ref } from 'vue'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
-import { tickCollectionOptions, useTickBatching } from '@tanstack/vue-realtime'
+import { sseTransport } from '@realtimejs/adapter-sse'
+import { tickCollectionOptions, useTickBatching } from '@realtimejs/vue'
 
 interface GameEntity {
   id: string
@@ -24,7 +24,7 @@ const entities = ref<Array<GameEntity>>([])
 
 onMounted(() => {
   const transport = sseTransport({
-    url: '/api/realtime',
+    url: '/api/core',
     initialDelay: 50,
     maxDelay: 200,
     jitter: 0,

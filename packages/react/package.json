@@ -1,0 +1,38 @@
+{
+  "name": "@realtimejs/react",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "React hooks and provider for @realtimejs/core",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup"
+  },
+  "dependencies": {
+    "@tanstack/db": "*",
+    "@tanstack/react-db": "*",
+    "@realtimejs/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "@tanstack/react-store": ">=0.0.0",
+    "react": ">=18.0.0"
+  },
+  "sideEffects": false,
+  "devDependencies": {
+    "@standard-schema/spec": "^1.1.0"
+  }
+}

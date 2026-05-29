@@ -12,8 +12,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
-import { tickCollectionOptions, useTickBatching } from '@tanstack/realtime'
+import { sseTransport } from '@realtimejs/adapter-sse'
+import { tickCollectionOptions, useTickBatching } from '@realtimejs/core'
 import { useCollectionSync } from '../useCollectionSync.js'
 
 interface GameEntity {
@@ -34,7 +34,7 @@ export function TickPanel() {
 
   useEffect(() => {
     const transport = sseTransport({
-      url: '/api/realtime',
+      url: '/api/core',
       initialDelay: 50,
       maxDelay: 200,
       jitter: 0,

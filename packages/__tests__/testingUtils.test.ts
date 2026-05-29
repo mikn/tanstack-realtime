@@ -3,7 +3,7 @@ import {
   createMockPresenceTransport,
   createMockTransport,
   createRealtimeClient,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 
 describe('createMockTransport', () => {
   it('starts in connected state by default', () => {

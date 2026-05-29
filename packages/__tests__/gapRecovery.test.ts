@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { createMockTransport, useGapRecovery } from '@tanstack/realtime'
+import { createMockTransport, useGapRecovery } from '@realtimejs/core'
 
 describe('useGapRecovery', () => {
   it('tracks active channels via hook', () => {

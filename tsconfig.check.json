@@ -8,33 +8,29 @@
     "jsx": "react-jsx",
     "types": ["vitest/globals"],
     "paths": {
-      "@tanstack/realtime": ["./packages/realtime/src/index.ts"],
-      "@tanstack/react-realtime": ["./packages/react-realtime/src/index.ts"],
-      "@tanstack/realtime-adapter-centrifugo": [
-        "./packages/realtime-adapter-centrifugo/src/index.ts"
+      "@realtimejs/core": ["./packages/core/src/index.ts"],
+      "@realtimejs/react": ["./packages/react/src/index.ts"],
+      "@realtimejs/adapter-centrifugo": [
+        "./packages/adapter-centrifugo/src/index.ts"
       ],
-      "@tanstack/realtime-adapter-sse": [
-        "./packages/realtime-adapter-sse/src/index.ts"
+      "@realtimejs/adapter-sse": ["./packages/adapter-sse/src/index.ts"],
+      "@realtimejs/preset-start": ["./packages/preset-start/src/index.ts"],
+      "@realtimejs/reactive-drizzle": [
+        "./packages/reactive-drizzle/src/index.ts"
       ],
-      "@tanstack/realtime-preset-start": [
-        "./packages/realtime-preset-start/src/index.ts"
-      ],
-      "@tanstack/realtime-reactive-drizzle": [
-        "./packages/realtime-reactive-drizzle/src/index.ts"
-      ],
-      "@tanstack/react-realtime-devtools": [
-        "./packages/react-realtime-devtools/src/index.ts"
-      ]
+      "@realtimejs/react-devtools": ["./packages/react-devtools/src/index.ts"],
+      "realtime.js": ["./packages/meta/src/index.ts"]
     }
   },
   "include": [
-    "packages/realtime/src",
-    "packages/react-realtime/src",
-    "packages/react-realtime-devtools/src",
-    "packages/realtime-adapter-centrifugo/src",
-    "packages/realtime-adapter-sse/src",
-    "packages/realtime-preset-start/src",
-    "packages/realtime-reactive-drizzle/src",
+    "packages/core/src",
+    "packages/react/src",
+    "packages/react-devtools/src",
+    "packages/adapter-centrifugo/src",
+    "packages/adapter-sse/src",
+    "packages/preset-start/src",
+    "packages/reactive-drizzle/src",
+    "packages/meta/src",
     "packages/__tests__"
   ],
   "exclude": ["node_modules", "dist", "packages/docs"]

@@ -3,7 +3,7 @@
  * Panels are deferred until the client connects at least once.
  */
 import { Show, createEffect, createSignal } from 'solid-js'
-import { RealtimeProvider, useConnectionStatus } from '@tanstack/solid-realtime'
+import { RealtimeProvider, useConnectionStatus } from '@realtimejs/solid'
 import { client } from './transport.js'
 import { StatusBar } from './panels/StatusBar.js'
 import { RealtimeCollectionPanel } from './panels/RealtimeCollectionPanel.js'

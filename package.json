@@ -21,18 +21,18 @@
     "version": "changeset version",
     "release": "pnpm build && changeset publish",
     "prepare": "husky",
-    "test:playwright": "pnpm --filter @tanstack/realtime-e2e test"
+    "test:playwright": "pnpm --filter @realtimejs/e2e test"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.4",
     "@size-limit/preset-small-lib": "^11.2.0",
     "@tanstack/db": "^0.5.28",
-    "@tanstack/realtime": "workspace:*",
-    "@tanstack/react-realtime": "workspace:*",
-    "@tanstack/realtime-preset-start": "workspace:*",
-    "@tanstack/realtime-reactive-drizzle": "workspace:*",
-    "@tanstack/realtime-adapter-centrifugo": "workspace:*",
-    "@tanstack/realtime-adapter-sse": "workspace:*",
+    "@realtimejs/core": "workspace:*",
+    "@realtimejs/react": "workspace:*",
+    "@realtimejs/preset-start": "workspace:*",
+    "@realtimejs/reactive-drizzle": "workspace:*",
+    "@realtimejs/adapter-centrifugo": "workspace:*",
+    "@realtimejs/adapter-sse": "workspace:*",
     "@tanstack/eslint-config": "^0.4.0",
     "@tanstack/react-db": "^0.1.72",
     "@tanstack/react-query": "^5.90.21",
@@ -58,8 +58,8 @@
   },
   "size-limit": [
     {
-      "name": "@tanstack/realtime",
-      "path": "packages/realtime/dist/index.js",
+      "name": "@realtimejs/core",
+      "path": "packages/core/dist/index.js",
       "limit": "35 kB",
       "ignore": [
         "@tanstack/db",
@@ -67,22 +67,22 @@
       ]
     },
     {
-      "name": "@tanstack/react-realtime",
-      "path": "packages/react-realtime/dist/index.js",
+      "name": "@realtimejs/react",
+      "path": "packages/react/dist/index.js",
       "limit": "20 kB",
       "ignore": [
-        "@tanstack/realtime",
+        "@realtimejs/core",
         "@tanstack/db",
         "@tanstack/store",
         "@tanstack/react-store"
       ]
     },
     {
-      "name": "@tanstack/solid-realtime",
-      "path": "packages/solid-realtime/dist/index.js",
+      "name": "@realtimejs/solid",
+      "path": "packages/solid/dist/index.js",
       "limit": "20 kB",
       "ignore": [
-        "@tanstack/realtime",
+        "@realtimejs/core",
         "@tanstack/db",
         "solid-js"
       ]

@@ -5,8 +5,8 @@ export function SolidPrimitives() {
     <article className="doc-article">
       <h1>Solid Primitives</h1>
       <p className="doc-lead">
-        All primitives are exported from <code>@tanstack/solid-realtime</code>.
-        The client is sourced from <code>RealtimeProvider</code> context.
+        All primitives are exported from <code>@realtimejs/solid</code>. The
+        client is sourced from <code>RealtimeProvider</code> context.
       </p>
 
       <p>
@@ -18,14 +18,12 @@ export function SolidPrimitives() {
       </p>
 
       <h2>Installation</h2>
-      <CodeBlock
-        code={`npm install @tanstack/realtime @tanstack/solid-realtime`}
-      />
+      <CodeBlock code={`npm install @realtimejs/core @realtimejs/solid`} />
 
       <h2>Provider</h2>
       <CodeBlock
         title="App.tsx"
-        code={`import { RealtimeProvider } from '@tanstack/solid-realtime'
+        code={`import { RealtimeProvider } from '@realtimejs/solid'
 import { client } from './client'
 
 function App() {
@@ -83,7 +81,7 @@ function App() {
       </p>
       <CodeBlock
         title="TodoList.tsx"
-        code={`import { createQuery } from '@tanstack/solid-realtime'
+        code={`import { createQuery } from '@realtimejs/solid'
 import { getTodos } from '../server/todos'
 
 function TodoList(props: { teamId: string }) {
@@ -127,7 +125,7 @@ function TodoList(props: { teamId: string }) {
       </p>
       <CodeBlock
         title="AddTodoForm.tsx"
-        code={`import { createMutation } from '@tanstack/solid-realtime'
+        code={`import { createMutation } from '@realtimejs/solid'
 import { getTodos, createTodo } from '../server/todos'
 
 function AddTodoForm(props: { teamId: string }) {
@@ -177,7 +175,7 @@ function AddTodoForm(props: { teamId: string }) {
       </p>
       <CodeBlock
         title="FeedList.tsx"
-        code={`import { createPaginatedQuery } from '@tanstack/solid-realtime'
+        code={`import { createPaginatedQuery } from '@realtimejs/solid'
 import { getFeedPage } from '../server/feed'
 
 function FeedList(props: { teamId: string }) {
@@ -233,8 +231,8 @@ function FeedList(props: { teamId: string }) {
 
       <h2>DevTools</h2>
       <p>
-        Use <code>@tanstack/solid-realtime-devtools</code> for the Solid
-        developer tools panel. See <a href="#/docs/devtools">DevTools</a>.
+        Use <code>@realtimejs/solid-devtools</code> for the Solid developer
+        tools panel. See <a href="#/docs/devtools">DevTools</a>.
       </p>
     </article>
   )

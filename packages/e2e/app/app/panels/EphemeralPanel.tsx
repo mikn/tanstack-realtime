@@ -6,7 +6,7 @@
  * After 2 seconds without a new event, the indicator disappears automatically.
  */
 
-import { ephemeralLiveOptions } from '@tanstack/realtime'
+import { ephemeralLiveOptions } from '@realtimejs/core'
 import { client, userId } from '../transport.js'
 import { useCollectionSync } from '../useCollectionSync.js'
 

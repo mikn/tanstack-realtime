@@ -22,8 +22,8 @@ import {
   pnIncrement,
   pnValue,
   tickClock,
-} from '@tanstack/realtime'
-import type { LwwState, OrState, PnState } from '@tanstack/realtime'
+} from '@realtimejs/core'
+import type { LwwState, OrState, PnState } from '@realtimejs/core'
 
 // ---------------------------------------------------------------------------
 // Lamport clock

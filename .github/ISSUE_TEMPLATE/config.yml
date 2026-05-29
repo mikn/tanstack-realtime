@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: Question / discussion
-    url: https://github.com/TanStack/realtime/discussions
+    url: https://github.com/TanStack/core/discussions
     about: Ask questions and discuss ideas in GitHub Discussions.
   - name: TanStack Discord
     url: https://tlinz.com/discord

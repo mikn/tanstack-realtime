@@ -38,7 +38,7 @@ const { data, collection } = useQuery(getTodos, { teamId }, {
           </a>
         </div>
         <div className="hero-install">
-          <code>npm i @tanstack/realtime @tanstack/react-realtime</code>
+          <code>npm i @realtimejs/core @realtimejs/react</code>
           <p className="hero-install-alt">
             Also available for <a href="#/docs/solid-primitives">Solid</a> and{' '}
             <a href="#/docs/vue-composables">Vue</a>
@@ -344,21 +344,19 @@ function QuickStart() {
           <div className="qs-step">
             <div className="qs-number">1</div>
             <h3>Install</h3>
-            <CodeBlock
-              code={`npm i @tanstack/realtime @tanstack/react-realtime`}
-            />
+            <CodeBlock code={`npm i @realtimejs/core @realtimejs/react`} />
           </div>
 
           <div className="qs-step">
             <div className="qs-number">2</div>
             <h3>Create a client</h3>
             <CodeBlock
-              code={`import { createRealtimeClient } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
-import { RealtimeProvider } from '@tanstack/react-realtime'
+              code={`import { createRealtimeClient } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
+import { RealtimeProvider } from '@realtimejs/react'
 
 const client = createRealtimeClient({
-  transport: sseTransport({ url: '/api/realtime' }),
+  transport: sseTransport({ url: '/api/core' }),
 })
 
 function App() {

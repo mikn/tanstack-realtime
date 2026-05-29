@@ -1,5 +1,5 @@
 /**
- * Tests for the @tanstack/vue-realtime composable behavior.
+ * Tests for the @realtimejs/vue composable behavior.
  *
  * These tests verify the underlying logic that each Vue composable encapsulates
  * using the core framework-agnostic API directly. They serve as a contract
@@ -39,7 +39,7 @@ import {
   pnIncrement,
   pnValue,
   tickClock,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 
 // ---------------------------------------------------------------------------
 // Helpers

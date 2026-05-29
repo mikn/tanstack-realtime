@@ -101,7 +101,7 @@ export function Examples() {
       <h3>Server</h3>
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
 
 export const realtime = createStartHandler({
   getUser: async (req) => {
@@ -117,7 +117,7 @@ export const realtime = createStartHandler({
       <CodeBlock
         title="app/collections/todos.ts"
         code={`import { createCollection } from '@tanstack/db'
-import { realtimeCollectionOptions, withRest } from '@tanstack/realtime'
+import { realtimeCollectionOptions, withRest } from '@realtimejs/core'
 import { client } from '../client'
 
 export const todosCollection = createCollection(
@@ -184,7 +184,7 @@ export function TodoList() {
 
       <CodeBlock
         title="app/components/ChatRoom.tsx"
-        code={`import { useChannel, usePresence } from '@tanstack/react-realtime'
+        code={`import { useChannel, usePresence } from '@realtimejs/react'
 import { useState } from 'react'
 
 export function ChatRoom({ room, userName }: {
@@ -244,7 +244,7 @@ export function ChatRoom({ room, userName }: {
 
       <CodeBlock
         title="app/server/generate.ts"
-        code={`import { realtime } from './realtime'
+        code={`import { realtime } from './core'
 
 export async function generateResponse(prompt: string, sessionId: string) {
   const stream = realtime.createStream<{ type: string; text?: string }>({
@@ -263,7 +263,7 @@ export async function generateResponse(prompt: string, sessionId: string) {
 
       <CodeBlock
         title="app/components/AIChat.tsx"
-        code={`import { useStream } from '@tanstack/react-realtime'
+        code={`import { useStream } from '@realtimejs/react'
 
 export function AIChat({ sessionId }: { sessionId: string }) {
   const { state, status } = useStream({

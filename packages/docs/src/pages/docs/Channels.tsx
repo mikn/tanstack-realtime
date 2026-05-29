@@ -124,7 +124,7 @@ export function Channels() {
       <CodeBlock
         title="features/chat/TypingIndicator.tsx"
         code={`import { useState } from 'react'
-import { useSubscribe } from '@tanstack/react-realtime'
+import { useSubscribe } from '@realtimejs/react'
 
 function TypingIndicator({ roomId }: { roomId: string }) {
   const [typing, setTyping] = useState<string[]>([])
@@ -142,7 +142,7 @@ function TypingIndicator({ roomId }: { roomId: string }) {
       <h2 id="use-publish">usePublish &mdash; publish to a channel</h2>
       <CodeBlock
         title="features/chat/TypingBroadcast.tsx"
-        code={`import { usePublish } from '@tanstack/react-realtime'
+        code={`import { usePublish } from '@realtimejs/react'
 
 function TypingBroadcast({ roomId }: { roomId: string }) {
   const publish = usePublish(['chat:typing', { roomId }])
@@ -160,7 +160,7 @@ function TypingBroadcast({ roomId }: { roomId: string }) {
       <CodeBlock
         title="features/chat/ChatRoom.tsx"
         code={`import { useState } from 'react'
-import { useChannel } from '@tanstack/react-realtime'
+import { useChannel } from '@realtimejs/react'
 
 function ChatRoom({ roomId }: { roomId: string }) {
   const [messages, setMessages] = useState<Message[]>([])
@@ -191,7 +191,7 @@ function ChatRoom({ roomId }: { roomId: string }) {
       </p>
       <CodeBlock
         title="features/chat/collection.ts"
-        code={`import { liveChannelOptions } from '@tanstack/realtime'
+        code={`import { liveChannelOptions } from '@realtimejs/core'
 
 const chatOptions = (roomId: string) =>
   liveChannelOptions<Message, string>({
@@ -221,7 +221,7 @@ const chatOptions = (roomId: string) =>
       </p>
       <CodeBlock
         title="features/chat/ChatRoom.tsx"
-        code={`import { useLiveChannel } from '@tanstack/react-realtime'
+        code={`import { useLiveChannel } from '@realtimejs/react'
 import { useLiveQuery } from '@tanstack/react-db'
 
 interface ChatMessage {
@@ -274,7 +274,7 @@ function ChatRoom({ roomId }: { roomId: string }) {
       </p>
       <CodeBlock
         title="server/realtime.ts"
-        code={`import { createValidatedPublish } from '@tanstack/realtime'
+        code={`import { createValidatedPublish } from '@realtimejs/core'
 import { sseHandler } from './realtime.server'
 import { todoSchema } from '../shared/schemas'
 
@@ -304,7 +304,7 @@ const validatedPublish = createValidatedPublish({
       </p>
       <CodeBlock
         title="server/functions/todos.ts"
-        code={`import { validatedPublish } from '../realtime'
+        code={`import { validatedPublish } from '../core'
 
 export const updateTodo = createServerFn()(async ({ id, data }) => {
   const updated = await db.todos.update(id, data)

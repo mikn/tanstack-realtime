@@ -5,8 +5,8 @@ export function Hooks() {
     <article className="doc-article">
       <h1>React Hooks</h1>
       <p className="doc-lead">
-        All hooks are exported from <code>@tanstack/react-realtime</code>. The
-        client is sourced from <code>RealtimeProvider</code> context.
+        All hooks are exported from <code>@realtimejs/react</code>. The client
+        is sourced from <code>RealtimeProvider</code> context.
       </p>
       <p>
         These same hooks are available for{' '}
@@ -19,7 +19,7 @@ export function Hooks() {
       <p>Connection status and control.</p>
       <CodeBlock
         title="ConnectionBadge.tsx"
-        code={`import { useRealtime } from '@tanstack/react-realtime'
+        code={`import { useRealtime } from '@realtimejs/react'
 
 function ConnectionBadge() {
   const { status, connect, disconnect } = useRealtime()
@@ -50,7 +50,7 @@ function ConnectionBadge() {
       <CodeBlock
         title="TypingIndicator.tsx"
         code={`import { useState } from 'react'
-import { useSubscribe } from '@tanstack/react-realtime'
+import { useSubscribe } from '@realtimejs/react'
 
 function TypingIndicator({ roomId }: { roomId: string }) {
   const [typing, setTyping] = useState<string[]>([])
@@ -78,7 +78,7 @@ function TypingIndicator({ roomId }: { roomId: string }) {
       <p>Stable publish function bound to a channel.</p>
       <CodeBlock
         title="TypingBroadcast.tsx"
-        code={`import { usePublish } from '@tanstack/react-realtime'
+        code={`import { usePublish } from '@realtimejs/react'
 
 function TypingBroadcast({ roomId }: { roomId: string }) {
   const publish = usePublish(['chat:typing', { roomId }])
@@ -107,7 +107,7 @@ function TypingBroadcast({ roomId }: { roomId: string }) {
       <CodeBlock
         title="ChatRoom.tsx"
         code={`import { useState } from 'react'
-import { useChannel } from '@tanstack/react-realtime'
+import { useChannel } from '@realtimejs/react'
 
 function ChatRoom({ roomId }: { roomId: string }) {
   const [messages, setMessages] = useState<Message[]>([])
@@ -145,7 +145,7 @@ function ChatRoom({ roomId }: { roomId: string }) {
       <p>Join a presence channel. Returns others + update function.</p>
       <CodeBlock
         title="DocumentPage.tsx"
-        code={`import { usePresence } from '@tanstack/react-realtime'
+        code={`import { usePresence } from '@realtimejs/react'
 import { docPresence } from './channel'
 
 function DocumentPage({ docId }: { docId: string }) {
@@ -189,7 +189,7 @@ function DocumentPage({ docId }: { docId: string }) {
       </p>
       <CodeBlock
         title="AIResponse.tsx"
-        code={`import { useStream } from '@tanstack/react-realtime'
+        code={`import { useStream } from '@realtimejs/react'
 import { aiResponseStream } from './stream'
 
 function AIResponse({ requestId }: { requestId: string }) {
@@ -233,7 +233,7 @@ function AIResponse({ requestId }: { requestId: string }) {
       </p>
       <CodeBlock
         title="TodoList.tsx"
-        code={`import { useRealtimeCollection } from '@tanstack/react-realtime'
+        code={`import { useRealtimeCollection } from '@realtimejs/react'
 import { useLiveQuery } from '@tanstack/react-db'
 
 function TodoList({ projectId }: { projectId: string }) {
@@ -274,7 +274,7 @@ function TodoList({ projectId }: { projectId: string }) {
       </p>
       <CodeBlock
         title="AuditLog.tsx"
-        code={`import { useLiveChannel } from '@tanstack/react-realtime'
+        code={`import { useLiveChannel } from '@realtimejs/react'
 
 function AuditLog({ resourceId }: { resourceId: string }) {
   const events = useLiveChannel<AuditEvent>({
@@ -311,7 +311,7 @@ function AuditLog({ resourceId }: { resourceId: string }) {
       </p>
       <CodeBlock
         title="ConnectionBanner.tsx"
-        code={`import { useConnectionStatus } from '@tanstack/react-realtime'
+        code={`import { useConnectionStatus } from '@realtimejs/react'
 
 function ConnectionBanner() {
   const status = useConnectionStatus()
@@ -334,7 +334,7 @@ function ConnectionBanner() {
       </p>
       <CodeBlock
         title="SendButton.tsx"
-        code={`import { useIsConnected } from '@tanstack/react-realtime'
+        code={`import { useIsConnected } from '@realtimejs/react'
 
 function SendButton({ onClick }: { onClick: () => void }) {
   const connected = useIsConnected()
@@ -356,7 +356,7 @@ function SendButton({ onClick }: { onClick: () => void }) {
       </p>
       <CodeBlock
         title="LiveScore.tsx"
-        code={`import { useLatestMessage } from '@tanstack/react-realtime'
+        code={`import { useLatestMessage } from '@realtimejs/react'
 
 function LiveScore({ matchId }: { matchId: string }) {
   const { message: score, messageCount } = useLatestMessage<ScoreUpdate>(
@@ -383,7 +383,7 @@ function LiveScore({ matchId }: { matchId: string }) {
       </p>
       <CodeBlock
         title="ChatRoom.tsx"
-        code={`import { useChannelHistory } from '@tanstack/react-realtime'
+        code={`import { useChannelHistory } from '@realtimejs/react'
 
 function ChatRoom({ roomId }: { roomId: string }) {
   const { messages, clear } = useChannelHistory<Message>(
@@ -421,7 +421,7 @@ function ChatRoom({ roomId }: { roomId: string }) {
       </p>
       <CodeBlock
         title="TypingStatus.tsx"
-        code={`import { useTypingIndicator } from '@tanstack/react-realtime'
+        code={`import { useTypingIndicator } from '@realtimejs/react'
 
 function ChatInput({ roomId }: { roomId: string }) {
   const { typingUsers, startTyping, stopTyping } = useTypingIndicator(
@@ -464,7 +464,7 @@ function ChatInput({ roomId }: { roomId: string }) {
       </p>
       <CodeBlock
         title="ChannelDebug.tsx"
-        code={`import { useChannelStats } from '@tanstack/react-realtime'
+        code={`import { useChannelStats } from '@realtimejs/react'
 
 function ChannelDebugBadge({ channel }: { channel: string }) {
   const { messageCount, lastMessageAt } = useChannelStats(channel)
@@ -494,7 +494,7 @@ function ChannelDebugBadge({ channel }: { channel: string }) {
       </p>
       <CodeBlock
         title="DataGrid.tsx"
-        code={`import { useOnReconnect } from '@tanstack/react-realtime'
+        code={`import { useOnReconnect } from '@realtimejs/react'
 
 function DataGrid() {
   const { refetch } = useQuery(...)
@@ -593,7 +593,7 @@ function TagEditor({ postId }: { postId: string }) {
       </p>
       <CodeBlock
         title="TodoList.tsx"
-        code={`import { useQuery } from '@tanstack/react-realtime'
+        code={`import { useQuery } from '@realtimejs/react'
 import { getTodos } from '../server/todos'
 
 function TodoList({ teamId }: { teamId: string }) {
@@ -634,7 +634,7 @@ function TodoList({ teamId }: { teamId: string }) {
       </p>
       <CodeBlock
         title="AddTodoForm.tsx"
-        code={`import { useMutation } from '@tanstack/react-realtime'
+        code={`import { useMutation } from '@realtimejs/react'
 import { getTodos, createTodo } from '../server/todos'
 
 function AddTodoForm({ teamId }: { teamId: string }) {
@@ -684,7 +684,7 @@ function AddTodoForm({ teamId }: { teamId: string }) {
       </p>
       <CodeBlock
         title="FeedList.tsx"
-        code={`import { usePaginatedQuery } from '@tanstack/react-realtime'
+        code={`import { usePaginatedQuery } from '@realtimejs/react'
 import { getFeedPage } from '../server/feed'
 
 function FeedList({ teamId }: { teamId: string }) {

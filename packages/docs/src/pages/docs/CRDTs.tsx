@@ -535,8 +535,8 @@ export function CRDTs() {
       </p>
       <CodeBlock
         title="useSyncedCounter"
-        code={`import { defineSyncedCounter } from '@tanstack/realtime'
-import { useSyncedCounter } from '@tanstack/react-realtime'
+        code={`import { defineSyncedCounter } from '@realtimejs/core'
+import { useSyncedCounter } from '@realtimejs/react'
 
 const postVotes = defineSyncedCounter({
   id: 'post-votes',
@@ -560,8 +560,8 @@ function VoteButton({ postId }: { postId: string }) {
       />
       <CodeBlock
         title="useSyncedSet"
-        code={`import { defineSyncedSet } from '@tanstack/realtime'
-import { useSyncedSet } from '@tanstack/react-realtime'
+        code={`import { defineSyncedSet } from '@realtimejs/core'
+import { useSyncedSet } from '@realtimejs/react'
 
 const postTags = defineSyncedSet({
   id: 'post-tags',
@@ -617,8 +617,8 @@ function TagEditor({ postId }: { postId: string }) {
       <CodeBlock
         title="Wrapping useSyncedValue with an undo stack"
         code={`import { useCallback, useRef } from 'react'
-import { defineSyncedValue } from '@tanstack/realtime'
-import { useSyncedValue } from '@tanstack/react-realtime'
+import { defineSyncedValue } from '@realtimejs/core'
+import { useSyncedValue } from '@realtimejs/react'
 
 const docTitle = defineSyncedValue<string>({
   id: 'doc-title',

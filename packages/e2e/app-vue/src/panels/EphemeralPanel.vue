@@ -3,7 +3,7 @@
  * EphemeralPanel — exercises ephemeralLiveOptions.
  * Pattern: short-lived state that auto-expires after a TTL.
  */
-import { ephemeralLiveOptions } from '@tanstack/vue-realtime'
+import { ephemeralLiveOptions } from '@realtimejs/vue'
 import { client, userId } from '../transport.js'
 import { useCollectionSync } from '../useCollectionSync.js'
 

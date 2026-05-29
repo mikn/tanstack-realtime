@@ -3,8 +3,8 @@
  * Pattern: game-state batch updates via the tick transport.
  */
 import { For, Show, createSignal, onCleanup, onMount } from 'solid-js'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
-import { tickCollectionOptions, useTickBatching } from '@tanstack/realtime'
+import { sseTransport } from '@realtimejs/adapter-sse'
+import { tickCollectionOptions, useTickBatching } from '@realtimejs/core'
 
 interface GameEntity {
   id: string
@@ -24,7 +24,7 @@ export function TickPanel() {
 
   onMount(() => {
     const transport = sseTransport({
-      url: '/api/realtime',
+      url: '/api/core',
       initialDelay: 50,
       maxDelay: 200,
       jitter: 0,

@@ -49,7 +49,7 @@ export function Authentication() {
       </p>
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
 import { verifyJwt } from './auth'
 
 export const realtime = createStartHandler({
@@ -78,7 +78,7 @@ export const realtime = createStartHandler({
         permitted on all channels.
       </p>
       <p>
-        Pass the <code>AuthorizeFn</code> from <code>@tanstack/realtime</code>{' '}
+        Pass the <code>AuthorizeFn</code> from <code>@realtimejs/core</code>{' '}
         &mdash; it works across <strong>all presets</strong> (
         <code>createSseHandler</code> and <code>createStartHandler</code>). See
         the <a href="#unified-authorize">unified AuthorizeFn</a> section below
@@ -91,7 +91,7 @@ export const realtime = createStartHandler({
       <div className="doc-callout">
         <p>
           <strong>Recommended:</strong> The <code>AuthorizeFn</code> signature
-          from <code>@tanstack/realtime</code> works across{' '}
+          from <code>@realtimejs/core</code> works across{' '}
           <strong>all presets</strong> &mdash; <code>createSseHandler</code> and{' '}
           <code>createStartHandler</code>. Write one authorize function and use
           it everywhere.
@@ -124,7 +124,7 @@ interface ChannelPermissions {
       </p>
       <CodeBlock
         title="app/server/authorize.ts"
-        code={`import type { AuthorizeFn, ChannelPermissions } from '@tanstack/realtime'
+        code={`import type { AuthorizeFn, ChannelPermissions } from '@realtimejs/core'
 import { db } from './db'
 
 export const authorize: AuthorizeFn = async (
@@ -179,12 +179,12 @@ const sseHandler = createSseHandler({ getUser, authorize })`}
       </p>
       <CodeBlock
         title="app/client/realtime.ts"
-        code={`import { createRealtimeClient } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+        code={`import { createRealtimeClient } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
 export const realtimeClient = createRealtimeClient({
   transport: sseTransport({
-    url: '/api/realtime',
+    url: '/api/core',
     // Called lazily: once when opening the SSE stream, then before each POST action
     getToken: async () => {
       const session = await fetch('/api/auth/session')
@@ -249,15 +249,15 @@ export const realtimeClient = createRealtimeClient({
       </ul>
       <CodeBlock
         title="app/client/realtime.ts — Centrifugo"
-        code={`import { createRealtimeClient } from '@tanstack/realtime'
-import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
+        code={`import { createRealtimeClient } from '@realtimejs/core'
+import { centrifugoTransport } from '@realtimejs/adapter-centrifugo'
 
 export const realtimeClient = createRealtimeClient({
   transport: centrifugoTransport({
     url: 'wss://realtime.example.com/connection/websocket',
     // Connection token — fetched once per (re)connect
     token: async () => {
-      const res = await fetch('/api/realtime/connection-token')
+      const res = await fetch('/api/core/connection-token')
       const { token } = await res.json()
       return token
     },
@@ -265,7 +265,7 @@ export const realtimeClient = createRealtimeClient({
 })`}
       />
       <CodeBlock
-        title="app/routes/api/realtime/connection-token.ts — server"
+        title="app/routes/api/core/connection-token.ts — server"
         code={`import jwt from 'jsonwebtoken'
 import { getSession } from '../../../server/auth'
 
@@ -307,7 +307,7 @@ export async function GET({ request }: { request: Request }) {
       </p>
       <CodeBlock
         title="app/server/realtime.ts — Zod validation"
-        code={`import { createValidatedPublish, serializeKey } from '@tanstack/realtime'
+        code={`import { createValidatedPublish, serializeKey } from '@realtimejs/core'
 import { z } from 'zod'
 
 const todoSchema = z.object({
@@ -388,7 +388,7 @@ const validatedPublish = createValidatedPublish({
       <CodeBlock
         title="Observing connection state"
         code={`import { useStore } from '@tanstack/react-store'
-import { realtimeClient } from './realtime'
+import { realtimeClient } from './core'
 
 function ConnectionStatus() {
   const { status } = useStore(realtimeClient.store)
@@ -468,7 +468,7 @@ const realtime = createStartHandler({
 
 // Client — no getToken needed, cookies are sent automatically
 const realtimeClient = createRealtimeClient({
-  transport: sseTransport({ url: '/api/realtime' }),
+  transport: sseTransport({ url: '/api/core' }),
 })`}
       />
 

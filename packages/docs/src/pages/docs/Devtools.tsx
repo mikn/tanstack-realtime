@@ -13,13 +13,13 @@ export function Devtools() {
       <h2>Installation</h2>
       <CodeBlock
         code={`# React
-npm install @tanstack/react-realtime-devtools
+npm install @realtimejs/react-devtools
 
 # Solid
-npm install @tanstack/solid-realtime-devtools
+npm install @realtimejs/solid-devtools
 
 # Vue
-npm install @tanstack/vue-realtime-devtools`}
+npm install @realtimejs/vue-devtools`}
       />
 
       <h2>Usage</h2>
@@ -32,8 +32,8 @@ npm install @tanstack/vue-realtime-devtools`}
       <h3>React</h3>
       <CodeBlock
         title="App.tsx"
-        code={`import { RealtimeProvider } from '@tanstack/react-realtime'
-import { RealtimeDevtools } from '@tanstack/react-realtime-devtools'
+        code={`import { RealtimeProvider } from '@realtimejs/react'
+import { RealtimeDevtools } from '@realtimejs/react-devtools'
 
 function App() {
   return (
@@ -48,8 +48,8 @@ function App() {
       <h3>Solid</h3>
       <CodeBlock
         title="App.tsx"
-        code={`import { RealtimeProvider } from '@tanstack/solid-realtime'
-import { RealtimeDevtools } from '@tanstack/solid-realtime-devtools'
+        code={`import { RealtimeProvider } from '@realtimejs/solid'
+import { RealtimeDevtools } from '@realtimejs/solid-devtools'
 
 function App() {
   return (
@@ -65,8 +65,8 @@ function App() {
       <CodeBlock
         title="App.vue"
         code={`<script setup lang="ts">
-import { RealtimeProvider } from '@tanstack/vue-realtime'
-import { RealtimeDevtools } from '@tanstack/vue-realtime-devtools'
+import { RealtimeProvider } from '@realtimejs/vue'
+import { RealtimeDevtools } from '@realtimejs/vue-devtools'
 import { client } from './client'
 </script>
 
@@ -116,7 +116,7 @@ import { client } from './client'
         with all the data the panel displays.
       </p>
       <CodeBlock
-        code={`import { createDevtoolsStore } from '@tanstack/react-realtime-devtools'
+        code={`import { createDevtoolsStore } from '@realtimejs/react-devtools'
 
 const devtools = createDevtoolsStore({ client })
 // devtools.store → DevtoolsState (channels, messages, connection history, etc.)

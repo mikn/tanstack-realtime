@@ -23,16 +23,16 @@ export function GettingStarted() {
       <h2 id="installation">Installation</h2>
       <FrameworkTabs
         react={{
-          code: `npm i @tanstack/realtime @tanstack/react-realtime \\
-      @tanstack/realtime-preset-start @tanstack/realtime-adapter-sse`,
+          code: `npm i @realtimejs/core @realtimejs/react \\
+      @realtimejs/preset-start @realtimejs/adapter-sse`,
         }}
         solid={{
-          code: `npm i @tanstack/realtime @tanstack/solid-realtime \\
-      @tanstack/realtime-preset-start @tanstack/realtime-adapter-sse`,
+          code: `npm i @realtimejs/core @realtimejs/solid \\
+      @realtimejs/preset-start @realtimejs/adapter-sse`,
         }}
         vue={{
-          code: `npm i @tanstack/realtime @tanstack/vue-realtime \\
-      @tanstack/realtime-preset-start @tanstack/realtime-adapter-sse`,
+          code: `npm i @realtimejs/core @realtimejs/vue \\
+      @realtimejs/preset-start @realtimejs/adapter-sse`,
         }}
       />
 
@@ -43,7 +43,7 @@ export function GettingStarted() {
       </p>
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
 
 // Minimal setup — no auth required to get started
 export const realtime = createStartHandler({})`}
@@ -60,9 +60,9 @@ export const realtime = createStartHandler({})`}
       <CodeBlock
         title="app/routes/api/realtime.ts"
         code={`import { createAPIFileRoute } from '@tanstack/start/api'
-import { realtime } from '../../server/realtime'
+import { realtime } from '../../server/core'
 
-export const Route = createAPIFileRoute('/api/realtime')({
+export const Route = createAPIFileRoute('/api/core')({
   GET:     ({ request }) => realtime.handle(request),
   POST:    ({ request }) => realtime.handle(request),
   OPTIONS: ({ request }) => realtime.handle(request),
@@ -72,18 +72,18 @@ export const Route = createAPIFileRoute('/api/realtime')({
       <h2 id="client-setup">Client setup</h2>
       <CodeBlock
         title="app/client/realtime.ts"
-        code={`import { createRealtimeClient } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+        code={`import { createRealtimeClient } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
 export const realtimeClient = createRealtimeClient({
-  transport: sseTransport({ url: '/api/realtime' }),
+  transport: sseTransport({ url: '/api/core' }),
 })`}
       />
       <FrameworkTabs
         react={{
           title: 'app/root.tsx',
-          code: `import { RealtimeProvider } from '@tanstack/react-realtime'
-import { realtimeClient } from './client/realtime'
+          code: `import { RealtimeProvider } from '@realtimejs/react'
+import { realtimeClient } from './client/core'
 
 function App() {
   return (
@@ -95,8 +95,8 @@ function App() {
         }}
         solid={{
           title: 'app/root.tsx',
-          code: `import { RealtimeProvider } from '@tanstack/solid-realtime'
-import { realtimeClient } from './client/realtime'
+          code: `import { RealtimeProvider } from '@realtimejs/solid'
+import { realtimeClient } from './client/core'
 
 function App() {
   return (
@@ -109,8 +109,8 @@ function App() {
         vue={{
           title: 'app/App.vue',
           code: `<script setup>
-import { provideRealtimeClient } from '@tanstack/vue-realtime'
-import { realtimeClient } from './client/realtime'
+import { provideRealtimeClient } from '@realtimejs/vue'
+import { realtimeClient } from './client/core'
 
 provideRealtimeClient(realtimeClient)
 </script>
@@ -143,7 +143,7 @@ provideRealtimeClient(realtimeClient)
       </p>
       <CodeBlock
         title="app/server/todos.ts"
-        code={`import { realtime } from './realtime'
+        code={`import { realtime } from './core'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { todos } from '../../db/schema'
@@ -164,7 +164,7 @@ export const createTodo = realtime.mutation(
       <FrameworkTabs
         react={{
           title: 'app/features/todos/TodoList.tsx',
-          code: `import { useQuery, useMutation } from '@tanstack/react-realtime'
+          code: `import { useQuery, useMutation } from '@realtimejs/react'
 import { getTodos, createTodo } from '../../server/todos'
 
 function TodoList({ teamId }: { teamId: string }) {
@@ -191,7 +191,7 @@ function TodoList({ teamId }: { teamId: string }) {
         }}
         solid={{
           title: 'app/features/todos/TodoList.tsx',
-          code: `import { createQuery, createMutation } from '@tanstack/solid-realtime'
+          code: `import { createQuery, createMutation } from '@realtimejs/solid'
 import { getTodos, createTodo } from '../../server/todos'
 
 function TodoList(props: { teamId: string }) {
@@ -218,7 +218,7 @@ function TodoList(props: { teamId: string }) {
         vue={{
           title: 'app/features/todos/TodoList.vue',
           code: `<script setup lang="ts">
-import { useQuery, useMutation } from '@tanstack/vue-realtime'
+import { useQuery, useMutation } from '@realtimejs/vue'
 import { getTodos, createTodo } from '../../server/todos'
 
 const props = defineProps<{ teamId: string }>()
@@ -270,7 +270,7 @@ const { data: active } = useLiveQuery(
         <code>useRealtimeCollection</code>:
       </p>
       <CodeBlock
-        code={`import { useRealtimeCollection } from '@tanstack/react-realtime'
+        code={`import { useRealtimeCollection } from '@realtimejs/react'
 import { useLiveQuery } from '@tanstack/react-db'
 
 function TodoList() {

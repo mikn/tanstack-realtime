@@ -282,7 +282,7 @@ streamChannelOptions({ channel: ['stream', { sessionId }], ... })`}
         CRUD automatically:
       </p>
       <CodeBlock
-        code={`import { useRealtimeCollection } from '@tanstack/react-realtime'
+        code={`import { useRealtimeCollection } from '@realtimejs/react'
 import { useLiveQuery } from '@tanstack/react-db'
 
 function TodoList() {

@@ -15,8 +15,8 @@ import {
   createLocalStorageAdapter,
   createMockTransport,
   useOfflineQueue,
-} from '@tanstack/realtime'
-import type { OfflineQueueStorage, QueuedMessage } from '@tanstack/realtime'
+} from '@realtimejs/core'
+import type { OfflineQueueStorage, QueuedMessage } from '@realtimejs/core'
 
 // ---------------------------------------------------------------------------
 // In-memory storage adapter (simulates persistence without real IndexedDB)

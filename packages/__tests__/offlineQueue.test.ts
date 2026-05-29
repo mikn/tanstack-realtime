@@ -4,13 +4,13 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Store } from '@tanstack/store'
-import { useOfflineQueue } from '@tanstack/realtime'
-import { createHookPipeline } from '../../packages/realtime/src/core/hookPipeline.js'
-import type { ConnectionStatus, RealtimeTransport } from '@tanstack/realtime'
+import { useOfflineQueue } from '@realtimejs/core'
+import { createHookPipeline } from '../../packages/core/src/core/hookPipeline.js'
+import type { ConnectionStatus, RealtimeTransport } from '@realtimejs/core'
 import type {
   HookHandle,
   HookRegistration,
-} from '../../packages/realtime/src/core/hooks.js'
+} from '../../packages/core/src/core/hooks.js'
 
 // ---------------------------------------------------------------------------
 // Mock transport with controllable connection status and hook support

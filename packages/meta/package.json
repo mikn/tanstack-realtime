@@ -1,0 +1,30 @@
+{
+  "name": "realtime.js",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "One-install meta-package bundling @realtimejs/core and the default @realtimejs/adapter-sse transport",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup"
+  },
+  "dependencies": {
+    "@realtimejs/core": "workspace:*",
+    "@realtimejs/adapter-sse": "workspace:*"
+  }
+}

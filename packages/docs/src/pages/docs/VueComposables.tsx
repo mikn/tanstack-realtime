@@ -5,8 +5,8 @@ export function VueComposables() {
     <article className="doc-article">
       <h1>Vue Composables</h1>
       <p className="doc-lead">
-        All composables are exported from <code>@tanstack/vue-realtime</code>.
-        The client is sourced from <code>RealtimeProvider</code> context via
+        All composables are exported from <code>@realtimejs/vue</code>. The
+        client is sourced from <code>RealtimeProvider</code> context via
         Vue&rsquo;s provide/inject.
       </p>
 
@@ -18,15 +18,13 @@ export function VueComposables() {
       </p>
 
       <h2>Installation</h2>
-      <CodeBlock
-        code={`npm install @tanstack/realtime @tanstack/vue-realtime`}
-      />
+      <CodeBlock code={`npm install @realtimejs/core @realtimejs/vue`} />
 
       <h2>Provider</h2>
       <CodeBlock
         title="App.vue"
         code={`<script setup lang="ts">
-import { RealtimeProvider } from '@tanstack/vue-realtime'
+import { RealtimeProvider } from '@realtimejs/vue'
 import { client } from './client'
 </script>
 
@@ -87,7 +85,7 @@ import { client } from './client'
         title="TodoList.vue"
         code={`<script setup lang="ts">
 import { toRef } from 'vue'
-import { useQuery } from '@tanstack/vue-realtime'
+import { useQuery } from '@realtimejs/vue'
 import { getTodos } from '../server/todos'
 
 const props = defineProps<{ teamId: string }>()
@@ -136,7 +134,7 @@ const { data, isPending, error } = useQuery(
       <CodeBlock
         title="AddTodoForm.vue"
         code={`<script setup lang="ts">
-import { useMutation } from '@tanstack/vue-realtime'
+import { useMutation } from '@realtimejs/vue'
 import { getTodos, createTodo } from '../server/todos'
 
 const props = defineProps<{ teamId: string }>()
@@ -193,7 +191,7 @@ function handleAdd() {
       <CodeBlock
         title="FeedList.vue"
         code={`<script setup lang="ts">
-import { usePaginatedQuery } from '@tanstack/vue-realtime'
+import { usePaginatedQuery } from '@realtimejs/vue'
 import { getFeedPage } from '../server/feed'
 
 const props = defineProps<{ teamId: string }>()
@@ -245,8 +243,8 @@ const { items, isPending, hasNextPage, isFetchingNextPage, fetchNextPage } =
 
       <h2>DevTools</h2>
       <p>
-        Use <code>@tanstack/vue-realtime-devtools</code> for the Vue developer
-        tools panel. See <a href="#/docs/devtools">DevTools</a>.
+        Use <code>@realtimejs/vue-devtools</code> for the Vue developer tools
+        panel. See <a href="#/docs/devtools">DevTools</a>.
       </p>
     </article>
   )

@@ -75,7 +75,7 @@ export function Transports() {
         data. It has the simplest setup, works behind every corporate proxy and
         CDN, and runs on any HTTP server &mdash; including edge runtimes and
         serverless functions. The TanStack Start preset (
-        <code>@tanstack/realtime-preset-start</code>) uses SSE under the hood.
+        <code>@realtimejs/preset-start</code>) uses SSE under the hood.
       </p>
       <p>
         <strong>Use Centrifugo</strong> when you need presence, typing
@@ -102,7 +102,7 @@ export function Transports() {
         gap recovery.
       </p>
       <CodeBlock
-        code={`import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
+        code={`import { centrifugoTransport } from '@realtimejs/adapter-centrifugo'
 
 const client = createRealtimeClient({
   transport: centrifugoTransport({
@@ -118,10 +118,10 @@ const client = createRealtimeClient({
         proxies and CDNs.
       </p>
       <CodeBlock
-        code={`import { sseTransport } from '@tanstack/realtime-adapter-sse'
+        code={`import { sseTransport } from '@realtimejs/adapter-sse'
 
 const client = createRealtimeClient({
-  transport: sseTransport({ url: '/api/realtime/events' }),
+  transport: sseTransport({ url: '/api/core/events' }),
 })`}
       />
 
@@ -133,10 +133,10 @@ const client = createRealtimeClient({
       </p>
       <CodeBlock
         title="game/transport.ts"
-        code={`import { useTickBatching } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+        code={`import { useTickBatching } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
-const transport = sseTransport({ url: '/api/realtime/sse' })
+const transport = sseTransport({ url: '/api/core/sse' })
 const tick = useTickBatching(transport, {
   tickMs: 16, deltaCompression: true,  // ~60 Hz
 })

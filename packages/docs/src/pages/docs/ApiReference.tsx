@@ -8,9 +8,9 @@ export function ApiReference() {
       </p>
 
       {/* ------------------------------------------------------------------ */}
-      {/* @tanstack/realtime                                                   */}
+      {/* @realtimejs/core                                                   */}
       {/* ------------------------------------------------------------------ */}
-      <h2 id="realtime-core">@tanstack/realtime</h2>
+      <h2 id="realtime-core">@realtimejs/core</h2>
       <p>
         Framework-agnostic core. Includes the client factory, collection
         helpers, CRDT primitives, transport utilities, and server-side
@@ -86,7 +86,7 @@ export function ApiReference() {
       <p>
         Import:{' '}
         <code>
-          import {'{'} createRealtimeClient {'}'} from '@tanstack/realtime'
+          import {'{'} createRealtimeClient {'}'} from '@realtimejs/core'
         </code>
       </p>
 
@@ -587,7 +587,7 @@ export function ApiReference() {
       <p>
         Import:{' '}
         <code>
-          import {'{'} pnValue, mergePn {'}'} from '@tanstack/realtime'
+          import {'{'} pnValue, mergePn {'}'} from '@realtimejs/core'
         </code>
       </p>
 
@@ -1207,17 +1207,17 @@ export function ApiReference() {
       </table>
 
       {/* ------------------------------------------------------------------ */}
-      {/* @tanstack/react-realtime                                            */}
+      {/* @realtimejs/react                                            */}
       {/* ------------------------------------------------------------------ */}
-      <h2 id="react-realtime">@tanstack/react-realtime</h2>
+      <h2 id="react">@realtimejs/react</h2>
       <p>
         React provider and hooks. Re-exports everything from{' '}
-        <code>@tanstack/realtime</code> so you only need one import.
+        <code>@realtimejs/core</code> so you only need one import.
       </p>
       <p>
         Import:{' '}
         <code>
-          import {'{'} useRealtime {'}'} from '@tanstack/react-realtime'
+          import {'{'} useRealtime {'}'} from '@realtimejs/react'
         </code>
       </p>
 
@@ -1516,9 +1516,9 @@ export function ApiReference() {
       </table>
 
       {/* ------------------------------------------------------------------ */}
-      {/* @tanstack/realtime-adapter-sse                                      */}
+      {/* @realtimejs/adapter-sse                                      */}
       {/* ------------------------------------------------------------------ */}
-      <h2 id="adapter-sse">@tanstack/realtime-adapter-sse</h2>
+      <h2 id="adapter-sse">@realtimejs/adapter-sse</h2>
       <p>
         Server-Sent Events (SSE) transport adapter. Provides both the client
         transport and the server handler.
@@ -1821,14 +1821,14 @@ export function ApiReference() {
         Import:{' '}
         <code>
           import {'{'} sseTransport, createSseHandler {'}'} from
-          '@tanstack/realtime-adapter-sse'
+          '@realtimejs/adapter-sse'
         </code>
       </p>
 
       {/* ------------------------------------------------------------------ */}
-      {/* @tanstack/realtime-adapter-centrifugo                               */}
+      {/* @realtimejs/adapter-centrifugo                               */}
       {/* ------------------------------------------------------------------ */}
-      <h2 id="adapter-centrifugo">@tanstack/realtime-adapter-centrifugo</h2>
+      <h2 id="adapter-centrifugo">@realtimejs/adapter-centrifugo</h2>
       <p>
         Centrifugo v4+ WebSocket transport adapter with built-in presence and
         epoch/offset recovery.
@@ -1968,14 +1968,14 @@ export function ApiReference() {
         Import:{' '}
         <code>
           import {'{'} centrifugoTransport {'}'} from
-          '@tanstack/realtime-adapter-centrifugo'
+          '@realtimejs/adapter-centrifugo'
         </code>
       </p>
 
       {/* ------------------------------------------------------------------ */}
-      {/* @tanstack/realtime-preset-start                                     */}
+      {/* @realtimejs/preset-start                                     */}
       {/* ------------------------------------------------------------------ */}
-      <h2 id="preset-start">@tanstack/realtime-preset-start</h2>
+      <h2 id="preset-start">@realtimejs/preset-start</h2>
       <p>
         TanStack Start / TanStack Router server-side preset. Composes{' '}
         <code>createSseHandler</code> with a pluggable{' '}
@@ -2155,8 +2155,7 @@ export function ApiReference() {
       <p>
         Import:{' '}
         <code>
-          import {'{'} createStartHandler {'}'} from
-          '@tanstack/realtime-preset-start'
+          import {'{'} createStartHandler {'}'} from '@realtimejs/preset-start'
         </code>
       </p>
 
@@ -2180,7 +2179,7 @@ export function ApiReference() {
               <code>RealtimeClient</code>
             </td>
             <td>
-              <code>@tanstack/realtime</code>
+              <code>@realtimejs/core</code>
             </td>
             <td>
               The client object returned by <code>createRealtimeClient</code>.
@@ -2191,7 +2190,7 @@ export function ApiReference() {
               <code>RealtimeTransport</code>
             </td>
             <td>
-              <code>@tanstack/realtime</code>
+              <code>@realtimejs/core</code>
             </td>
             <td>
               Core transport interface (connect, disconnect, subscribe,
@@ -2203,7 +2202,7 @@ export function ApiReference() {
               <code>PresenceCapable</code>
             </td>
             <td>
-              <code>@tanstack/realtime</code>
+              <code>@realtimejs/core</code>
             </td>
             <td>
               Optional transport extension for joinPresence, updatePresence,
@@ -2215,7 +2214,7 @@ export function ApiReference() {
               <code>ConnectionStatus</code>
             </td>
             <td>
-              <code>@tanstack/realtime</code>
+              <code>@realtimejs/core</code>
             </td>
             <td>
               <code>
@@ -2228,7 +2227,7 @@ export function ApiReference() {
               <code>QueryKey</code>
             </td>
             <td>
-              <code>@tanstack/realtime</code>
+              <code>@realtimejs/core</code>
             </td>
             <td>
               Array channel key, e.g.{' '}
@@ -2243,7 +2242,7 @@ export function ApiReference() {
               <code>PresenceUser&lt;TData&gt;</code>
             </td>
             <td>
-              <code>@tanstack/realtime</code>
+              <code>@realtimejs/core</code>
             </td>
             <td>
               <code>
@@ -2257,7 +2256,7 @@ export function ApiReference() {
               <code>ServerStream&lt;TEvent&gt;</code>
             </td>
             <td>
-              <code>@tanstack/realtime</code>
+              <code>@realtimejs/core</code>
             </td>
             <td>
               Handle with <code>push(event)</code>, <code>done()</code>, and{' '}
@@ -2269,7 +2268,7 @@ export function ApiReference() {
               <code>StreamStatus</code>
             </td>
             <td>
-              <code>@tanstack/realtime</code>
+              <code>@realtimejs/core</code>
             </td>
             <td>
               <code>'pending' | 'streaming' | 'done' | 'error' | 'stale'</code>
@@ -2280,7 +2279,7 @@ export function ApiReference() {
               <code>PublishFn</code>
             </td>
             <td>
-              <code>@tanstack/realtime</code>
+              <code>@realtimejs/core</code>
             </td>
             <td>
               <code>

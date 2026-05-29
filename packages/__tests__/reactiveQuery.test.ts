@@ -15,23 +15,23 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createStartHandler } from '@tanstack/realtime-preset-start'
+import { createStartHandler } from '@realtimejs/preset-start'
 import {
   createReactiveQueries,
   createSubscriptionManager,
   wrapReactiveDb,
-} from '@tanstack/realtime-reactive-drizzle'
+} from '@realtimejs/reactive-drizzle'
 import {
   deriveCacheKey,
   getOrCreateQueryCollection,
   lookupQueryCollection,
   serializeKey,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 import {
   REALTIME_BATCH_CHANNEL,
   clearRegistry,
   subscribeToRealtimeBatch,
-} from '../realtime/src/queryCollectionRegistry.js'
+} from '../core/src/queryCollectionRegistry.js'
 
 // ---------------------------------------------------------------------------
 // Drizzle-compatible fake table objects (same pattern as reactiveLayer.test.ts)

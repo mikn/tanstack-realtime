@@ -3,7 +3,7 @@
  * StreamPanel — exercises streamChannelOptions / useStream.
  * Pattern: reduce-based stream accumulation.
  */
-import { useStream } from '@tanstack/vue-realtime'
+import { useStream } from '@realtimejs/vue'
 import { textStream } from '../defs.js'
 import { client } from '../transport.js'
 

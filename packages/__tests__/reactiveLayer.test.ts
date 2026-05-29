@@ -6,8 +6,8 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { serializeKey } from '@tanstack/realtime'
-import { createStartHandler } from '@tanstack/realtime-preset-start'
+import { serializeKey } from '@realtimejs/core'
+import { createStartHandler } from '@realtimejs/preset-start'
 import {
   REALTIME_BATCH_CHANNEL,
   ReactivePredicateParseError,
@@ -19,15 +19,15 @@ import {
   extractReferencedColumns,
   runInReactiveContext,
   wrapReactiveDb,
-} from '@tanstack/realtime-reactive-drizzle'
-import { createLoader } from '../realtime-reactive-drizzle/src/reactive-loader.js'
-import { createMutationHandler } from '../realtime-reactive-drizzle/src/reactive-mutation.js'
+} from '@realtimejs/reactive-drizzle'
+import { createLoader } from '../reactive-drizzle/src/reactive-loader.js'
+import { createMutationHandler } from '../reactive-drizzle/src/reactive-mutation.js'
 import type {
   CapturedRead,
   ReactiveQueryEngine,
   SubscriptionEntry,
   WriteDescriptor,
-} from '@tanstack/realtime-reactive-drizzle'
+} from '@realtimejs/reactive-drizzle'
 
 // ---------------------------------------------------------------------------
 // Drizzle-compatible fake table objects
@@ -1095,8 +1095,8 @@ describe('createMutationHandler', () => {
 // ---------------------------------------------------------------------------
 // createReactiveQueries + createStartHandler — integration
 //
-// The reactive engine now lives in @tanstack/realtime-reactive-drizzle and
-// composes with the transport handler from @tanstack/realtime-preset-start.
+// The reactive engine now lives in @realtimejs/reactive-drizzle and
+// composes with the transport handler from @realtimejs/preset-start.
 // These tests preserve the original end-to-end coverage of query/mutation/
 // invalidate/subscriptionManager, now exercised through createReactiveQueries.
 // ---------------------------------------------------------------------------

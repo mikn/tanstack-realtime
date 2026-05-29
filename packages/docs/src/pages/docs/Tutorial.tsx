@@ -25,8 +25,8 @@ export function Tutorial() {
         code={`npx create-start-app@latest task-board
 cd task-board
 
-npm i @tanstack/realtime @tanstack/react-realtime \\
-      @tanstack/realtime-preset-start @tanstack/realtime-adapter-sse \\
+npm i @realtimejs/core @realtimejs/react \\
+      @realtimejs/preset-start @realtimejs/adapter-sse \\
       @tanstack/db @tanstack/react-db \\
       drizzle-orm postgres
 npm i -D drizzle-kit`}
@@ -73,19 +73,19 @@ export const db = drizzle(client)`}
       </p>
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
 
 export const realtime = createStartHandler({})
 
 // That's it. Add getUser/authorize later for auth.
-// See: https://tanstack.com/realtime/docs/authentication`}
+// See: https://tanstack.com/core/docs/authentication`}
       />
       <CodeBlock
         title="app/routes/api/realtime.ts"
         code={`import { createAPIFileRoute } from '@tanstack/start/api'
-import { realtime } from '../../server/realtime'
+import { realtime } from '../../server/core'
 
-export const Route = createAPIFileRoute('/api/realtime')({
+export const Route = createAPIFileRoute('/api/core')({
   GET:     ({ request }) => realtime.handle(request),
   POST:    ({ request }) => realtime.handle(request),
   OPTIONS: ({ request }) => realtime.handle(request),
@@ -103,7 +103,7 @@ export const Route = createAPIFileRoute('/api/realtime')({
         code={`import { eq } from 'drizzle-orm'
 import { db } from '../../db'
 import { tasks, type NewTask } from '../../db/schema'
-import { realtime } from './realtime'
+import { realtime } from './core'
 
 // Queries — one annotation makes them live
 export const getTasks = realtime.query(
@@ -141,17 +141,17 @@ export const deleteTask = realtime.mutation(
       <p>Create a realtime client and wrap your app with the provider.</p>
       <CodeBlock
         title="app/client/realtime.ts"
-        code={`import { createRealtimeClient } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+        code={`import { createRealtimeClient } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
 export const realtimeClient = createRealtimeClient({
-  transport: sseTransport({ url: '/api/realtime' }),
+  transport: sseTransport({ url: '/api/core' }),
 })`}
       />
       <CodeBlock
         title="app/root.tsx"
-        code={`import { RealtimeProvider } from '@tanstack/react-realtime'
-import { realtimeClient } from './client/realtime'
+        code={`import { RealtimeProvider } from '@realtimejs/react'
+import { realtimeClient } from './client/core'
 
 export function App() {
   return (
@@ -170,7 +170,7 @@ export function App() {
       </p>
       <CodeBlock
         title="app/features/board/TaskBoard.tsx"
-        code={`import { useQuery, useMutation } from '@tanstack/react-realtime'
+        code={`import { useQuery, useMutation } from '@realtimejs/react'
 import { useLiveQuery } from '@tanstack/react-db'
 import { getTasks, createTask, updateTask } from '../../server/tasks'
 
@@ -218,9 +218,9 @@ export function TaskBoard({ projectId }: { projectId: string }) {
       </p>
       <CodeBlock
         title="app/features/board/OnlineUsers.tsx"
-        code={`import { usePresence } from '@tanstack/react-realtime'
-import { presenceChannelOptions } from '@tanstack/realtime'
-import { realtimeClient } from '../../client/realtime'
+        code={`import { usePresence } from '@realtimejs/react'
+import { presenceChannelOptions } from '@realtimejs/core'
+import { realtimeClient } from '../../client/core'
 
 const boardPresence = (projectId: string) =>
   presenceChannelOptions({

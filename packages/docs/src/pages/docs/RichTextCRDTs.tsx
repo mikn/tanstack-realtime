@@ -29,7 +29,7 @@ export function RichTextCRDTs() {
           <p>
             <code>lww</code>, <code>pn-counter</code>, <code>or-set</code>{' '}
             &mdash; structured data, forms, counters, tag sets. Zero
-            dependencies, included in <code>@tanstack/realtime</code>.
+            dependencies, included in <code>@realtimejs/core</code>.
           </p>
         </div>
         <div className="doc-grid-card">
@@ -141,7 +141,7 @@ export function RichTextCRDTs() {
       <h2 id="setup">Step-by-step setup</h2>
 
       <h3>1. Install dependencies</h3>
-      <CodeBlock code={`npm install yjs y-protocols @tanstack/realtime`} />
+      <CodeBlock code={`npm install yjs y-protocols @realtimejs/core`} />
 
       <h3>2. Create a Y.js document</h3>
       <CodeBlock
@@ -161,7 +161,7 @@ const yText = ydoc.getText('shared-text')`}
       <CodeBlock
         title="realtime-yjs-provider.ts"
         code={`import * as Y from 'yjs'
-import type { RealtimeClient } from '@tanstack/realtime'
+import type { RealtimeClient } from '@realtimejs/core'
 
 export class RealtimeYjsProvider {
   private unsubscribe: (() => void) | null = null
@@ -214,13 +214,13 @@ export class RealtimeYjsProvider {
       <CodeBlock
         title="app.ts"
         code={`import * as Y from 'yjs'
-import { createRealtimeClient } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+import { createRealtimeClient } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 import { RealtimeYjsProvider } from './realtime-yjs-provider'
 
 // Create the TanStack Realtime client
 const client = createRealtimeClient({
-  transport: sseTransport({ url: '/api/realtime' }),
+  transport: sseTransport({ url: '/api/core' }),
 })
 
 // Create the Y.js document
@@ -286,7 +286,7 @@ provider.connect()
   encodeAwarenessUpdate,
   applyAwarenessUpdate,
 } from 'y-protocols/awareness'
-import type { RealtimeClient } from '@tanstack/realtime'
+import type { RealtimeClient } from '@realtimejs/core'
 import type * as Y from 'yjs'
 
 /**

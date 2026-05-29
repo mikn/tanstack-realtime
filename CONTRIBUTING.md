@@ -6,20 +6,20 @@ Thanks for your interest in contributing! Please read this guide before opening 
 
 This is a pnpm workspace monorepo with [Nx](https://nx.dev/) for task orchestration. Published packages:
 
-| Directory                              | Package                                                                  |
-| -------------------------------------- | ------------------------------------------------------------------------ |
-| `packages/realtime`                    | `@tanstack/realtime` — core client, collection helpers, CRDTs, and types |
-| `packages/react-realtime`              | `@tanstack/react-realtime` — React hooks and provider                    |
-| `packages/solid-realtime`              | `@tanstack/solid-realtime` — Solid primitives and provider               |
-| `packages/vue-realtime`                | `@tanstack/vue-realtime` — Vue composables and provider                  |
-| `packages/realtime-adapter-centrifugo` | `@tanstack/realtime-adapter-centrifugo` — Centrifugo transport adapter   |
-| `packages/realtime-adapter-sse`        | `@tanstack/realtime-adapter-sse` — Server-Sent Events transport adapter  |
-| `packages/realtime-preset-start`       | `@tanstack/realtime-preset-start` — TanStack Start preset                |
-| `packages/react-realtime-devtools`     | `@tanstack/react-realtime-devtools` — React developer tools panel        |
-| `packages/solid-realtime-devtools`     | `@tanstack/solid-realtime-devtools` — Solid developer tools panel        |
-| `packages/vue-realtime-devtools`       | `@tanstack/vue-realtime-devtools` — Vue developer tools panel            |
-| `packages/docs`                        | Documentation site (not published)                                       |
-| `packages/__tests__`                   | Integration test suite (not published)                                   |
+| Directory                     | Package                                                                |
+| ----------------------------- | ---------------------------------------------------------------------- |
+| `packages/core`               | `@realtimejs/core` — core client, collection helpers, CRDTs, and types |
+| `packages/react`              | `@realtimejs/react` — React hooks and provider                         |
+| `packages/solid`              | `@realtimejs/solid` — Solid primitives and provider                    |
+| `packages/vue`                | `@realtimejs/vue` — Vue composables and provider                       |
+| `packages/adapter-centrifugo` | `@realtimejs/adapter-centrifugo` — Centrifugo transport adapter        |
+| `packages/adapter-sse`        | `@realtimejs/adapter-sse` — Server-Sent Events transport adapter       |
+| `packages/preset-start`       | `@realtimejs/preset-start` — TanStack Start preset                     |
+| `packages/react-devtools`     | `@realtimejs/react-devtools` — React developer tools panel             |
+| `packages/solid-devtools`     | `@realtimejs/solid-devtools` — Solid developer tools panel             |
+| `packages/vue-devtools`       | `@realtimejs/vue-devtools` — Vue developer tools panel                 |
+| `packages/docs`               | Documentation site (not published)                                     |
+| `packages/__tests__`          | Integration test suite (not published)                                 |
 
 ## Development setup
 

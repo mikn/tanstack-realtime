@@ -17,8 +17,8 @@ import {
   createMockTransport,
   tickCollectionOptions,
   useTickBatching,
-} from '@tanstack/realtime'
-import type { TickFrame } from '@tanstack/realtime'
+} from '@realtimejs/core'
+import type { TickFrame } from '@realtimejs/core'
 
 // ---------------------------------------------------------------------------
 // Tests: Delta compression helpers

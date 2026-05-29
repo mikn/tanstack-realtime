@@ -18,7 +18,7 @@ import {
   useGapRecovery,
   useOfflineQueue,
   withRest,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 import type { CollectionConfig } from '@tanstack/db'
 
 // ---------------------------------------------------------------------------

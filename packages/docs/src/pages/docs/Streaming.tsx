@@ -147,7 +147,7 @@ export function Streaming() {
       <h2 id="define-stream">Define a stream channel</h2>
       <CodeBlock
         title="features/ai/stream.ts"
-        code={`import { createStreamChannel, serverStreamCallbacks } from '@tanstack/realtime'
+        code={`import { createStreamChannel, serverStreamCallbacks } from '@realtimejs/core'
 
 export const aiResponseStream = createStreamChannel({
   id: 'ai-response',
@@ -167,7 +167,7 @@ export const aiResponseStream = createStreamChannel({
       <h2 id="consume-stream">Consume in React</h2>
       <CodeBlock
         title="features/ai/AIResponse.tsx"
-        code={`import { useStream } from '@tanstack/react-realtime'
+        code={`import { useStream } from '@realtimejs/react'
 import { aiResponseStream } from './stream'
 
 function AIResponse({ requestId }: { requestId: string }) {
@@ -190,8 +190,8 @@ function AIResponse({ requestId }: { requestId: string }) {
       <h2 id="server-side">Server-side streaming</h2>
       <CodeBlock
         title="server/routes/chat.ts"
-        code={`import { createServerStream } from '@tanstack/realtime'
-import { sseHandler } from '../realtime'
+        code={`import { createServerStream } from '@realtimejs/core'
+import { sseHandler } from '../core'
 
 app.post('/api/chat', async (req) => {
   const { requestId, prompt } = req.body
@@ -235,7 +235,7 @@ app.post('/api/chat', async (req) => {
       </p>
       <CodeBlock
         title="features/ai/stream.ts"
-        code={`import { createStreamChannel, serverStreamCallbacks } from '@tanstack/realtime'
+        code={`import { createStreamChannel, serverStreamCallbacks } from '@realtimejs/core'
 
 export const aiResponseStream = createStreamChannel({
   id: 'ai-response',
@@ -261,7 +261,7 @@ export const aiResponseStream = createStreamChannel({
       </p>
       <CodeBlock
         title="features/ai/AIResponse.tsx"
-        code={`import { useStream } from '@tanstack/react-realtime'
+        code={`import { useStream } from '@realtimejs/react'
 import { aiResponseStream } from './stream'
 
 function AIResponse({ requestId }: { requestId: string }) {
@@ -319,8 +319,8 @@ function AIResponse({ requestId }: { requestId: string }) {
       </p>
       <CodeBlock
         title="server/routes/ai-stream.ts"
-        code={`import { createServerStream } from '@tanstack/realtime'
-import { sseHandler } from '../realtime'
+        code={`import { createServerStream } from '@realtimejs/core'
+import { sseHandler } from '../core'
 import { db } from '../db'
 
 const stream = createServerStream({

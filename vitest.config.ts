@@ -19,12 +19,12 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: /^@tanstack\/react-realtime$/,
-        replacement: resolve(root, 'packages/react-realtime/src/index.ts'),
+        find: /^@realtimejs\/react$/,
+        replacement: resolve(root, 'packages/react/src/index.ts'),
       },
       {
-        find: /^@tanstack\/realtime$/,
-        replacement: resolve(root, 'packages/realtime/src/index.ts'),
+        find: /^@realtimejs\/core$/,
+        replacement: resolve(root, 'packages/core/src/index.ts'),
       },
       {
         find: /^@tanstack\/realtime-preset-workerd$/,
@@ -34,11 +34,8 @@ export default defineConfig({
         ),
       },
       {
-        find: /^@tanstack\/realtime-adapter-centrifugo$/,
-        replacement: resolve(
-          root,
-          'packages/realtime-adapter-centrifugo/src/index.ts',
-        ),
+        find: /^@realtimejs\/adapter-centrifugo$/,
+        replacement: resolve(root, 'packages/adapter-centrifugo/src/index.ts'),
       },
     ],
   },

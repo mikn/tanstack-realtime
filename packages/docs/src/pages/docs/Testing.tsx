@@ -18,7 +18,7 @@ export function Testing() {
       <CodeBlock
         title="test/mock-transport.ts"
         code={`import { Store } from '@tanstack/store'
-import type { RealtimeTransport, ConnectionStatus } from '@tanstack/realtime'
+import type { RealtimeTransport, ConnectionStatus } from '@realtimejs/core'
 
 function createMockTransport(): RealtimeTransport & {
   simulateMessage: (channel: string, data: unknown) => void
@@ -64,7 +64,7 @@ function createMockTransport(): RealtimeTransport & {
       </p>
       <CodeBlock
         title="test/mock-transport-presence.ts"
-        code={`import type { PresenceCapable, PresenceUser } from '@tanstack/realtime'
+        code={`import type { PresenceCapable, PresenceUser } from '@realtimejs/core'
 
 function createMockTransportWithPresence(): RealtimeTransport & PresenceCapable & {
   simulateMessage: (channel: string, data: unknown) => void
@@ -102,7 +102,7 @@ function createMockTransportWithPresence(): RealtimeTransport & PresenceCapable 
       <CodeBlock
         title="test/task-collection.test.ts"
         code={`import { describe, it, expect } from 'vitest'
-import { createRealtimeClient, realtimeCollectionOptions } from '@tanstack/realtime'
+import { createRealtimeClient, realtimeCollectionOptions } from '@realtimejs/core'
 
 describe('task collection', () => {
   it('receives server inserts', () => {
@@ -149,13 +149,13 @@ describe('task collection', () => {
         React hooks that consume realtime data need a{' '}
         <code>RealtimeProvider</code> in the component tree. Use{' '}
         <code>createTestRealtimeProvider</code> from{' '}
-        <code>@tanstack/react-realtime</code> to get a pre-wired wrapper,
-        transport, and client in one call:
+        <code>@realtimejs/react</code> to get a pre-wired wrapper, transport,
+        and client in one call:
       </p>
       <CodeBlock
         title="test/my-hook.test.tsx"
         code={`import { renderHook } from '@testing-library/react'
-import { createTestRealtimeProvider, useSubscribe } from '@tanstack/react-realtime'
+import { createTestRealtimeProvider, useSubscribe } from '@realtimejs/react'
 
 it('receives messages', () => {
   const { wrapper, transport } = createTestRealtimeProvider()

@@ -10,7 +10,7 @@
  * Late-joiner handling: PresencePanel calls updatePresence() every 2 s so
  * any peer who joins after us will see us within that interval.
  */
-import type { PresenceUser, RealtimeTransport } from '@tanstack/vue-realtime'
+import type { PresenceUser, RealtimeTransport } from '@realtimejs/vue'
 
 type PresenceCapableTransport = RealtimeTransport & {
   joinPresence: (channel: string, data: unknown) => void

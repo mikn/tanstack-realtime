@@ -2,7 +2,7 @@
 
 > Add realtime to your existing app — keep your server, your database, your deploy target. Live collections, pub/sub, presence, and CRDTs as a transport layer, not a platform. Built for [TanStack DB](https://github.com/TanStack/db).
 
-[![npm version](https://img.shields.io/npm/v/@tanstack/realtime)](https://www.npmjs.com/package/@tanstack/realtime)
+[![npm version](https://img.shields.io/npm/v/@realtimejs/core)](https://www.npmjs.com/package/@realtimejs/core)
 [![License](https://img.shields.io/github/license/mikn/tanstack-realtime)](LICENSE)
 [![CI](https://github.com/mikn/tanstack-realtime/actions/workflows/ci.yml/badge.svg)](https://github.com/mikn/tanstack-realtime/actions/workflows/ci.yml)
 
@@ -21,29 +21,29 @@
 
 ## Packages
 
-| Package                                                                         | Description                                                            |
-| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| [`@tanstack/realtime`](#tanstackrealtime)                                       | Core client, collection helpers, CRDT primitives, and type definitions |
-| [`@tanstack/react-realtime`](#tanstackreact-realtime)                           | React hooks and provider                                               |
-| [`@tanstack/solid-realtime`](#tanstacksolid-realtime)                           | Solid primitives and provider                                          |
-| [`@tanstack/vue-realtime`](#tanstackvue-realtime)                               | Vue composables and provider                                           |
-| [`@tanstack/realtime-adapter-centrifugo`](#tanstackrealtime-adapter-centrifugo) | Transport adapter for [Centrifugo](https://centrifugal.dev)            |
-| [`@tanstack/realtime-adapter-sse`](#tanstackrealtime-adapter-sse)               | Server-Sent Events transport adapter                                   |
-| [`@tanstack/realtime-preset-start`](#tanstackrealtime-preset-start)             | TanStack Start preset with SSE handler and publish backend             |
-| [`@tanstack/react-realtime-devtools`](#devtools)                                | React developer tools panel                                            |
-| [`@tanstack/solid-realtime-devtools`](#devtools)                                | Solid developer tools panel                                            |
-| [`@tanstack/vue-realtime-devtools`](#devtools)                                  | Vue developer tools panel                                              |
+| Package                                                                  | Description                                                            |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| [`@realtimejs/core`](#tanstackrealtime)                                  | Core client, collection helpers, CRDT primitives, and type definitions |
+| [`@realtimejs/react`](#tanstackreact-realtime)                           | React hooks and provider                                               |
+| [`@realtimejs/solid`](#tanstacksolid-realtime)                           | Solid primitives and provider                                          |
+| [`@realtimejs/vue`](#tanstackvue-realtime)                               | Vue composables and provider                                           |
+| [`@realtimejs/adapter-centrifugo`](#tanstackrealtime-adapter-centrifugo) | Transport adapter for [Centrifugo](https://centrifugal.dev)            |
+| [`@realtimejs/adapter-sse`](#tanstackrealtime-adapter-sse)               | Server-Sent Events transport adapter                                   |
+| [`@realtimejs/preset-start`](#tanstackrealtime-preset-start)             | TanStack Start preset with SSE handler and publish backend             |
+| [`@realtimejs/react-devtools`](#devtools)                                | React developer tools panel                                            |
+| [`@realtimejs/solid-devtools`](#devtools)                                | Solid developer tools panel                                            |
+| [`@realtimejs/vue-devtools`](#devtools)                                  | Vue developer tools panel                                              |
 
 ---
 
-## `@tanstack/realtime`
+## `@realtimejs/core`
 
 Framework-agnostic core. Exposes `createRealtimeClient`, collection helpers (`realtimeCollectionOptions`, `liveChannelOptions`, `presenceChannelOptions`, `streamChannelOptions`), CRDT primitives, channel-key serialization, and all shared types.
 
 ### Installation
 
 ```bash
-npm install @tanstack/realtime
+npm install @realtimejs/core
 ```
 
 ### Creating a client
@@ -52,13 +52,13 @@ npm install @tanstack/realtime
 import {
   createCoordinatedTransport,
   createRealtimeClient,
-} from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+} from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
 // Recommended: automatic multi-tab coordination
 export const client = createRealtimeClient({
   transport: createCoordinatedTransport({
-    transport: () => sseTransport({ url: '/api/realtime/sse' }),
+    transport: () => sseTransport({ url: '/api/core/sse' }),
   }),
 })
 
@@ -79,8 +79,8 @@ When a user opens your app in multiple browser tabs, each tab would normally ope
 
 ```ts
 // realtime.worker.ts — a separate file your bundler produces
-import { createSharedWorkerCoordinator } from '@tanstack/realtime'
-import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
+import { createSharedWorkerCoordinator } from '@realtimejs/core'
+import { centrifugoTransport } from '@realtimejs/adapter-centrifugo'
 
 // createSharedWorkerCoordinator requires a PresenceCapable transport.
 // The Centrifugo adapter implements PresenceCapable; sseTransport does not.
@@ -113,14 +113,14 @@ const transport = createCoordinatedTransport({
 
 ---
 
-## `@tanstack/react-realtime`
+## `@realtimejs/react`
 
 React adapter. Provides a context provider and hooks that integrate with the core client.
 
 ### Installation
 
 ```bash
-npm install @tanstack/realtime @tanstack/react-realtime
+npm install @realtimejs/core @realtimejs/react
 ```
 
 ### Quick start — reactive queries
@@ -136,7 +136,7 @@ export const getTodos = realtime.query(async ({ teamId }: { teamId: string }) =>
 
 ```tsx
 // Client — data stays live, shared across components
-import { useQuery, useMutation } from '@tanstack/react-realtime'
+import { useQuery, useMutation } from '@realtimejs/react'
 import { getTodos, createTodo } from '../server/todos'
 
 function TodoList({ teamId }: { teamId: string }) {
@@ -170,7 +170,7 @@ For use cases beyond server queries (chat, cursors, typing indicators):
 
 ```tsx
 // Subscribe to a channel
-import { useSubscribe } from '@tanstack/react-realtime'
+import { useSubscribe } from '@realtimejs/react'
 
 function Chat({ roomId }: { roomId: string }) {
   const [messages, setMessages] = useState<string[]>([])
@@ -191,7 +191,7 @@ function Chat({ roomId }: { roomId: string }) {
 
 ```tsx
 // Publish to a channel
-import { usePublish } from '@tanstack/react-realtime'
+import { usePublish } from '@realtimejs/react'
 
 function ChatInput({ roomId }: { roomId: string }) {
   const publish = usePublish(['chat', { roomId }])
@@ -201,7 +201,7 @@ function ChatInput({ roomId }: { roomId: string }) {
 
 ```tsx
 // 4. Presence — track other connected users
-import { createPresenceChannel, usePresence } from '@tanstack/react-realtime'
+import { createPresenceChannel, usePresence } from '@realtimejs/react'
 
 const editorPresence = createPresenceChannel<{ documentId: string }>({
   id: 'editor',
@@ -236,7 +236,7 @@ function Editor({
 
 ```tsx
 // 5. Connection status
-import { useRealtime } from '@tanstack/react-realtime'
+import { useRealtime } from '@realtimejs/react'
 
 function StatusBar() {
   const { status, connect, disconnect } = useRealtime()
@@ -270,30 +270,26 @@ function StatusBar() {
 | `useMutation(serverFn, opts?)`             | Wraps a reactive server mutation with `isPending`/`error`/`data` state and declarative `optimistic` updates        |
 | `usePaginatedQuery(serverFn, args, opts?)` | Paginated variant of `useQuery`; `fetchNextPage`, `hasNextPage`, live first-page updates                           |
 
-> **Vue** (`@tanstack/vue-realtime`) exports the same composables with identical names and signatures. Args may be `MaybeRef<T>` — pass reactive refs and the composable will watch them.
+> **Vue** (`@realtimejs/vue`) exports the same composables with identical names and signatures. Args may be `MaybeRef<T>` — pass reactive refs and the composable will watch them.
 >
-> **Solid** (`@tanstack/solid-realtime`) exports the same primitives as `createQuery`, `createMutation`, and `createPaginatedQuery` (Solid `create*` convention). Remaining hooks keep the `use*` name.
+> **Solid** (`@realtimejs/solid`) exports the same primitives as `createQuery`, `createMutation`, and `createPaginatedQuery` (Solid `create*` convention). Remaining hooks keep the `use*` name.
 
 ---
 
-## `@tanstack/solid-realtime`
+## `@realtimejs/solid`
 
 Solid adapter. Exports the same primitives as the React adapter, backed by Solid signals and `createEffect`.
 
 ### Installation
 
 ```bash
-npm install @tanstack/realtime @tanstack/solid-realtime
+npm install @realtimejs/core @realtimejs/solid
 ```
 
 ### Quick start
 
 ```tsx
-import {
-  RealtimeProvider,
-  useRealtime,
-  useSubscribe,
-} from '@tanstack/solid-realtime'
+import { RealtimeProvider, useRealtime, useSubscribe } from '@realtimejs/solid'
 import { client } from './client'
 
 function App() {
@@ -311,25 +307,21 @@ Testing utilities (`createTestRealtimeProvider`, `createTestRealtimeProviderWith
 
 ---
 
-## `@tanstack/vue-realtime`
+## `@realtimejs/vue`
 
 Vue adapter. Exports composables that return Vue `ref`/`computed` values.
 
 ### Installation
 
 ```bash
-npm install @tanstack/realtime @tanstack/vue-realtime
+npm install @realtimejs/core @realtimejs/vue
 ```
 
 ### Quick start
 
 ```vue
 <script setup lang="ts">
-import {
-  RealtimeProvider,
-  useRealtime,
-  useSubscribe,
-} from '@tanstack/vue-realtime'
+import { RealtimeProvider, useRealtime, useSubscribe } from '@realtimejs/vue'
 import { client } from './client'
 </script>
 
@@ -346,21 +338,21 @@ Testing utilities (`createTestRealtimeProvider`, `createTestRealtimeProviderWith
 
 ---
 
-## `@tanstack/realtime-adapter-centrifugo`
+## `@realtimejs/adapter-centrifugo`
 
 Transport adapter for [Centrifugo](https://centrifugal.dev). Supports token-based auth, server-assisted gap recovery, and presence.
 
 ### Installation
 
 ```bash
-npm install @tanstack/realtime @tanstack/realtime-adapter-centrifugo
+npm install @realtimejs/core @realtimejs/adapter-centrifugo
 ```
 
 ### Usage
 
 ```ts
-import { createRealtimeClient } from '@tanstack/realtime'
-import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
+import { createRealtimeClient } from '@realtimejs/core'
+import { centrifugoTransport } from '@realtimejs/adapter-centrifugo'
 
 export const client = createRealtimeClient({
   transport: centrifugoTransport({
@@ -387,20 +379,20 @@ export const client = createRealtimeClient({
 
 ---
 
-## `@tanstack/realtime-adapter-sse`
+## `@realtimejs/adapter-sse`
 
 Server-Sent Events transport. Ideal for environments where WebSockets are unavailable. Publishes over HTTP POST; receives over a persistent SSE stream. No presence support.
 
 ### Installation
 
 ```bash
-npm install @tanstack/realtime @tanstack/realtime-adapter-sse
+npm install @realtimejs/core @realtimejs/adapter-sse
 ```
 
 ### Server
 
 ```ts
-import { createSseHandler } from '@tanstack/realtime-adapter-sse'
+import { createSseHandler } from '@realtimejs/adapter-sse'
 
 const handler = createSseHandler({
   // Identify the user from the request (return null to reject)
@@ -453,8 +445,8 @@ const handler = createSseHandler({
 ### Client transport
 
 ```ts
-import { createRealtimeClient } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+import { createRealtimeClient } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
 export const client = createRealtimeClient({
   transport: sseTransport({
@@ -466,21 +458,21 @@ export const client = createRealtimeClient({
 
 ---
 
-## `@tanstack/realtime-preset-start`
+## `@realtimejs/preset-start`
 
 TanStack Start preset. Provides an SSE-based request handler for TanStack Router API routes and a pluggable `PublishBackend` interface for horizontal scaling.
 
 ### Installation
 
 ```bash
-npm install @tanstack/realtime @tanstack/realtime-preset-start
+npm install @realtimejs/core @realtimejs/preset-start
 ```
 
 ### Usage
 
 ```ts
 // app/server/realtime.ts
-import { createStartHandler } from '@tanstack/realtime-preset-start'
+import { createStartHandler } from '@realtimejs/preset-start'
 
 export const realtime = createStartHandler({
   getUser: async (req) => {
@@ -495,23 +487,23 @@ export const realtimePublish = realtime.publish
 ```ts
 // app/routes/api/realtime.ts
 import { createAPIFileRoute } from '@tanstack/start/api'
-import { realtime } from '../../server/realtime'
+import { realtime } from '../../server/core'
 
-export const Route = createAPIFileRoute('/api/realtime')({
+export const Route = createAPIFileRoute('/api/core')({
   GET: ({ request }) => realtime.handle(request),
   POST: ({ request }) => realtime.handle(request),
   OPTIONS: ({ request }) => realtime.handle(request),
 })
 ```
 
-For the client side, pair with `sseTransport` from `@tanstack/realtime-adapter-sse`.
+For the client side, pair with `sseTransport` from `@realtimejs/adapter-sse`.
 
 ### `realtime.query()` and `realtime.mutation()`
 
 Wrap server functions to make them reactive. Channels are derived automatically — no manual channel wiring required.
 
 ```ts
-import { realtime } from './realtime'
+import { realtime } from './core'
 
 // Reactive query — channel derived from args
 export const getTodos = realtime.query(async ({ teamId }: { teamId: string }) =>
@@ -542,19 +534,19 @@ Developer tools panels for inspecting channels, messages, presence, connection s
 
 ```bash
 # React
-npm install @tanstack/react-realtime-devtools
+npm install @realtimejs/react-devtools
 
 # Solid
-npm install @tanstack/solid-realtime-devtools
+npm install @realtimejs/solid-devtools
 
 # Vue
-npm install @tanstack/vue-realtime-devtools
+npm install @realtimejs/vue-devtools
 ```
 
 ### Usage (React)
 
 ```tsx
-import { RealtimeDevtools } from '@tanstack/react-realtime-devtools'
+import { RealtimeDevtools } from '@realtimejs/react-devtools'
 
 function App() {
   return (
@@ -572,7 +564,7 @@ The `RealtimeDevtools` component renders a floating panel (toggleable) that show
 
 ## Live Collections (TanStack DB integration)
 
-`@tanstack/realtime` ships helpers that wire [TanStack DB](https://github.com/TanStack/db) collections to live channels so server-pushed mutations are reflected instantly in your UI.
+`@realtimejs/core` ships helpers that wire [TanStack DB](https://github.com/TanStack/db) collections to live channels so server-pushed mutations are reflected instantly in your UI.
 
 ### `realtimeCollectionOptions` — server-managed rows
 
@@ -580,7 +572,7 @@ Use this when your server owns the source of truth and pushes `insert` / `update
 
 ```ts
 import { createCollection } from '@tanstack/db'
-import { realtimeCollectionOptions } from '@tanstack/realtime'
+import { realtimeCollectionOptions } from '@realtimejs/core'
 import { client } from './client'
 
 interface Todo {
@@ -627,7 +619,7 @@ Use this for chat, activity feeds, or any stream where events are appended rathe
 
 ```ts
 import { createCollection } from '@tanstack/db'
-import { liveChannelOptions } from '@tanstack/realtime'
+import { liveChannelOptions } from '@realtimejs/core'
 import { client } from './client'
 
 interface ChatMessage {
@@ -655,7 +647,7 @@ Observe who is currently connected to a channel as a TanStack DB collection. Eac
 
 ```ts
 import { createCollection } from '@tanstack/db'
-import { presenceChannelOptions } from '@tanstack/realtime'
+import { presenceChannelOptions } from '@realtimejs/core'
 import { client } from './client'
 
 export const viewersCollection = createCollection(
@@ -675,7 +667,7 @@ The recommended pattern: define the channel shape once with `createStreamChannel
 
 ```ts
 // features/ai/stream.ts — define once, share everywhere
-import { createStreamChannel, serverStreamCallbacks } from '@tanstack/realtime'
+import { createStreamChannel, serverStreamCallbacks } from '@realtimejs/core'
 
 export const aiStream = createStreamChannel({
   id: 'ai-response',
@@ -692,7 +684,7 @@ export const aiStream = createStreamChannel({
 
 ```tsx
 // features/ai/AIResponse.tsx — consume in React
-import { useStream } from '@tanstack/react-realtime'
+import { useStream } from '@realtimejs/react'
 import { aiStream } from './stream'
 
 function AIResponse({ requestId }: { requestId: string }) {
@@ -709,7 +701,7 @@ For direct TanStack DB collection use (without the React hook):
 
 ```ts
 import { createCollection } from '@tanstack/db'
-import { streamChannelOptions, serverStreamCallbacks } from '@tanstack/realtime'
+import { streamChannelOptions, serverStreamCallbacks } from '@realtimejs/core'
 import { client } from './client'
 
 export const generationCollection = createCollection(
@@ -733,7 +725,7 @@ export const generationCollection = createCollection(
 ### Server: `realtime.query()` and `realtime.mutation()`
 
 ```ts
-import { realtime } from './realtime' // createStartHandler result
+import { realtime } from './core' // createStartHandler result
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { todos } from '../../db/schema'
@@ -758,7 +750,7 @@ export const createTodo = realtime.mutation(
 ### Client: `useQuery` and `useMutation`
 
 ```tsx
-import { useQuery, useMutation } from '@tanstack/react-realtime'
+import { useQuery, useMutation } from '@realtimejs/react'
 import { getTodos, createTodo } from '../server/todos'
 
 function TodoList({ teamId }: { teamId: string }) {
@@ -803,7 +795,7 @@ Multiple components using the same `(serverFn, args)` share one TanStack DB `Col
 
 ## CRDT Primitives
 
-`@tanstack/realtime` ships conflict-free data type helpers for collaborative state. Annotate collection fields with a CRDT strategy via the `fields` option on `realtimeCollectionOptions`:
+`@realtimejs/core` ships conflict-free data type helpers for collaborative state. Annotate collection fields with a CRDT strategy via the `fields` option on `realtimeCollectionOptions`:
 
 ```ts
 realtimeCollectionOptions<Counter, string>({

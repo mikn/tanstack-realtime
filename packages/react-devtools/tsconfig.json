@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "incremental": false,
+    "jsx": "react-jsx",
+    "outDir": "dist",
+    "paths": {
+      "@realtimejs/core": ["../core/src/index.ts"],
+      "@realtimejs/react": ["../react/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}

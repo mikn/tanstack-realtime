@@ -1,5 +1,5 @@
 /**
- * End-to-end tests for @tanstack/realtime-adapter-centrifugo against a real
+ * End-to-end tests for @realtimejs/adapter-centrifugo against a real
  * Centrifugo binary.
  *
  * Usage:
@@ -16,8 +16,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, inject, it } from 'vitest'
-import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
-import { createRealtimeClient } from '@tanstack/realtime'
+import { centrifugoTransport } from '@realtimejs/adapter-centrifugo'
+import { createRealtimeClient } from '@realtimejs/core'
 
 declare module 'vitest' {
   export interface ProvidedContext {

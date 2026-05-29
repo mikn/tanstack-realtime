@@ -25,11 +25,11 @@ export function Tick() {
         individual events.
       </p>
       <CodeBlock
-        title="realtime/tickSetup.ts"
-        code={`import { useTickBatching } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+        title="core/tickSetup.ts"
+        code={`import { useTickBatching } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
-const transport = sseTransport({ url: '/api/realtime' })
+const transport = sseTransport({ url: '/api/core' })
 
 // Register tick-batching hooks on the transport.
 const tick = useTickBatching(transport, {
@@ -60,8 +60,8 @@ const tick = useTickBatching(transport, {
       <CodeBlock
         title="features/game/players.ts"
         code={`import { createCollection } from '@tanstack/db'
-import { tickCollectionOptions } from '@tanstack/realtime'
-import { tick } from '../../realtime/tickSetup'
+import { tickCollectionOptions } from '@realtimejs/core'
+import { tick } from '../../core/tickSetup'
 
 interface Player {
   id: string
@@ -129,7 +129,7 @@ export const playerCollection = createCollection(
         title="features/game/GameLoop.tsx"
         code={`import { useEffect, useRef } from 'react'
 import { useLiveQuery } from '@tanstack/react-db'
-import { tick } from '../../realtime/tickSetup'
+import { tick } from '../../core/tickSetup'
 import { playerCollection } from './players'
 
 function GameLoop({ myPlayerId }: { myPlayerId: string }) {
@@ -174,10 +174,10 @@ function GameLoop({ myPlayerId }: { myPlayerId: string }) {
       </p>
       <CodeBlock
         title="features/metrics/metricsSetup.ts"
-        code={`import { useTickBatching } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+        code={`import { useTickBatching } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
-const transport = sseTransport({ url: '/api/realtime' })
+const transport = sseTransport({ url: '/api/core' })
 
 // 10 Hz is plenty for dashboard gauges.
 export const metricsTick = useTickBatching(transport, { tickMs: 100 })`}
@@ -185,7 +185,7 @@ export const metricsTick = useTickBatching(transport, { tickMs: 100 })`}
       <CodeBlock
         title="features/metrics/serverMetrics.ts"
         code={`import { createCollection } from '@tanstack/db'
-import { tickCollectionOptions } from '@tanstack/realtime'
+import { tickCollectionOptions } from '@realtimejs/core'
 import { metricsTick } from './metricsSetup'
 
 interface ServerMetric {

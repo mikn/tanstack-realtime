@@ -5,10 +5,10 @@
   "fixed": [],
   "linked": [
     [
-      "@tanstack/realtime",
-      "@tanstack/react-realtime",
-      "@tanstack/realtime-adapter-centrifugo",
-      "@tanstack/realtime-adapter-sse"
+      "@realtimejs/core",
+      "@realtimejs/react",
+      "@realtimejs/adapter-centrifugo",
+      "@realtimejs/adapter-sse"
     ]
   ],
   "access": "public",
