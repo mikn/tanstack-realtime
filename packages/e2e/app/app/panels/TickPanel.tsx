@@ -34,7 +34,7 @@ export function TickPanel() {
 
   useEffect(() => {
     const transport = sseTransport({
-      url: '/api/core',
+      url: '/api/realtime',
       initialDelay: 50,
       maxDelay: 200,
       jitter: 0,

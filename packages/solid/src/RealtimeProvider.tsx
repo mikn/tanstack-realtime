@@ -34,7 +34,7 @@ export interface RealtimeProviderProps {
  * provider mount/unmount cycles.
  *
  * @example
- * const realtimeClient = createRealtimeClient({ transport: sseTransport({ url: '/api/core/sse' }) })
+ * const realtimeClient = createRealtimeClient({ transport: sseTransport({ url: '/api/realtime/sse' }) })
  *
  * function Root() {
  *   return (

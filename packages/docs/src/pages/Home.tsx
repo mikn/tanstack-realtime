@@ -356,7 +356,7 @@ import { sseTransport } from '@realtimejs/adapter-sse'
 import { RealtimeProvider } from '@realtimejs/react'
 
 const client = createRealtimeClient({
-  transport: sseTransport({ url: '/api/core' }),
+  transport: sseTransport({ url: '/api/realtime' }),
 })
 
 function App() {

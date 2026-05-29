@@ -62,11 +62,15 @@ const NAME_ENTRIES = Object.entries(NAME_MAP).sort(
 // tsconfig.check.json, vitest alias replacements, knip workspace keys, and the
 // pkg-pr-new publish list in CI) must be updated to the new directory name.
 //
-// Keys are matched as `<dirName>/` so that the rename is anchored to a path
-// segment boundary. Longest-first ordering ensures `react-realtime-devtools`
-// is rewritten before `react-realtime`, and `realtime-adapter-sse` etc. before
-// the bare `realtime` directory. The trailing `/` prevents the bare `realtime`
-// entry from clobbering unrelated dirs such as `realtime-preset-workerd`.
+// Keys are matched ONLY when preceded by the literal `packages/` prefix so the
+// rename is anchored to a real workspace-package path — never a bare token in a
+// URL, endpoint, channel name, or local module import. Longest-first ordering
+// ensures `react-realtime-devtools` is rewritten before `react-realtime`, and
+// `realtime-adapter-sse` etc. before the bare `realtime` directory. The required
+// `packages/` prefix is what prevents the bare `realtime` entry from clobbering
+// app-level strings such as `/api/realtime`, `'../realtime'`, or
+// `https://tanstack.com/realtime`, as well as unrelated dirs like
+// `realtime-preset-workerd`.
 const DIR_NAME_MAP = {
   'react-realtime-devtools': 'react-devtools',
   'vue-realtime-devtools': 'vue-devtools',
@@ -163,17 +167,20 @@ for (const file of walk(ROOT)) {
     })
   }
 
-  // Directory-path renames (longest first). Match `<oldDir>` only when it is
-  // preceded by a path-boundary char (`/`, start, quote, paren, whitespace)
-  // and followed by either `/` (deeper path) or a closing boundary (`"`, `'`,
-  // backtick) so JSON keys like "packages/realtime" are caught too. Required
-  // boundaries + longest-first ordering keep `realtime` from clobbering
-  // `realtime-*` dirs (e.g. realtime-preset-workerd, realtime-adapter-sse).
+  // Directory-path renames (longest first). Match `<oldDir>` ONLY when it is
+  // immediately preceded by the literal `packages/` path prefix and followed by
+  // either `/` (deeper path) or a closing boundary (`"`, `'`, backtick, or
+  // end-of-input) so JSON keys like "packages/realtime" are caught while bare
+  // tokens are not. Anchoring on `packages/` (instead of a generic boundary
+  // char) is what keeps the bare `realtime` entry from clobbering app-level
+  // strings such as `/api/realtime`, `'../realtime'`, `LISTEN realtime`, or
+  // `https://tanstack.com/realtime`. Longest-first ordering still prevents
+  // `realtime` from matching inside `realtime-*` dirs.
   const rel = relative(ROOT, file)
   for (const [from, to] of DIR_ENTRIES) {
     const re = new RegExp(
-      '(^|[/\'"`(\\s])' + escapeRe(from) + '(/|(?=["\'`]))',
-      'g',
+      '(packages/)' + escapeRe(from) + '(/|(?=["\'`])|$)',
+      'gm',
     )
     next = next.replace(re, (_m, pre, post) => {
       pathHits++

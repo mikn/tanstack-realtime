@@ -27,9 +27,9 @@
  * ```ts
  * // app/routes/api/realtime.ts
  * import { createAPIFileRoute } from '@tanstack/start/api'
- * import { realtime } from '../../server/core'
+ * import { realtime } from '../../server/realtime'
  *
- * export const Route = createAPIFileRoute('/api/core')({
+ * export const Route = createAPIFileRoute('/api/realtime')({
  *   GET: ({ request }) => realtime.handle(request),
  *   POST: ({ request }) => realtime.handle(request),
  *   OPTIONS: ({ request }) => realtime.handle(request),

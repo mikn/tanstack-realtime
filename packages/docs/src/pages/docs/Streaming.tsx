@@ -191,7 +191,7 @@ function AIResponse({ requestId }: { requestId: string }) {
       <CodeBlock
         title="server/routes/chat.ts"
         code={`import { createServerStream } from '@realtimejs/core'
-import { sseHandler } from '../core'
+import { sseHandler } from '../realtime'
 
 app.post('/api/chat', async (req) => {
   const { requestId, prompt } = req.body
@@ -320,7 +320,7 @@ function AIResponse({ requestId }: { requestId: string }) {
       <CodeBlock
         title="server/routes/ai-stream.ts"
         code={`import { createServerStream } from '@realtimejs/core'
-import { sseHandler } from '../core'
+import { sseHandler } from '../realtime'
 import { db } from '../db'
 
 const stream = createServerStream({

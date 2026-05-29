@@ -27,13 +27,6 @@ export default defineConfig({
         replacement: resolve(root, 'packages/core/src/index.ts'),
       },
       {
-        find: /^@tanstack\/realtime-preset-workerd$/,
-        replacement: resolve(
-          root,
-          'packages/realtime-preset-workerd/src/index.ts',
-        ),
-      },
-      {
         find: /^@realtimejs\/adapter-centrifugo$/,
         replacement: resolve(root, 'packages/adapter-centrifugo/src/index.ts'),
       },

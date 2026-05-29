@@ -60,9 +60,9 @@ export const realtime = createStartHandler({})`}
       <CodeBlock
         title="app/routes/api/realtime.ts"
         code={`import { createAPIFileRoute } from '@tanstack/start/api'
-import { realtime } from '../../server/core'
+import { realtime } from '../../server/realtime'
 
-export const Route = createAPIFileRoute('/api/core')({
+export const Route = createAPIFileRoute('/api/realtime')({
   GET:     ({ request }) => realtime.handle(request),
   POST:    ({ request }) => realtime.handle(request),
   OPTIONS: ({ request }) => realtime.handle(request),
@@ -76,14 +76,14 @@ export const Route = createAPIFileRoute('/api/core')({
 import { sseTransport } from '@realtimejs/adapter-sse'
 
 export const realtimeClient = createRealtimeClient({
-  transport: sseTransport({ url: '/api/core' }),
+  transport: sseTransport({ url: '/api/realtime' }),
 })`}
       />
       <FrameworkTabs
         react={{
           title: 'app/root.tsx',
           code: `import { RealtimeProvider } from '@realtimejs/react'
-import { realtimeClient } from './client/core'
+import { realtimeClient } from './client/realtime'
 
 function App() {
   return (
@@ -96,7 +96,7 @@ function App() {
         solid={{
           title: 'app/root.tsx',
           code: `import { RealtimeProvider } from '@realtimejs/solid'
-import { realtimeClient } from './client/core'
+import { realtimeClient } from './client/realtime'
 
 function App() {
   return (
@@ -110,7 +110,7 @@ function App() {
           title: 'app/App.vue',
           code: `<script setup>
 import { provideRealtimeClient } from '@realtimejs/vue'
-import { realtimeClient } from './client/core'
+import { realtimeClient } from './client/realtime'
 
 provideRealtimeClient(realtimeClient)
 </script>
@@ -143,7 +143,7 @@ provideRealtimeClient(realtimeClient)
       </p>
       <CodeBlock
         title="app/server/todos.ts"
-        code={`import { realtime } from './core'
+        code={`import { realtime } from './realtime'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { todos } from '../../db/schema'

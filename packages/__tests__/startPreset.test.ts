@@ -22,7 +22,7 @@ import type { PublishBackend } from '@realtimejs/preset-start'
 // Helpers
 // ---------------------------------------------------------------------------
 
-const SSE_URL = 'http://localhost/api/core'
+const SSE_URL = 'http://localhost/api/realtime'
 
 /**
  * Read N parsed SSE events from a ReadableStreamDefaultReader, with a timeout.

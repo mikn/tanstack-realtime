@@ -244,7 +244,7 @@ export function ChatRoom({ room, userName }: {
 
       <CodeBlock
         title="app/server/generate.ts"
-        code={`import { realtime } from './core'
+        code={`import { realtime } from './realtime'
 
 export async function generateResponse(prompt: string, sessionId: string) {
   const stream = realtime.createStream<{ type: string; text?: string }>({

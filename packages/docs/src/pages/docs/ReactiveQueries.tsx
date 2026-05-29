@@ -46,7 +46,7 @@ export function ReactiveQueries() {
       </p>
       <CodeBlock
         title="app/server/todos.ts"
-        code={`import { realtime } from './core'
+        code={`import { realtime } from './realtime'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { todos } from '../../db/schema'

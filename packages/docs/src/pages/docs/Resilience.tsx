@@ -25,7 +25,7 @@ export function Resilience() {
 import { sseTransport } from '@realtimejs/adapter-sse'
 import { useStore } from '@tanstack/react-store'
 
-const transport = sseTransport({ url: '/api/core' })
+const transport = sseTransport({ url: '/api/realtime' })
 const queue = useOfflineQueue(transport, {
   maxSize: 500,
   storage: createLocalStorageAdapter(),
@@ -60,7 +60,7 @@ const tasksOptions = realtimeCollectionOptions({
 import { useGapRecovery } from '@realtimejs/core'
 import { sseTransport } from '@realtimejs/adapter-sse'
 
-const transport = sseTransport({ url: '/api/core' })
+const transport = sseTransport({ url: '/api/realtime' })
 useGapRecovery(transport, {
   onGap: async (channel) => {
     await refetchCollection(channel)
@@ -85,7 +85,7 @@ useGapRecovery(transport, {
 import { sseTransport } from '@realtimejs/adapter-sse'
 
 const transport = createCoordinatedTransport({
-  transport: () => sseTransport({ url: '/api/core' }),
+  transport: () => sseTransport({ url: '/api/realtime' }),
 })`}
       />
 
@@ -100,7 +100,7 @@ const transport = createCoordinatedTransport({
 import { sseTransport } from '@realtimejs/adapter-sse'
 
 const coordinator = createSharedWorkerCoordinator(
-  sseTransport({ url: '/api/core' }),
+  sseTransport({ url: '/api/realtime' }),
 )
 self.addEventListener('connect', (e) => {
   coordinator.connect(e.ports[0])
@@ -112,7 +112,7 @@ self.addEventListener('connect', (e) => {
 import { sseTransport } from '@realtimejs/adapter-sse'
 
 const transport = createCoordinatedTransport({
-  transport: () => sseTransport({ url: '/api/core' }),
+  transport: () => sseTransport({ url: '/api/realtime' }),
   workerUrl: new URL('./realtime.worker.ts', import.meta.url),
 })`}
       />
@@ -207,7 +207,7 @@ self.addEventListener('connect', (e) => {
 import { sseTransport } from '@realtimejs/adapter-sse'
 
 const transport = createCoordinatedTransport({
-  transport: () => sseTransport({ url: '/api/core' }),
+  transport: () => sseTransport({ url: '/api/realtime' }),
   workerUrl: new URL('./realtime-worker.ts', import.meta.url),
 })`}
       />
@@ -223,7 +223,7 @@ const transport = createCoordinatedTransport({
 import { sseTransport } from '@realtimejs/adapter-sse'
 
 const transport = createCoordinatedTransport({
-  transport: () => sseTransport({ url: '/api/core' }),
+  transport: () => sseTransport({ url: '/api/realtime' }),
   workerUrl: new URL('./realtime-worker.ts', import.meta.url),
 })`}
       />

@@ -304,7 +304,7 @@ const validatedPublish = createValidatedPublish({
       </p>
       <CodeBlock
         title="server/functions/todos.ts"
-        code={`import { validatedPublish } from '../core'
+        code={`import { validatedPublish } from '../realtime'
 
 export const updateTodo = createServerFn()(async ({ id, data }) => {
   const updated = await db.todos.update(id, data)

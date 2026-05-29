@@ -132,7 +132,7 @@ realtimeCollectionOptions({
       </p>
       <CodeBlock
         code={`// SSE — zero infra, works behind corporate proxies
-transport: sseTransport({ url: '/api/core' })
+transport: sseTransport({ url: '/api/realtime' })
 
 // Centrifugo — WebSocket, multi-node clustering, gap recovery
 transport: centrifugoTransport({ url: 'wss://rt.example.com/connection/websocket' })`}

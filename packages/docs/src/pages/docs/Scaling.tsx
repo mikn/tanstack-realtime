@@ -100,11 +100,11 @@ const sub = new Redis(process.env.REDIS_URL!)
 
 export const redisBackend: PublishBackend = {
   async publish(channel, data) {
-    await pub.publish('core', JSON.stringify({ channel, data }))
+    await pub.publish('realtime', JSON.stringify({ channel, data }))
   },
 
   subscribe(onMessage) {
-    void sub.subscribe('core')
+    void sub.subscribe('realtime')
     sub.on('message', (_redisChannel, msg) => {
       const { channel, data } = JSON.parse(msg) as {
         channel: string
@@ -113,7 +113,7 @@ export const redisBackend: PublishBackend = {
       onMessage(channel, data)
     })
     return () => {
-      void sub.unsubscribe('core')
+      void sub.unsubscribe('realtime')
     }
   },
 }`}
@@ -152,21 +152,21 @@ initPgBackend().catch((err) => {
 export const pgBackend: PublishBackend = {
   async publish(channel, data) {
     const payload = JSON.stringify({ channel, data })
-    await pgPub.query(\`SELECT pg_notify('core', $1)\`, [payload])
+    await pgPub.query(\`SELECT pg_notify('realtime', $1)\`, [payload])
   },
 
   subscribe(onMessage) {
     pgSub.on('notification', (msg) => {
-      if (msg.channel !== 'core' || !msg.payload) return
+      if (msg.channel !== 'realtime' || !msg.payload) return
       const { channel, data } = JSON.parse(msg.payload) as {
         channel: string
         data: unknown
       }
       onMessage(channel, data)
     })
-    void pgSub.query('LISTEN core')
+    void pgSub.query('LISTEN realtime')
     return () => {
-      void pgSub.query('UNLISTEN core')
+      void pgSub.query('UNLISTEN realtime')
     }
   },
 }`}

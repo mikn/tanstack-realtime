@@ -30,7 +30,7 @@ export interface RealtimeProviderProps {
  * Set `autoConnect={false}` to manage the connection yourself.
  *
  * @example
- * const realtimeClient = createRealtimeClient({ transport: sseTransport({ url: '/api/core/sse' }) })
+ * const realtimeClient = createRealtimeClient({ transport: sseTransport({ url: '/api/realtime/sse' }) })
  *
  * // In your root component:
  * <RealtimeProvider :client="realtimeClient">

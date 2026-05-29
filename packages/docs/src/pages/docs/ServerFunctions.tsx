@@ -61,9 +61,9 @@ export const realtime = createStartHandler({
       <CodeBlock
         title="app/routes/api/realtime.ts"
         code={`import { createAPIFileRoute } from '@tanstack/start/api'
-import { realtime } from '../../server/core'
+import { realtime } from '../../server/realtime'
 
-export const Route = createAPIFileRoute('/api/core')({
+export const Route = createAPIFileRoute('/api/realtime')({
   GET:     ({ request }) => realtime.handle(request),
   POST:    ({ request }) => realtime.handle(request),
   OPTIONS: ({ request }) => realtime.handle(request),
@@ -81,13 +81,13 @@ export const Route = createAPIFileRoute('/api/core')({
 import { sseTransport } from '@realtimejs/adapter-sse'
 
 export const realtimeClient = createRealtimeClient({
-  transport: sseTransport({ url: '/api/core' }),
+  transport: sseTransport({ url: '/api/realtime' }),
 })`}
       />
       <CodeBlock
         title="app/root.tsx"
         code={`import { RealtimeProvider } from '@realtimejs/react'
-import { realtimeClient } from './client/core'
+import { realtimeClient } from './client/realtime'
 
 export function App() {
   return (
@@ -174,7 +174,7 @@ export const deleteTodo = createServerFn({ method: 'POST' })
       <CodeBlock
         title="app/features/todos/collection.ts"
         code={`import { withServerFns, realtimeCollectionOptions } from '@realtimejs/core'
-import { realtimeClient } from '../../client/core'
+import { realtimeClient } from '../../client/realtime'
 import {
   fetchTodos, createTodo, updateTodo, deleteTodo,
 } from '../../server/todos'
@@ -290,7 +290,7 @@ export function TodoList({ projectId }: { projectId: string }) {
       />
       <CodeBlock
         title="app/server/todos.ts (manual publish variant)"
-        code={`import { realtime } from '../core'
+        code={`import { realtime } from '../realtime'
 
 export const updateTodo = createServerFn({ method: 'POST' })
   .handler(async ({ data }: { data: Todo }) => {
@@ -366,7 +366,7 @@ export const realtimePublish = realtime.publish`}
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { todos } from '../../db/schema'
-import { realtime } from '../core'
+import { realtime } from '../realtime'
 
 export const getTodos = realtime.query(
   async ({ teamId }: { teamId: string }) =>

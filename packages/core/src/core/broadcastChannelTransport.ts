@@ -22,7 +22,7 @@
  * import { sseTransport } from '@realtimejs/adapter-sse'
  *
  * const transport = createBroadcastChannelTransport(
- *   () => sseTransport({ url: '/api/core/sse' }),
+ *   () => sseTransport({ url: '/api/realtime/sse' }),
  * )
  * const client = createRealtimeClient({ transport })
  * ```

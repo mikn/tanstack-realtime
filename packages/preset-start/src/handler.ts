@@ -36,15 +36,15 @@ import type { SseHandlerOptions } from '@realtimejs/adapter-sse'
  *
  * const backend: PublishBackend = {
  *   async publish(channel, data) {
- *     await pub.publish('core', JSON.stringify({ channel, data }))
+ *     await pub.publish('realtime', JSON.stringify({ channel, data }))
  *   },
  *   subscribe(onMessage) {
- *     void sub.subscribe('core')
+ *     void sub.subscribe('realtime')
  *     sub.on('message', (_ch, msg) => {
  *       const { channel, data } = JSON.parse(msg) as { channel: string; data: unknown }
  *       onMessage(channel, data)
  *     })
- *     return () => { void sub.unsubscribe('core') }
+ *     return () => { void sub.unsubscribe('realtime') }
  *   },
  * }
  *
@@ -60,7 +60,7 @@ import type { SseHandlerOptions } from '@realtimejs/adapter-sse'
  * const backend: PublishBackend = {
  *   async publish(channel, data) {
  *     const payload = JSON.stringify({ channel, data })
- *     await pgPub.query(`SELECT pg_notify('core', $1)`, [payload])
+ *     await pgPub.query(`SELECT pg_notify('realtime', $1)`, [payload])
  *   },
  *   subscribe(onMessage) {
  *     pgSub.on('notification', (msg) => {
@@ -68,8 +68,8 @@ import type { SseHandlerOptions } from '@realtimejs/adapter-sse'
  *       const { channel, data } = JSON.parse(msg.payload) as { channel: string; data: unknown }
  *       onMessage(channel, data)
  *     })
- *     void pgSub.query('LISTEN core')
- *     return () => { void pgSub.query('UNLISTEN core') }
+ *     void pgSub.query('LISTEN realtime')
+ *     return () => { void pgSub.query('UNLISTEN realtime') }
  *   },
  * }
  */
@@ -150,9 +150,9 @@ export interface StartRealtimeHandler {
    * ```ts
    * // app/routes/api/realtime.ts
    * import { createAPIFileRoute } from '@tanstack/start/api'
-   * import { realtime } from '../../server/core'
+   * import { realtime } from '../../server/realtime'
    *
-   * export const Route = createAPIFileRoute('/api/core')({
+   * export const Route = createAPIFileRoute('/api/realtime')({
    *   GET: ({ request }) => realtime.handle(request),
    *   POST: ({ request }) => realtime.handle(request),
    *   OPTIONS: ({ request }) => realtime.handle(request),
@@ -172,7 +172,7 @@ export interface StartRealtimeHandler {
    * ```ts
    * // app/server/functions/todos.ts
    * import { createServerFn } from '@tanstack/start'
-   * import { realtimePublish } from '../core'
+   * import { realtimePublish } from '../realtime'
    *
    * export const updateTodo = createServerFn({ method: 'POST' })
    *   .handler(async ({ data }) => {
@@ -265,9 +265,9 @@ export interface StartRealtimeHandler {
  * ```ts
  * // app/routes/api/realtime.ts
  * import { createAPIFileRoute } from '@tanstack/start/api'
- * import { realtime } from '../../server/core'
+ * import { realtime } from '../../server/realtime'
  *
- * export const Route = createAPIFileRoute('/api/core')({
+ * export const Route = createAPIFileRoute('/api/realtime')({
  *   GET: ({ request }) => realtime.handle(request),
  *   POST: ({ request }) => realtime.handle(request),
  *   OPTIONS: ({ request }) => realtime.handle(request),
@@ -277,7 +277,7 @@ export interface StartRealtimeHandler {
  * ```ts
  * // app/server/functions/todos.ts
  * import { createServerFn } from '@tanstack/start'
- * import { realtimePublish } from '../core'
+ * import { realtimePublish } from '../realtime'
  *
  * export const updateTodo = createServerFn({ method: 'POST' })
  *   .handler(async ({ data }) => {

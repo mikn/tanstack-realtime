@@ -41,7 +41,7 @@ export default defineConfig({
       name: 'realtime-api',
       configureServer(server) {
         server.middlewares.use(
-          '/api/core',
+          '/api/realtime',
           async (req: IncomingMessage, res: ServerResponse) => {
             if (req.method === 'OPTIONS') {
               res.writeHead(204, {
@@ -64,7 +64,7 @@ export default defineConfig({
               }
 
               const webRequest = new Request(
-                `http://localhost:3000${req.url ?? '/api/core'}`,
+                `http://localhost:3000${req.url ?? '/api/realtime'}`,
                 {
                   method: req.method ?? 'GET',
                   headers: Object.fromEntries(

@@ -35,7 +35,7 @@ export interface RealtimeProviderProps {
  * provider mount/unmount cycles (including React Strict Mode's double-invoke).
  *
  * @example
- * const realtimeClient = createRealtimeClient({ transport: sseTransport({ url: '/api/core/sse' }) })
+ * const realtimeClient = createRealtimeClient({ transport: sseTransport({ url: '/api/realtime/sse' }) })
  *
  * function Root() {
  *   return (

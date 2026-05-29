@@ -22,12 +22,12 @@
  *
  * // Automatic — picks BroadcastChannel in browsers, errors on server
  * const transport = createCoordinatedTransport({
- *   transport: () => sseTransport({ url: '/api/core/sse' }),
+ *   transport: () => sseTransport({ url: '/api/realtime/sse' }),
  * })
  *
  * // Best: SharedWorker when available, falls back to BroadcastChannel
  * const transport = createCoordinatedTransport({
- *   transport: () => sseTransport({ url: '/api/core/sse' }),
+ *   transport: () => sseTransport({ url: '/api/realtime/sse' }),
  *   workerUrl: new URL('./realtime.worker.ts', import.meta.url),
  * })
  * ```

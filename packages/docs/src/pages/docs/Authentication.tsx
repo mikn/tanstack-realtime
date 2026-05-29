@@ -184,7 +184,7 @@ import { sseTransport } from '@realtimejs/adapter-sse'
 
 export const realtimeClient = createRealtimeClient({
   transport: sseTransport({
-    url: '/api/core',
+    url: '/api/realtime',
     // Called lazily: once when opening the SSE stream, then before each POST action
     getToken: async () => {
       const session = await fetch('/api/auth/session')
@@ -257,7 +257,7 @@ export const realtimeClient = createRealtimeClient({
     url: 'wss://realtime.example.com/connection/websocket',
     // Connection token — fetched once per (re)connect
     token: async () => {
-      const res = await fetch('/api/core/connection-token')
+      const res = await fetch('/api/realtime/connection-token')
       const { token } = await res.json()
       return token
     },
@@ -265,7 +265,7 @@ export const realtimeClient = createRealtimeClient({
 })`}
       />
       <CodeBlock
-        title="app/routes/api/core/connection-token.ts — server"
+        title="app/routes/api/realtime/connection-token.ts — server"
         code={`import jwt from 'jsonwebtoken'
 import { getSession } from '../../../server/auth'
 
@@ -388,7 +388,7 @@ const validatedPublish = createValidatedPublish({
       <CodeBlock
         title="Observing connection state"
         code={`import { useStore } from '@tanstack/react-store'
-import { realtimeClient } from './core'
+import { realtimeClient } from './realtime'
 
 function ConnectionStatus() {
   const { status } = useStore(realtimeClient.store)
@@ -468,7 +468,7 @@ const realtime = createStartHandler({
 
 // Client — no getToken needed, cookies are sent automatically
 const realtimeClient = createRealtimeClient({
-  transport: sseTransport({ url: '/api/core' }),
+  transport: sseTransport({ url: '/api/realtime' }),
 })`}
       />
 

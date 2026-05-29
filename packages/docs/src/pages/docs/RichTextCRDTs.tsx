@@ -220,7 +220,7 @@ import { RealtimeYjsProvider } from './realtime-yjs-provider'
 
 // Create the TanStack Realtime client
 const client = createRealtimeClient({
-  transport: sseTransport({ url: '/api/core' }),
+  transport: sseTransport({ url: '/api/realtime' }),
 })
 
 // Create the Y.js document

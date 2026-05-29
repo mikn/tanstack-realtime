@@ -78,14 +78,14 @@ export const db = drizzle(client)`}
 export const realtime = createStartHandler({})
 
 // That's it. Add getUser/authorize later for auth.
-// See: https://tanstack.com/core/docs/authentication`}
+// See: https://tanstack.com/realtime/docs/authentication`}
       />
       <CodeBlock
         title="app/routes/api/realtime.ts"
         code={`import { createAPIFileRoute } from '@tanstack/start/api'
-import { realtime } from '../../server/core'
+import { realtime } from '../../server/realtime'
 
-export const Route = createAPIFileRoute('/api/core')({
+export const Route = createAPIFileRoute('/api/realtime')({
   GET:     ({ request }) => realtime.handle(request),
   POST:    ({ request }) => realtime.handle(request),
   OPTIONS: ({ request }) => realtime.handle(request),
@@ -103,7 +103,7 @@ export const Route = createAPIFileRoute('/api/core')({
         code={`import { eq } from 'drizzle-orm'
 import { db } from '../../db'
 import { tasks, type NewTask } from '../../db/schema'
-import { realtime } from './core'
+import { realtime } from './realtime'
 
 // Queries — one annotation makes them live
 export const getTasks = realtime.query(
@@ -145,13 +145,13 @@ export const deleteTask = realtime.mutation(
 import { sseTransport } from '@realtimejs/adapter-sse'
 
 export const realtimeClient = createRealtimeClient({
-  transport: sseTransport({ url: '/api/core' }),
+  transport: sseTransport({ url: '/api/realtime' }),
 })`}
       />
       <CodeBlock
         title="app/root.tsx"
         code={`import { RealtimeProvider } from '@realtimejs/react'
-import { realtimeClient } from './client/core'
+import { realtimeClient } from './client/realtime'
 
 export function App() {
   return (
@@ -220,7 +220,7 @@ export function TaskBoard({ projectId }: { projectId: string }) {
         title="app/features/board/OnlineUsers.tsx"
         code={`import { usePresence } from '@realtimejs/react'
 import { presenceChannelOptions } from '@realtimejs/core'
-import { realtimeClient } from '../../client/core'
+import { realtimeClient } from '../../client/realtime'
 
 const boardPresence = (projectId: string) =>
   presenceChannelOptions({

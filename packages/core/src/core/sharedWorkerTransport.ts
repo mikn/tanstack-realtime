@@ -487,7 +487,7 @@ export function isSharedWorkerSupported(): boolean {
  *
  * const transport = createSharedWorkerTransport(
  *   { url: new URL('./realtime.worker.ts', import.meta.url) },
- *   () => sseTransport({ url: '/api/core/sse' }),
+ *   () => sseTransport({ url: '/api/realtime/sse' }),
  * )
  * const client = createRealtimeClient({ transport })
  * // No explicit client.connect() needed — the worker auto-connects.

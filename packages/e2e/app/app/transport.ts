@@ -23,7 +23,7 @@ const myConnectionId =
 export const client = createRealtimeClient({
   transport: withPresence(
     sseTransport({
-      url: '/api/core',
+      url: '/api/realtime',
       initialDelay: 50,
       maxDelay: 200,
       jitter: 0,

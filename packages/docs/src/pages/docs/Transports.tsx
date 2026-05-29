@@ -121,7 +121,7 @@ const client = createRealtimeClient({
         code={`import { sseTransport } from '@realtimejs/adapter-sse'
 
 const client = createRealtimeClient({
-  transport: sseTransport({ url: '/api/core/events' }),
+  transport: sseTransport({ url: '/api/realtime/events' }),
 })`}
       />
 
@@ -136,7 +136,7 @@ const client = createRealtimeClient({
         code={`import { useTickBatching } from '@realtimejs/core'
 import { sseTransport } from '@realtimejs/adapter-sse'
 
-const transport = sseTransport({ url: '/api/core/sse' })
+const transport = sseTransport({ url: '/api/realtime/sse' })
 const tick = useTickBatching(transport, {
   tickMs: 16, deltaCompression: true,  // ~60 Hz
 })

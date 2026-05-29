@@ -26,7 +26,7 @@ function presenceNotSupported(method: string): never {
  * import { sseTransport } from '@realtimejs/adapter-sse'
  *
  * export const realtimeClient = createRealtimeClient({
- *   transport: sseTransport({ url: '/api/core/sse' }),
+ *   transport: sseTransport({ url: '/api/realtime/sse' }),
  * })
  */
 export function createRealtimeClient(

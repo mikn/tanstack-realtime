@@ -399,7 +399,7 @@ function ChatRoom({ roomId }: { roomId: string }) {
         connected clients.
       </p>
       <CodeBlock
-        title="server/core/publish.ts"
+        title="server/realtime/publish.ts"
         code={`const CENTRIFUGO_API = process.env.CENTRIFUGO_API_URL ?? 'http://localhost:8000/api'
 const CENTRIFUGO_API_KEY = process.env.CENTRIFUGO_API_KEY!
 
@@ -422,7 +422,7 @@ export async function publishToChannel(
       />
       <CodeBlock
         title="server/routes/api/todos.ts"
-        code={`import { publishToChannel } from '../../core/publish'
+        code={`import { publishToChannel } from '../../realtime/publish'
 
 export async function POST(req: Request) {
   const todo = await createTodo(await req.json())

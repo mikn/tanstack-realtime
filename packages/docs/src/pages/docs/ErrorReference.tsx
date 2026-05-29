@@ -165,7 +165,7 @@ realtimeCollectionOptions({
         code={`import { sseTransport } from '@realtimejs/adapter-sse'
 
 const transport = sseTransport({
-  url: '/api/core',
+  url: '/api/realtime',
   getToken: () => auth.getSession().then((s) => s.accessToken),
 })`}
       />
@@ -262,7 +262,7 @@ const transport = sseTransport({
         code={`import { useOfflineQueue } from '@realtimejs/core'
 import { sseTransport } from '@realtimejs/adapter-sse'
 
-const transport = sseTransport({ url: '/api/core' })
+const transport = sseTransport({ url: '/api/realtime' })
 useOfflineQueue(transport, {
   maxSize: 500,
   onFlushError: (message, error) => {
@@ -314,7 +314,7 @@ useOfflineQueue(transport, {
         code={`import { useGapRecovery } from '@realtimejs/core'
 import { sseTransport } from '@realtimejs/adapter-sse'
 
-const transport = sseTransport({ url: '/api/core' })
+const transport = sseTransport({ url: '/api/realtime' })
 useGapRecovery(transport, {
   onGap: async (channel) => {
     await refetchCollection(channel)

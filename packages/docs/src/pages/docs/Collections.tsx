@@ -115,7 +115,7 @@ router.delete('/api/tasks/:id', async (req) => {
       </p>
       <CodeBlock
         title="server/jobs/inventorySync.ts"
-        code={`import { sseHandler } from '../core'
+        code={`import { sseHandler } from '../realtime'
 import { serializeKey } from '@realtimejs/core'
 
 export async function syncInventory(productId: string) {
@@ -204,7 +204,7 @@ realtimeCollectionOptions({
 import { createRealtimeClient } from '@realtimejs/core'
 import { sseTransport } from '@realtimejs/adapter-sse'
 
-const baseTransport = sseTransport({ url: '/api/core' })
+const baseTransport = sseTransport({ url: '/api/realtime' })
 
 // Listen for connection status changes
 const client = createRealtimeClient({ transport: baseTransport })

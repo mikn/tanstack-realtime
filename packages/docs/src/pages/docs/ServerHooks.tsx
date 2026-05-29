@@ -420,7 +420,7 @@ export const realtimePublish = createValidatedPublish({
       <CodeBlock
         title="app/server/functions/todos.ts"
         code={`import { createServerFn } from '@tanstack/start'
-import { realtimePublish } from '../core'
+import { realtimePublish } from '../realtime'
 import { db } from '../db'
 
 export const updateTodo = createServerFn({ method: 'POST' })
@@ -523,7 +523,7 @@ if (import.meta.hot) {
       <CodeBlock
         title="app/routes/api/health.ts"
         code={`import { createAPIFileRoute } from '@tanstack/start/api'
-import { sseHandler } from '../../server/core'
+import { sseHandler } from '../../server/realtime'
 
 export const Route = createAPIFileRoute('/api/health')({
   GET: () =>
