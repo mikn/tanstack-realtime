@@ -19,6 +19,9 @@
       "@tanstack/realtime-preset-start": [
         "./packages/realtime-preset-start/src/index.ts"
       ],
+      "@tanstack/realtime-reactive-drizzle": [
+        "./packages/realtime-reactive-drizzle/src/index.ts"
+      ],
       "@tanstack/react-realtime-devtools": [
         "./packages/react-realtime-devtools/src/index.ts"
       ]
@@ -31,6 +34,7 @@
     "packages/realtime-adapter-centrifugo/src",
     "packages/realtime-adapter-sse/src",
     "packages/realtime-preset-start/src",
+    "packages/realtime-reactive-drizzle/src",
     "packages/__tests__"
   ],
   "exclude": ["node_modules", "dist", "packages/docs"]

@@ -22,6 +22,7 @@
       "ignore": ["setup.ts"]
     },
     "packages/realtime-preset-start": {},
+    "packages/realtime-reactive-drizzle": {},
     "packages/e2e": {
       "entry": [
         "app/vite.config.ts",

@@ -30,6 +30,13 @@ const sourceAliases = [
     replacement: resolve(root, 'packages/realtime-preset-start/src/index.ts'),
   },
   {
+    find: /^@tanstack\/realtime-reactive-drizzle$/,
+    replacement: resolve(
+      root,
+      'packages/realtime-reactive-drizzle/src/index.ts',
+    ),
+  },
+  {
     find: /^@tanstack\/react-realtime-devtools$/,
     replacement: resolve(root, 'packages/react-realtime-devtools/src/index.ts'),
   },

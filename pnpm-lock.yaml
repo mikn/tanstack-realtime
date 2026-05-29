@@ -43,6 +43,9 @@ importers:
       '@tanstack/realtime-preset-start':
         specifier: workspace:*
         version: link:packages/realtime-preset-start
+      '@tanstack/realtime-reactive-drizzle':
+        specifier: workspace:*
+        version: link:packages/realtime-reactive-drizzle
       '@tanstack/store':
         specifier: ^0.9.1
         version: 0.9.1
@@ -277,6 +280,12 @@ importers:
       '@tanstack/realtime-adapter-sse':
         specifier: workspace:*
         version: link:../realtime-adapter-sse
+
+  packages/realtime-reactive-drizzle:
+    dependencies:
+      '@tanstack/realtime':
+        specifier: workspace:*
+        version: link:../realtime
       drizzle-orm:
         specifier: ^0.36.0
         version: 0.36.4(@types/react@19.2.14)(react@19.2.4)

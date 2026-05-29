@@ -34,7 +34,29 @@ export class SubscriptionManager {
   // Inverted index: tableName → (channel → SubscriptionEntry)
   private index = new Map<string, Map<string, SubscriptionEntry>>()
 
-  constructor(private readonly publishFn: PublishFn) {}
+  // Mutable publish ref so the publish/onChannelEmpty circular dependency with
+  // the SSE handler can be resolved: a manager may be created before its
+  // publish function is known, then have it injected via `setPublish`.
+  private publishFn: PublishFn
+
+  constructor(publishFn?: PublishFn) {
+    this.publishFn =
+      publishFn ??
+      (() => {
+        throw new Error(
+          '[realtime:reactive] SubscriptionManager has no publish function. ' +
+            'Pass one to createReactiveQueries({ publish }) or call bindPublish().',
+        )
+      })
+  }
+
+  /**
+   * Inject (or replace) the publish function after construction. Used to wire
+   * a handler's publish into a manager created up front.
+   */
+  setPublish(publishFn: PublishFn): void {
+    this.publishFn = publishFn
+  }
 
   /**
    * Register a subscription. Overwrites any existing entry for the same channel.
@@ -144,7 +166,7 @@ export class SubscriptionManager {
 }
 
 export function createSubscriptionManager(
-  publishFn: PublishFn,
+  publishFn?: PublishFn,
 ): SubscriptionManager {
   return new SubscriptionManager(publishFn)
 }

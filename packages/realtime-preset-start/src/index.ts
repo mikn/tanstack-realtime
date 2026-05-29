@@ -43,9 +43,6 @@
 export { createStartHandler } from './handler.js'
 export type {
   PublishBackend,
-  ReactiveQueryFn,
-  ReactiveMutationFn,
   StartHandlerOptions,
   StartRealtimeHandler,
 } from './handler.js'
-export { wrapReactiveDb } from './reactive-db.js'

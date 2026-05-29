@@ -7,25 +7,22 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { serializeKey } from '@tanstack/realtime'
-import {
-  createStartHandler,
-  wrapReactiveDb,
-} from '@tanstack/realtime-preset-start'
+import { createStartHandler } from '@tanstack/realtime-preset-start'
 import {
   REALTIME_BATCH_CHANNEL,
-  createSubscriptionManager,
-} from '../realtime-preset-start/src/subscription-manager.js'
-import {
   ReactivePredicateParseError,
   compilePredicate,
+  createReactiveQueries,
+  createSubscriptionManager,
   deriveChannelKey,
   extractEqualityConditions,
   extractReferencedColumns,
-} from '../realtime-preset-start/src/compile-predicate.js'
-import { runInReactiveContext } from '../realtime-preset-start/src/reactive-db.js'
-import { createLoader } from '../realtime-preset-start/src/reactive-loader.js'
-import { createMutationHandler } from '../realtime-preset-start/src/reactive-mutation.js'
-import type { SubscriptionEntry } from '../realtime-preset-start/src/subscription-manager.js'
+  runInReactiveContext,
+  wrapReactiveDb,
+} from '@tanstack/realtime-reactive-drizzle'
+import { createLoader } from '../realtime-reactive-drizzle/src/reactive-loader.js'
+import { createMutationHandler } from '../realtime-reactive-drizzle/src/reactive-mutation.js'
+import type { SubscriptionEntry } from '@tanstack/realtime-reactive-drizzle'
 
 // ---------------------------------------------------------------------------
 // Drizzle-compatible fake table objects
@@ -1091,10 +1088,15 @@ describe('createMutationHandler', () => {
 })
 
 // ---------------------------------------------------------------------------
-// createStartHandler — integration
+// createReactiveQueries + createStartHandler — integration
+//
+// The reactive engine now lives in @tanstack/realtime-reactive-drizzle and
+// composes with the transport handler from @tanstack/realtime-preset-start.
+// These tests preserve the original end-to-end coverage of query/mutation/
+// invalidate/subscriptionManager, now exercised through createReactiveQueries.
 // ---------------------------------------------------------------------------
 
-describe('createStartHandler — reactive integration', () => {
+describe('createReactiveQueries — reactive integration', () => {
   function makeReactiveDb(queryResult: Array<any>, insertResult: Array<any>) {
     const returningBuilder: any = {
       toSQL: () => ({ sql: 'INSERT INTO todos RETURNING *', params: [] }),
@@ -1122,27 +1124,28 @@ describe('createStartHandler — reactive integration', () => {
   }
 
   it('query() + mutation() end-to-end: only matching channel invalidated', async () => {
-    const realtime = createStartHandler({})
+    const handler = createStartHandler({})
+    const reactive = createReactiveQueries({ publish: handler.publish })
     const wrappedDb = makeReactiveDb(
       [{ id: 1, teamId: 'A' }],
       [{ id: 2, teamId: 'A' }],
     )
 
     // Register subscription via the new factory API
-    const getRows = realtime.query(
+    const getRows = reactive.query(
       async () => await wrappedDb.select().from(fakeTable),
     )
     await getRows(undefined)
 
     const expectedChannel = serializeKey(['todos', { teamId: 'A' }])
     expect(
-      realtime.subscriptionManager.activeChannels().has(expectedChannel),
+      reactive.subscriptionManager.activeChannels().has(expectedChannel),
     ).toBe(true)
 
     // Trigger mutation via the new factory API
-    const invalidateSpy = vi.spyOn(realtime.subscriptionManager, 'invalidate')
+    const invalidateSpy = vi.spyOn(reactive.subscriptionManager, 'invalidate')
 
-    const doInsert = realtime.mutation(
+    const doInsert = reactive.mutation(
       async () =>
         await wrappedDb.insert(fakeTable).values({ teamId: 'A' }).returning(),
     )
@@ -1162,14 +1165,15 @@ describe('createStartHandler — reactive integration', () => {
         return Promise.resolve()
       }),
     }
-    const realtime2 = createStartHandler({ backend })
+    const handler2 = createStartHandler({ backend })
+    const reactive2 = createReactiveQueries({ publish: handler2.publish })
     const wrappedDb2 = makeReactiveDb([{ id: 1, teamId: 'A' }], [])
-    const getRows2 = realtime2.query(
+    const getRows2 = reactive2.query(
       async () => await wrappedDb2.select().from(fakeTable),
     )
     await getRows2(undefined)
 
-    await realtime2.invalidate([
+    await reactive2.invalidate([
       { table: 'todos', operation: 'insert', affectedRows: [] },
     ])
 
@@ -1183,36 +1187,85 @@ describe('createStartHandler — reactive integration', () => {
     expect(updates.some((u) => u.channel.includes('todos'))).toBe(true)
   })
 
-  it('realtime.invalidate([{ table, affectedRows }]) works directly', async () => {
-    const realtime = createStartHandler({})
+  it('reactive.invalidate([{ table, affectedRows }]) works directly', async () => {
+    const handler = createStartHandler({})
+    const reactive = createReactiveQueries({ publish: handler.publish })
     const wrappedDb = makeReactiveDb([{ id: 1, teamId: 'A' }], [])
 
-    const getRows = realtime.query(
+    const getRows = reactive.query(
       async () => await wrappedDb.select().from(fakeTable),
     )
     await getRows(undefined)
 
     // Direct invalidation with matching rows
-    const invalidateSpy = vi.spyOn(realtime.subscriptionManager, 'invalidate')
-    await realtime.invalidate([
+    const invalidateSpy = vi.spyOn(reactive.subscriptionManager, 'invalidate')
+    await reactive.invalidate([
       { table: 'todos', operation: 'insert', affectedRows: [{ teamId: 'A' }] },
     ])
 
     expect(invalidateSpy).toHaveBeenCalledTimes(1)
   })
 
-  it('realtime.subscriptionManager is an instance of SubscriptionManager', () => {
-    const realtime = createStartHandler({})
+  it('reactive.subscriptionManager is an instance of SubscriptionManager', () => {
+    const reactive = createReactiveQueries({})
     // Check that subscriptionManager has the expected interface
-    expect(realtime.subscriptionManager).toBeDefined()
-    expect(typeof realtime.subscriptionManager.register).toBe('function')
-    expect(typeof realtime.subscriptionManager.unregister).toBe('function')
-    expect(typeof realtime.subscriptionManager.invalidate).toBe('function')
-    expect(typeof realtime.subscriptionManager.activeChannels).toBe('function')
+    expect(reactive.subscriptionManager).toBeDefined()
+    expect(typeof reactive.subscriptionManager.register).toBe('function')
+    expect(typeof reactive.subscriptionManager.unregister).toBe('function')
+    expect(typeof reactive.subscriptionManager.invalidate).toBe('function')
+    expect(typeof reactive.subscriptionManager.activeChannels).toBe('function')
+  })
+
+  it('onChannelEmpty unregisters channels but never the batch channel', () => {
+    const reactive = createReactiveQueries({})
+    reactive.subscriptionManager.register(
+      makeEntry('ch-A', 'todos', () => true),
+    )
+    reactive.subscriptionManager.register(
+      makeEntry(REALTIME_BATCH_CHANNEL, 'todos', () => true),
+    )
+
+    reactive.onChannelEmpty('ch-A')
+    expect(reactive.subscriptionManager.activeChannels().has('ch-A')).toBe(
+      false,
+    )
+
+    // The batch channel must survive — it's always needed for invalidation.
+    reactive.onChannelEmpty(REALTIME_BATCH_CHANNEL)
+    expect(
+      reactive.subscriptionManager.activeChannels().has(REALTIME_BATCH_CHANNEL),
+    ).toBe(true)
+  })
+
+  it('bindPublish injects publish after construction', async () => {
+    const published: Array<{ ch: string; data: unknown }> = []
+    const handler = createStartHandler({
+      backend: {
+        publish: (ch: string, data: unknown) => {
+          published.push({ ch, data })
+          return Promise.resolve()
+        },
+      },
+    })
+    // Construct the reactive engine BEFORE the handler's publish is wired in.
+    const reactive = createReactiveQueries({})
+    const wrappedDb = makeReactiveDb([{ id: 1, teamId: 'A' }], [])
+    const getRows = reactive.query(
+      async () => await wrappedDb.select().from(fakeTable),
+    )
+    await getRows(undefined)
+
+    // Inject publish, then invalidate — the batch message should fan out.
+    reactive.bindPublish(handler.publish)
+    await reactive.invalidate([
+      { table: 'todos', operation: 'insert', affectedRows: [] },
+    ])
+
+    expect(published.some((p) => p.ch === REALTIME_BATCH_CHANNEL)).toBe(true)
   })
 
   it('query without .where() registers table-level subscription and does not throw', async () => {
-    const realtime = createStartHandler({})
+    const reactive = createReactiveQueries({})
     const fakeResult = [{ id: 1 }]
     const fakeBuilder = makeFakeBuilder('SELECT * FROM "todos"', [], fakeResult)
 
@@ -1224,7 +1277,7 @@ describe('createStartHandler — reactive integration', () => {
     const wrappedDb = wrapReactiveDb(rawDb)
 
     // Should not throw even though there is no WHERE clause
-    const getRows = realtime.query(
+    const getRows = reactive.query(
       async () => await wrappedDb.select().from(fakeTable),
     )
     const { data } = await getRows(undefined)
@@ -1232,7 +1285,7 @@ describe('createStartHandler — reactive integration', () => {
     expect(data).toEqual(fakeResult)
     const expectedChannel = serializeKey(['todos'])
     expect(
-      realtime.subscriptionManager.activeChannels().has(expectedChannel),
+      reactive.subscriptionManager.activeChannels().has(expectedChannel),
     ).toBe(true)
   })
 })

@@ -15,16 +15,17 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createStartHandler } from '@tanstack/realtime-preset-start'
 import {
-  createStartHandler,
+  createReactiveQueries,
+  createSubscriptionManager,
   wrapReactiveDb,
-} from '@tanstack/realtime-preset-start'
+} from '@tanstack/realtime-reactive-drizzle'
 import {
   deriveCacheKey,
   getOrCreateQueryCollection,
   serializeKey,
 } from '@tanstack/realtime'
-import { createSubscriptionManager } from '../realtime-preset-start/src/subscription-manager.js'
 import {
   REALTIME_BATCH_CHANNEL,
   clearRegistry,
@@ -110,10 +111,10 @@ function makeSelectDbNoWhere(queryResult: Array<any>) {
 
 describe('query factory — auto-derived channel', () => {
   it('returns { data, channel } with channel derived from WHERE teamId = A', async () => {
-    const handler = createStartHandler({ pingInterval: 0 })
+    const reactive = createReactiveQueries({})
     const db = makeSelectDb([{ id: 1, teamId: 'A' }])
 
-    const result = await handler.query(
+    const result = await reactive.query(
       async () => await db.select().from(fakeTable),
     )(undefined)
 
@@ -129,10 +130,10 @@ describe('query factory — auto-derived channel', () => {
       { id: 1, teamId: 'A', done: false },
       { id: 2, teamId: 'A', done: true },
     ]
-    const handler = createStartHandler({ pingInterval: 0 })
+    const reactive = createReactiveQueries({})
     const db = makeSelectDb(todos)
 
-    const { data, channel } = await handler.query(
+    const { data, channel } = await reactive.query(
       async () => await db.select().from(fakeTable),
     )(undefined)
 
@@ -148,14 +149,14 @@ describe('query factory — auto-derived channel', () => {
 
 describe('query factory — registers subscription', () => {
   it('registers the channel in the subscriptionManager after call', async () => {
-    const handler = createStartHandler({ pingInterval: 0 })
+    const reactive = createReactiveQueries({})
     const db = makeSelectDb([{ id: 1, teamId: 'A' }])
 
-    const { channel } = await handler.query(
+    const { channel } = await reactive.query(
       async () => await db.select().from(fakeTable),
     )(undefined)
 
-    const activeChannels = handler.subscriptionManager.activeChannels()
+    const activeChannels = reactive.subscriptionManager.activeChannels()
     expect(activeChannels.has(channel)).toBe(true)
   })
 
@@ -171,14 +172,15 @@ describe('query factory — registers subscription', () => {
       backend,
       pingInterval: 0,
     })
+    const reactive = createReactiveQueries({ publish: handler.publish })
     const db = makeSelectDb([{ id: 1, teamId: 'A' }])
 
-    const { channel } = await handler.query(
+    const { channel } = await reactive.query(
       async () => await db.select().from(fakeTable),
     )(undefined)
 
     // Trigger invalidation with a matching row
-    await handler.invalidate([
+    await reactive.invalidate([
       { table: 'todos', operation: 'insert', affectedRows: [{ teamId: 'A' }] },
     ])
 
@@ -203,14 +205,15 @@ describe('query factory — registers subscription', () => {
       backend,
       pingInterval: 0,
     })
+    const reactive = createReactiveQueries({ publish: handler.publish })
     const db = makeSelectDb([{ id: 1, teamId: 'A' }])
 
-    const { channel } = await handler.query(
+    const { channel } = await reactive.query(
       async () => await db.select().from(fakeTable),
     )(undefined)
 
     // Row belongs to team B — should not invalidate team A's subscription
-    await handler.invalidate([
+    await reactive.invalidate([
       { table: 'todos', operation: 'insert', affectedRows: [{ teamId: 'B' }] },
     ])
 
@@ -229,28 +232,22 @@ describe('query factory — registers subscription', () => {
 
   it('two query calls with the same manager both register the same channel for same query', async () => {
     const mgr = createSubscriptionManager(vi.fn().mockResolvedValue(undefined))
-    const handlerA = createStartHandler({
-      subscriptionManager: mgr,
-      pingInterval: 0,
-    })
-    const handlerB = createStartHandler({
-      subscriptionManager: mgr,
-      pingInterval: 0,
-    })
+    const reactiveA = createReactiveQueries({ subscriptionManager: mgr })
+    const reactiveB = createReactiveQueries({ subscriptionManager: mgr })
 
     const dbA = makeSelectDb([])
     const dbB = makeSelectDb([])
 
-    await handlerA.query(async () => await dbA.select().from(fakeTable))(
+    await reactiveA.query(async () => await dbA.select().from(fakeTable))(
       undefined,
     )
-    await handlerB.query(async () => await dbB.select().from(fakeTable))(
+    await reactiveB.query(async () => await dbB.select().from(fakeTable))(
       undefined,
     )
 
     const channels = mgr.activeChannels()
     const expectedChannel = serializeKey(['todos', { teamId: 'A' }])
-    // Both handlers used the same manager; channel should be registered (possibly overwritten once)
+    // Both engines used the same manager; channel should be registered (possibly overwritten once)
     expect(channels.has(expectedChannel)).toBe(true)
   })
 })
@@ -261,10 +258,10 @@ describe('query factory — registers subscription', () => {
 
 describe('query factory — table-level channel (no WHERE)', () => {
   it('derives a table-level channel when query has no WHERE clause', async () => {
-    const handler = createStartHandler({ pingInterval: 0 })
+    const reactive = createReactiveQueries({})
     const db = makeSelectDbNoWhere([{ id: 1 }, { id: 2 }])
 
-    const { channel, data } = await handler.query(
+    const { channel, data } = await reactive.query(
       async () => await db.select().from(fakeTable),
     )(undefined)
 
@@ -273,14 +270,14 @@ describe('query factory — table-level channel (no WHERE)', () => {
   })
 
   it('table-level channel is registered in subscriptionManager', async () => {
-    const handler = createStartHandler({ pingInterval: 0 })
+    const reactive = createReactiveQueries({})
     const db = makeSelectDbNoWhere([])
 
-    await handler.query(async () => await db.select().from(fakeTable))(
+    await reactive.query(async () => await db.select().from(fakeTable))(
       undefined,
     )
 
-    const channels = handler.subscriptionManager.activeChannels()
+    const channels = reactive.subscriptionManager.activeChannels()
     expect(channels.has(serializeKey(['todos']))).toBe(true)
   })
 
@@ -296,14 +293,15 @@ describe('query factory — table-level channel (no WHERE)', () => {
       backend,
       pingInterval: 0,
     })
+    const reactive = createReactiveQueries({ publish: handler.publish })
     const db = makeSelectDbNoWhere([{ id: 1 }])
 
-    const { channel } = await handler.query(
+    const { channel } = await reactive.query(
       async () => await db.select().from(fakeTable),
     )(undefined)
 
     // Table-level invalidation (no specific rows)
-    await handler.invalidate([
+    await reactive.invalidate([
       { table: 'todos', operation: 'insert', affectedRows: [] },
     ])
 

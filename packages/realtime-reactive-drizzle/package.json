@@ -1,8 +1,8 @@
 {
-  "name": "@tanstack/realtime-preset-start",
+  "name": "@tanstack/realtime-reactive-drizzle",
   "version": "0.0.1",
   "type": "module",
-  "description": "TanStack Start / TanStack Router preset for @tanstack/realtime — transport-agnostic server-side publishing",
+  "description": "Drizzle/Postgres reactive-query engine for @tanstack/realtime — auto-derived channels, predicate matching, and invalidation",
   "license": "MIT",
   "exports": {
     ".": {
@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@tanstack/realtime": "workspace:*",
-    "@tanstack/realtime-adapter-sse": "workspace:*"
+    "drizzle-orm": "^0.36.0",
+    "pgsql-ast-parser": "^12.0.0"
   }
 }
