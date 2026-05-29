@@ -34,6 +34,24 @@ pnpm --filter @realtimejs-example/ai-streaming dev
 
 Open <http://localhost:5175> and click **Generate** to watch tokens stream in.
 
+## Subscribe-ordering race (a deliberate caveat)
+
+`useStream` subscribes to the `['ai', { sessionId }]` channel on mount, but the
+SSE subscribe is a separate client→server round-trip. If the client POSTs
+`/api/generate` before that subscribe lands, the server can emit the first
+tokens before this client is a registered subscriber — and because this mock
+stream has **no replay/buffer**, those early tokens are dropped.
+
+To keep the example focused, `src/App.tsx` papers over this with a small fixed
+delay before POSTing. That is intentionally a teaching shortcut, not a
+recommendation. The current client API does not expose a subscribe-confirmation
+to await (`client.subscribe` is synchronous and `useStream`'s `pending` status
+does not mean "the server has registered us"). **Production code should instead
+make delivery order-independent server-side** — buffer/replay the stream so
+pre-subscription tokens are still delivered, or only start emitting once the
+server observes the subscription (e.g. via an `onChannelSubscribe` hook) —
+rather than guessing a delay on the client.
+
 ## Scripts
 
 - `dev` — start the Vite dev server (client + in-memory SSE server middleware)

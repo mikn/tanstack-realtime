@@ -17,8 +17,26 @@ function StreamView({ sessionId }: { sessionId: string }) {
     params: { sessionId },
   })
 
-  // Trigger generation once the subscription has had a moment to register on
-  // the server (the SSE subscribe action is a separate round-trip).
+  // Subscribe-ordering race (intentional, documented limitation):
+  //
+  // `useStream` subscribes to the channel on mount, but the SSE subscribe is a
+  // separate client→server round-trip. If we POST /api/generate immediately,
+  // the server can start pushing tokens BEFORE this client is registered as a
+  // subscriber — and this mock server stream has no replay/buffer, so those
+  // early tokens are dropped and the UI shows a truncated response.
+  //
+  // The clean fix is to gate generation on the subscription actually being
+  // live, but the current client API does not surface a subscribe-confirmation:
+  // `client.subscribe` returns synchronously (an unsub fn, not a promise) and
+  // `useStream`'s `status` starts at `'pending'` on mount regardless of whether
+  // the server has registered us yet — so there is no "subscribed" signal to
+  // await here. As a teaching example we therefore use a small fixed delay to
+  // let the subscribe round-trip land first.
+  //
+  // Production code should NOT rely on a timing guess. Instead, buffer/replay
+  // the stream server-side (so tokens emitted before a subscriber attaches are
+  // still delivered), or have the server emit tokens only after it observes the
+  // subscription (e.g. via an `onChannelSubscribe` hook). See the README.
   useEffect(() => {
     const t = setTimeout(() => {
       void fetch('/api/generate', {

@@ -12,7 +12,12 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
-    "types": ["node"]
+    "types": ["node"],
+    "paths": {
+      "@realtimejs/react": ["../../packages/react/src/index.ts"],
+      "@realtimejs/core": ["../../packages/core/src/index.ts"],
+      "@realtimejs/adapter-sse": ["../../packages/adapter-sse/src/index.ts"]
+    }
   },
   "include": ["src", "vite.config.ts"]
 }

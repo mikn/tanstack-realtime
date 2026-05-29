@@ -29,6 +29,17 @@ Presence is layered on the transport via a small `withPresence` wrapper
 (`src/withPresence.ts`) — the same helper the repo's e2e app uses — so the SSE
 server needs no presence-specific code.
 
+### Late joiners
+
+The presence sidecar channel only delivers a `join` announcement to peers who
+are already subscribed when it is published — it has no replay/history. Without
+mitigation that makes the online list asymmetric: if Alice joins and then Bob
+joins, Bob sees Alice's `join`, but Alice's earlier `join` never reaches Bob.
+`src/App.tsx` fixes this (mirroring the e2e `PresencePanel`) with a ~2s
+`updatePresence` heartbeat: each client re-announces its presence on an interval
+(cleared on unmount), so every peer — including late joiners — discovers
+everyone else within a couple of seconds.
+
 ## Run
 
 ```sh

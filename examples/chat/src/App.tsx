@@ -9,7 +9,7 @@
  * Messages are sent with a plain `fetch` POST to the in-memory server, which
  * appends to history and broadcasts over the `chat` channel.
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   createPresenceChannel,
   useConnectionStatus,
@@ -28,6 +28,9 @@ interface ChatMessage {
 }
 
 const ROOM = 'lobby'
+
+// How often each client re-announces its presence (see the heartbeat note below).
+const PRESENCE_HEARTBEAT_MS = 2_000
 
 const roomPresence = createPresenceChannel({
   id: 'chat-room-presence',
@@ -56,10 +59,26 @@ export function App() {
     q.from({ messages }).orderBy(({ messages: m }) => m.timestamp, 'asc'),
   )
 
-  const { others } = usePresence<{ name: string }, { room: string }>(
-    roomPresence,
-    { params: { room: ROOM }, initial: { name: userId } },
-  )
+  const { others, updatePresence } = usePresence<
+    { name: string },
+    { room: string }
+  >(roomPresence, { params: { room: ROOM }, initial: { name: userId } })
+
+  // Late-joiner handling: presence is layered on a plain pub/sub sidecar
+  // channel, which only delivers a `join` announcement to peers who are
+  // already subscribed when it is published. So if Alice joins and then Bob
+  // joins, Bob's `join` reaches Alice, but Alice's earlier `join` never reaches
+  // Bob — the list would be asymmetric. We fix this the same way the repo's
+  // e2e PresencePanel does: each client re-announces its full presence data on
+  // a short interval via `updatePresence`, so every peer (including late
+  // joiners) discovers everyone else within a couple of seconds. The interval
+  // is cleared on unmount.
+  useEffect(() => {
+    const id = setInterval(() => {
+      updatePresence({ name: userId })
+    }, PRESENCE_HEARTBEAT_MS)
+    return () => clearInterval(id)
+  }, [updatePresence])
 
   const { typingUsers, startTyping, stopTyping } = useTypingIndicator(
     ['chat-typing', { room: ROOM }],

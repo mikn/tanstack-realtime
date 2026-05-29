@@ -6,15 +6,25 @@
  * only needs a transport (SSE) and a channel to broadcast mutations on.
  *
  * Responsibilities:
- *  - `GET  /api/todos`  → returns the current todo list (queryFn source).
- *  - `POST /api/todos`  → create a todo, broadcast `{ action: 'insert', data }`.
- *  - `PATCH /api/todos/:id` → update a todo, broadcast `{ action: 'update', data }`.
- *  - `DELETE /api/todos/:id` → delete a todo, broadcast `{ action: 'delete', data }`.
+ *  - `GET  /api/todos`  → returns the current todo list (the `queryFn` source
+ *    used for each tab's initial load).
+ *  - `POST /api/todos`  → create a todo (persist only).
+ *  - `PATCH /api/todos/:id` → update a todo (persist only).
+ *  - `DELETE /api/todos/:id` → delete a todo (persist only).
  *  - SSE stream + client actions are delegated to `createSseHandler`.
  *
- * The REST mutations persist into the Map and then call `handler.broadcast` so
- * every connected client converges. CRDT fields on the client (`votes` as a
- * `pn-counter`, `text` as `lww`) make concurrent edits converge without loss.
+ * Peer sync is **client-authoritative**: after a mutation, the mutating client
+ * publishes a message over the `todos` channel that carries the per-field
+ * `_crdt` header (PN counter for `votes`, Lamport clock for `text`). Peers
+ * merge those headers so concurrent edits converge without loss.
+ *
+ * Crucially, the server does NOT also broadcast a freshly-constructed plain
+ * (header-less) row for the same mutation. A header-less `{ action, data }`
+ * would carry the server's absolute `votes` value with no CRDT metadata and, on
+ * peers, would race with / clobber the correctly CRDT-merged value. So REST is
+ * persistence-only here; the channel traffic comes from the client publish-back.
+ * (If you had a second write path that bypassed the client — e.g. a cron job —
+ * it should relay a CRDT-tagged message, not a plain row.)
  */
 import { createSseHandler } from '@realtimejs/adapter-sse'
 
@@ -24,8 +34,6 @@ interface Todo {
   votes: number
   done: boolean
 }
-
-const TODOS_CHANNEL = 'todos'
 
 interface TodosServer {
   /** Handles the SSE GET stream and POST client actions on /api/realtime. */
@@ -79,7 +87,8 @@ export function createTodosServer(): TodosServer {
         done: body.done ?? false,
       }
       store.set(todo.id, todo)
-      sse.broadcast(TODOS_CHANNEL, { action: 'insert', data: todo })
+      // Persist only — the client publishes the CRDT-tagged insert over the
+      // `todos` channel itself (see file header). No header-less re-broadcast.
       return json(todo, 201)
     }
 
@@ -90,18 +99,15 @@ export function createTodosServer(): TodosServer {
       const patch = (await req.json()) as Partial<Todo>
       const updated: Todo = { ...existing, ...patch, id }
       store.set(id, updated)
-      sse.broadcast(TODOS_CHANNEL, { action: 'update', data: updated })
+      // Persist only — the client publishes the CRDT-tagged update (carrying the
+      // PN `inc`/`dec` maps for `votes`) over the `todos` channel itself.
       return json(updated)
     }
 
     // DELETE /api/todos/:id — delete.
     if (req.method === 'DELETE' && id) {
-      const existing = store.get(id)
       store.delete(id)
-      sse.broadcast(TODOS_CHANNEL, {
-        action: 'delete',
-        data: existing ?? { id },
-      })
+      // Persist only — the client publishes the delete over the `todos` channel.
       return json({ ok: true })
     }
 

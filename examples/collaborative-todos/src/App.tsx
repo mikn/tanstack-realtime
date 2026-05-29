@@ -8,9 +8,19 @@
  * - `done` is a plain (incoming-wins) field.
  *
  * The collection uses the REST shorthand (`url`) so `queryFn` + CRUD callbacks
- * are generated automatically. `serverAuthoritative` makes the in-memory server
- * the single publisher: every REST mutation broadcasts `{ action, data }` back
- * over the `todos` channel and all tabs converge.
+ * are generated automatically. This example uses the **client-authoritative**
+ * CRDT path (`optimistic: true` + `fields`, NO `serverAuthoritative`):
+ *
+ *  - The server's REST endpoints are pure persistence + the source of truth for
+ *    the initial load (`GET /api/todos`).
+ *  - After a local mutation, the mutating client publishes a message back over
+ *    the `todos` channel carrying the per-field `_crdt` header (e.g. the PN
+ *    counter `inc`/`dec` maps for `votes`). Peers merge that header with
+ *    `mergePn` so concurrent upvotes from many tabs always add up — no lost
+ *    updates and no forced reset to 0.
+ *  - The server does NOT re-broadcast a plain (header-less) row for these
+ *    mutations; doing so would race with / overwrite the CRDT-merged value on
+ *    peers. Peer sync flows exclusively through the client's CRDT publish-back.
  */
 import { useState } from 'react'
 import { useConnectionStatus, useRealtimeCollection } from '@realtimejs/react'
@@ -32,8 +42,9 @@ export function App() {
     getKey: (t) => t.id,
     // CRDT convergence per field — see file header.
     fields: { text: 'lww', votes: 'pn-counter' },
-    // The server is the only publisher; clients consume the broadcast.
-    serverAuthoritative: true,
+    // Client-authoritative CRDT path: the mutating client publishes the `_crdt`
+    // header back over the `todos` channel; `optimistic` enables echo
+    // suppression so we don't re-apply our own publish.
     optimistic: true,
   })
 

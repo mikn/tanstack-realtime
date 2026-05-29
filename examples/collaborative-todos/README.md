@@ -4,8 +4,12 @@ A multi-tab collaborative todo list demonstrating **optimistic updates** and
 **CRDT convergence** with `@realtimejs/core` + `@realtimejs/react`.
 
 > **Architecture:** Vite + React client talks to an in-memory SSE server
-> (mounted as Vite dev middleware) over a single `todos` channel; the server is
-> the authoritative publisher and rebroadcasts every REST mutation.
+> (mounted as Vite dev middleware) over a single `todos` channel. Peer sync is
+> **client-authoritative**: the in-memory server's REST endpoints persist data
+> and serve the initial load, while the mutating client publishes a
+> CRDT-tagged message (`_crdt` header) back over the `todos` channel so peers
+> converge. The server deliberately does **not** re-broadcast a header-less row,
+> which would clobber the CRDT-merged `votes` value on peers.
 
 ## Bring your own backend
 
