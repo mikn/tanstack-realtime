@@ -2,7 +2,7 @@ const sections = [
   {
     title: 'Overview',
     items: [
-      { label: 'Why TanStack Realtime', hash: '#/docs/why' },
+      { label: 'Why realtime.js', hash: '#/docs/why' },
       { label: 'Getting Started', hash: '#/docs/getting-started' },
       { label: 'Tutorial: Task Board', hash: '#/docs/tutorial' },
       { label: 'Collections', hash: '#/docs/collections' },

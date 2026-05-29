@@ -5,14 +5,18 @@ function Hero() {
     <section className="hero">
       <div className="hero-glow" />
       <div className="container">
-        <span className="badge">v0.1 &middot; Alpha</span>
+        <span className="badge">
+          v0.1 &middot; Experimental &middot; pre-1.0
+        </span>
         <h1>
-          Reactive queries. <span className="gradient-text">Any backend.</span>
+          <span className="logo-tan">realtime</span>
+          <span className="gradient-text">.js</span>
         </h1>
+        <p className="hero-tagline">Bring your own backend.</p>
         <p className="hero-sub">
-          Wrap a server function with <code>realtime.query()</code> and every
-          subscriber updates automatically. Your database, your ORM, your
-          deployment target.
+          The kitchen sink you actually need for proper realtime &mdash; sync,
+          presence, CRDTs, and offline &mdash; with no platform and no per-seat
+          bill. Keep your server, your database, your deploy target.
         </p>
 
         <div className="hero-code">
@@ -189,9 +193,9 @@ function Positioning() {
       <div className="container">
         <h2>What this is (and isn&rsquo;t)</h2>
         <p className="section-sub">
-          TanStack Realtime is a sync layer. It makes server functions reactive
-          and adds presence, CRDTs, and pub/sub. It is not a database, not a
-          hosting platform, and not a full backend.
+          <code>realtime.js</code> is a sync layer. It makes server functions
+          reactive and adds presence, CRDTs, and pub/sub. It is not a database,
+          not a hosting platform, and not a full backend &mdash; bring your own.
         </p>
 
         <div className="positioning-grid">
@@ -227,8 +231,8 @@ function Positioning() {
                 PowerSync replicate at the WAL level. Different architecture.
               </li>
               <li>
-                <strong>Rich text?</strong> Yjs is purpose-built. TanStack
-                Realtime works as a{' '}
+                <strong>Rich text?</strong> Yjs is purpose-built.{' '}
+                <code>realtime.js</code> works as a{' '}
                 <a href="#/docs/rich-text-crdts">transport for Y.js</a>, not a
                 replacement.
               </li>
@@ -460,8 +464,8 @@ function Community() {
       <div className="container">
         <h2>Built for the community</h2>
         <p className="section-sub">
-          TanStack Realtime is MIT-licensed and community-driven. Join the
-          conversation on{' '}
+          <code>realtime.js</code> is MIT-licensed and community-driven. Join
+          the conversation on{' '}
           <a
             href="https://github.com/mikn/tanstack-realtime"
             target="_blank"
@@ -489,9 +493,9 @@ function Footer() {
     <footer className="footer">
       <div className="container footer-inner">
         <div className="footer-brand">
-          <span className="logo-tan">TanStack</span>{' '}
-          <span className="logo-realtime">Realtime</span>
-          <p>Reactive queries. Any backend. Full control.</p>
+          <span className="logo-tan">realtime</span>
+          <span className="logo-realtime">.js</span>
+          <p>Bring your own backend. No platform, no per-seat bill.</p>
         </div>
         <div className="footer-links">
           <div>
@@ -536,8 +540,9 @@ function Footer() {
         </div>
         <div className="footer-bottom">
           <p>
-            &copy; {new Date().getFullYear()} mikn. MIT License. Not an official
-            TanStack project.
+            &copy; {new Date().getFullYear()} mikn. MIT License. An independent,
+            vendor-neutral project &mdash; not affiliated with or endorsed by
+            TanStack.
           </p>
         </div>
       </div>

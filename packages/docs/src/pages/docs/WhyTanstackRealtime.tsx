@@ -3,22 +3,27 @@ import { CodeBlock } from '../../components/CodeBlock'
 export function WhyTanstackRealtime() {
   return (
     <article className="doc-article">
-      <h1>Why TanStack Realtime</h1>
+      <h1>Why realtime.js</h1>
       <p className="doc-lead">
-        A sync layer that makes server functions reactive. You keep your
-        database, your ORM, and your deploy target.
+        Sync without a platform. Keep your backend, your database, and your
+        deploy target &mdash; and skip the per-seat bill.
       </p>
 
       <h2 id="problem">The problem</h2>
       <p>
-        Making server data update in real time usually means either adopting a
-        managed platform (and its database, its query language, its pricing) or
-        wiring up WebSockets, channels, cache invalidation, and reconnection
-        logic yourself.
+        Making server data update in real time usually means one of two things:
+        adopting a managed platform &mdash; and with it a proprietary database,
+        a query language, a hosting target, and a per-seat or per-connection
+        pricing meter &mdash; or wiring up WebSockets, channels, cache
+        invalidation, presence, and reconnection logic yourself.
       </p>
       <p>
-        TanStack Realtime is an alternative: annotate a server function, get
-        live queries. Everything else stays the same.
+        <code>realtime.js</code> is a third option: a freestanding,
+        vendor-neutral library. There is no platform to adopt and no lock-in.
+        Your Express/Hono routes, your Postgres, and your deploy target stay
+        exactly where they are. You pay your own infra, not a usage meter.
+        Annotate a server function, get live queries &mdash; everything else
+        stays the same.
       </p>
 
       <CodeBlock
@@ -72,7 +77,10 @@ export const getTodos = realtime.query(async ({ teamId }: { teamId: string }) =>
       </ul>
 
       <h2 id="what-it-doesnt">What it doesn&rsquo;t do</h2>
-      <p>TanStack Realtime is a sync layer. It does not provide:</p>
+      <p>
+        <code>realtime.js</code> is a sync layer, not a platform. It does not
+        provide:
+      </p>
       <ul>
         <li>
           A database &mdash; bring Postgres, MySQL, SQLite, or anything else
@@ -86,16 +94,105 @@ export const getTodos = realtime.query(async ({ teamId }: { teamId: string }) =>
         <li>
           Rich text CRDT &mdash; use{' '}
           <a href="#/docs/rich-text-crdts">
-            Y.js with TanStack Realtime as the transport
+            Y.js with realtime.js as the transport
           </a>
         </li>
       </ul>
       <p>
         If you want all of those bundled together, a managed platform like
         Convex is designed for that. The trade-off is coupling to its database,
-        query language, and pricing model. Both are reasonable choices depending
-        on what you value.
+        query language, and pricing model &mdash; plus a per-seat or
+        per-connection bill that grows with usage. With <code>realtime.js</code>{' '}
+        you pay your own infra and nothing else. Both are reasonable choices
+        depending on what you value.
       </p>
+
+      <h2 id="what-needs-what">What needs what (honest capability matrix)</h2>
+      <p>
+        The whole point of the rebrand is credibility, so here is the honest
+        breakdown. Most of <code>realtime.js</code> is fully vendor-neutral and
+        works with any backend. One layer &mdash; auto-invalidating reactive
+        server queries &mdash; currently ships a single engine adapter.
+      </p>
+
+      <h3 id="vendor-neutral">Vendor-neutral &mdash; works with any backend</h3>
+      <p>
+        These features make no assumptions about your server, database, ORM, or
+        deploy target. Bring whatever you already run:
+      </p>
+      <ul>
+        <li>
+          <strong>Transports</strong> &mdash; SSE, WebSocket, and Centrifugo.
+          Swap one import; your collections and hooks don&rsquo;t change.
+        </li>
+        <li>
+          <strong>Live collections</strong> &mdash;{' '}
+          <code>realtimeCollectionOptions</code> backed by any transport.
+        </li>
+        <li>
+          <strong>Pub/sub channels</strong> &mdash; raw publish/subscribe,
+          append-only live channels, ephemeral channels with TTL.
+        </li>
+        <li>
+          <strong>Presence and typing indicators</strong> &mdash; online user
+          lists, cursors, typing state.
+        </li>
+        <li>
+          <strong>Field-level CRDTs</strong> &mdash; LWW registers, PN-counters,
+          and OR-sets. Merging happens on the client; your server just stores
+          and relays.
+        </li>
+        <li>
+          <strong>AI / stream channels</strong> &mdash; reduce-based streaming
+          state from ordered event streams.
+        </li>
+        <li>
+          <strong>Offline queue</strong>,{' '}
+          <strong>multi-tab coordination</strong> (SharedWorker &rarr;
+          BroadcastChannel &rarr; direct), and <strong>devtools</strong>.
+        </li>
+      </ul>
+
+      <h3 id="reactive-queries-requirement">
+        Reactive server queries &mdash; one built-in engine today
+      </h3>
+      <p>
+        Auto-invalidating reactive queries (<code>createReactiveQueries</code>{' '}
+        &mdash; the layer behind <code>realtime.query()</code>/
+        <code>realtime.mutation()</code> that derives channels and invalidates
+        affected queries automatically) currently ships{' '}
+        <strong>one engine adapter</strong>:{' '}
+        <code>@realtimejs/reactive-drizzle</code> (Drizzle ORM + Postgres).
+      </p>
+      <p>
+        The reactive layer is <strong>pluggable</strong> via the{' '}
+        <code>ReactiveQueryEngine</code> interface exported from core, so other
+        ORMs and dialects can be supported by implementing that interface.
+        Today, Drizzle/Postgres is the only built-in. If you use a different
+        stack, the vendor-neutral primitives above (live collections, pub/sub,
+        explicit channels) still work everywhere &mdash; you just wire
+        invalidation yourself instead of getting it automatically.
+      </p>
+
+      <h3 id="known-limitations">Known limitations (stated honestly)</h3>
+      <ul>
+        <li>
+          <strong>JOINs only track the primary table.</strong> Automatic
+          multi-table reactivity covers separate <code>select().from()</code>{' '}
+          reads. A SQL <code>JOIN</code> only captures the primary table &mdash;
+          changes to joined tables won&rsquo;t auto-invalidate. Use the explicit
+          channel/predicate escape hatch for queries that join.
+        </li>
+        <li>
+          <strong>
+            Distinct queries that derive the same channel can collide.
+          </strong>{' '}
+          Two different reactive queries that happen to derive the same channel
+          key may interfere &mdash; a query sharing a channel key with another
+          can miss updates. This is a known limitation tracked for a future fix;
+          give colliding queries distinct args/channels for now.
+        </li>
+      </ul>
 
       <h2 id="progressive">Progressive adoption</h2>
       <p>

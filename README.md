@@ -1,38 +1,42 @@
-# TanStack Realtime
+# realtime.js
 
-> Add realtime to your existing app — keep your server, your database, your deploy target. Live collections, pub/sub, presence, and CRDTs as a transport layer, not a platform. Built for [TanStack DB](https://github.com/TanStack/db).
+> **Bring your own backend.**
+>
+> _The kitchen sink you actually need for proper realtime — sync, presence, CRDTs, and offline — with no platform and no per-seat bill._
 
 [![npm version](https://img.shields.io/npm/v/@realtimejs/core)](https://www.npmjs.com/package/@realtimejs/core)
 [![License](https://img.shields.io/github/license/mikn/tanstack-realtime)](LICENSE)
 [![CI](https://github.com/mikn/tanstack-realtime/actions/workflows/ci.yml/badge.svg)](https://github.com/mikn/tanstack-realtime/actions/workflows/ci.yml)
 
 > [!WARNING]
-> This is **not** an official [TanStack](https://tanstack.com) project. It is a
-> vibe-coded library that explores an architecture and structure for what a
-> TanStack Realtime library could look like. Use it to experiment, get inspired,
-> or contribute ideas — but do not rely on it in production.
+> **Project status:** `realtime.js` is **experimental and pre-1.0**. The API
+> still moves, and it has not been hardened in production. Use it to experiment,
+> build prototypes, and contribute ideas — but pin your versions and expect
+> breaking changes before 1.0.
 
-- **Keep your backend** — not a platform. Your Express routes, your Postgres, your deploy target stay exactly where they are. Add a `channel` to one collection and it goes live.
+- **Bring your own backend** — `realtime.js` is a library, not a platform. Your Express/Hono routes, your Postgres, your deploy target stay exactly where they are. Add a `channel` to one collection and it goes live.
+- **No platform, no lock-in** — no proprietary database, no required hosting, no SDK that owns your data. Self-host the transport you already run, or point it at Centrifugo.
+- **No per-seat / per-connection bill** — you pay your own infra, not a usage meter. Scaling is your server's problem, not a pricing tier.
 - **One feature at a time** — start with `queryFn`. Add `channel` when ready. Add `fields` for CRDTs when you need conflict resolution. Each step is one config key — stop at any point.
-- **Pub/sub + presence** — chat, typing indicators, live cursors, and activity feeds are first-class. These aren't database rows — they need channels and presence, not table sync.
-- **Client-side CRDTs** — `{ votes: 'pn-counter', tags: 'or-set' }`. Merging happens on the client. Your server just stores and relays — no CRDT logic server-side.
+- **The kitchen sink, when you need it** — pub/sub, presence, typing indicators, field-level CRDTs (LWW / PN-counter / OR-set), AI/stream channels, offline queue, multi-tab coordination, and devtools. Reach for what you need; ignore the rest.
 - **Swap transports, not code** — `sseTransport` → `centrifugoTransport`. One import swap. Your collections and hooks don't change.
-- **Resilient by default** — offline queue, gap recovery, deduplication, and automatic multi-tab coordination (SharedWorker → BroadcastChannel → direct)
+
+> [TanStack DB](https://github.com/TanStack/db) and [TanStack Start](https://tanstack.com/start) are **supported integrations**, not the identity. `realtime.js` is freestanding and vendor-neutral — use it with them, or without them.
 
 ## Packages
 
-| Package                                                                  | Description                                                            |
-| ------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| [`@realtimejs/core`](#tanstackrealtime)                                  | Core client, collection helpers, CRDT primitives, and type definitions |
-| [`@realtimejs/react`](#tanstackreact-realtime)                           | React hooks and provider                                               |
-| [`@realtimejs/solid`](#tanstacksolid-realtime)                           | Solid primitives and provider                                          |
-| [`@realtimejs/vue`](#tanstackvue-realtime)                               | Vue composables and provider                                           |
-| [`@realtimejs/adapter-centrifugo`](#tanstackrealtime-adapter-centrifugo) | Transport adapter for [Centrifugo](https://centrifugal.dev)            |
-| [`@realtimejs/adapter-sse`](#tanstackrealtime-adapter-sse)               | Server-Sent Events transport adapter                                   |
-| [`@realtimejs/preset-start`](#tanstackrealtime-preset-start)             | TanStack Start preset with SSE handler and publish backend             |
-| [`@realtimejs/react-devtools`](#devtools)                                | React developer tools panel                                            |
-| [`@realtimejs/solid-devtools`](#devtools)                                | Solid developer tools panel                                            |
-| [`@realtimejs/vue-devtools`](#devtools)                                  | Vue developer tools panel                                              |
+| Package                                                           | Description                                                            |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| [`@realtimejs/core`](#realtimejscore)                             | Core client, collection helpers, CRDT primitives, and type definitions |
+| [`@realtimejs/react`](#realtimejsreact)                           | React hooks and provider                                               |
+| [`@realtimejs/solid`](#realtimejssolid)                           | Solid primitives and provider                                          |
+| [`@realtimejs/vue`](#realtimejsvue)                               | Vue composables and provider                                           |
+| [`@realtimejs/adapter-centrifugo`](#realtimejsadapter-centrifugo) | Transport adapter for [Centrifugo](https://centrifugal.dev)            |
+| [`@realtimejs/adapter-sse`](#realtimejsadapter-sse)               | Server-Sent Events transport adapter                                   |
+| [`@realtimejs/preset-start`](#realtimejspreset-start)             | TanStack Start preset with SSE handler and publish backend             |
+| [`@realtimejs/react-devtools`](#devtools)                         | React developer tools panel                                            |
+| [`@realtimejs/solid-devtools`](#devtools)                         | Solid developer tools panel                                            |
+| [`@realtimejs/vue-devtools`](#devtools)                           | Vue developer tools panel                                              |
 
 ---
 
@@ -835,4 +839,4 @@ realtimeCollectionOptions<Counter, string>({
 
 ## License
 
-[MIT](LICENSE) © [mikn](https://github.com/mikn) — Not affiliated with or endorsed by TanStack.
+[MIT](LICENSE) © [mikn](https://github.com/mikn). `realtime.js` is an independent, vendor-neutral project — not affiliated with or endorsed by TanStack.
