@@ -1,9 +1,27 @@
 {
   "name": "@realtimejs/react",
-  "version": "0.0.1",
-  "type": "module",
+  "version": "0.1.0",
   "description": "React hooks and provider for @realtimejs/core",
+  "type": "module",
   "license": "MIT",
+  "author": "mikn",
+  "homepage": "https://github.com/mikn/realtime.js#readme",
+  "bugs": {
+    "url": "https://github.com/mikn/realtime.js/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mikn/realtime.js.git",
+    "directory": "packages/react"
+  },
+  "keywords": [
+    "realtime",
+    "sync",
+    "react",
+    "tanstack-db",
+    "presence"
+  ],
+  "sideEffects": false,
   "exports": {
     ".": {
       "import": {
@@ -19,6 +37,12 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup"
   },
@@ -31,7 +55,6 @@
     "@tanstack/react-store": ">=0.0.0",
     "react": ">=18.0.0"
   },
-  "sideEffects": false,
   "devDependencies": {
     "@standard-schema/spec": "^1.1.0"
   }

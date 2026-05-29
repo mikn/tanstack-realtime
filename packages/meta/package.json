@@ -1,9 +1,29 @@
 {
   "name": "realtime.js",
-  "version": "0.0.1",
-  "type": "module",
+  "version": "0.1.0",
   "description": "One-install meta-package bundling @realtimejs/core and the default @realtimejs/adapter-sse transport",
+  "type": "module",
   "license": "MIT",
+  "author": "mikn",
+  "homepage": "https://github.com/mikn/realtime.js#readme",
+  "bugs": {
+    "url": "https://github.com/mikn/realtime.js/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mikn/realtime.js.git",
+    "directory": "packages/meta"
+  },
+  "keywords": [
+    "realtime",
+    "sync",
+    "websocket",
+    "sse",
+    "crdt",
+    "presence",
+    "tanstack-db"
+  ],
+  "sideEffects": false,
   "exports": {
     ".": {
       "import": {
@@ -19,7 +39,12 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup"
   },

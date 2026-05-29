@@ -4,7 +4,7 @@
 >
 > _The kitchen sink you actually need for proper realtime — sync, presence, CRDTs, and offline — with no platform and no per-seat bill._
 
-[![npm version](https://img.shields.io/npm/v/@realtimejs/core)](https://www.npmjs.com/package/@realtimejs/core)
+[![npm version](https://img.shields.io/npm/v/realtime.js)](https://www.npmjs.com/package/realtime.js)
 [![License](https://img.shields.io/github/license/mikn/tanstack-realtime)](LICENSE)
 [![CI](https://github.com/mikn/tanstack-realtime/actions/workflows/ci.yml/badge.svg)](https://github.com/mikn/tanstack-realtime/actions/workflows/ci.yml)
 
