@@ -10,35 +10,44 @@
  *
  * ## How the fake models the provider so the three-phase reconnect has teeth
  *
- * `FakePusher` keeps a provider-side `subscribed` set of channel names, exactly
- * like a real broker:
- *   - `subscribe(ch)`        → adds `ch`, returns a channel object whose `bind`
- *                              registers handlers; fires
+ * `FakePusher` separates two things, exactly like real pusher-js: the channel
+ * OBJECTS it retains for the client's lifetime (`channels`), and which of them
+ * are CURRENTLY subscribed at the provider (`activeSubs`):
+ *   - `subscribe(ch)`        → REUSES the existing channel object if present
+ *                              (real pusher-js never discards channel objects);
+ *                              marks `ch` active; fires
  *                              `pusher:subscription_succeeded` so presence
  *                              members are reported.
- *   - `unsubscribe(ch)`      → removes `ch`.
+ *   - `unsubscribe(ch)`      → marks `ch` inactive AND releases the object
+ *                              (mirrors `Pusher.unsubscribe`).
  *   - `emitMessage(ch,data)` → invokes the `'message'` handler ONLY if `ch` is
- *                              currently in `subscribed` (drops otherwise).
- *   - `simulateDisconnect()` → clears `subscribed`, sets connection state and
- *                              fires `state_change` → `unavailable` so the
- *                              adapter goes `reconnecting`. A message emitted
- *                              while disconnected is NOT delivered.
+ *                              currently active (drops otherwise).
+ *   - `simulateDisconnect()` → clears `activeSubs` but RETAINS channel objects
+ *                              and their bindings; fires `state_change` →
+ *                              `unavailable` so the adapter goes
+ *                              `reconnecting`. A message emitted while
+ *                              disconnected is NOT delivered.
  *   - `simulateReconnect()`  → fires `state_change` → `connected`. The adapter's
  *                              `handleStateChange('connected')` runs
  *                              `resubscribeAll()`, which calls `subscribe(ch)`
- *                              again for every active channel — repopulating
- *                              the provider-side `subscribed` set and restoring
- *                              delivery. If the adapter did NOT re-subscribe,
- *                              the set would stay empty and the post-reconnect
- *                              message would be dropped, failing the kit's
- *                              negative→positive reconnect assertion. The
- *                              re-subscription is genuinely exercised.
+ *                              again for every active channel — re-activating it
+ *                              against the SAME retained channel object and
+ *                              restoring delivery. If the adapter did NOT
+ *                              re-subscribe, the channel stays inactive and the
+ *                              post-reconnect message is dropped, failing the
+ *                              kit's negative→positive reconnect assertion.
+ *
+ * Retaining the channel object across a disconnect is what gives the kit teeth
+ * against handler double-binding: if the adapter re-binds its `'message'`
+ * handler on reconnect WITHOUT unbinding first, the reused object now has two
+ * handlers and a single `emitMessage` fans out twice — caught by the
+ * three-phase reconnect assertion and by the dedicated double-bind guard below.
  *
  * Everything is synchronous (no timers / microtasks between an emit and the
  * assertion), matching the kit's synchronous delivery contract.
  */
 
-import { beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { pusherTransport } from '@realtimejs/adapter-pusher'
 import { runAdapterConformance } from '@realtimejs/adapter-conformance'
 import type {
@@ -143,8 +152,20 @@ class FakePusher {
   }
 
   private readonly connectionHandlers = new Map<string, Set<Handler>>()
-  /** Provider-side subscription set — the heart of the reconnect check. */
-  private readonly subscribed = new Map<string, FakeChannel>()
+  /**
+   * Channel OBJECTS, retained for the lifetime of the client — mirrors real
+   * pusher-js, which keeps `Channel` instances (and their event bindings)
+   * across disconnects and REUSES them on reconnect rather than constructing
+   * fresh ones. `subscribe(name)` returns the pre-existing object if present.
+   */
+  private readonly channels = new Map<string, FakeChannel>()
+  /**
+   * Which channels are CURRENTLY subscribed at the provider — the heart of the
+   * reconnect check. A disconnect flips these off (so `emitMessage` drops while
+   * disconnected) WITHOUT discarding the channel objects, so a double-bind
+   * survives a reconnect and is observable as duplicate delivery.
+   */
+  private readonly activeSubs = new Set<string>()
 
   connect(): void {
     this.setState('connecting')
@@ -152,16 +173,19 @@ class FakePusher {
   }
 
   disconnect(): void {
-    this.subscribed.clear()
+    // Real pusher-js retains channel objects on disconnect; it only stops
+    // delivering. Keep the objects (and their bindings), just mark inactive.
+    this.activeSubs.clear()
     this.setState('disconnected')
   }
 
   subscribe(name: string): FakeChannel {
-    let ch = this.subscribed.get(name)
+    let ch = this.channels.get(name)
     if (!ch) {
       ch = new FakeChannel(name)
-      this.subscribed.set(name, ch)
+      this.channels.set(name, ch)
     }
+    this.activeSubs.add(name)
     // Presence channels: the auth flow assigns this connection a member id.
     if (ch.isPresence && !ch.me) {
       ch.me = { id: 'self-conn', info: { self: true } }
@@ -173,11 +197,14 @@ class FakePusher {
   }
 
   unsubscribe(name: string): void {
-    this.subscribed.delete(name)
+    // An explicit unsubscribe DOES release the channel object (matches real
+    // pusher-js `Pusher.unsubscribe`, which removes it from its channels map).
+    this.activeSubs.delete(name)
+    this.channels.delete(name)
   }
 
   channel(name: string): FakeChannel | undefined {
-    return this.subscribed.get(name)
+    return this.activeSubs.has(name) ? this.channels.get(name) : undefined
   }
 
   private setState(state: string): void {
@@ -190,14 +217,19 @@ class FakePusher {
 
   // ── Harness control surface ──────────────────────────────────────────────
 
+  /** The currently-subscribed channel object, or undefined if dropped. */
+  private activeChannel(name: string): FakeChannel | undefined {
+    return this.activeSubs.has(name) ? this.channels.get(name) : undefined
+  }
+
   emitMessage(channel: string, data: unknown): void {
-    const ch = this.subscribed.get(channel)
+    const ch = this.activeChannel(channel)
     if (!ch) return // dropped: not currently subscribed at the provider
     ch.emit('message', data)
   }
 
   emitSubscribeError(channel: string, reason: string, code?: number): void {
-    const ch = this.subscribed.get(channel)
+    const ch = this.activeChannel(channel)
     if (!ch) return
     ch.emit('pusher:subscription_error', {
       type: 'AuthError',
@@ -207,7 +239,7 @@ class FakePusher {
   }
 
   emitPresence(channel: string, members: ReadonlyArray<PresenceUser>): void {
-    const ch = this.subscribed.get(`${PRESENCE_PREFIX}${channel}`)
+    const ch = this.activeChannel(`${PRESENCE_PREFIX}${channel}`)
     if (!ch) return
     for (const m of members) {
       ch.memberMap.set(m.connectionId, m.data)
@@ -216,7 +248,11 @@ class FakePusher {
   }
 
   simulateDisconnect(): void {
-    this.subscribed.clear()
+    // Mirror real pusher-js: a transport drop stops delivery (channels become
+    // inactive) but RETAINS the channel objects and their bindings. On
+    // reconnect the adapter re-subscribes the SAME object — so if it re-binds
+    // without unbinding, the double-bind is observable as duplicate delivery.
+    this.activeSubs.clear()
     this.setState('unavailable')
   }
 
@@ -249,4 +285,71 @@ runAdapterConformance({
   simulateSubscribeError: (channel, reason, code) =>
     pusher.emitSubscribeError(channel, reason, code),
   emitPresence: (channel, members) => pusher.emitPresence(channel, members),
+})
+
+// ---------------------------------------------------------------------------
+// Regression guard: handler double-binding across reconnects (P-4 review).
+//
+// Real pusher-js REUSES channel objects across reconnects. The adapter runs
+// resubscribeAll() on every `state_change → connected`, re-binding its
+// PUSHER-level handlers on the SAME reused channel object. Without an
+// unbind-before-rebind step that accumulates a duplicate 'message' handler per
+// reconnect, fanning a single inbound message out to the realtime.js subscriber
+// N+1 times after N reconnects. This locks in the single-delivery invariant
+// across MULTIPLE reconnect cycles (the kit's three-phase case covers one).
+// ---------------------------------------------------------------------------
+
+describe('pusherTransport double-bind regression guard', () => {
+  it('delivers a single inbound message exactly once after repeated reconnects', async () => {
+    const t = createTransport()
+    await t.connect()
+
+    const got: Array<unknown> = []
+    const unsub = t.subscribe('room', (data) => got.push(data))
+
+    pusher.emitMessage('room', 'm0')
+    expect(got).toEqual(['m0'])
+
+    // Three disconnect/reconnect cycles against the REUSED channel object.
+    for (let i = 1; i <= 3; i++) {
+      pusher.simulateDisconnect()
+      pusher.simulateReconnect()
+      got.length = 0
+      pusher.emitMessage('room', `m${i}`)
+      // Exactly one delivery, not N+1.
+      expect(got, `after ${i} reconnect(s) the message must fire once`).toEqual(
+        [`m${i}`],
+      )
+    }
+
+    unsub()
+    t.disconnect()
+  })
+
+  it('fires presence callbacks once per change after repeated reconnects', async () => {
+    const t = createTransport() as RealtimeTransport & {
+      onPresenceChange: (
+        channel: string,
+        cb: (users: ReadonlyArray<PresenceUser>) => void,
+      ) => () => void
+    }
+    await t.connect()
+
+    let calls = 0
+    const off = t.onPresenceChange('lobby', () => {
+      calls++
+    })
+
+    for (let i = 1; i <= 3; i++) {
+      pusher.simulateDisconnect()
+      pusher.simulateReconnect()
+      calls = 0
+      pusher.emitPresence('lobby', [{ connectionId: `peer-${i}`, data: {} }])
+      // A single member_added must invoke the presence callback exactly once.
+      expect(calls, `after ${i} reconnect(s) presence must fire once`).toBe(1)
+    }
+
+    off()
+    t.disconnect()
+  })
 })

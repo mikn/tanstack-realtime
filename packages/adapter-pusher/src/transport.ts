@@ -279,6 +279,16 @@ export function pusherTransport(
   // --------------------------------------------------------------------------
 
   function bindDataChannel(channel: string, ch: PusherChannelLike): void {
+    // Idempotent binding: real pusher-js REUSES channel objects across
+    // reconnects (it never deletes them, only marks them unsubscribed and
+    // re-subscribes on reconnect). Since resubscribeAll() re-runs this on every
+    // reconnect, we must unbind OUR previously-registered handlers first or we
+    // accumulate a duplicate 'message' handler per reconnect — fanning a single
+    // inbound message out to the realtime.js subscriber N+1 times after N
+    // reconnects. unbind(event) with no callback removes all handlers for that
+    // event (the adapter owns these specific events).
+    ch.unbind(PUSHER_MESSAGE_EVENT)
+    ch.unbind('pusher:subscription_error')
     ch.bind(PUSHER_MESSAGE_EVENT, (data) => deliverMessage(channel, data))
     ch.bind('pusher:subscription_error', (raw) => {
       const { reason, code } = parseSubscriptionError(raw)
@@ -287,6 +297,13 @@ export function pusherTransport(
   }
 
   function bindPresenceChannel(channel: string, ch: PusherChannelLike): void {
+    // Idempotent binding — see bindDataChannel. Against a reused presence
+    // channel object, re-binding without unbinding first would multiply every
+    // presence callback per reconnect.
+    ch.unbind('pusher:subscription_succeeded')
+    ch.unbind('pusher:member_added')
+    ch.unbind('pusher:member_removed')
+    ch.unbind('pusher:subscription_error')
     const refresh = () => dispatchPresence(channel)
     ch.bind('pusher:subscription_succeeded', refresh)
     ch.bind('pusher:member_added', refresh)
