@@ -122,11 +122,14 @@ export const getTodos = realtime.query(async ({ teamId }: { teamId: string }) =>
       </p>
       <ul>
         <li>
-          <strong>Transports</strong> &mdash; SSE and Centrifugo (Centrifugo
-          runs over WebSocket), plus a small <code>RealtimeTransport</code>{' '}
-          interface for custom transports (e.g. a plain WebSocket you implement
-          yourself). Swap one import; your collections and hooks don&rsquo;t
-          change.
+          <strong>Transports</strong> &mdash; four adapters ship today: SSE
+          (receive-only HTTP), Centrifugo (WebSocket, presence + gap replay),
+          Pusher/Soketi (managed or self-hosted, presence), and PartyKit (edge /
+          Durable Objects, presence), plus a small{' '}
+          <code>RealtimeTransport</code> interface for custom transports
+          validated by <code>@realtimejs/adapter-conformance</code>. Swap one
+          import; your collections and hooks don&rsquo;t change. See the{' '}
+          <a href="#/docs/transports">per-provider capability matrix</a>.
         </li>
         <li>
           <strong>Live collections</strong> &mdash;{' '}
@@ -138,9 +141,10 @@ export const getTodos = realtime.query(async ({ teamId }: { teamId: string }) =>
         </li>
         <li>
           <strong>Presence and typing indicators</strong> &mdash; online user
-          lists, cursors, typing state (presence/typing require a bidirectional
-          transport &mdash; Centrifugo or a custom WebSocket; the default SSE
-          transport is receive-only).
+          lists, cursors, typing state. Presence needs server-held membership
+          state, so it requires a presence-capable transport (Centrifugo,
+          Pusher/Soketi, PartyKit, or a custom WebSocket); the receive-only SSE
+          transport reports <code>presence: false</code>.
         </li>
         <li>
           <strong>Field-level CRDTs</strong> &mdash; LWW registers, PN-counters,

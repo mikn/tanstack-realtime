@@ -25,18 +25,21 @@
 
 ## Packages
 
-| Package                                                           | Description                                                            |
-| ----------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| [`@realtimejs/core`](#realtimejscore)                             | Core client, collection helpers, CRDT primitives, and type definitions |
-| [`@realtimejs/react`](#realtimejsreact)                           | React hooks and provider                                               |
-| [`@realtimejs/solid`](#realtimejssolid)                           | Solid primitives and provider                                          |
-| [`@realtimejs/vue`](#realtimejsvue)                               | Vue composables and provider                                           |
-| [`@realtimejs/adapter-centrifugo`](#realtimejsadapter-centrifugo) | Transport adapter for [Centrifugo](https://centrifugal.dev)            |
-| [`@realtimejs/adapter-sse`](#realtimejsadapter-sse)               | Server-Sent Events transport adapter                                   |
-| [`@realtimejs/preset-start`](#realtimejspreset-start)             | TanStack Start preset with SSE handler and publish backend             |
-| [`@realtimejs/react-devtools`](#devtools)                         | React developer tools panel                                            |
-| [`@realtimejs/solid-devtools`](#devtools)                         | Solid developer tools panel                                            |
-| [`@realtimejs/vue-devtools`](#devtools)                           | Vue developer tools panel                                              |
+| Package                                                             | Description                                                                                                                             |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| [`@realtimejs/core`](#realtimejscore)                               | Core client, collection helpers, CRDT primitives, and type definitions                                                                  |
+| [`@realtimejs/react`](#realtimejsreact)                             | React hooks and provider                                                                                                                |
+| [`@realtimejs/solid`](#realtimejssolid)                             | Solid primitives and provider                                                                                                           |
+| [`@realtimejs/vue`](#realtimejsvue)                                 | Vue composables and provider                                                                                                            |
+| [`@realtimejs/adapter-centrifugo`](#realtimejsadapter-centrifugo)   | Transport adapter for [Centrifugo](https://centrifugal.dev)                                                                             |
+| [`@realtimejs/adapter-sse`](#realtimejsadapter-sse)                 | Server-Sent Events transport adapter (receive-only stream + HTTP POST publish; no presence)                                             |
+| [`@realtimejs/adapter-pusher`](#realtimejsadapter-pusher)           | Transport adapter for [Pusher Channels](https://pusher.com/channels) and self-hosted [Soketi](https://soketi.app) (presence; no replay) |
+| [`@realtimejs/adapter-partykit`](#realtimejsadapter-partykit)       | Transport adapter for [PartyKit](https://www.partykit.io) / Cloudflare Durable Objects (edge presence; no replay)                       |
+| [`@realtimejs/adapter-conformance`](#realtimejsadapter-conformance) | Conformance test kit — validate any transport adapter against the `RealtimeTransport` contract                                          |
+| [`@realtimejs/preset-start`](#realtimejspreset-start)               | TanStack Start preset with SSE handler and publish backend                                                                              |
+| [`@realtimejs/react-devtools`](#devtools)                           | React developer tools panel                                                                                                             |
+| [`@realtimejs/solid-devtools`](#devtools)                           | Solid developer tools panel                                                                                                             |
+| [`@realtimejs/vue-devtools`](#devtools)                             | Vue developer tools panel                                                                                                               |
 
 ---
 
@@ -474,6 +477,97 @@ export const client = createRealtimeClient({
   }),
 })
 ```
+
+---
+
+## `@realtimejs/adapter-pusher`
+
+Transport adapter for [Pusher Channels](https://pusher.com/channels) (managed SaaS) and the self-hostable, protocol-compatible [Soketi](https://soketi.app) server. Presence is mapped onto Pusher **presence channels**. There is no offset/epoch gap replay — delivery is **at-most-once** across disconnects (`serverAssistedRecovery: false`); the adapter re-subscribes its active channels on reconnect. Client publish is a Pusher **client event** and only works on **private or presence** channels (and only when client events are enabled for the app); public-channel fan-out is server-published via Pusher's HTTP API.
+
+### Installation
+
+```bash
+npm install @realtimejs/core @realtimejs/adapter-pusher pusher-js
+```
+
+### Usage
+
+```ts
+import { createRealtimeClient } from '@realtimejs/core'
+import { pusherTransport } from '@realtimejs/adapter-pusher'
+
+export const client = createRealtimeClient({
+  transport: pusherTransport({
+    key: 'app-key',
+    cluster: 'eu',
+    // Presence/private channels require auth:
+    authEndpoint: '/api/pusher/auth',
+  }),
+})
+```
+
+For self-hosted Soketi, point the adapter at your server with `wsHost` / `wsPort` instead of `cluster`.
+
+---
+
+## `@realtimejs/adapter-partykit`
+
+Transport adapter for [PartyKit](https://www.partykit.io) and Cloudflare Durable Objects. Presence works because the Durable Object holds connection membership server-side (`presence: true`). PartySocket is a reconnecting WebSocket with no built-in offset/epoch gap replay, so `serverAssistedRecovery` is **false** — the adapter re-asserts subscriptions and presence intent on every reconnect. You deploy a PartyKit server (the edge fan-out tier).
+
+### Installation
+
+```bash
+npm install @realtimejs/core @realtimejs/adapter-partykit partysocket
+```
+
+### Usage
+
+```ts
+import { createRealtimeClient } from '@realtimejs/core'
+import { partykitTransport } from '@realtimejs/adapter-partykit'
+
+export const client = createRealtimeClient({
+  transport: partykitTransport({
+    host: 'my-app.username.partykit.dev',
+    room: 'hub',
+  }),
+})
+```
+
+---
+
+## `@realtimejs/adapter-conformance`
+
+Conformance test kit that proves a transport adapter satisfies the `@realtimejs/core` `RealtimeTransport` (and optional `PresenceCapable`) contract and declares **honest** capabilities. This is the public extension point: any WebSocket-style provider can be wrapped as an adapter and validated against the same battery every first-party adapter passes — including a real reconnect / re-subscribe check.
+
+### Installation
+
+```bash
+npm install -D @realtimejs/adapter-conformance
+```
+
+### Usage
+
+```ts
+import { runAdapterConformance } from '@realtimejs/adapter-conformance'
+import { myTransport } from './my-transport'
+
+runAdapterConformance({
+  name: 'my-transport',
+  createTransport: () => myTransport({ socket: fakeProvider }),
+  capabilities: {
+    presence: true,
+    serverAssistedRecovery: false,
+    history: false,
+    ephemeral: true,
+  },
+  emitMessage: (channel, data) => fakeProvider.deliver(channel, data),
+  simulateDisconnect: () => fakeProvider.drop(),
+  simulateReconnect: () => fakeProvider.reconnect(),
+})
+```
+
+The presence sub-battery runs only when `capabilities.presence` is `true`, and the kit asserts `hasPresence(transport)` agrees with the declared flag — no half-implemented presence.
 
 ---
 
