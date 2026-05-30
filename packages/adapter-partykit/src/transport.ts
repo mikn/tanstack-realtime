@@ -177,6 +177,16 @@ export function partykitTransport(
   // Tracks whether listeners are already bound to the CURRENT socket instance,
   // so a re-`connect()` against a reused injected socket never double-binds.
   let listenersBound = false
+  // The handler functions currently bound to `socket`, kept so we can call
+  // `removeEventListener` for each on teardown. Without this, a reused injected
+  // socket put through connect → disconnect → connect would accumulate a second
+  // set of listeners (the latent double-bind class fixed in the Pusher adapter).
+  let boundHandlers: {
+    open: (event: unknown) => void
+    message: (event: unknown) => void
+    close: (event: unknown) => void
+    error: (event: unknown) => void
+  } | null = null
   let myConnectionId: string | null = null
   let intentionalDisconnect = false
 
@@ -306,28 +316,54 @@ export function partykitTransport(
     if (listenersBound) return
     listenersBound = true
 
-    s.addEventListener('open', () => {
+    const onOpen = () => {
       myConnectionId = null
       store.setState(() => 'connected')
       // Re-subscribe in the SAME turn the connection becomes usable so a
       // freshly-arriving message isn't dropped between connect and resubscribe.
       resubscribeAll()
-    })
+    }
 
-    s.addEventListener('message', (event) => {
+    const onMessage = (event: unknown) => {
       const data = (event as { data?: unknown }).data
       handleRaw(data)
-    })
+    }
 
-    s.addEventListener('close', () => {
+    const onClose = () => {
       store.setState(() =>
         intentionalDisconnect ? 'disconnected' : 'reconnecting',
       )
-    })
+    }
 
-    s.addEventListener('error', () => {
+    const onError = () => {
       // PartySocket reconnects internally; `close`/`open` drive status.
-    })
+    }
+
+    boundHandlers = {
+      open: onOpen,
+      message: onMessage,
+      close: onClose,
+      error: onError,
+    }
+
+    s.addEventListener('open', onOpen)
+    s.addEventListener('message', onMessage)
+    s.addEventListener('close', onClose)
+    s.addEventListener('error', onError)
+  }
+
+  // Detach the handlers bound by `bindSocket` from the given socket. Idempotent.
+  // Keeping the bind-once invariant requires removing the OLD listeners before a
+  // fresh bind, otherwise a reused (injected) socket would accumulate duplicates.
+  function unbindSocket(s: PartySocketLike | null): void {
+    if (s && boundHandlers && s.removeEventListener) {
+      s.removeEventListener('open', boundHandlers.open)
+      s.removeEventListener('message', boundHandlers.message)
+      s.removeEventListener('close', boundHandlers.close)
+      s.removeEventListener('error', boundHandlers.error)
+    }
+    boundHandlers = null
+    listenersBound = false
   }
 
   function awaitConnection(): Promise<void> {
@@ -376,8 +412,11 @@ export function partykitTransport(
       intentionalDisconnect = false
 
       if (!socket) {
-        socket = await buildSocket()
+        // Fresh socket: ensure no handler bookkeeping survives from a prior
+        // instance before we bind to this one.
+        boundHandlers = null
         listenersBound = false
+        socket = await buildSocket()
       }
       bindSocket(socket)
 
@@ -395,9 +434,13 @@ export function partykitTransport(
     disconnect() {
       intentionalDisconnect = true
       myConnectionId = null
-      socket?.close()
+      const closing = socket
+      closing?.close()
+      // Remove our listeners from the socket BEFORE dropping the reference, so a
+      // reused injected socket re-entering connect() rebinds from a clean slate
+      // (no accumulated, never-removed handlers → no double delivery).
+      unbindSocket(closing)
       socket = null
-      listenersBound = false
       store.setState(() => 'disconnected')
     },
 

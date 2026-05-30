@@ -121,6 +121,18 @@ class FakePartySocket {
     this.listeners.get(type)?.delete(listener)
   }
 
+  /** Live (currently-attached) listener count for a type — distinct from the
+   * cumulative `bindCounts`. A double-bind shows up here as a count > 1. */
+  liveListenerCount(type: string): number {
+    return this.listeners.get(type)?.size ?? 0
+  }
+
+  /** Re-open a CLOSED fake so a reused instance can be put through a second
+   * connect() — models a caller injecting the SAME socket object twice. */
+  reopen(): void {
+    this.readyState = 0 // CONNECTING
+  }
+
   send(raw: string): void {
     let env: ClientEnvelope
     try {
@@ -225,8 +237,10 @@ beforeEach(() => {
 })
 
 function createTransport(): RealtimeTransport {
-  // Inject the fake socket. It starts OPEN, so the adapter's connect() takes
-  // the already-open fast path and resubscribes synchronously.
+  // Inject the fake socket. It starts in CONNECTING (readyState 0), so the
+  // adapter's connect() binds its listeners and awaits the connection; the fake
+  // fires `open` via queueMicrotask, which flushes during the awaited connect()
+  // and drives the store to 'connected' before connect() resolves.
   return partykitTransport({ socket })
 }
 
@@ -295,6 +309,41 @@ describe('partykitTransport single-delivery-across-reconnects guard', () => {
     expect(socket.bindCounts.get('open')).toBe(1)
     expect(socket.bindCounts.get('close')).toBe(1)
 
+    t.disconnect()
+  })
+
+  it('does not double-bind on connect → disconnect → connect with a REUSED injected socket', async () => {
+    // Latent double-bind class (same as the Pusher P-4 bug): a caller injects ONE
+    // socket object and cycles connect → disconnect → connect. `buildSocket()`
+    // returns that same object on the second connect; without removing the first
+    // set of listeners on disconnect, `bindSocket` would attach a SECOND set,
+    // delivering every inbound message twice. We assert single delivery AND that
+    // the per-type live listener counts stay at 1.
+    const t = createTransport()
+
+    await t.connect()
+    t.disconnect()
+
+    // Re-open the SAME socket object and connect again (real PartySocket hands a
+    // fresh object, but an injected reusable socket is the path that exposes the
+    // latent bug).
+    socket.reopen()
+    await t.connect()
+
+    // Listeners must not accumulate across the cycle.
+    expect(socket.liveListenerCount('open')).toBe(1)
+    expect(socket.liveListenerCount('message')).toBe(1)
+    expect(socket.liveListenerCount('close')).toBe(1)
+    expect(socket.liveListenerCount('error')).toBe(1)
+
+    const got: Array<unknown> = []
+    const unsub = t.subscribe('room', (data) => got.push(data))
+
+    // Emit exactly ONE message; the realtime.js callback must fire exactly once.
+    socket.emitMessage('room', 'only-once')
+    expect(got).toEqual(['only-once'])
+
+    unsub()
     t.disconnect()
   })
 
