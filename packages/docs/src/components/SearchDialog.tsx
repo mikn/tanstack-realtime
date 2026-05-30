@@ -117,7 +117,7 @@ const searchIndex: Array<SearchEntry> = [
     hash: '#/docs/transports',
     section: 'Infrastructure',
     keywords:
-      'transport SSE websocket centrifugo adapter sseTransport centrifugoTransport',
+      'transport SSE websocket centrifugo adapter sseTransport centrifugoTransport pusher soketi partykit durable objects pusherTransport partykitTransport capabilities conformance',
   },
   {
     label: 'Resilience',
