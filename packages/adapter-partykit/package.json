@@ -1,0 +1,66 @@
+{
+  "name": "@realtimejs/adapter-partykit",
+  "version": "0.1.0",
+  "description": "PartyKit / Cloudflare Durable Objects transport adapter for @realtimejs/core",
+  "type": "module",
+  "license": "MIT",
+  "author": "mikn",
+  "homepage": "https://github.com/mikn/tanstack-realtime#readme",
+  "bugs": {
+    "url": "https://github.com/mikn/tanstack-realtime/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mikn/tanstack-realtime.git",
+    "directory": "packages/adapter-partykit"
+  },
+  "keywords": [
+    "realtime",
+    "partykit",
+    "cloudflare",
+    "durable-objects",
+    "transport",
+    "adapter",
+    "websocket"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./server": {
+      "import": {
+        "types": "./dist/server.d.ts",
+        "default": "./dist/server.js"
+      },
+      "require": {
+        "types": "./dist/server.d.cts",
+        "default": "./dist/server.cjs"
+      }
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup"
+  },
+  "dependencies": {
+    "@realtimejs/core": "workspace:*",
+    "@tanstack/store": "^0.9.1",
+    "partysocket": "^1.1.19"
+  }
+}

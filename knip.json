@@ -17,6 +17,7 @@
     "packages/react-devtools": {},
     "packages/adapter-centrifugo": {},
     "packages/adapter-pusher": {},
+    "packages/adapter-partykit": {},
     "packages/adapter-sse": {},
     "packages/adapter-conformance": {},
     "packages/__tests__": {
