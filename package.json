@@ -32,6 +32,7 @@
     "@realtimejs/preset-start": "workspace:*",
     "@realtimejs/reactive-drizzle": "workspace:*",
     "@realtimejs/adapter-centrifugo": "workspace:*",
+    "@realtimejs/adapter-conformance": "workspace:*",
     "@realtimejs/adapter-sse": "workspace:*",
     "@tanstack/eslint-config": "^0.4.0",
     "@tanstack/react-db": "^0.1.72",

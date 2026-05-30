@@ -17,6 +17,7 @@
     "packages/react-devtools": {},
     "packages/adapter-centrifugo": {},
     "packages/adapter-sse": {},
+    "packages/adapter-conformance": {},
     "packages/__tests__": {
       "entry": ["**/*.test.ts"],
       "ignore": ["setup.ts"]

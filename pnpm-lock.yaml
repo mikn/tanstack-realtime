@@ -13,6 +13,9 @@ importers:
       '@realtimejs/adapter-centrifugo':
         specifier: workspace:*
         version: link:packages/adapter-centrifugo
+      '@realtimejs/adapter-conformance':
+        specifier: workspace:*
+        version: link:packages/adapter-conformance
       '@realtimejs/adapter-sse':
         specifier: workspace:*
         version: link:packages/adapter-sse
@@ -232,6 +235,15 @@ importers:
       '@tanstack/store':
         specifier: ^0.9.1
         version: 0.9.1
+
+  packages/adapter-conformance:
+    dependencies:
+      '@realtimejs/core':
+        specifier: workspace:*
+        version: link:../core
+      vitest:
+        specifier: '>=2.0.0'
+        version: 2.1.9(@types/node@22.19.12)
 
   packages/adapter-sse:
     dependencies:
