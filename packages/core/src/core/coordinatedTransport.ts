@@ -41,9 +41,13 @@ import {
   createSharedWorkerTransport,
   isSharedWorkerSupported,
 } from './sharedWorkerTransport.js'
-import { hasPresence } from './types.js'
+import { getCapabilities, hasPresence } from './types.js'
 import type { BroadcastChannelTransportOptions } from './broadcastChannelTransport.js'
-import type { PresenceCapable, RealtimeTransport } from './types.js'
+import type {
+  PresenceCapable,
+  RealtimeTransport,
+  TransportCapabilities,
+} from './types.js'
 
 // ---------------------------------------------------------------------------
 // Options
@@ -84,6 +88,24 @@ export interface CoordinatedTransportOptions {
    * Only relevant when BroadcastChannel is the selected strategy.
    */
   broadcastOptions?: Omit<BroadcastChannelTransportOptions, 'name'>
+
+  /**
+   * Declared {@link TransportCapabilities} of the inner transport produced by
+   * `transport()`.
+   *
+   * The SharedWorker and BroadcastChannel strategies create the inner transport
+   * lazily / in a separate process and cannot synchronously inspect it, so the
+   * coordinated wrapper forwards these declared capabilities to the selected
+   * strategy. The direct-fallback strategy derives them from the constructed
+   * inner instead (this option is ignored there).
+   *
+   * Pass the wrapped transport's real capabilities so `usePresence` degrades
+   * correctly — e.g. `{ presence: false, ... }` for an SSE inner.
+   *
+   * @default { presence: true, serverAssistedRecovery: false, history: false, ephemeral: true }
+   *   (assumes a presence-capable inner transport for back-compat.)
+   */
+  capabilities?: TransportCapabilities
 }
 
 // ---------------------------------------------------------------------------
@@ -114,13 +136,19 @@ export function createCoordinatedTransport(
 
   // ── 1. SharedWorker (best) ──────────────────────────────────────────────
   if (options.workerUrl && isSharedWorkerSupported()) {
-    return createSharedWorkerTransport(options.workerUrl)
+    // Forward the declared inner capabilities — the worker holds the real
+    // transport, so the tab cannot inspect it synchronously.
+    return createSharedWorkerTransport({
+      url: options.workerUrl,
+      ...(options.capabilities ? { capabilities: options.capabilities } : {}),
+    })
   }
 
   // ── 2. BroadcastChannel + leader election (good) ────────────────────────
   if (isBroadcastChannelSupported()) {
     return createBroadcastChannelTransport(options.transport, {
       name: options.channelName,
+      ...(options.capabilities ? { capabilities: options.capabilities } : {}),
       ...options.broadcastOptions,
     })
   }
@@ -133,8 +161,12 @@ export function createCoordinatedTransport(
   // consistent. The client layer already throws descriptive errors for
   // presence calls on non-capable transports, but this ensures the type
   // contract holds even when used without createRealtimeClient.
+  //
+  // Forward the inner transport's capabilities so a coordinated transport
+  // reports exactly what the wrapped transport supports.
   return {
     ...inner,
+    capabilities: getCapabilities(inner),
     joinPresence() {
       throw new Error(
         '[realtime] Transport does not support presence. ' +

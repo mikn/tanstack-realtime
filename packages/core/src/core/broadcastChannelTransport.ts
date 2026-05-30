@@ -37,6 +37,7 @@ import type {
   PresenceCapable,
   PresenceUser,
   RealtimeTransport,
+  TransportCapabilities,
 } from './types.js'
 
 // ---------------------------------------------------------------------------
@@ -57,6 +58,35 @@ export interface BroadcastChannelTransportOptions {
    * @default (err) => console.error('[BroadcastChannelTransport] connect error:', err)
    */
   onConnectError?: (err: unknown) => void
+  /**
+   * Declared {@link TransportCapabilities} of the **inner** transport.
+   *
+   * The leader's inner transport is created lazily (only on the elected leader
+   * tab), so this wrapper cannot synchronously inspect it. Declare the inner
+   * transport's capabilities here so the wrapper forwards them — e.g. pass
+   * `{ presence: false, ... }` when wrapping an SSE transport so `usePresence`
+   * degrades correctly.
+   *
+   * @default { presence: true, serverAssistedRecovery: false, history: false, ephemeral: true }
+   *   (the wrapper always proxies the full presence API; the default assumes a
+   *   presence-capable inner transport for back-compat.)
+   */
+  capabilities?: TransportCapabilities
+}
+
+/**
+ * Default capabilities for the BroadcastChannel multi-tab wrapper.
+ *
+ * Assumes a presence-capable inner transport (the wrapper exposes the full
+ * {@link PresenceCapable} surface). Override via
+ * {@link BroadcastChannelTransportOptions.capabilities} when the wrapped
+ * transport lacks a feature (e.g. SSE → `presence: false`).
+ */
+const DEFAULT_BROADCAST_CHANNEL_CAPABILITIES: TransportCapabilities = {
+  presence: true,
+  serverAssistedRecovery: false,
+  history: false,
+  ephemeral: true,
 }
 
 // ---------------------------------------------------------------------------
@@ -154,6 +184,15 @@ export function createBroadcastChannelTransport(
   const tabId = crypto.randomUUID()
   const store = new Store<ConnectionStatus>('disconnected')
   const bc = new BroadcastChannel(name)
+
+  // The leader's inner transport is created lazily (only on the tab elected
+  // leader), so this wrapper cannot synchronously inspect it. Capabilities are
+  // therefore declared via `options.capabilities`, defaulting to a
+  // presence-capable set for back-compat (the wrapper always proxies the full
+  // presence API). Forward the wrapped transport's real capabilities by
+  // passing them here — e.g. `{ presence: false, ... }` for an SSE inner.
+  const capabilities: TransportCapabilities =
+    options.capabilities ?? DEFAULT_BROADCAST_CHANNEL_CAPABILITIES
 
   // ── Local state ─────────────────────────────────────────────────────────
 
@@ -630,6 +669,7 @@ export function createBroadcastChannelTransport(
 
   const transport: RealtimeTransport & PresenceCapable = {
     store,
+    capabilities,
 
     async connect() {
       userCalledConnect = true

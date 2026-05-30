@@ -55,6 +55,7 @@ import type {
   PresenceCapable,
   PresenceUser,
   RealtimeTransport,
+  TransportCapabilities,
 } from './types.js'
 
 // ---------------------------------------------------------------------------
@@ -444,6 +445,37 @@ export interface SharedWorkerTransportOptions {
    * @default 10000
    */
   publishTimeout?: number
+  /**
+   * Declared {@link TransportCapabilities} of the **inner** transport managed by
+   * the SharedWorker coordinator.
+   *
+   * The tab-side transport proxies all operations to the worker and cannot
+   * synchronously inspect the inner transport (it lives in a separate worker
+   * process). Declare the inner transport's capabilities here so the wrapper
+   * forwards them — e.g. pass `{ presence: false, ... }` when the worker wraps
+   * an SSE transport so `usePresence` degrades correctly.
+   *
+   * @default { presence: true, serverAssistedRecovery: false, history: false, ephemeral: true }
+   *   (SharedWorker has always exposed the full presence API to tabs; the
+   *   default assumes a presence-capable inner transport for back-compat.)
+   */
+  capabilities?: TransportCapabilities
+}
+
+/**
+ * Default capabilities for the SharedWorker tab transport.
+ *
+ * The tab transport always implements the full {@link PresenceCapable} surface
+ * (it proxies presence calls to the worker), so the historical default assumes
+ * a presence-capable inner transport. Override via
+ * {@link SharedWorkerTransportOptions.capabilities} when the worker wraps a
+ * transport that lacks a feature (e.g. SSE → `presence: false`).
+ */
+const DEFAULT_SHARED_WORKER_CAPABILITIES: TransportCapabilities = {
+  presence: true,
+  serverAssistedRecovery: false,
+  history: false,
+  ephemeral: true,
 }
 
 /**
@@ -510,10 +542,13 @@ export function createSharedWorkerTransport(
     )
   }
 
-  const { url, publishTimeout = 10_000 } =
-    typeof options === 'string' || options instanceof URL
-      ? { url: options, publishTimeout: 10_000 }
-      : options
+  const {
+    url,
+    publishTimeout = 10_000,
+    capabilities = DEFAULT_SHARED_WORKER_CAPABILITIES,
+  } = typeof options === 'string' || options instanceof URL
+    ? { url: options, publishTimeout: 10_000, capabilities: undefined }
+    : options
 
   const worker = new SharedWorker(url)
   const port = worker.port
@@ -598,6 +633,7 @@ export function createSharedWorkerTransport(
 
   const transport: RealtimeTransport & PresenceCapable = {
     store,
+    capabilities,
 
     connect() {
       port.postMessage({ type: 'connect' } satisfies TabToWorkerMsg)

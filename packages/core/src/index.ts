@@ -15,7 +15,7 @@ export {
   deriveChannelFromUrl,
 } from './core/serializeKey.js'
 export { createRealtimeClient } from './core/client.js'
-export { hasPresence } from './core/types.js'
+export { hasPresence, getCapabilities } from './core/types.js'
 
 // Hook system
 export type {
@@ -54,6 +54,7 @@ export type {
   SubscribeError,
   RealtimeTransport,
   PresenceCapable,
+  TransportCapabilities,
   RealtimeClient,
   RealtimeClientOptions,
 } from './core/types.js'

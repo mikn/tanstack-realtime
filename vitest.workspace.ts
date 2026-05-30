@@ -65,6 +65,7 @@ export default defineWorkspace([
         'packages/__tests__/liveChannel.test.ts',
         'packages/__tests__/sharedTransport.test.ts',
         'packages/__tests__/hasPresence.test.ts',
+        'packages/__tests__/capabilities.test.ts',
         'packages/__tests__/realtimeCollectionOnMessage.test.ts',
         'packages/__tests__/presenceCollection.test.ts',
         'packages/__tests__/ephemeralLive.test.ts',

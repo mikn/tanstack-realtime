@@ -1,11 +1,32 @@
 import { Store } from '@tanstack/store'
 import { createHookPipeline } from '../core/hookPipeline.js'
 import type { HookHandle, HookRegistration } from '../core/hooks.js'
-import type { ConnectionStatus, RealtimeTransport } from '../core/types.js'
+import type {
+  ConnectionStatus,
+  RealtimeTransport,
+  TransportCapabilities,
+} from '../core/types.js'
 
 export interface MockTransportOptions {
   /** Initial status. @default 'connected' */
   initialStatus?: ConnectionStatus
+  /**
+   * Override the transport's declared {@link TransportCapabilities}.
+   *
+   * Defaults to a non-presence transport
+   * (`{ presence: false, serverAssistedRecovery: false, history: false, ephemeral: true }`).
+   * Pass arbitrary flags to exercise capability-gated code paths in tests
+   * (e.g. the conformance kit's capability-honesty battery).
+   */
+  capabilities?: TransportCapabilities
+}
+
+/** Default capabilities for the base (non-presence) mock transport. */
+const DEFAULT_MOCK_CAPABILITIES: TransportCapabilities = {
+  presence: false,
+  serverAssistedRecovery: false,
+  history: false,
+  ephemeral: true,
 }
 
 /** Recorded message from a publish call. */
@@ -43,7 +64,10 @@ export interface MockTransport extends RealtimeTransport {
 export function createMockTransport(
   options: MockTransportOptions = {},
 ): MockTransport {
-  const { initialStatus = 'connected' } = options
+  const {
+    initialStatus = 'connected',
+    capabilities = DEFAULT_MOCK_CAPABILITIES,
+  } = options
 
   const store = new Store<ConnectionStatus>(initialStatus)
   const listeners = new Map<string, Set<(data: unknown) => void>>()
@@ -87,6 +111,7 @@ export function createMockTransport(
 
   return {
     store,
+    capabilities,
 
     hook(registration: HookRegistration): HookHandle {
       return pipeline.register(registration)

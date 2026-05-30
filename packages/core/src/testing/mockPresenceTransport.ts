@@ -1,8 +1,20 @@
 import { createMockTransport } from './mockTransport.js'
-import type { PresenceCapable, PresenceUser } from '../core/types.js'
+import type {
+  PresenceCapable,
+  PresenceUser,
+  TransportCapabilities,
+} from '../core/types.js'
 import type { MockTransport, MockTransportOptions } from './mockTransport.js'
 
 export interface MockPresenceTransportOptions extends MockTransportOptions {}
+
+/** Default capabilities for the presence-capable mock transport. */
+const DEFAULT_MOCK_PRESENCE_CAPABILITIES: TransportCapabilities = {
+  presence: true,
+  serverAssistedRecovery: false,
+  history: false,
+  ephemeral: true,
+}
 
 export interface MockPresenceTransport extends MockTransport, PresenceCapable {
   simulatePresenceJoin: (channel: string, user: PresenceUser) => void
@@ -13,7 +25,12 @@ export interface MockPresenceTransport extends MockTransport, PresenceCapable {
 export function createMockPresenceTransport(
   options: MockPresenceTransportOptions = {},
 ): MockPresenceTransport {
-  const base = createMockTransport(options)
+  // Default to a presence-capable capability set; callers can still override
+  // via `options.capabilities` (useful for the conformance kit).
+  const base = createMockTransport({
+    capabilities: DEFAULT_MOCK_PRESENCE_CAPABILITIES,
+    ...options,
+  })
 
   const presenceState = new Map<string, Array<PresenceUser>>()
   const selfConnectionIds = new Map<string, string>()

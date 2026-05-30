@@ -79,6 +79,15 @@ export function usePresence<
 ): UsePresenceResult<TData> {
   const client = useRealtimeClient('usePresence')
 
+  if (!client.capabilities.presence) {
+    throw new Error(
+      '[realtime] usePresence requires a transport with presence support; ' +
+        'the current transport reports capabilities.presence = false. ' +
+        'Use a presence-capable transport (Centrifugo, Pusher, PartyKit) or ' +
+        'check client.capabilities.presence before rendering presence UI.',
+    )
+  }
+
   const { params, initial } = options
   const channel = channelDef.resolveChannel(params)
 

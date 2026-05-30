@@ -48,6 +48,64 @@ export interface SubscribeError {
 export type QueryKey = ReadonlyArray<unknown>
 
 // ---------------------------------------------------------------------------
+// Transport capabilities — the public adapter capability contract
+// ---------------------------------------------------------------------------
+
+/**
+ * The public capability contract that every transport adapter declares.
+ *
+ * `TransportCapabilities` is an **honest, machine-readable description** of
+ * what a transport/provider can actually do. The provider-adapter layer
+ * (`@realtimejs/adapter-*`) uses it to:
+ *  - gate features at the hook boundary so the DX degrades predictably
+ *    (e.g. `usePresence` throws an actionable error on a transport that
+ *    reports `presence: false`), and
+ *  - drive the conformance kit's "capability honesty" battery, which asserts
+ *    that declared flags match observed behavior.
+ *
+ * Every adapter SHOULD declare its capabilities explicitly on the transport
+ * (`transport.capabilities`). Transports that don't declare them still work —
+ * {@link getCapabilities} derives a conservative back-compat default from the
+ * transport's shape.
+ *
+ * @see getCapabilities for the defaulting rules.
+ * @see RealtimeTransport.capabilities for where adapters declare these.
+ */
+export interface TransportCapabilities {
+  /**
+   * Transport can carry presence (join/update/leave + member lists).
+   *
+   * `true` only when the provider holds server-side membership state and the
+   * transport implements {@link PresenceCapable}. SSE-style receive-only
+   * streams report `false`.
+   */
+  presence: boolean
+  /**
+   * Transport/provider can replay missed messages by offset/epoch after a gap.
+   *
+   * `true` when the provider tracks per-channel offsets/epochs and can resume
+   * a subscription from a known position after a reconnect (server-assisted
+   * gap recovery). `false` when recovery is best-effort / client-only.
+   */
+  serverAssistedRecovery: boolean
+  /**
+   * Provider offers server-side message history retrieval.
+   *
+   * `true` when past messages can be fetched on demand (e.g. a separate
+   * history API). Declared for adapters to advertise; consumed by future
+   * history/pagination tooling.
+   */
+  history: boolean
+  /**
+   * Transport supports fire-and-forget ephemeral messages (no persistence).
+   *
+   * Defaults to `true` for any pub/sub transport — fire-and-forget delivery
+   * is the baseline behavior of every transport in this library.
+   */
+  ephemeral: boolean
+}
+
+// ---------------------------------------------------------------------------
 // Transport interface — base + optional presence capability
 // ---------------------------------------------------------------------------
 
@@ -131,6 +189,21 @@ export interface RealtimeTransport {
    * and if any returns `false`, the message is suppressed.
    */
   hook: (registration: HookRegistration) => HookHandle
+
+  /**
+   * Declared {@link TransportCapabilities} for this transport.
+   *
+   * **Optional** — existing and third-party transports that don't declare
+   * capabilities continue to work. When omitted, {@link getCapabilities}
+   * derives a conservative back-compat default from the transport's shape.
+   *
+   * Every first-party adapter declares this explicitly so the hook layer and
+   * the conformance kit can reason about what the transport actually supports.
+   * Wrapper transports (coordinated / SharedWorker / BroadcastChannel) forward
+   * the **inner** transport's capabilities so wrapping a presence-capable
+   * provider still reports `presence: true`.
+   */
+  readonly capabilities?: TransportCapabilities
 }
 
 /**
@@ -211,6 +284,47 @@ export function hasPresence(
   )
 }
 
+/**
+ * Resolve the {@link TransportCapabilities} for any {@link RealtimeTransport}.
+ *
+ * This is the single source of truth the hook layer and conformance kit use to
+ * decide what a transport supports.
+ *
+ * **Defaulting rule** (back-compat for transports that don't declare
+ * `capabilities`):
+ *  - If `transport.capabilities` is present, it is returned verbatim — the
+ *    adapter's declared contract always wins.
+ *  - Otherwise a conservative default is derived from the transport's shape:
+ *    ```ts
+ *    {
+ *      presence: hasPresence(transport), // true only if it implements PresenceCapable
+ *      serverAssistedRecovery: false,    // assume no server-assisted gap recovery
+ *      history: false,                   // assume no history API
+ *      ephemeral: true,                  // any pub/sub transport can fire-and-forget
+ *    }
+ *    ```
+ *
+ * `ephemeral` defaults to `true` because fire-and-forget delivery is the
+ * baseline behavior of every transport; the other flags default to the safe,
+ * least-capable assumption so undeclared transports never over-promise.
+ *
+ * @example
+ * if (!getCapabilities(transport).presence) {
+ *   // degrade gracefully — presence is unavailable on this transport
+ * }
+ */
+export function getCapabilities(
+  transport: RealtimeTransport,
+): TransportCapabilities {
+  if (transport.capabilities) return transport.capabilities
+  return {
+    presence: hasPresence(transport),
+    serverAssistedRecovery: false,
+    history: false,
+    ephemeral: true,
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Client interface
 // ---------------------------------------------------------------------------
@@ -245,6 +359,17 @@ export interface RealtimeClient {
    * frameworks) to reactively track the connection state.
    */
   readonly store: Store<{ status: ConnectionStatus }>
+
+  /**
+   * The resolved {@link TransportCapabilities} of the underlying transport.
+   *
+   * Computed once via {@link getCapabilities} when the client is created.
+   * Read this to branch UI/feature code on what the transport supports —
+   * e.g. `if (client.capabilities.presence)` before mounting presence UI.
+   * Calling presence methods when `capabilities.presence` is `false` throws an
+   * actionable `[realtime]` error.
+   */
+  readonly capabilities: TransportCapabilities
 
   /**
    * Open the connection. Resolves once `status` reaches `'connected'`.

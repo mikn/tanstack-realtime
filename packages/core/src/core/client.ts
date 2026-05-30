@@ -1,5 +1,5 @@
 import { Store } from '@tanstack/store'
-import { hasPresence } from './types.js'
+import { getCapabilities, hasPresence } from './types.js'
 import { serializeKey } from './serializeKey.js'
 import { generateClientId } from './crdt.js'
 import type {
@@ -8,13 +8,18 @@ import type {
   RealtimeClientOptions,
 } from './types.js'
 
-/** Throw a consistent error when a non-presence transport is used for presence. */
+/**
+ * Throw a consistent, actionable error when a non-presence-capable transport
+ * is used for a presence operation. The message is capability-based: it points
+ * at `client.capabilities.presence` and names presence-capable providers.
+ */
 function presenceNotSupported(method: string): never {
   throw new Error(
-    `[realtime] ${method}() requires the transport to implement PresenceCapable ` +
-      `(joinPresence, updatePresence, leavePresence, onPresenceChange). ` +
-      `Check hasPresence(transport) before calling presence methods, or use a ` +
-      `transport that includes presence support (Centrifugo adapter, SharedWorker).`,
+    `[realtime] ${method}() requires a transport with presence support, ` +
+      `but the current transport reports capabilities.presence = false ` +
+      `(it does not implement PresenceCapable). ` +
+      `Use a presence-capable transport (Centrifugo, Pusher, PartyKit) or ` +
+      `check client.capabilities.presence before calling presence methods.`,
   )
 }
 
@@ -51,9 +56,14 @@ export function createRealtimeClient(
 
   const clientId = generateClientId()
 
+  // Resolve capabilities once. Falls back to a shape-derived default for
+  // transports (including third-party ones) that don't declare them.
+  const capabilities = getCapabilities(transport)
+
   const client: RealtimeClient = {
     clientId,
     store,
+    capabilities,
 
     async connect() {
       ensureStatusSubscription()
@@ -83,22 +93,26 @@ export function createRealtimeClient(
     },
 
     joinPresence(channel, data) {
-      if (!hasPresence(transport)) presenceNotSupported('joinPresence')
+      if (!capabilities.presence || !hasPresence(transport))
+        presenceNotSupported('joinPresence')
       transport.joinPresence(channel, data)
     },
 
     updatePresence(channel, data) {
-      if (!hasPresence(transport)) presenceNotSupported('updatePresence')
+      if (!capabilities.presence || !hasPresence(transport))
+        presenceNotSupported('updatePresence')
       transport.updatePresence(channel, data)
     },
 
     leavePresence(channel) {
-      if (!hasPresence(transport)) presenceNotSupported('leavePresence')
+      if (!capabilities.presence || !hasPresence(transport))
+        presenceNotSupported('leavePresence')
       transport.leavePresence(channel)
     },
 
     onPresenceChange(channel, callback) {
-      if (!hasPresence(transport)) presenceNotSupported('onPresenceChange')
+      if (!capabilities.presence || !hasPresence(transport))
+        presenceNotSupported('onPresenceChange')
       return transport.onPresenceChange(channel, callback)
     },
 

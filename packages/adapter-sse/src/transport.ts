@@ -277,6 +277,17 @@ export function sseTransport(options: SseTransportOptions): RealtimeTransport {
   const transport: RealtimeTransport = {
     store,
 
+    // SSE is receive-only over the stream and the server holds no presence
+    // membership state, so presence is unsupported. Publishes are
+    // fire-and-forget HTTP POSTs (ephemeral). No offset-based recovery or
+    // history API is provided.
+    capabilities: {
+      presence: false,
+      serverAssistedRecovery: false,
+      history: false,
+      ephemeral: true,
+    },
+
     async connect() {
       const current = store.get()
       if (current === 'connected') return
