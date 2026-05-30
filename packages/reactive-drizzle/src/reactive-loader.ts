@@ -98,7 +98,7 @@ export function createLoader<TResult>(
       }
       channel =
         resolveChannelOverride(options.channel) ??
-        deriveChannelKey(pred.table, undefined, [], {})
+        deriveChannelKey(pred.table, undefined, [], {}, pred.matches)
     } else {
       throw new Error(
         "createLoader: no read set captured — use wrapReactiveDb() or provide 'predicate'",

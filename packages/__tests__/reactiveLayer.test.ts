@@ -554,6 +554,36 @@ describe('SubscriptionManager', () => {
     expect(entryV1.requery).not.toHaveBeenCalled()
   })
 
+  it('register: a DISTINCT entry overwriting the same channel warns once (loud, not silent)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const publishFn = vi.fn().mockResolvedValue(undefined)
+      const mgr = createSubscriptionManager(publishFn)
+      // distinct compiled matcher sources on the same channel → collision
+      mgr.register(makeEntry('ch-A', 'todos', (row) => row.teamId === 'OLD'))
+      mgr.register(makeEntry('ch-A', 'todos', (row) => row.teamId === 'NEW'))
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(warn.mock.calls[0]?.[0]).toContain('[realtime:reactive]')
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('register: an identical re-registration does NOT warn', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const publishFn = vi.fn().mockResolvedValue(undefined)
+      const mgr = createSubscriptionManager(publishFn)
+      // identical predicate (same table/sql/params/matcher source) → no warn
+      const matcher = (row: Record<string, unknown>) => row.teamId === 'A'
+      mgr.register(makeEntry('ch-A', 'todos', matcher))
+      mgr.register(makeEntry('ch-A', 'todos', matcher))
+      expect(warn).not.toHaveBeenCalled()
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
   // ------- Conservative UPDATE invalidation -----------------------------------
 
   it('UPDATE: non-matching post-update row still invalidates if predicate column was set', async () => {
@@ -812,9 +842,52 @@ describe('deriveChannelKey', () => {
     expect(key.startsWith(serializeKey(['todos']) + ':q=')).toBe(true)
   })
 
-  it('undefined whereSQL (matches escape hatch) → bare serializeKey([table]), no discriminator', () => {
+  it('undefined whereSQL with no matcher → bare serializeKey([table]), no discriminator', () => {
     const key = deriveChannelKey('todos', undefined, [], dkCols)
     expect(key).toBe(serializeKey(['todos']))
+  })
+
+  it('matches escape hatch → serializeKey([table]) prefix + :q=<hash> discriminator derived from matcher source', () => {
+    const matcher = (row: Record<string, unknown>) => row.teamId === 'A'
+    const key = deriveChannelKey('todos', undefined, [], dkCols, matcher)
+    expect(key.startsWith(serializeKey(['todos']) + ':q=')).toBe(true)
+  })
+
+  it('matches escape hatch: two DIFFERENT matcher functions on the same table → DIFFERENT channels', () => {
+    const a = deriveChannelKey(
+      'todos',
+      undefined,
+      [],
+      dkCols,
+      (row: Record<string, unknown>) => row.teamId === 'A',
+    )
+    const b = deriveChannelKey(
+      'todos',
+      undefined,
+      [],
+      dkCols,
+      (row: Record<string, unknown>) => row.teamId === 'B',
+    )
+    expect(a).not.toBe(b)
+    // both still carry the shared readable prefix
+    expect(a.startsWith(serializeKey(['todos']) + ':q=')).toBe(true)
+    expect(b.startsWith(serializeKey(['todos']) + ':q=')).toBe(true)
+  })
+
+  it('matches escape hatch: an identical matcher (same source) reuse → SAME channel', () => {
+    const matcher = (row: Record<string, unknown>) => row.teamId === 'A'
+    const a = deriveChannelKey('todos', undefined, [], dkCols, matcher)
+    const b = deriveChannelKey('todos', undefined, [], dkCols, matcher)
+    // distinct closures with identical source also collapse to the same channel
+    const c = deriveChannelKey(
+      'todos',
+      undefined,
+      [],
+      dkCols,
+      (row: Record<string, unknown>) => row.teamId === 'A',
+    )
+    expect(a).toBe(b)
+    expect(a).toBe(c)
   })
 
   it('byte-identical queries derive the SAME channel (deterministic)', () => {
@@ -868,6 +941,61 @@ describe('deriveChannelKey', () => {
     const a = deriveChannelKey('todos', '"todos"."team_id" = $1', ['A'], dkCols)
     const b = deriveChannelKey('todos', '"todos"."team_id" = $1', ['B'], dkCols)
     expect(a).not.toBe(b)
+  })
+
+  // ----- 64-bit discriminator: format + determinism -------------------------
+
+  it('discriminator is FIXED-LENGTH (Centrifugo-safe): exactly 14 base36 chars after :q=', () => {
+    // The discriminator must be bounded regardless of query size so the channel
+    // never exceeds Centrifugo's 255-char channel-name cap.
+    const longSql =
+      'SELECT * FROM "todos" WHERE "todos"."team_id" = $1 ' +
+      'AND "todos"."title" IN (' +
+      Array.from({ length: 200 }, (_unused, i) => `'value-${i}'`).join(', ') +
+      ')'
+    const key = deriveChannelKey('todos', longSql, ['A'], dkCols)
+    const token = key.slice(key.lastIndexOf(':q=') + 3)
+    expect(token).toMatch(/^[0-9a-z]{14}$/)
+  })
+
+  it('discriminator is deterministic across repeated calls (horizontal-scaling stable)', () => {
+    const sql = 'SELECT * FROM "todos" WHERE "todos"."team_id" = $1'
+    const tokenOf = () => {
+      const k = deriveChannelKey('todos', sql, ['A'], dkCols)
+      return k.slice(k.lastIndexOf(':q=') + 3)
+    }
+    expect(tokenOf()).toBe(tokenOf())
+  })
+
+  // ----- bigint-safe params -------------------------------------------------
+
+  it('a bigint param derives a channel WITHOUT throwing', () => {
+    expect(() =>
+      deriveChannelKey('todos', '"todos"."team_id" = $1', [123n], dkCols),
+    ).not.toThrow()
+  })
+
+  it('two different bigint values yield DIFFERENT channels', () => {
+    const a = deriveChannelKey('todos', '"todos"."team_id" = $1', [1n], dkCols)
+    const b = deriveChannelKey('todos', '"todos"."team_id" = $1', [2n], dkCols)
+    expect(a).not.toBe(b)
+  })
+
+  it('bigint 1n, number 1, and string "1" do NOT collide (n-suffix disambiguation)', () => {
+    const big = deriveChannelKey(
+      'todos',
+      '"todos"."team_id" = $1',
+      [1n],
+      dkCols,
+    )
+    const num = deriveChannelKey('todos', '"todos"."team_id" = $1', [1], dkCols)
+    const str = deriveChannelKey(
+      'todos',
+      '"todos"."team_id" = $1',
+      ['1'],
+      dkCols,
+    )
+    expect(new Set([big, num, str]).size).toBe(3)
   })
 })
 

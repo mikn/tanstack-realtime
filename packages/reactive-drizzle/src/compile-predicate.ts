@@ -458,7 +458,7 @@ export function extractEqualityConditions(
 }
 
 /**
- * A small, deterministic, non-cryptographic string hash (FNV-1a, 32-bit).
+ * A small, deterministic, non-cryptographic string hash (FNV-1a, 64-bit).
  *
  * Used to derive a stable discriminator from a query's full SQL + params so
  * that two queries which differ in anything that changes their RESULT SET
@@ -466,20 +466,56 @@ export function extractEqualityConditions(
  * top-level equality conditions — produce DIFFERENT channels, while
  * byte-identical queries produce the SAME channel.
  *
- * Deterministic across processes: the same input string always yields the
- * same hash. No dependency, no crypto — collision resistance is not a security
- * property here, only "distinct result-sets ⇒ distinct channels with
- * overwhelming probability".
+ * Why 64-bit and not 32-bit: a 32-bit hash has a ~n²/2³² birthday-collision
+ * tail, and a collision would silently route one query's update onto another
+ * query's channel (cache corruption via the client `Set<cacheKey>` fan-out).
+ * Widening to 64 bits pushes the collision probability into the "won't happen
+ * in practice" range while keeping the token FIXED-LENGTH and short.
+ *
+ * Why fixed-length (and not the raw normalised string): Centrifugo caps channel
+ * names at 255 chars, so an unbounded discriminator would break the Centrifugo
+ * adapter. A 64-bit value in base36 is ≤13 chars regardless of input size.
+ *
+ * Implemented as two independent 32-bit FNV-1a lanes (a second lane seeded from
+ * a different offset basis), each advanced with the standard FNV prime via
+ * `Math.imul` and kept unsigned with `>>> 0`. The lanes are concatenated as
+ * zero-padded base36 so the result is deterministic across processes (no crypto,
+ * no platform-dependent 64-bit integer math), giving horizontal-scaling-stable
+ * channels: two server instances derive identical channels for the same query.
  */
-function fnv1a32(input: string): string {
-  let hash = 0x811c9dc5
+function fnv1a64(input: string): string {
+  // Two lanes with distinct 32-bit FNV-1a offset bases. Lane B's offset is the
+  // standard offset XORed with a constant so identical inputs diverge between
+  // lanes, yielding ~64 bits of combined entropy.
+  let hashA = 0x811c9dc5
+  let hashB = 0x811c9dc5 ^ 0x9e3779b9
   for (let i = 0; i < input.length; i++) {
-    hash ^= input.charCodeAt(i)
-    // hash * 16777619, kept in 32-bit unsigned range via Math.imul.
-    hash = Math.imul(hash, 0x01000193)
+    const c = input.charCodeAt(i)
+    hashA ^= c
+    hashA = Math.imul(hashA, 0x01000193)
+    hashB ^= c
+    hashB = Math.imul(hashB, 0x01000193)
   }
-  // >>> 0 → unsigned; base36 for a short, stable, alphanumeric token.
-  return (hash >>> 0).toString(36)
+  // >>> 0 → unsigned; base36, each lane zero-padded to a fixed 7 chars (a
+  // 32-bit unsigned value is ≤ 6 base36 digits, so 7 is safe), so the combined
+  // token is always exactly 14 chars and never variable-length.
+  const a = (hashA >>> 0).toString(36).padStart(7, '0')
+  const b = (hashB >>> 0).toString(36).padStart(7, '0')
+  return a + b
+}
+
+/**
+ * JSON.stringify replacer that serialises `bigint` params safely.
+ *
+ * `JSON.stringify` throws `TypeError: Do not know how to serialize a BigInt` on
+ * any bigint value, which would otherwise crash channel derivation for queries
+ * binding a bigint column. We render bigints as their decimal string with a
+ * trailing `n` (e.g. `1n`) so that a bigint `1n` does not collide with the
+ * number `1` (serialised `1`) or the string `"1"` (serialised `"1"`), keeping
+ * distinct values mapped to distinct discriminators.
+ */
+function bigintSafeReplacer(_key: string, value: unknown): unknown {
+  return typeof value === 'bigint' ? value.toString() + 'n' : value
 }
 
 /**
@@ -487,29 +523,48 @@ function fnv1a32(input: string): string {
  *
  * Collapses runs of whitespace so cosmetically-different-but-identical SQL
  * (extra spaces/newlines from a query builder) still hashes the same, then
- * appends the JSON-serialised params so two queries with the same SQL text but
- * different bound values (and thus different result sets) hash differently.
+ * appends the JSON-serialised params (via {@link bigintSafeReplacer} so bigint
+ * binds don't throw) so two queries with the same SQL text but different bound
+ * values (and thus different result sets) hash differently.
  */
 function normalizeQueryForHash(
   sql: string,
   params: ReadonlyArray<unknown>,
 ): string {
   const normalizedSql = sql.replace(/\s+/g, ' ').trim()
-  return `${normalizedSql}|${JSON.stringify(params)}`
+  return `${normalizedSql}|${JSON.stringify(params, bigintSafeReplacer)}`
 }
 
 /**
  * Compute the short, stable SQL discriminator suffix (`q=<hash>`) for a query.
  *
- * Exported so other derivation sites (e.g. the no-WHERE table-level fallback)
- * can append the SAME discriminator and stay consistent with
- * {@link deriveChannelKey}.
+ * The token after `q=` is the 64-bit FNV-1a hash in base36 — always exactly 14
+ * chars (FIXED-LENGTH), so the overall channel stays comfortably under
+ * Centrifugo's 255-char cap regardless of how large the query is.
+ *
+ * Exported so other derivation sites (e.g. the no-WHERE table-level fallback
+ * and the `matches` escape hatch) can append the SAME discriminator and stay
+ * consistent with {@link deriveChannelKey}.
  */
 export function queryDiscriminator(
   sql: string,
   params: ReadonlyArray<unknown>,
 ): string {
-  return `q=${fnv1a32(normalizeQueryForHash(sql, params))}`
+  return `q=${fnv1a64(normalizeQueryForHash(sql, params))}`
+}
+
+/**
+ * Compute the discriminator for a `matches` escape-hatch query, which has no
+ * SQL to hash. We fold the matcher function's SOURCE (`fn.toString()`) into the
+ * hash so two DISTINCT matcher functions on the same table get DISTINCT
+ * channels (closing the silent-collision gap), while reusing the same matcher
+ * function (identical source) reuses the same channel (acceptable — it is the
+ * same logical query).
+ */
+function matchesDiscriminator(
+  matches: (row: Record<string, unknown>) => boolean,
+): string {
+  return `q=${fnv1a64(`matches|${matches.toString()}`)}`
 }
 
 /**
@@ -528,18 +583,26 @@ export function queryDiscriminator(
  *    and therefore still share one channel.
  *
  * `whereSQL === undefined` (the `matches` escape hatch, which has no SQL to
- * hash) keeps the legacy behaviour and returns the bare `serializeKey([table])`
- * with NO discriminator — distinct `matches`-based queries should pass an
- * explicit `channel` to disambiguate.
+ * hash) keeps the readable prefix `serializeKey([table])` but appends a
+ * `:q=<hash>` discriminator derived from the matcher function's SOURCE when a
+ * `matches` function is supplied — so two DISTINCT matcher functions on the
+ * same table get DISTINCT channels instead of silently colliding. When no
+ * matcher is supplied (and no explicit `channel`), it falls back to the bare
+ * table key. An explicit `channel` override always wins (handled by callers).
  */
 export function deriveChannelKey(
   tableName: string,
   whereSQL: string | undefined,
   params: ReadonlyArray<unknown>,
   columns: ColumnMap,
+  matches?: (row: Record<string, unknown>) => boolean,
 ): string {
-  // No SQL to discriminate on (matches escape hatch): legacy table-level key.
+  // No SQL to discriminate on (matches escape hatch). Fold the matcher source
+  // into the discriminator so distinct matchers on the same table don't collide.
   if (whereSQL === undefined) {
+    if (matches !== undefined) {
+      return `${serializeKey([tableName])}:${matchesDiscriminator(matches)}`
+    }
     return serializeKey([tableName])
   }
 

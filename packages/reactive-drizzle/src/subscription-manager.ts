@@ -11,6 +11,35 @@ import type {
 export { REALTIME_BATCH_CHANNEL }
 export type { QueryPredicate, SubscriptionEntry }
 
+/**
+ * Decide whether two subscription entries on the same channel are the SAME
+ * logical query (so re-registration is a no-op overwrite) or DISTINCT (so an
+ * overwrite would drop one query — a residual collision worth warning about).
+ *
+ * Compared by predicate identity: the full SQL, the bound params, and the
+ * compiled matcher's source. This deliberately treats a re-run of the same
+ * query (fresh closures, same source) as identical, while two genuinely
+ * different queries (different SQL/params/matcher) as distinct.
+ */
+function sameSubscription(a: SubscriptionEntry, b: SubscriptionEntry): boolean {
+  const pa = a.predicate
+  const pb = b.predicate
+  if (pa.table !== pb.table) return false
+  if ((pa.sql ?? '') !== (pb.sql ?? '')) return false
+  if (
+    JSON.stringify(pa.params ?? [], bigintReplacer) !==
+    JSON.stringify(pb.params ?? [], bigintReplacer)
+  ) {
+    return false
+  }
+  return pa.compiled.toString() === pb.compiled.toString()
+}
+
+/** bigint-safe JSON replacer (mirrors the channel-derivation replacer). */
+function bigintReplacer(_key: string, value: unknown): unknown {
+  return typeof value === 'bigint' ? value.toString() + 'n' : value
+}
+
 export class SubscriptionManager {
   // Inverted index: tableName → (channel → SubscriptionEntry)
   private index = new Map<string, Map<string, SubscriptionEntry>>()
@@ -47,12 +76,29 @@ export class SubscriptionManager {
    * — in which case they have identical `requery` semantics and overwriting is
    * harmless. DISTINCT queries (different result sets) always get DISTINCT
    * channels and therefore distinct entries; none is silently dropped.
+   *
+   * Belt-and-suspenders: if a DISTINCT entry would overwrite an existing entry
+   * on the same channel (a residual discriminator collision), we `console.warn`
+   * once with an actionable message so the collision is LOUD, not silent. We do
+   * NOT throw (back-compat), and we do NOT warn on identical re-registration.
    */
   register(entry: SubscriptionEntry): void {
     const tableMap =
       this.index.get(entry.predicate.table) ??
       new Map<string, SubscriptionEntry>()
     this.index.set(entry.predicate.table, tableMap)
+
+    const existing = tableMap.get(entry.channel)
+    if (existing && !sameSubscription(existing, entry)) {
+      console.warn(
+        `[realtime:reactive] channel collision on "${entry.channel}": a different ` +
+          'query is overwriting an existing subscription on the same channel. ' +
+          'This indicates a discriminator collision (two distinct queries hashed to ' +
+          'the same channel); pass an explicit `channel` to disambiguate. The ' +
+          'previous subscription will be dropped.',
+      )
+    }
+
     tableMap.set(entry.channel, entry)
   }
 
