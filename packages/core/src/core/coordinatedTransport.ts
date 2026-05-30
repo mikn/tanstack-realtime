@@ -91,19 +91,21 @@ export interface CoordinatedTransportOptions {
 
   /**
    * Declared {@link TransportCapabilities} of the inner transport produced by
-   * `transport()`.
+   * `transport()`. **Escape hatch — when provided, it always wins** for every
+   * strategy.
    *
-   * The SharedWorker and BroadcastChannel strategies create the inner transport
-   * lazily / in a separate process and cannot synchronously inspect it, so the
-   * coordinated wrapper forwards these declared capabilities to the selected
-   * strategy. The direct-fallback strategy derives them from the constructed
-   * inner instead (this option is ignored there).
-   *
-   * Pass the wrapped transport's real capabilities so `usePresence` degrades
-   * correctly — e.g. `{ presence: false, ... }` for an SSE inner.
-   *
-   * @default { presence: true, serverAssistedRecovery: false, history: false, ephemeral: true }
-   *   (assumes a presence-capable inner transport for back-compat.)
+   * You rarely need this. By default each strategy reports the inner
+   * transport's *real* capabilities so `usePresence` degrades honestly:
+   *  - **BroadcastChannel** and **direct fallback** can construct the inner
+   *    synchronously (side-effect-free until `.connect()`), so they auto-derive
+   *    via {@link getCapabilities} — e.g. an SSE inner reports
+   *    `presence: false`.
+   *  - **SharedWorker** is the exception: the inner genuinely lives in the
+   *    worker process and cannot be inspected from the tab. It defaults to the
+   *    least-capable set (`presence: false, …`) so the worker path
+   *    under-promises (loud, honest) rather than over-promises (silent). When
+   *    your worker wraps a presence-capable transport, pass `capabilities`
+   *    matching it here to re-enable presence.
    */
   capabilities?: TransportCapabilities
 }

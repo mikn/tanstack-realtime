@@ -180,24 +180,29 @@ describe('BroadcastChannel transport', () => {
   // ── Single tab becomes leader ───────────────────────────────────────────
 
   it('first tab becomes leader and connects inner transport', async () => {
-    let innerCreated = false
+    let factoryCalls = 0
     const mockInner = createMockInner()
 
     const transport = createBroadcastChannelTransport(
       () => {
-        innerCreated = true
+        factoryCalls++
         return mockInner
       },
       { name: 'test-single-leader' },
     )
 
-    // Before election timeout, not yet leader
-    expect(innerCreated).toBe(false)
+    // The factory is called once up front to probe the inner's capabilities
+    // (side-effect-free — no connection opens). The probe is memoized and
+    // reused as the leader's inner, so the factory is called exactly once.
+    expect(factoryCalls).toBe(1)
+    // The invariant that matters: the inner is NOT connected before election.
+    expect(mockInner.store.get()).toBe('disconnected')
 
     // Fire the 150ms discovery timer + 150ms election timer
     await vi.advanceTimersByTimeAsync(350)
 
-    expect(innerCreated).toBe(true)
+    // Probe was reused as the leader's inner — factory still called only once.
+    expect(factoryCalls).toBe(1)
 
     // connect() should work on the leader
     await transport.connect()
@@ -446,24 +451,43 @@ describe('BroadcastChannel transport', () => {
 
   it('tab with lowest ID wins election when multiple tabs start simultaneously', async () => {
     const inners: Array<MockInnerTransport> = []
+    let connectCalls = 0
+    const tabs: Array<ReturnType<typeof createBroadcastChannelTransport>> = []
 
     // Create 3 tabs at once — they'll get IDs tab-001, tab-002, tab-003
     for (let i = 0; i < 3; i++) {
-      createBroadcastChannelTransport(
-        () => {
-          const m = createMockInner()
-          inners.push(m)
-          return m
-        },
-        { name: 'test-tiebreak' },
+      tabs.push(
+        createBroadcastChannelTransport(
+          () => {
+            const m = createMockInner()
+            const origConnect = m.connect
+            m.connect = () => {
+              connectCalls++
+              return origConnect()
+            }
+            inners.push(m)
+            return m
+          },
+          { name: 'test-tiebreak' },
+        ),
       )
     }
+
+    // Each tab constructs exactly one inner up front to probe capabilities
+    // (side-effect-free — no connection opens). The probe is memoized and
+    // reused as that tab's leader inner, so the factory is called once per tab.
+    expect(inners.length).toBe(3)
+    // ...but constructing a probe must NOT open a connection.
+    expect(connectCalls).toBe(0)
+
+    // Every tab calls connect() — only the elected leader actually connects.
+    for (const tab of tabs) await tab.connect()
 
     // Wait for discovery + election
     await vi.advanceTimersByTimeAsync(500)
 
-    // Only one inner transport should have been created (the leader's)
-    expect(inners.length).toBe(1)
+    // Invariant: only ONE inner transport ever connects (the elected leader's).
+    expect(connectCalls).toBe(1)
   })
 })
 

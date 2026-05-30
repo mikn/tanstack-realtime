@@ -155,11 +155,27 @@ describe('built-in transports declare capabilities', () => {
 // ---------------------------------------------------------------------------
 
 describe('capability forwarding through wrappers', () => {
-  it('broadcast wrapper defaults to presence-capable', () => {
+  it('broadcast wrapper auto-derives presence:true from a presence-capable inner', () => {
     const wrapper = createBroadcastChannelTransport(() =>
       createMockPresenceTransport(),
     )
     expect(getCapabilities(wrapper).presence).toBe(true)
+  })
+
+  it('broadcast wrapper auto-derives presence:false from a non-presence inner (no capabilities option)', () => {
+    const wrapper = createBroadcastChannelTransport(() => createMockTransport())
+    expect(getCapabilities(wrapper).presence).toBe(false)
+  })
+
+  it('broadcast wrapper calls the inner factory exactly once per tab (probe is reused as leader inner)', () => {
+    let calls = 0
+    createBroadcastChannelTransport(() => {
+      calls++
+      return createMockTransport()
+    })
+    // The probe constructed up front to read capabilities is the only call;
+    // it is memoized and reused as the first leader's inner.
+    expect(calls).toBe(1)
   })
 
   it('broadcast wrapper forwards a declared non-presence capability set', () => {
@@ -200,9 +216,9 @@ describe('capability forwarding through wrappers', () => {
       else g['SharedWorker'] = realSharedWorker
     })
 
-    it('defaults to presence-capable', () => {
+    it('defaults to least-capable (presence:false) — inner is unreachable from the tab, so under-promise', () => {
       const tab = createSharedWorkerTransport('https://example.com/worker.js')
-      expect(getCapabilities(tab).presence).toBe(true)
+      expect(getCapabilities(tab).presence).toBe(false)
     })
 
     it('honors a declared inner capability set', () => {
@@ -251,6 +267,70 @@ describe('capability forwarding through wrappers', () => {
     it('forwards a presence inner transport via the direct fallback', () => {
       const transport = createCoordinatedTransport({
         transport: () => createMockPresenceTransport(),
+      })
+      expect(getCapabilities(transport).presence).toBe(true)
+    })
+  })
+
+  // The documented happy path: BroadcastChannel available, no workerUrl, no
+  // capabilities option. This is the branch the README recommends, so it must
+  // report the inner transport's REAL capabilities (no silent over-promise).
+  describe('coordinated transport — BroadcastChannel branch (no capabilities option)', () => {
+    const g = globalThis as Record<string, unknown>
+    let realWindow: unknown
+    let realBC: unknown
+
+    beforeEach(() => {
+      realWindow = g['window']
+      realBC = g['BroadcastChannel']
+      g['window'] = { addEventListener: () => {} }
+      // Minimal BroadcastChannel stub — election never fires (no real timers
+      // needed for a synchronous capabilities read), so a no-op channel suffices.
+      g['BroadcastChannel'] = class {
+        onmessage: ((e: MessageEvent) => void) | null = null
+        postMessage(): void {}
+        close(): void {}
+        addEventListener(): void {}
+      }
+    })
+
+    afterEach(() => {
+      if (realWindow === undefined) delete g['window']
+      else g['window'] = realWindow
+      if (realBC === undefined) delete g['BroadcastChannel']
+      else g['BroadcastChannel'] = realBC
+    })
+
+    it('reports presence:false when wrapping a non-presence (sse-like) inner', () => {
+      const transport = createCoordinatedTransport({
+        transport: () => createMockTransport(),
+      })
+      expect(getCapabilities(transport).presence).toBe(false)
+    })
+
+    it('reports presence:false when wrapping a real sseTransport', () => {
+      const transport = createCoordinatedTransport({
+        transport: () => sseTransport({ url: 'https://example.com/sse' }),
+      })
+      expect(getCapabilities(transport).presence).toBe(false)
+    })
+
+    it('reports presence:true when wrapping a presence-capable inner (no regression)', () => {
+      const transport = createCoordinatedTransport({
+        transport: () => createMockPresenceTransport(),
+      })
+      expect(getCapabilities(transport).presence).toBe(true)
+    })
+
+    it('explicit capabilities option still wins (escape hatch)', () => {
+      const transport = createCoordinatedTransport({
+        transport: () => createMockTransport(),
+        capabilities: {
+          presence: true,
+          serverAssistedRecovery: false,
+          history: false,
+          ephemeral: true,
+        },
       })
       expect(getCapabilities(transport).presence).toBe(true)
     })

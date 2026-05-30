@@ -450,14 +450,18 @@ export interface SharedWorkerTransportOptions {
    * the SharedWorker coordinator.
    *
    * The tab-side transport proxies all operations to the worker and cannot
-   * synchronously inspect the inner transport (it lives in a separate worker
-   * process). Declare the inner transport's capabilities here so the wrapper
-   * forwards them — e.g. pass `{ presence: false, ... }` when the worker wraps
-   * an SSE transport so `usePresence` degrades correctly.
+   * synchronously inspect the inner transport (it genuinely lives in a separate
+   * worker process). Declare the worker's inner transport's capabilities here
+   * so the wrapper forwards them — e.g. pass a presence-capable set like
+   * `{ presence: true, ... }` when the worker wraps a Centrifugo transport.
    *
-   * @default { presence: true, serverAssistedRecovery: false, history: false, ephemeral: true }
-   *   (SharedWorker has always exposed the full presence API to tabs; the
-   *   default assumes a presence-capable inner transport for back-compat.)
+   * @default { presence: false, serverAssistedRecovery: false, history: false, ephemeral: true }
+   *   (least-capable). The inner transport is unreachable from the tab, so the
+   *   default deliberately under-promises rather than over-promises: a
+   *   presence-capable worker that forgets to pass `capabilities` makes
+   *   `usePresence` throw a loud, actionable error, which is strictly safer
+   *   than silently proxying presence to a transport that cannot do it. Pass
+   *   `capabilities` matching your worker's transport to opt back in.
    */
   capabilities?: TransportCapabilities
 }
@@ -465,14 +469,17 @@ export interface SharedWorkerTransportOptions {
 /**
  * Default capabilities for the SharedWorker tab transport.
  *
- * The tab transport always implements the full {@link PresenceCapable} surface
- * (it proxies presence calls to the worker), so the historical default assumes
- * a presence-capable inner transport. Override via
+ * The inner transport lives in the worker process and cannot be inspected from
+ * the tab, so unlike the BroadcastChannel/direct strategies (which auto-derive
+ * from a synchronously-constructed inner) the SharedWorker tab must declare
+ * capabilities. The default is **least-capable** (`presence: false`) so the
+ * worker path under-promises (loud, honest degradation) instead of
+ * over-promising (silent presence no-op). Override via
  * {@link SharedWorkerTransportOptions.capabilities} when the worker wraps a
- * transport that lacks a feature (e.g. SSE → `presence: false`).
+ * presence-capable transport.
  */
 const DEFAULT_SHARED_WORKER_CAPABILITIES: TransportCapabilities = {
-  presence: true,
+  presence: false,
   serverAssistedRecovery: false,
   history: false,
   ephemeral: true,

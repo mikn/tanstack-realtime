@@ -30,7 +30,7 @@
 
 import { Store } from '@tanstack/store'
 import { createHookPipeline } from './hookPipeline.js'
-import { hasPresence } from './types.js'
+import { getCapabilities, hasPresence } from './types.js'
 import type { HookHandle, HookRegistration } from './hooks.js'
 import type {
   ConnectionStatus,
@@ -61,32 +61,20 @@ export interface BroadcastChannelTransportOptions {
   /**
    * Declared {@link TransportCapabilities} of the **inner** transport.
    *
-   * The leader's inner transport is created lazily (only on the elected leader
-   * tab), so this wrapper cannot synchronously inspect it. Declare the inner
-   * transport's capabilities here so the wrapper forwards them — e.g. pass
-   * `{ presence: false, ... }` when wrapping an SSE transport so `usePresence`
-   * degrades correctly.
+   * **Escape hatch — when provided, this always wins.** Pass it to override the
+   * auto-derived capabilities (see below) for unusual setups.
    *
-   * @default { presence: true, serverAssistedRecovery: false, history: false, ephemeral: true }
-   *   (the wrapper always proxies the full presence API; the default assumes a
-   *   presence-capable inner transport for back-compat.)
+   * By default this wrapper derives the inner transport's real capabilities
+   * automatically: constructing a transport instance is side-effect-free (no
+   * connection opens until `.connect()`), so the wrapper builds one inner up
+   * front purely to read {@link getCapabilities}, then reuses that same
+   * instance as the first elected leader's transport (the factory is therefore
+   * still called exactly once per tab, and only the leader ever `.connect()`s).
+   * This keeps capabilities honest — e.g. an SSE inner reports
+   * `presence: false` so `usePresence` degrades with a loud, actionable error
+   * instead of silently no-op'ing.
    */
   capabilities?: TransportCapabilities
-}
-
-/**
- * Default capabilities for the BroadcastChannel multi-tab wrapper.
- *
- * Assumes a presence-capable inner transport (the wrapper exposes the full
- * {@link PresenceCapable} surface). Override via
- * {@link BroadcastChannelTransportOptions.capabilities} when the wrapped
- * transport lacks a feature (e.g. SSE → `presence: false`).
- */
-const DEFAULT_BROADCAST_CHANNEL_CAPABILITIES: TransportCapabilities = {
-  presence: true,
-  serverAssistedRecovery: false,
-  history: false,
-  ephemeral: true,
 }
 
 // ---------------------------------------------------------------------------
@@ -185,14 +173,34 @@ export function createBroadcastChannelTransport(
   const store = new Store<ConnectionStatus>('disconnected')
   const bc = new BroadcastChannel(name)
 
-  // The leader's inner transport is created lazily (only on the tab elected
-  // leader), so this wrapper cannot synchronously inspect it. Capabilities are
-  // therefore declared via `options.capabilities`, defaulting to a
-  // presence-capable set for back-compat (the wrapper always proxies the full
-  // presence API). Forward the wrapped transport's real capabilities by
-  // passing them here — e.g. `{ presence: false, ... }` for an SSE inner.
-  const capabilities: TransportCapabilities =
-    options.capabilities ?? DEFAULT_BROADCAST_CHANNEL_CAPABILITIES
+  // ── Capabilities: honest by default, auto-derived from the inner ──────────
+  //
+  // An explicit `options.capabilities` always wins (escape hatch). Otherwise
+  // we derive the inner transport's real capabilities by constructing one inner
+  // instance up front. Constructing a transport is side-effect-free — no
+  // connection opens until `.connect()` — so this does NOT violate the
+  // "only the elected leader connects" invariant. We MEMOIZE this probe and
+  // hand it to the first leader so the user's factory is still called exactly
+  // once per tab (the probe becomes the leader's inner; subsequent leaders,
+  // e.g. after failover, get a fresh instance from the factory).
+  let probeInner: (RealtimeTransport & Partial<PresenceCapable>) | null = null
+  let capabilities: TransportCapabilities
+  if (options.capabilities) {
+    capabilities = options.capabilities
+  } else {
+    probeInner = createInner()
+    capabilities = getCapabilities(probeInner)
+  }
+
+  /** Returns the memoized probe on first use, then a fresh inner each time. */
+  function makeInner(): RealtimeTransport & Partial<PresenceCapable> {
+    if (probeInner) {
+      const reused = probeInner
+      probeInner = null
+      return reused
+    }
+    return createInner()
+  }
 
   // ── Local state ─────────────────────────────────────────────────────────
 
@@ -344,8 +352,8 @@ export function createBroadcastChannelTransport(
     leaderTabId = tabId
     stopLeaderWatch()
 
-    // Create the real transport
-    inner = createInner()
+    // Create the real transport (reuses the memoized probe on first election).
+    inner = makeInner()
 
     // Mirror inner status → local store + broadcast to followers
     const sub = inner.store.subscribe((status) => {
