@@ -4,6 +4,7 @@ import {
   compilePredicate,
   deriveChannelKey,
   extractReferencedColumns,
+  queryDiscriminator,
 } from './compile-predicate.js'
 import type { ColumnMap } from './reactive-db.js'
 import type { CapturedRead, QueryKey } from '@realtimejs/core'
@@ -61,10 +62,17 @@ export function deriveCapturedRead(
       err instanceof ReactivePredicateParseError &&
       err.message.includes('No WHERE clause')
     ) {
-      // Table-level subscription: query has no WHERE clause
+      // Table-level subscription: query has no WHERE clause. We still
+      // discriminate by the FULL SQL + params so two whole-table reads that
+      // differ in SELECT columns / ORDER BY / LIMIT (different result sets)
+      // get different channels, while byte-identical whole-table reads share
+      // one. The prefix is the bare table key; the discriminator distinguishes.
       compiled = () => true
       referencedColumns = new Set<string>()
-      autoChannel = serializeKey([read.table])
+      autoChannel = `${serializeKey([read.table])}:${queryDiscriminator(
+        read.sql,
+        read.params,
+      )}`
     } else {
       throw err
     }

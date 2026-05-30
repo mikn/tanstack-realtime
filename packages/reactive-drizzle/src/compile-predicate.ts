@@ -458,10 +458,79 @@ export function extractEqualityConditions(
 }
 
 /**
- * Derive a stable serialized channel key from table + WHERE clause.
- * Returns serializeKey([tableName, conditions]) if equalities found,
- * or serializeKey([tableName]) if no equalities.
- * whereSQL undefined (no .where() call) → serializeKey([tableName]).
+ * A small, deterministic, non-cryptographic string hash (FNV-1a, 32-bit).
+ *
+ * Used to derive a stable discriminator from a query's full SQL + params so
+ * that two queries which differ in anything that changes their RESULT SET
+ * (SELECT columns, range predicates, ORDER BY, LIMIT, …) — not just their
+ * top-level equality conditions — produce DIFFERENT channels, while
+ * byte-identical queries produce the SAME channel.
+ *
+ * Deterministic across processes: the same input string always yields the
+ * same hash. No dependency, no crypto — collision resistance is not a security
+ * property here, only "distinct result-sets ⇒ distinct channels with
+ * overwhelming probability".
+ */
+function fnv1a32(input: string): string {
+  let hash = 0x811c9dc5
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i)
+    // hash * 16777619, kept in 32-bit unsigned range via Math.imul.
+    hash = Math.imul(hash, 0x01000193)
+  }
+  // >>> 0 → unsigned; base36 for a short, stable, alphanumeric token.
+  return (hash >>> 0).toString(36)
+}
+
+/**
+ * Normalise a query SQL + params into a single stable string for hashing.
+ *
+ * Collapses runs of whitespace so cosmetically-different-but-identical SQL
+ * (extra spaces/newlines from a query builder) still hashes the same, then
+ * appends the JSON-serialised params so two queries with the same SQL text but
+ * different bound values (and thus different result sets) hash differently.
+ */
+function normalizeQueryForHash(
+  sql: string,
+  params: ReadonlyArray<unknown>,
+): string {
+  const normalizedSql = sql.replace(/\s+/g, ' ').trim()
+  return `${normalizedSql}|${JSON.stringify(params)}`
+}
+
+/**
+ * Compute the short, stable SQL discriminator suffix (`q=<hash>`) for a query.
+ *
+ * Exported so other derivation sites (e.g. the no-WHERE table-level fallback)
+ * can append the SAME discriminator and stay consistent with
+ * {@link deriveChannelKey}.
+ */
+export function queryDiscriminator(
+  sql: string,
+  params: ReadonlyArray<unknown>,
+): string {
+  return `q=${fnv1a32(normalizeQueryForHash(sql, params))}`
+}
+
+/**
+ * Derive a stable serialized channel key from table + (full query) SQL.
+ *
+ * The channel has two parts:
+ *  - A human-readable PREFIX `serializeKey([table, equalityConditions])` (or
+ *    `serializeKey([table])` when there are no top-level equalities) — kept for
+ *    debuggability.
+ *  - A stable DISCRIMINATOR `:q=<hash>` derived from the NORMALISED full query
+ *    `sql` + `params`. Because the prefix is built only from top-level equality
+ *    conditions, two genuinely different queries (e.g. one with an extra range
+ *    predicate, or a different SELECT column list) can share a prefix; the
+ *    discriminator makes their channels DIFFERENT, so a result-set difference
+ *    never collides onto the same channel. Byte-identical queries hash the same
+ *    and therefore still share one channel.
+ *
+ * `whereSQL === undefined` (the `matches` escape hatch, which has no SQL to
+ * hash) keeps the legacy behaviour and returns the bare `serializeKey([table])`
+ * with NO discriminator — distinct `matches`-based queries should pass an
+ * explicit `channel` to disambiguate.
  */
 export function deriveChannelKey(
   tableName: string,
@@ -469,15 +538,17 @@ export function deriveChannelKey(
   params: ReadonlyArray<unknown>,
   columns: ColumnMap,
 ): string {
+  // No SQL to discriminate on (matches escape hatch): legacy table-level key.
   if (whereSQL === undefined) {
     return serializeKey([tableName])
   }
 
   const conditions = extractEqualityConditions(whereSQL, params, columns)
 
-  if (Object.keys(conditions).length === 0) {
-    return serializeKey([tableName])
-  }
+  const prefix =
+    Object.keys(conditions).length === 0
+      ? serializeKey([tableName])
+      : serializeKey([tableName, conditions])
 
-  return serializeKey([tableName, conditions])
+  return `${prefix}:${queryDiscriminator(whereSQL, params)}`
 }

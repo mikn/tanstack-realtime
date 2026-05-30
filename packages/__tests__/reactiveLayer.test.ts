@@ -665,6 +665,66 @@ describe('SubscriptionManager', () => {
     expect(activeEntry.requery).not.toHaveBeenCalled()
     expect(publishFn).not.toHaveBeenCalled()
   })
+
+  it('two queries differing only in a RANGE predicate get distinct channels; a write matching one invalidates only it', async () => {
+    const dkCols = {
+      teamId: { name: 'team_id' },
+      priority: { name: 'priority' },
+    }
+    const publishFn = vi.fn().mockResolvedValue(undefined)
+    const mgr = createSubscriptionManager(publishFn)
+
+    // Both queries share the same top-level equality (team_id = $1) so the OLD
+    // lossy derivation collided them onto one channel; the full-SQL discriminator
+    // now separates them.
+    const allChannel = deriveChannelKey(
+      'todos',
+      'SELECT * FROM "todos" WHERE "todos"."team_id" = $1',
+      ['A'],
+      dkCols,
+    )
+    const highChannel = deriveChannelKey(
+      'todos',
+      'SELECT * FROM "todos" WHERE "todos"."team_id" = $1 AND "todos"."priority" > $2',
+      ['A', 5],
+      dkCols,
+    )
+    expect(allChannel).not.toBe(highChannel)
+
+    // "all team A" matches any team-A row; "high priority" needs priority > 5.
+    const allEntry = makeEntry(allChannel, 'todos', (row) => row.teamId === 'A')
+    const highEntry = makeEntry(
+      highChannel,
+      'todos',
+      (row) => row.teamId === 'A' && (row.priority as number) > 5,
+    )
+    mgr.register(allEntry)
+    mgr.register(highEntry)
+
+    // Both entries survive — distinct channels, neither overwrote the other.
+    expect(mgr.activeChannels().has(allChannel)).toBe(true)
+    expect(mgr.activeChannels().has(highChannel)).toBe(true)
+
+    // Insert a LOW-priority team-A row: matches "all" but not "high priority".
+    await mgr.invalidate([
+      {
+        table: 'todos',
+        operation: 'insert',
+        affectedRows: [{ teamId: 'A', priority: 1 }],
+      },
+    ])
+
+    expect(allEntry.requery).toHaveBeenCalledTimes(1)
+    expect(highEntry.requery).not.toHaveBeenCalled()
+  })
+
+  it('two byte-identical queries derive the same channel (last register wins, identical requery semantics)', () => {
+    const dkCols = { teamId: { name: 'team_id' } }
+    const sql = 'SELECT * FROM "todos" WHERE "todos"."team_id" = $1'
+    const chA = deriveChannelKey('todos', sql, ['A'], dkCols)
+    const chB = deriveChannelKey('todos', sql, ['A'], dkCols)
+    expect(chA).toBe(chB)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -729,29 +789,85 @@ describe('extractEqualityConditions', () => {
 describe('deriveChannelKey', () => {
   const dkCols = { teamId: { name: 'team_id' } }
 
-  it('equality conditions → serializeKey([table, conditions])', () => {
+  it('equality conditions → serializeKey([table, conditions]) prefix + :q=<hash> discriminator', () => {
     const key = deriveChannelKey(
       'todos',
       '"todos"."team_id" = $1',
       ['A'],
       dkCols,
     )
-    expect(key).toBe(serializeKey(['todos', { teamId: 'A' }]))
+    // Human-readable prefix preserved for debuggability.
+    expect(
+      key.startsWith(serializeKey(['todos', { teamId: 'A' }]) + ':q='),
+    ).toBe(true)
   })
 
-  it('no equality conditions → serializeKey([table])', () => {
+  it('no equality conditions → serializeKey([table]) prefix + :q=<hash> discriminator', () => {
     const key = deriveChannelKey(
       'todos',
       '"todos"."team_id" > $1',
       ['A'],
       dkCols,
     )
+    expect(key.startsWith(serializeKey(['todos']) + ':q=')).toBe(true)
+  })
+
+  it('undefined whereSQL (matches escape hatch) → bare serializeKey([table]), no discriminator', () => {
+    const key = deriveChannelKey('todos', undefined, [], dkCols)
     expect(key).toBe(serializeKey(['todos']))
   })
 
-  it('undefined whereSQL → serializeKey([table])', () => {
-    const key = deriveChannelKey('todos', undefined, [], dkCols)
-    expect(key).toBe(serializeKey(['todos']))
+  it('byte-identical queries derive the SAME channel (deterministic)', () => {
+    const a = deriveChannelKey('todos', '"todos"."team_id" = $1', ['A'], dkCols)
+    const b = deriveChannelKey('todos', '"todos"."team_id" = $1', ['A'], dkCols)
+    expect(a).toBe(b)
+  })
+
+  it('a range predicate added to an equality query yields a DIFFERENT channel (lossy-collision fixed)', () => {
+    // Both share the same top-level equality prefix (team_id = $1), so the OLD
+    // derivation collided them. The full-SQL discriminator now separates them.
+    const eqOnly = deriveChannelKey(
+      'todos',
+      'SELECT * FROM "todos" WHERE "todos"."team_id" = $1',
+      ['A'],
+      dkCols,
+    )
+    const eqPlusRange = deriveChannelKey(
+      'todos',
+      'SELECT * FROM "todos" WHERE "todos"."team_id" = $1 AND "todos"."priority" > $2',
+      ['A', 5],
+      dkCols,
+    )
+    expect(eqOnly).not.toBe(eqPlusRange)
+    // Both still carry the shared human-readable prefix.
+    expect(
+      eqOnly.startsWith(serializeKey(['todos', { teamId: 'A' }]) + ':q='),
+    ).toBe(true)
+    expect(
+      eqPlusRange.startsWith(serializeKey(['todos', { teamId: 'A' }]) + ':q='),
+    ).toBe(true)
+  })
+
+  it('differing SELECT columns (same WHERE) yield DIFFERENT channels (shape difference)', () => {
+    const star = deriveChannelKey(
+      'todos',
+      'SELECT * FROM "todos" WHERE "todos"."team_id" = $1',
+      ['A'],
+      dkCols,
+    )
+    const projected = deriveChannelKey(
+      'todos',
+      'SELECT "todos"."id", "todos"."title" FROM "todos" WHERE "todos"."team_id" = $1',
+      ['A'],
+      dkCols,
+    )
+    expect(star).not.toBe(projected)
+  })
+
+  it('differing bound params yield DIFFERENT channels', () => {
+    const a = deriveChannelKey('todos', '"todos"."team_id" = $1', ['A'], dkCols)
+    const b = deriveChannelKey('todos', '"todos"."team_id" = $1', ['B'], dkCols)
+    expect(a).not.toBe(b)
   })
 })
 
@@ -851,7 +967,13 @@ describe('createLoader', () => {
     await loader.load()
 
     const registered = mockMgr.register.mock.calls[0][0]
-    expect(registered.channel).toBe(serializeKey(['todos', { teamId: 'A' }]))
+    // Prefix is the human-readable equality key; the :q=<hash> discriminator
+    // (derived from the full SQL) is appended to keep distinct queries distinct.
+    expect(
+      registered.channel.startsWith(
+        serializeKey(['todos', { teamId: 'A' }]) + ':q=',
+      ),
+    ).toBe(true)
   })
 
   it('explicit channel override overrides auto-derivation', async () => {
@@ -951,9 +1073,11 @@ describe('createLoader', () => {
     await loader.load()
 
     const registered = mockMgr.register.mock.calls[0][0]
-    expect(registered.channel).toBe(
-      serializeKey(['todos', { teamId: 'team-42' }]),
-    )
+    expect(
+      registered.channel.startsWith(
+        serializeKey(['todos', { teamId: 'team-42' }]) + ':q=',
+      ),
+    ).toBe(true)
   })
 
   it('no-WHERE auto path: query without .where() registers table-level subscription with match-all predicate', async () => {
@@ -976,8 +1100,11 @@ describe('createLoader', () => {
     expect(mockMgr.register).toHaveBeenCalledTimes(1)
     const registered = mockMgr.register.mock.calls[0][0]
     expect(registered.predicate.table).toBe('todos')
-    // channel should be table-level
-    expect(registered.channel).toBe(serializeKey(['todos']))
+    // channel is table-level prefix + full-SQL discriminator: two whole-table
+    // reads that differ in SELECT/ORDER BY get distinct channels.
+    expect(registered.channel.startsWith(serializeKey(['todos']) + ':q=')).toBe(
+      true,
+    )
     // predicate should match any row (match-all)
     expect(registered.predicate.compiled({ teamId: 'anything' })).toBe(true)
     expect(registered.predicate.compiled({})).toBe(true)
@@ -1142,9 +1269,11 @@ describe('createReactiveQueries — reactive integration', () => {
     )
     await getRows(undefined)
 
-    const expectedChannel = serializeKey(['todos', { teamId: 'A' }])
+    const expectedPrefix = serializeKey(['todos', { teamId: 'A' }]) + ':q='
     expect(
-      reactive.subscriptionManager.activeChannels().has(expectedChannel),
+      Array.from(reactive.subscriptionManager.activeChannels()).some((c) =>
+        c.startsWith(expectedPrefix),
+      ),
     ).toBe(true)
 
     // Trigger mutation via the new factory API
@@ -1288,9 +1417,11 @@ describe('createReactiveQueries — reactive integration', () => {
     const { data } = await getRows(undefined)
 
     expect(data).toEqual(fakeResult)
-    const expectedChannel = serializeKey(['todos'])
+    const expectedPrefix = serializeKey(['todos']) + ':q='
     expect(
-      reactive.subscriptionManager.activeChannels().has(expectedChannel),
+      Array.from(reactive.subscriptionManager.activeChannels()).some((c) =>
+        c.startsWith(expectedPrefix),
+      ),
     ).toBe(true)
   })
 })
@@ -1498,16 +1629,21 @@ describe('createReactiveQueries — multi-table query (WP-C)', () => {
     const reactive = createReactiveQueries({})
     const { channel, channels } = await makeMultiTableQuery(reactive)(undefined)
 
-    const todosChannel = serializeKey(['todos', { teamId: 'A' }])
-    const projectsChannel = serializeKey(['projects', { teamId: 'A' }])
+    const todosPrefix = serializeKey(['todos', { teamId: 'A' }]) + ':q='
+    const projectsPrefix = serializeKey(['projects', { teamId: 'A' }]) + ':q='
 
-    // channel is back-compat (channels[0]); channels lists every read.
-    expect(channel).toBe(todosChannel)
-    expect(channels).toEqual([todosChannel, projectsChannel])
+    // channel is back-compat (channels[0]); channels lists every read. Each now
+    // carries the full-SQL discriminator suffix appended to its prefix.
+    expect(channel.startsWith(todosPrefix)).toBe(true)
+    expect(channels).toHaveLength(2)
+    expect(channels![0].startsWith(todosPrefix)).toBe(true)
+    expect(channels![1].startsWith(projectsPrefix)).toBe(true)
 
     const active = reactive.subscriptionManager.activeChannels()
-    expect(active.has(todosChannel)).toBe(true)
-    expect(active.has(projectsChannel)).toBe(true)
+    expect(Array.from(active).some((c) => c.startsWith(todosPrefix))).toBe(true)
+    expect(Array.from(active).some((c) => c.startsWith(projectsPrefix))).toBe(
+      true,
+    )
   })
 
   it('a write to the FIRST table invalidates the query', async () => {
@@ -1548,8 +1684,10 @@ describe('createReactiveQueries — multi-table query (WP-C)', () => {
     const updates = (batchMsg!.data as { updates: Array<{ channel: string }> })
       .updates
     expect(
-      updates.some(
-        (u) => u.channel === serializeKey(['projects', { teamId: 'A' }]),
+      updates.some((u) =>
+        u.channel.startsWith(
+          serializeKey(['projects', { teamId: 'A' }]) + ':q=',
+        ),
       ),
     ).toBe(true)
   })

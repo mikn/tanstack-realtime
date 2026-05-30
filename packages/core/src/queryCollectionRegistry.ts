@@ -97,13 +97,40 @@ type RegistryEntry<
 /** Module-level singleton registry keyed by cache key string. */
 const registry = new Map<string, RegistryEntry>()
 
-/** Reverse index: channel → cache key. Used for O(1) batch fan-out. */
-const channelIndex = new Map<string, string>()
+/**
+ * Reverse index: channel → set of cache keys. Used for O(1) batch fan-out.
+ *
+ * A channel can map to MULTIPLE cache keys: the server derives a channel from
+ * the full query SQL (see `deriveChannelKey`), so two cache keys share a channel
+ * ONLY when their queries are byte-identical ⟹ identical result-set and shape.
+ * Applying the same update to every cache key on the channel is therefore always
+ * correct (no risk of applying one query's data to a differently-shaped query —
+ * that pitfall is closed by the SQL discriminator in the channel).
+ */
+const channelIndex = new Map<string, Set<string>>()
 
 /** Clears all entries from the registry. Used in tests only. */
 export function clearRegistry(): void {
   registry.clear()
   channelIndex.clear()
+}
+
+/** Add `key` to `channel`'s cache-key set, creating the set on first use. */
+function indexChannel(channel: string, key: string): void {
+  let set = channelIndex.get(channel)
+  if (set == null) {
+    set = new Set<string>()
+    channelIndex.set(channel, set)
+  }
+  set.add(key)
+}
+
+/** Remove `key` from `channel`'s set; drop the channel entry when it empties. */
+function deindexChannel(channel: string, key: string): void {
+  const set = channelIndex.get(channel)
+  if (set == null) return
+  set.delete(key)
+  if (set.size === 0) channelIndex.delete(channel)
 }
 
 /** WeakMap to assign stable string identifiers to server function references. */
@@ -247,10 +274,10 @@ export function getOrCreateQueryCollection<
                 nextChannels.length !== entry.channels.length ||
                 nextChannels.some((c, i) => c !== entry.channels[i])
               if (changed) {
-                for (const prev of entry.channels) channelIndex.delete(prev)
+                for (const prev of entry.channels) deindexChannel(prev, key)
                 entry.channels = nextChannels
                 entry.applyUpdate = applyData
-                for (const c of nextChannels) channelIndex.set(c, key)
+                for (const c of nextChannels) indexChannel(c, key)
               }
 
               // Subscribe to each individual channel as a fallback for direct
@@ -285,7 +312,10 @@ export function getOrCreateQueryCollection<
           channelUnsubs = []
           triggerRefetch = null
           // Clean up ALL of this query's channel index entries, not just one.
-          for (const c of entry.channels) channelIndex.delete(c)
+          // Only this cacheKey is removed from each channel's set; the channel
+          // entry survives if another query still shares it (and is dropped
+          // when its set empties).
+          for (const c of entry.channels) deindexChannel(c, key)
           registry.delete(key)
           currentItems.clear()
         }
@@ -342,9 +372,16 @@ export function subscribeToRealtimeBatch(client: RealtimeClient): () => void {
     // re-renders / double application.
     const latestByKey = new Map<string, unknown>()
     for (const { channel, data } of batch.updates) {
-      const cacheKey = channelIndex.get(channel)
-      if (cacheKey == null) continue
-      latestByKey.set(cacheKey, data)
+      const cacheKeys = channelIndex.get(channel)
+      if (cacheKeys == null) continue
+      // A channel may map to MULTIPLE cache keys (queries with byte-identical
+      // SQL legitimately share one). Fan the update out to every one of them.
+      // Keying by cacheKey also dedupes the multi-table case where several of
+      // one query's channels appear in the same batch — last write wins, so
+      // each query applies exactly once.
+      for (const cacheKey of cacheKeys) {
+        latestByKey.set(cacheKey, data)
+      }
     }
     for (const [cacheKey, data] of latestByKey) {
       registry.get(cacheKey)?.applyUpdate?.(data)

@@ -41,6 +41,12 @@ export class SubscriptionManager {
 
   /**
    * Register a subscription. Overwrites any existing entry for the same channel.
+   *
+   * Channels are derived from the full query SQL (see `deriveChannelKey`), so
+   * two registrations share a channel ONLY when their queries are byte-identical
+   * — in which case they have identical `requery` semantics and overwriting is
+   * harmless. DISTINCT queries (different result sets) always get DISTINCT
+   * channels and therefore distinct entries; none is silently dropped.
    */
   register(entry: SubscriptionEntry): void {
     const tableMap =
