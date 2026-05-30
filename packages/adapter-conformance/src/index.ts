@@ -13,27 +13,80 @@ import type {
  * The kit owns all assertions — the harness only knows how to (a) create a
  * fresh transport instance wired to a fake provider and (b) make that fake
  * provider do things (deliver a message, (re)connect, reject a subscribe…).
+ *
+ * ## Contract the fake provider MUST honor
+ *
+ * The reconnect-resubscribe check is only meaningful if the fake provider
+ * models real provider semantics. An adapter author wiring this harness MUST
+ * ensure:
+ *
+ *  - **`emitMessage(channel, data)`** delivers ONLY to channels the transport
+ *    is CURRENTLY subscribed to *at the provider*. A message on an unsubscribed
+ *    (or no-longer-subscribed) channel is dropped.
+ *  - **`simulateDisconnect()`** drops the provider-side subscription set, so
+ *    messages emitted while disconnected are NOT delivered — they only resume
+ *    once the transport re-subscribes.
+ *  - **`simulateReconnect()` / `simulateConnected()`** brings the connection
+ *    back. On reconnect the transport is expected to re-subscribe its active
+ *    channels — this is the documented {@link RealtimeTransport} contract:
+ *    "subscribe is deferred and re-sent on the next connection, including after
+ *    reconnects". If the adapter fails to re-subscribe, delivery stays
+ *    suspended and the reconnect-resubscribe case FAILS.
+ *
+ * ## Mandatory vs. optional hooks
+ *
+ * The mandatory hooks (`createTransport`, `capabilities`, `emitMessage`,
+ * `simulateDisconnect`, and a reconnect trigger) are the core
+ * `RealtimeTransport` contract: every adapter MUST drive them so the
+ * reconnect-resubscribe case can run. They are kept optional in the *type* only
+ * for ergonomics — the battery asserts they are defined and FAILS conformance
+ * (rather than skipping) when reconnect driving is missing. Only
+ * `simulateSubscribeError` and `emitPresence` are genuinely provider-specific
+ * and legitimately skippable.
  */
 export interface ConformanceHarness {
-  /** Create a fresh transport instance under test (wired to a controllable fake provider). */
+  /** MANDATORY. Create a fresh transport instance under test (wired to a controllable fake provider). */
   createTransport: () => RealtimeTransport
-  /** The capabilities the adapter CLAIMS (the kit verifies behavior matches these). */
+  /** MANDATORY. The capabilities the adapter CLAIMS (the kit verifies behavior matches these). */
   capabilities: TransportCapabilities
-  /** Simulate the provider/server delivering a message on a channel to the transport. */
+  /**
+   * MANDATORY. Simulate the provider/server delivering a message on a channel
+   * to the transport. Per the contract above, delivery reaches the subscriber
+   * ONLY when the channel is currently subscribed at the provider.
+   */
   emitMessage: (channel: string, data: unknown) => void
-  /** Drive a successful (re)connect on the underlying fake provider. */
-  simulateConnected?: () => void
-  /** Drive a disconnect (unexpected drop) on the fake provider. */
+  /**
+   * MANDATORY (core reconnect driving). Drive a disconnect (unexpected drop) on
+   * the fake provider. MUST drop the provider-side subscription set so messages
+   * are no longer delivered until the transport re-subscribes.
+   *
+   * Kept optional in the type for ergonomics, but the battery asserts it is
+   * defined and FAILS when it is missing.
+   */
   simulateDisconnect?: () => void
-  /** Drive a reconnect on the fake provider. */
+  /**
+   * MANDATORY (core reconnect driving — provide this OR
+   * {@link ConformanceHarness.simulateConnected}). Drive a reconnect on the
+   * fake provider. The transport is expected to re-subscribe its active
+   * channels, restoring delivery.
+   *
+   * Kept optional in the type for ergonomics, but the battery asserts a
+   * reconnect trigger is defined and FAILS when none is provided.
+   */
   simulateReconnect?: () => void
-  /** Simulate the provider rejecting a subscribe (for onSubscribeError checks). */
+  /**
+   * MANDATORY (core reconnect driving — provide this OR
+   * {@link ConformanceHarness.simulateReconnect}). Drive a successful
+   * (re)connect on the underlying fake provider.
+   */
+  simulateConnected?: () => void
+  /** OPTIONAL (provider-specific). Simulate the provider rejecting a subscribe (for onSubscribeError checks). */
   simulateSubscribeError?: (
     channel: string,
     reason: string,
     code?: number,
   ) => void
-  /** Presence-only: simulate the provider delivering a member list for a channel. */
+  /** OPTIONAL (presence-only). Simulate the provider delivering a member list for a channel. */
   emitPresence?: (channel: string, members: ReadonlyArray<PresenceUser>) => void
   /** Optional adapter name for test titles. */
   name?: string
@@ -55,8 +108,24 @@ function titlePrefix(harness: ConformanceHarness): string {
  * The battery is capability-aware: the presence sub-battery only runs when
  * `harness.capabilities.presence` is `true`, and the kit asserts that
  * `hasPresence(transport)` agrees with the declared flag (no half-implemented
- * presence). Lifecycle/reconnect/subscribe-error cases that need optional
- * harness hooks are skipped gracefully when those hooks are absent.
+ * presence).
+ *
+ * The mandatory core checks — lifecycle, subscribe/deliver, channel isolation,
+ * unsubscribe, publish, reconnect re-subscribe, and capability honesty — always
+ * run. Only the subscribe-error and presence cases are genuinely
+ * provider-specific and skip when their (optional) harness hooks are absent.
+ *
+ * ## What the battery does and does NOT exercise
+ *
+ *  - The `serverAssistedRecovery`, `history`, and `ephemeral` capability flags
+ *    are **declaration-only**: the kit verifies they are reported honestly and
+ *    consistently (capability-honesty cases), but does not behaviorally
+ *    exercise the features they describe — the kit has no provider-side view of
+ *    gap recovery / history fetches / ephemeral semantics to assert against.
+ *  - **`publish` conformance only asserts the call resolves.** The kit cannot
+ *    see the wire, so it cannot verify that published data actually reached the
+ *    provider — only that the adapter's `publish()` contract (returns a promise
+ *    that resolves) holds.
  */
 export function runAdapterConformance(harness: ConformanceHarness): void {
   const p = titlePrefix(harness)
@@ -162,28 +231,75 @@ export function runAdapterConformance(harness: ConformanceHarness): void {
     })
 
     // ── 5. Reconnect re-subscribe ────────────────────────────────────────
+    //
+    // MANDATORY core check. This is the most important guarantee the kit
+    // provides, so it runs UNCONDITIONALLY. Reconnect driving is part of the
+    // core RealtimeTransport contract: an adapter that cannot drive a
+    // disconnect + reconnect (or that does not re-subscribe on reconnect) FAILS
+    // conformance — it never silently skips.
     describe('reconnect re-subscribe', () => {
-      const reconnect = harness.simulateReconnect ?? harness.simulateConnected
-      const canReconnect = Boolean(harness.simulateDisconnect && reconnect)
+      it(`${p}provides the required reconnect-driving hooks (core contract)`, () => {
+        // Kept optional in the type for ergonomics; asserted here so a harness
+        // that omits reconnect driving FAILS conformance rather than skipping
+        // the most important check.
+        expect(
+          harness.simulateDisconnect,
+          'core conformance requires reconnect driving: provide harness.simulateDisconnect',
+        ).toBeDefined()
+        expect(
+          harness.simulateReconnect ?? harness.simulateConnected,
+          'core conformance requires reconnect driving: provide harness.simulateReconnect or harness.simulateConnected',
+        ).toBeDefined()
+      })
 
-      it.skipIf(!canReconnect)(
-        `${p}re-establishes subscriptions across a disconnect/reconnect cycle`,
-        async () => {
-          const t = harness.createTransport()
-          await t.connect()
-          const got: Array<unknown> = []
-          const unsub = t.subscribe('ch', (data) => got.push(data))
-          harness.emitMessage('ch', 'before')
+      it(`${p}re-establishes subscriptions across a disconnect/reconnect cycle`, async () => {
+        const reconnect = harness.simulateReconnect ?? harness.simulateConnected
+        // Guarded above by the explicit hook-presence assertion. We assert again
+        // here so a missing hook surfaces as a clear failure instead of a
+        // confusing "is not a function" throw mid-test.
+        expect(
+          harness.simulateDisconnect,
+          'core conformance requires reconnect driving: provide harness.simulateDisconnect',
+        ).toBeDefined()
+        expect(
+          reconnect,
+          'core conformance requires reconnect driving: provide harness.simulateReconnect or harness.simulateConnected',
+        ).toBeDefined()
+        const simulateDisconnect = harness.simulateDisconnect!
 
-          harness.simulateDisconnect!()
-          reconnect!()
+        const t = harness.createTransport()
+        await t.connect()
+        const got: Array<unknown> = []
+        const unsub = t.subscribe('ch', (data) => got.push(data))
 
-          harness.emitMessage('ch', 'after')
-          expect(got).toEqual(['before', 'after'])
-          unsub()
-          t.disconnect()
-        },
-      )
+        // (a) Subscribed + connected → delivered.
+        harness.emitMessage('ch', 'before')
+        expect(got).toEqual(['before'])
+
+        // (b) NEGATIVE PHASE — this is what gives the check teeth. After a
+        // disconnect the provider drops the subscription, so a message is NOT
+        // delivered until the transport re-subscribes. If delivery did not stop
+        // here, phase (c) would prove nothing.
+        simulateDisconnect()
+        harness.emitMessage('ch', 'while-disconnected')
+        expect(
+          got,
+          'message emitted while disconnected must NOT be delivered (provider dropped the subscription)',
+        ).toEqual(['before'])
+
+        // (c) After reconnect the adapter MUST re-subscribe its active channels
+        // (deferred-subscribe contract), restoring delivery. A no-op transport
+        // that never re-subscribes fails here.
+        reconnect!()
+        harness.emitMessage('ch', 'after')
+        expect(
+          got,
+          'after reconnect the adapter must have re-subscribed, so delivery resumes',
+        ).toEqual(['before', 'after'])
+
+        unsub()
+        t.disconnect()
+      })
     })
 
     // ── 6. Subscribe error ───────────────────────────────────────────────
