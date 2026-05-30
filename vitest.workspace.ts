@@ -59,6 +59,7 @@ export default defineWorkspace([
       include: [
         'packages/__tests__/stream.test.ts',
         'packages/__tests__/centrifugo.test.ts',
+        'packages/__tests__/centrifugoConformance.test.ts',
         'packages/__tests__/conformance.test.ts',
         'packages/__tests__/dedup.test.ts',
         'packages/__tests__/offlineQueue.test.ts',

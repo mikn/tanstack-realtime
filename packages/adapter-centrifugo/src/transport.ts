@@ -423,6 +423,13 @@ export function centrifugoTransport(
 
     if (reply.connect) {
       centrifugoClientId = reply.connect.client
+      // Re-subscribe active channels as soon as the connect reply is processed,
+      // in the SAME turn the connection becomes usable. Driving re-subscription
+      // from the connect-reply handler (rather than from a later microtask in
+      // the socket 'open' continuation) closes the window between "connected"
+      // and "re-subscribed" in which a freshly-arriving publication would be
+      // dropped because the server has not yet seen our subscribe command.
+      resubscribeAll()
     }
 
     // Process subscribe replies — update recovery state and dispatch missed pubs.
@@ -558,7 +565,11 @@ export function centrifugoTransport(
           await sendCmd(connectCmd)
           reconnectAttempt = 0
           store.setState(() => 'connected')
-          await resubscribeAll()
+          // NOTE: re-subscription of active channels is driven synchronously
+          // from handleReply()'s connect branch (see above), so it has already
+          // happened by the time this resolves. We intentionally do NOT call
+          // resubscribeAll() again here to avoid sending duplicate subscribe
+          // commands.
         } catch {
           // connect command failed; close will fire and trigger reconnect
           ws.close()
@@ -614,6 +625,23 @@ export function centrifugoTransport(
 
   const transport: RealtimeTransport & PresenceCapable = {
     store,
+
+    // Honest capability declaration — see the conformance suite
+    // (centrifugoConformance.test.ts) which verifies these match behavior.
+    //
+    //  - presence: true — implements PresenceCapable via the sidecar channel.
+    //  - serverAssistedRecovery: true — tracks per-channel epoch/offset and
+    //    re-subscribes with `recover: true` after a reconnect so Centrifugo
+    //    replays only the missed publications (see `resubscribeAll`/`handleReply`).
+    //  - history: false — the adapter exposes no on-demand server-side history
+    //    retrieval API; recovery is reconnect-time gap replay, not a history fetch.
+    //  - ephemeral: true — fire-and-forget pub/sub is the baseline.
+    capabilities: {
+      presence: true,
+      serverAssistedRecovery: true,
+      history: false,
+      ephemeral: true,
+    },
 
     async connect() {
       const current = store.get()
