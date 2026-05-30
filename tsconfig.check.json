@@ -14,6 +14,7 @@
         "./packages/adapter-centrifugo/src/index.ts"
       ],
       "@realtimejs/adapter-sse": ["./packages/adapter-sse/src/index.ts"],
+      "@realtimejs/adapter-pusher": ["./packages/adapter-pusher/src/index.ts"],
       "@realtimejs/adapter-conformance": [
         "./packages/adapter-conformance/src/index.ts"
       ],
@@ -31,6 +32,7 @@
     "packages/react-devtools/src",
     "packages/adapter-centrifugo/src",
     "packages/adapter-sse/src",
+    "packages/adapter-pusher/src",
     "packages/adapter-conformance/src",
     "packages/preset-start/src",
     "packages/reactive-drizzle/src",

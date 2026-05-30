@@ -33,6 +33,7 @@
     "@realtimejs/reactive-drizzle": "workspace:*",
     "@realtimejs/adapter-centrifugo": "workspace:*",
     "@realtimejs/adapter-conformance": "workspace:*",
+    "@realtimejs/adapter-pusher": "workspace:*",
     "@realtimejs/adapter-sse": "workspace:*",
     "@tanstack/eslint-config": "^0.4.0",
     "@tanstack/react-db": "^0.1.72",
@@ -86,6 +87,16 @@
         "@realtimejs/core",
         "@tanstack/db",
         "solid-js"
+      ]
+    },
+    {
+      "name": "@realtimejs/adapter-pusher",
+      "path": "packages/adapter-pusher/dist/index.js",
+      "limit": "5 kB",
+      "ignore": [
+        "@realtimejs/core",
+        "@tanstack/store",
+        "pusher-js"
       ]
     }
   ]

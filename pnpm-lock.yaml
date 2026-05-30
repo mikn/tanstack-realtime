@@ -16,6 +16,9 @@ importers:
       '@realtimejs/adapter-conformance':
         specifier: workspace:*
         version: link:packages/adapter-conformance
+      '@realtimejs/adapter-pusher':
+        specifier: workspace:*
+        version: link:packages/adapter-pusher
       '@realtimejs/adapter-sse':
         specifier: workspace:*
         version: link:packages/adapter-sse
@@ -244,6 +247,18 @@ importers:
       vitest:
         specifier: '>=2.0.0'
         version: 2.1.9(@types/node@22.19.12)
+
+  packages/adapter-pusher:
+    dependencies:
+      '@realtimejs/core':
+        specifier: workspace:*
+        version: link:../core
+      '@tanstack/store':
+        specifier: ^0.9.1
+        version: 0.9.1
+      pusher-js:
+        specifier: ^8.5.0
+        version: 8.5.0
 
   packages/adapter-sse:
     dependencies:
@@ -5000,6 +5015,12 @@ packages:
       }
     engines: { node: '>=6' }
 
+  pusher-js@8.5.0:
+    resolution:
+      {
+        integrity: sha512-V7uzGi9bqOOOyM/6IkJdpFyjGZj7llz1v0oWnYkZKcYLvbz6VcHVLmzKqkvegjuMumpfIEKGLmWHwFb39XFCpw==,
+      }
+
   quansync@0.2.11:
     resolution:
       {
@@ -5568,6 +5589,12 @@ packages:
       }
     engines: { node: '>=18.0.0' }
     hasBin: true
+
+  tweetnacl@1.0.3:
+    resolution:
+      {
+        integrity: sha512-6rt+RN7aOi1nGMyC4Xa5DdYiukl2UWCbcJft7YhxReBGQD7OAM8Pbxw6YMo4r2diNEA8FEmu32YOn9rhaiE5yw==,
+      }
 
   type-check@0.4.0:
     resolution:
@@ -8504,6 +8531,10 @@ snapshots:
 
   punycode@2.3.1: {}
 
+  pusher-js@8.5.0:
+    dependencies:
+      tweetnacl: 1.0.3
+
   quansync@0.2.11: {}
 
   queue-microtask@1.2.3: {}
@@ -8821,6 +8852,8 @@ snapshots:
       get-tsconfig: 4.13.6
     optionalDependencies:
       fsevents: 2.3.3
+
+  tweetnacl@1.0.3: {}
 
   type-check@0.4.0:
     dependencies:

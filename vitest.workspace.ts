@@ -23,6 +23,10 @@ const sourceAliases = [
     replacement: resolve(root, 'packages/adapter-sse/src/index.ts'),
   },
   {
+    find: /^@realtimejs\/adapter-pusher$/,
+    replacement: resolve(root, 'packages/adapter-pusher/src/index.ts'),
+  },
+  {
     find: /^@realtimejs\/adapter-conformance$/,
     replacement: resolve(root, 'packages/adapter-conformance/src/index.ts'),
   },
@@ -60,6 +64,7 @@ export default defineWorkspace([
         'packages/__tests__/stream.test.ts',
         'packages/__tests__/centrifugo.test.ts',
         'packages/__tests__/centrifugoConformance.test.ts',
+        'packages/__tests__/pusherConformance.test.ts',
         'packages/__tests__/conformance.test.ts',
         'packages/__tests__/dedup.test.ts',
         'packages/__tests__/offlineQueue.test.ts',
