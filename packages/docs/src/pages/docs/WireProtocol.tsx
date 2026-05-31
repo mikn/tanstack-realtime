@@ -27,14 +27,32 @@ export function WireProtocol() {
   hook: (registration: HookRegistration) => HookHandle
   /** Optional: called when the server rejects a subscription attempt. */
   onSubscribeError?: (callback: (channel: string, reason: string, code?: number) => void) => () => void
+  /** Optional: honest, machine-readable description of what this transport can do. */
+  readonly capabilities?: TransportCapabilities
 }
 
-export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'`}
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'
+
+export interface TransportCapabilities {
+  presence: boolean                 // join/update/leave + member lists (PresenceCapable)
+  serverAssistedRecovery: boolean   // replay missed messages by offset/epoch after a gap
+  history: boolean                  // server-side message history retrieval
+  ephemeral: boolean                // fire-and-forget delivery (baseline for any pub/sub)
+}`}
       />
+      <p>
+        Declare <code>capabilities</code> on your transport so the hook layer
+        degrades the DX predictably (for example, <code>usePresence</code>{' '}
+        throws an actionable error when <code>capabilities.presence</code> is{' '}
+        <code>false</code>). Transports that omit it still work &mdash;{' '}
+        <code>getCapabilities()</code> from <code>@realtimejs/core</code>{' '}
+        derives a conservative default from the transport&rsquo;s shape.
+      </p>
       <p>
         Transports that support presence also implement the{' '}
         <code>PresenceCapable</code> extension. The realtime client checks for
-        these methods at runtime and enables presence features when they exist.
+        these methods at runtime (via the <code>hasPresence()</code> type guard)
+        and enables presence features when they exist.
       </p>
       <CodeBlock
         code={`export interface PresenceCapable {
@@ -125,9 +143,24 @@ export interface PresenceUser<T = unknown> {
       <p>
         For presence support your transport must also implement the{' '}
         <code>PresenceCapable</code> interface shown above. The built-in
-        Centrifugo adapter implements both and can serve as a reference
-        implementation.
+        Centrifugo, Pusher, and PartyKit adapters implement both and can serve
+        as reference implementations.
       </p>
+      <div className="doc-callout">
+        <p>
+          <strong>Prove your transport is correct.</strong> Once you implement{' '}
+          <code>RealtimeTransport</code> (and optionally{' '}
+          <code>PresenceCapable</code>), run it through the conformance battery
+          in <code>@realtimejs/adapter-conformance</code>. Call{' '}
+          <code>runAdapterConformance(harness)</code> from a Vitest file: it
+          drives lifecycle, subscribe/deliver, unsubscribe, publish, the
+          three-phase reconnect-resubscribe check, and &mdash; when you declare{' '}
+          <code>capabilities.presence</code> &mdash; a presence sub-battery,
+          asserting that <code>getCapabilities()</code> matches observed
+          behavior. See the <a href="#/docs/api-reference">API Reference</a> for
+          the harness shape.
+        </p>
+      </div>
 
       <h2 id="sse-messages">SSE transport messages</h2>
       <p>

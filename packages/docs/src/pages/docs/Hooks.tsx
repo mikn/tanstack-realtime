@@ -142,14 +142,33 @@ function ChatRoom({ roomId }: { roomId: string }) {
       </p>
 
       <h2 id="usePresence">usePresence</h2>
-      <p>Join a presence channel. Returns others + update function.</p>
+      <p>
+        Join a presence channel. Returns peers (<code>others</code>), your own
+        last-sent data (<code>self</code>), and an update function. Requires a
+        presence-capable transport — <code>usePresence</code> throws an
+        actionable error on a transport that reports{' '}
+        <code>capabilities.presence === false</code> (e.g. SSE).
+      </p>
+      <p>
+        Define the channel once with <code>createPresenceChannel</code> from{' '}
+        <code>@realtimejs/core</code>, then pass it to the hook:
+      </p>
+      <CodeBlock
+        title="channel.ts"
+        code={`import { createPresenceChannel } from '@realtimejs/core'
+
+export const docPresence = createPresenceChannel({
+  id: 'doc-presence',
+  channel: (params: { docId: string }) => ['doc', params],
+})`}
+      />
       <CodeBlock
         title="DocumentPage.tsx"
         code={`import { usePresence } from '@realtimejs/react'
 import { docPresence } from './channel'
 
 function DocumentPage({ docId }: { docId: string }) {
-  const { others, updatePresence } = usePresence(docPresence, {
+  const { others, self, updatePresence } = usePresence(docPresence, {
     params: { docId },
     initial: { name: user.name, cursor: null },
   })
@@ -158,6 +177,9 @@ function DocumentPage({ docId }: { docId: string }) {
     <div onMouseMove={(e) =>
       updatePresence({ cursor: { x: e.clientX, y: e.clientY } })
     }>
+      {/* self === your own last-sent presence data */}
+      <Avatar name={self.name} isSelf />
+      {/* others excludes you; each peer is keyed by connectionId */}
       {others.map((u) => (
         <Avatar key={u.connectionId} name={u.data.name} />
       ))}
@@ -174,7 +196,8 @@ function DocumentPage({ docId }: { docId: string }) {
     initial: T
   },
 ): {
-  others: ReadonlyArray<PresenceUser<T>>
+  others: ReadonlyArray<PresenceUser<T>>  // peers only — self is excluded
+  self: T                                 // your own last-sent presence data
   updatePresence: (delta: Partial<T>) => void
 }`}
       />

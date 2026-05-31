@@ -80,6 +80,26 @@ export function ApiReference() {
               <code>PresenceCapable</code> interface.
             </td>
           </tr>
+          <tr>
+            <td>
+              <code>getCapabilities</code>
+            </td>
+            <td>
+              <code>
+                (transport: RealtimeTransport) =&gt; TransportCapabilities
+              </code>
+            </td>
+            <td>
+              Returns the declared <code>TransportCapabilities</code> (
+              <code>presence</code>, <code>serverAssistedRecovery</code>,{' '}
+              <code>history</code>, <code>ephemeral</code>). If the transport
+              doesn&rsquo;t declare <code>capabilities</code>, a conservative
+              default is derived from its shape (<code>presence</code> via{' '}
+              <code>hasPresence</code>, everything else assumed least-capable
+              except <code>ephemeral</code>). Use it to degrade UI gracefully
+              when a feature is unavailable.
+            </td>
+          </tr>
         </tbody>
       </table>
 
@@ -737,6 +757,19 @@ export function ApiReference() {
           </tr>
           <tr>
             <td>
+              <code>PublishValidationError</code>
+            </td>
+            <td>
+              <code>class PublishValidationError extends Error</code>
+            </td>
+            <td>
+              Thrown by a <code>createValidatedPublish</code> publish when the
+              payload validation function rejects the message. Carries the
+              validation <code>reason</code> as its message.
+            </td>
+          </tr>
+          <tr>
+            <td>
               <code>STREAM_DONE</code>
             </td>
             <td>
@@ -1366,8 +1399,10 @@ export function ApiReference() {
             </td>
             <td>
               Joins a presence channel on mount and returns <code>others</code>{' '}
-              (other connected users) and <code>updatePresence</code>. Leaves on
-              unmount.
+              (other connected users, keyed by <code>connectionId</code>),{' '}
+              <code>self</code> (your own last-sent data), and{' '}
+              <code>updatePresence</code>. Leaves on unmount. Requires a
+              presence-capable transport.
             </td>
           </tr>
         </tbody>
@@ -1973,6 +2008,212 @@ export function ApiReference() {
       </p>
 
       {/* ------------------------------------------------------------------ */}
+      {/* @realtimejs/adapter-pusher                                         */}
+      {/* ------------------------------------------------------------------ */}
+      <h2 id="adapter-pusher">@realtimejs/adapter-pusher</h2>
+      <p>
+        Pusher Channels (hosted) and self-hosted Soketi transport adapter.
+        Soketi speaks the Pusher protocol, so the same adapter works against
+        both — point <code>wsHost</code>/<code>wsPort</code> at Soketi for
+        self-hosting. Presence-capable.
+      </p>
+      <table className="api-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Signature</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <code>pusherTransport</code>
+            </td>
+            <td>
+              <code>
+                (options: PusherTransportOptions) =&gt; RealtimeTransport &amp;
+                PresenceCapable
+              </code>
+            </td>
+            <td>
+              Creates a transport over the Pusher protocol. Binds a single{' '}
+              <code>'message'</code> event per channel; presence channels map to{' '}
+              <code>presence-&lt;channel&gt;</code>; client publishes use a
+              Pusher client event (private/presence channels with client events
+              enabled). Public fan-out is server-published via the Pusher HTTP
+              API. Also exports the protocol constants{' '}
+              <code>PUSHER_MESSAGE_EVENT</code>,{' '}
+              <code>PUSHER_CLIENT_MESSAGE_EVENT</code>, and{' '}
+              <code>PUSHER_PRESENCE_PREFIX</code>.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Import:{' '}
+        <code>
+          import {'{'} pusherTransport {'}'} from '@realtimejs/adapter-pusher'
+        </code>
+      </p>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* @realtimejs/adapter-partykit                                       */}
+      {/* ------------------------------------------------------------------ */}
+      <h2 id="adapter-partykit">@realtimejs/adapter-partykit</h2>
+      <p>
+        PartyKit / Cloudflare Durable Objects transport adapter. Multiplexes all
+        realtime.js channels over a single PartyKit room connection (the
+        &ldquo;hub&rdquo;), routing each channel inside JSON envelopes. Presence
+        is backed by Durable Object membership. A reference room server is
+        available at <code>@realtimejs/adapter-partykit/server</code>.
+      </p>
+      <table className="api-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Signature</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <code>partykitTransport</code>
+            </td>
+            <td>
+              <code>
+                (options: PartyKitTransportOptions) =&gt; RealtimeTransport
+                &amp; PresenceCapable
+              </code>
+            </td>
+            <td>
+              Creates a transport that connects to a PartyKit room. Learns its
+              own <code>connectionId</code> from the server&rsquo;s{' '}
+              <code>connected</code> envelope and excludes self from reported
+              presence members.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Import:{' '}
+        <code>
+          import {'{'} partykitTransport {'}'} from
+          '@realtimejs/adapter-partykit'
+        </code>
+      </p>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* @realtimejs/reactive-drizzle                                       */}
+      {/* ------------------------------------------------------------------ */}
+      <h2 id="reactive-drizzle">@realtimejs/reactive-drizzle</h2>
+      <p>
+        Optional Drizzle/Postgres reactive-query engine for{' '}
+        <code>@realtimejs/core</code>. Kept separate so the core install carries
+        zero <code>drizzle-orm</code> dependencies. Composes with{' '}
+        <code>createStartHandler</code>: the handler owns the transport, this
+        package owns the reactive engine (auto-derived channels, predicate
+        matching, automatic invalidation).
+      </p>
+      <table className="api-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Signature</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <code>createReactiveQueries</code>
+            </td>
+            <td>
+              <code>
+                (options?: CreateReactiveQueriesOptions) =&gt; ReactiveQueries
+              </code>
+            </td>
+            <td>
+              Creates the reactive engine. Returns <code>query</code>,{' '}
+              <code>mutation</code>, <code>invalidate</code>,{' '}
+              <code>bindPublish</code>, and <code>onChannelEmpty</code>. Wire{' '}
+              <code>bindPublish(handler.publish)</code> after creating the
+              handler so invalidations fan out.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>createDrizzleEngine</code>
+            </td>
+            <td>
+              <code>(...) =&gt; ReactiveQueryEngine</code>
+            </td>
+            <td>
+              The Drizzle implementation of the neutral{' '}
+              <code>ReactiveQueryEngine</code> seam (also exported as{' '}
+              <code>drizzleEngine</code>). Implement your own engine to back the
+              seam with a different store.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Import:{' '}
+        <code>
+          import {'{'} createReactiveQueries {'}'} from
+          '@realtimejs/reactive-drizzle'
+        </code>
+      </p>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* @realtimejs/adapter-conformance                                    */}
+      {/* ------------------------------------------------------------------ */}
+      <h2 id="adapter-conformance">@realtimejs/adapter-conformance</h2>
+      <p>
+        A Vitest conformance battery for custom transport authors. Wire your
+        adapter to a controllable fake provider via the{' '}
+        <code>ConformanceHarness</code> hooks and the kit drives it against the{' '}
+        <code>RealtimeTransport</code> (+ <code>PresenceCapable</code>) contract
+        — including the three-phase reconnect-resubscribe check.
+      </p>
+      <table className="api-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Signature</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <code>runAdapterConformance</code>
+            </td>
+            <td>
+              <code>(harness: ConformanceHarness) =&gt; void</code>
+            </td>
+            <td>
+              Registers the conformance <code>describe</code>/<code>it</code>{' '}
+              blocks. Call it from a <code>*.test.ts</code> in your adapter
+              package. The harness supplies <code>createTransport</code>,{' '}
+              <code>capabilities</code>, <code>emitMessage</code>, disconnect/
+              reconnect triggers, and optional{' '}
+              <code>simulateSubscribeError</code>/<code>emitPresence</code>{' '}
+              hooks.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Import:{' '}
+        <code>
+          import {'{'} runAdapterConformance {'}'} from
+          '@realtimejs/adapter-conformance'
+        </code>
+      </p>
+
+      {/* ------------------------------------------------------------------ */}
       {/* @realtimejs/preset-start                                     */}
       {/* ------------------------------------------------------------------ */}
       <h2 id="preset-start">@realtimejs/preset-start</h2>
@@ -2207,6 +2448,21 @@ export function ApiReference() {
             <td>
               Optional transport extension for joinPresence, updatePresence,
               leavePresence, onPresenceChange.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>TransportCapabilities</code>
+            </td>
+            <td>
+              <code>@realtimejs/core</code>
+            </td>
+            <td>
+              <code>
+                {'{'} presence; serverAssistedRecovery; history; ephemeral {'}'}
+              </code>{' '}
+              — what a transport supports. Read via <code>getCapabilities</code>
+              .
             </td>
           </tr>
           <tr>

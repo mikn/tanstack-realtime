@@ -78,12 +78,29 @@ import { client } from './client'
 </template>`}
       />
 
+      <p>
+        In production builds (<code>process.env.NODE_ENV === 'production'</code>
+        ), <code>RealtimeDevtools</code> renders nothing unless{' '}
+        <code>force</code> is set to <code>true</code>.
+      </p>
+
       <h2>Props</h2>
       <CodeBlock
         code={`interface RealtimeDevtoolsProps {
-  /** Position of the floating toggle button.
-   *  @default 'bottom-right' */
+  /** Initial open state. @default false */
+  initialIsOpen?: boolean
+  /** Position of the floating toggle button. @default 'bottom-left' */
   position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+  /** Force rendering in production builds. @default false */
+  force?: boolean
+  /** Custom inline styles for the floating toggle button. */
+  toggleButtonStyle?: CSSProperties
+  /** Custom inline styles for the panel container. */
+  panelStyle?: CSSProperties
+  /** Offline queue handle to display queue state. Pass the result of useOfflineQueue(). */
+  offlineQueue?: OfflineQueueHandle
+  /** Track presence on channels when the transport supports it. @default true */
+  trackPresence?: boolean
 }`}
       />
 
@@ -112,15 +129,20 @@ import { client } from './client'
       <h2>Advanced: createDevtoolsStore</h2>
       <p>
         For custom devtools UIs, use <code>createDevtoolsStore</code> directly.
-        It accepts a <code>RealtimeClient</code> and returns a reactive store
-        with all the data the panel displays.
+        It takes the <code>RealtimeClient</code> as its first argument (plus
+        optional <code>DevtoolsStoreOptions</code>) and returns a reactive
+        handle with all the data the panel displays.
       </p>
       <CodeBlock
         code={`import { createDevtoolsStore } from '@realtimejs/react-devtools'
 
-const devtools = createDevtoolsStore({ client })
-// devtools.store → DevtoolsState (channels, messages, connection history, etc.)
-// devtools.destroy() → clean up listeners`}
+const devtools = createDevtoolsStore(client, {
+  offlineQueue,        // optional OfflineQueueHandle from useOfflineQueue()
+  trackPresence: true, // default
+})
+// devtools.store → Store<DevtoolsState> (channels, messages, connection history, etc.)
+// devtools.clear() → clear collected messages and events
+// devtools.destroy() → detach from the client and stop collecting`}
       />
     </article>
   )

@@ -10,11 +10,19 @@ export function SolidPrimitives() {
       </p>
 
       <p>
-        The Solid adapter mirrors the React adapter 1:1 — every hook listed on
-        the <a href="#/docs/hooks">React Hooks</a> page has a Solid equivalent
-        with the same name and signature. Internally, hooks use Solid signals
-        and <code>createEffect</code> instead of React state and{' '}
-        <code>useEffect</code>.
+        The Solid adapter mirrors the React adapter — every hook on the{' '}
+        <a href="#/docs/hooks">React Hooks</a> page has a Solid equivalent.
+        Names match, with one convention difference: the reactive-query
+        primitives are <code>createQuery</code>, <code>createMutation</code>,
+        and <code>createPaginatedQuery</code> (Solid-idiomatic{' '}
+        <code>create*</code> naming) rather than React&rsquo;s{' '}
+        <code>useQuery</code>/<code>useMutation</code>/
+        <code>usePaginatedQuery</code>. Every other primitive keeps its{' '}
+        <code>use*</code> name. Internally, primitives use Solid signals and{' '}
+        <code>createEffect</code> instead of React state and{' '}
+        <code>useEffect</code>, so query/mutation results are{' '}
+        <strong>signal accessors</strong> (call them: <code>query.data()</code>,{' '}
+        <code>mutation.isPending()</code>).
       </p>
 
       <h2>Installation</h2>
@@ -85,12 +93,16 @@ function App() {
 import { getTodos } from '../server/todos'
 
 function TodoList(props: { teamId: string }) {
-  const query = createQuery(getTodos, () => ({ teamId: props.teamId }))
+  const query = createQuery(
+    getTodos,
+    () => ({ teamId: props.teamId }),
+    { getKey: (t) => t.id },
+  )
 
   return (
-    <Show when={!query.isPending} fallback={<p>Loading…</p>}>
+    <Show when={!query.isPending()} fallback={<p>Loading…</p>}>
       <ul>
-        <For each={query.data}>{(todo) => <li>{todo.title}</li>}</For>
+        <For each={query.data()}>{(todo) => <li>{todo.title}</li>}</For>
       </ul>
     </Show>
   )
@@ -98,20 +110,20 @@ function TodoList(props: { teamId: string }) {
       />
       <h3>Signature</h3>
       <CodeBlock
-        code={`function createQuery<TArgs, TResult>(
-  serverFn: ReactiveQueryFn<TArgs, TResult>,
-  args: () => TArgs,          // reactive accessor — reruns when args change
-  options?: {
-    enabled?: boolean
-    refetchOnReconnect?: boolean
-  }
+        code={`function createQuery<TArgs, TItem extends Record<string, unknown>>(
+  serverFn: ReactiveQueryFn<TArgs, Array<TItem>>,
+  args: Accessor<TArgs>,      // reactive accessor — reruns when args change
+  options: {
+    getKey: (item: TItem) => string    // required — stable key per item
+    enabled?: Accessor<boolean>
+    refetchOnReconnect?: Accessor<boolean>
+  },
 ): {
-  data: TResult | undefined
-  isPending: boolean
-  isFetching: boolean
-  error: unknown
-  isOptimistic: boolean
-  optimisticUpdate: (transform: (prev: TResult | undefined) => TResult) => () => void
+  data: Accessor<Array<TItem>>           // live array from the server
+  collection: Accessor<Collection<TItem, string> | null>
+  isPending: Accessor<boolean>
+  isFetching: Accessor<boolean>
+  error: Accessor<unknown>
   refetch: () => void
 }`}
       />
@@ -140,10 +152,10 @@ function AddTodoForm(props: { teamId: string }) {
 
   return (
     <button
-      disabled={mutation.isPending}
+      disabled={mutation.isPending()}
       onClick={() => mutation.mutate({ teamId: props.teamId, title: 'New todo' })}
     >
-      {mutation.isPending ? 'Saving…' : 'Add'}
+      {mutation.isPending() ? 'Saving…' : 'Add'}
     </button>
   )
 }`}
@@ -159,9 +171,9 @@ function AddTodoForm(props: { teamId: string }) {
   }
 ): {
   mutate: (args: TArgs) => Promise<TResult>
-  isPending: boolean
-  error: unknown
-  data: TResult | undefined
+  isPending: Accessor<boolean>
+  error: Accessor<unknown>
+  data: Accessor<TResult | undefined>
   reset: () => void
 }`}
       />
@@ -187,11 +199,11 @@ function FeedList(props: { teamId: string }) {
   return (
     <>
       <ul>
-        <For each={query.items}>{(item) => <li>{item.text}</li>}</For>
+        <For each={query.items()}>{(item) => <li>{item.text}</li>}</For>
       </ul>
-      <Show when={query.hasNextPage}>
-        <button onClick={() => query.fetchNextPage()} disabled={query.isFetchingNextPage}>
-          {query.isFetchingNextPage ? 'Loading…' : 'Load more'}
+      <Show when={query.hasNextPage()}>
+        <button onClick={() => query.fetchNextPage()} disabled={query.isFetchingNextPage()}>
+          {query.isFetchingNextPage() ? 'Loading…' : 'Load more'}
         </button>
       </Show>
     </>
@@ -202,18 +214,18 @@ function FeedList(props: { teamId: string }) {
       <CodeBlock
         code={`function createPaginatedQuery<TItem, TArgs extends { cursor?: string | number | null; limit?: number }>(
   serverFn: ReactiveQueryFn<TArgs, PaginatedPage<TItem>>,
-  args: () => Omit<TArgs, 'cursor' | 'limit'>,
+  args: Accessor<Omit<TArgs, 'cursor' | 'limit'>>,
   options?: {
-    pageSize?: number
-    enabled?: boolean
-    refetchOnReconnect?: boolean
-  }
+    pageSize?: Accessor<number>
+    enabled?: Accessor<boolean>
+    refetchOnReconnect?: Accessor<boolean>
+  },
 ): {
-  items: TItem[]
-  isPending: boolean
-  isFetchingNextPage: boolean
-  hasNextPage: boolean
-  error: unknown
+  items: Accessor<Array<TItem>>
+  isPending: Accessor<boolean>
+  isFetchingNextPage: Accessor<boolean>
+  hasNextPage: Accessor<boolean>
+  error: Accessor<unknown>
   fetchNextPage: () => Promise<void>
   refetch: () => void
 }`}

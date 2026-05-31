@@ -11,10 +11,15 @@ export function VueComposables() {
       </p>
 
       <p>
-        The Vue adapter mirrors the React adapter 1:1 — every hook listed on the{' '}
-        <a href="#/docs/hooks">React Hooks</a> page has a Vue equivalent with
-        the same name and signature. Return values are Vue <code>ref</code> /{' '}
-        <code>computed</code> values instead of React state.
+        The Vue adapter mirrors the React adapter — every hook on the{' '}
+        <a href="#/docs/hooks">React Hooks</a> page has a Vue composable with
+        the same name. The two conventions to know: reactive arguments accept{' '}
+        <code>MaybeRef&lt;TArgs&gt;</code> (pass a plain object, a{' '}
+        <code>ref</code>, or a <code>computed</code> and the composable
+        re-subscribes when it changes), and return values are Vue{' '}
+        <code>Ref</code> / <code>ComputedRef</code> values rather than React
+        state &mdash; read them with <code>.value</code> (auto-unwrapped in{' '}
+        <code>&lt;template&gt;</code>).
       </p>
 
       <h2>Installation</h2>
@@ -84,15 +89,17 @@ import { client } from './client'
       <CodeBlock
         title="TodoList.vue"
         code={`<script setup lang="ts">
-import { toRef } from 'vue'
+import { computed } from 'vue'
 import { useQuery } from '@realtimejs/vue'
 import { getTodos } from '../server/todos'
 
 const props = defineProps<{ teamId: string }>()
 
+// args accepts a MaybeRef — pass a computed/ref to re-subscribe reactively.
 const { data, isPending, error } = useQuery(
   getTodos,
-  toRef(props, 'teamId').value ? { teamId: props.teamId } : { teamId: '' },
+  computed(() => ({ teamId: props.teamId })),
+  { getKey: (t) => t.id },
 )
 </script>
 
@@ -106,20 +113,20 @@ const { data, isPending, error } = useQuery(
       />
       <h3>Signature</h3>
       <CodeBlock
-        code={`function useQuery<TArgs, TResult>(
-  serverFn: ReactiveQueryFn<TArgs, TResult>,
+        code={`function useQuery<TArgs, TItem extends Record<string, unknown>>(
+  serverFn: ReactiveQueryFn<TArgs, Array<TItem>>,
   args: MaybeRef<TArgs>,      // plain object or ref — reactive refs are tracked
-  options?: {
-    enabled?: boolean
-    refetchOnReconnect?: boolean
-  }
+  options: {
+    getKey: (item: TItem) => string    // required — stable key per item
+    enabled?: MaybeRef<boolean>
+    refetchOnReconnect?: MaybeRef<boolean>
+  },
 ): {
-  data: Ref<TResult | undefined>
-  isPending: Ref<boolean>
+  data: Ref<Array<TItem>>                // live array from the server
+  collection: Ref<Collection<TItem, string> | null>  // pass to useLiveQuery
+  isPending: ComputedRef<boolean>
   isFetching: Ref<boolean>
   error: Ref<unknown>
-  isOptimistic: Ref<boolean>
-  optimisticUpdate: (transform: (prev: TResult | undefined) => TResult) => () => void
   refetch: () => void
 }`}
       />
@@ -216,15 +223,16 @@ const { items, isPending, hasNextPage, isFetchingNextPage, fetchNextPage } =
   serverFn: ReactiveQueryFn<TArgs, PaginatedPage<TItem>>,
   args: MaybeRef<Omit<TArgs, 'cursor' | 'limit'>>,
   options?: {
-    pageSize?: number
-    enabled?: boolean
-    refetchOnReconnect?: boolean
+    pageSize?: MaybeRef<number>
+    enabled?: MaybeRef<boolean>
+    refetchOnReconnect?: MaybeRef<boolean>
   }
 ): {
-  items: Ref<TItem[]>
-  isPending: Ref<boolean>
+  items: ComputedRef<Array<TItem>>
+  isPending: ComputedRef<boolean>
+  isFetching: Ref<boolean>
   isFetchingNextPage: Ref<boolean>
-  hasNextPage: Ref<boolean>
+  hasNextPage: ComputedRef<boolean>
   error: Ref<unknown>
   fetchNextPage: () => Promise<void>
   refetch: () => void
