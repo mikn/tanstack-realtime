@@ -675,10 +675,10 @@ function EditableTitle({ docId }: { docId: string }) {
 
       <h3 id="rich-text-undo">Rich text: use Y.js UndoManager</h3>
       <p>
-        For character-level collaborative text editing, TanStack
-        Realtime&rsquo;s field-level CRDTs aren&rsquo;t the right tool. They
-        operate on whole-field granularity (replacing the entire value), not
-        individual characters or ranges.
+        For character-level collaborative text editing, realtime.js&rsquo;s
+        field-level CRDTs aren&rsquo;t the right tool. They operate on
+        whole-field granularity (replacing the entire value), not individual
+        characters or ranges.
       </p>
       <p>
         Use a dedicated rich-text CRDT library such as <strong>Y.js</strong> or{' '}

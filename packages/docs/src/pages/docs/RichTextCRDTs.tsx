@@ -11,6 +11,17 @@ export function RichTextCRDTs() {
         CRDT engine.
       </p>
 
+      <div className="doc-callout">
+        <strong>No built-in Y.js adapter.</strong> realtime.js does not ship a{' '}
+        <code>withYjs</code> adapter or a packaged Y.js provider. This is the
+        manual integration pattern: you run Y.js&rsquo;s own update and
+        awareness messages over a realtime.js channel using{' '}
+        <code>client.subscribe</code> / <code>client.publish</code>. realtime.js
+        owns transport, reconnection, auth, and presence; Y.js owns the text
+        CRDT. The <code>RealtimeYjsProvider</code> below is roughly 40 lines you
+        copy into your app &mdash; not an installable package.
+      </div>
+
       {/* ----------------------------------------------------------------- */}
       {/* When to use Y.js vs field CRDTs                                   */}
       {/* ----------------------------------------------------------------- */}
@@ -111,8 +122,8 @@ export function RichTextCRDTs() {
         <div className="doc-grid-card">
           <h3>Custom provider (the glue)</h3>
           <p>
-            A Y.js provider that bridges <code>Y.Doc</code> updates to TanStack
-            Realtime channels. On local edit, publish the update. On channel
+            A Y.js provider that bridges <code>Y.Doc</code> updates to
+            realtime.js channels. On local edit, publish the update. On channel
             message, apply it to the doc.
           </p>
         </div>
@@ -252,7 +263,7 @@ provider.connect()
       {/* ----------------------------------------------------------------- */}
 
       <h2 id="awareness">
-        Cursor sharing via Y.js Awareness + TanStack Presence
+        Cursor sharing via Y.js Awareness + realtime.js Presence
       </h2>
       <p>
         Collaborative editors show remote cursors and selections. Y.js provides
@@ -270,7 +281,7 @@ provider.connect()
           </p>
         </div>
         <div className="doc-grid-card">
-          <h3>TanStack Presence</h3>
+          <h3>realtime.js Presence</h3>
           <p>
             Tracks user identity, display name, color, and online status.
             Updated infrequently. Use for the collaborator list, avatars, and
@@ -291,7 +302,7 @@ import type * as Y from 'yjs'
 
 /**
  * Bridge Y.js Awareness updates through realtime.js channels,
- * while using TanStack Presence for user metadata.
+ * while using realtime.js Presence for user metadata.
  */
 export function setupAwareness(
   client: RealtimeClient,
@@ -333,7 +344,7 @@ export function setupAwareness(
     },
   )
 
-  // Use TanStack Presence for user-level metadata
+  // Use realtime.js Presence for user-level metadata
   client.joinPresence(channel, {
     name: user.name,
     color: user.color,
@@ -363,7 +374,8 @@ export function setupAwareness(
       <p>
         With this setup, the editor renders remote cursors from Y.js Awareness
         (keystroke-level updates), while the UI sidebar shows collaborator names
-        and colors from TanStack Presence (infrequent, higher-level metadata).
+        and colors from realtime.js Presence (infrequent, higher-level
+        metadata).
       </p>
 
       {/* ----------------------------------------------------------------- */}

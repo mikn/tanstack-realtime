@@ -14,6 +14,18 @@ export function Tick() {
         dashboards, and real-time simulations.
       </p>
 
+      <div className="doc-callout">
+        <p>
+          <strong>Specialized path.</strong> Tick batching is a niche feature
+          for the rare cases where you publish many updates per second per
+          entity. Most realtime apps never need it &mdash; reach for{' '}
+          <a href="#/docs/reactive-queries">reactive queries</a>,{' '}
+          <a href="#/docs/channels">channels</a>, or{' '}
+          <a href="#/docs/presence">presence</a> first. Use tick batching only
+          when per-event publishing is genuinely too expensive.
+        </p>
+      </div>
+
       <h2 id="how">How it works</h2>
       <p>
         <code>useTickBatching</code> registers tick-batching hooks on any
