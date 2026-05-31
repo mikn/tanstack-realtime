@@ -1,9 +1,10 @@
-name: Deploy Docs
+name: Docs Preview
 
-# Production docs deploy. Publishes the built docs site to the ROOT of the
-# `gh-pages` branch. Per-PR previews (see docs-preview.yml) live under
-# `gh-pages/pr-preview/`, so this deploy uses `clean-exclude: pr-preview/` to
-# avoid wiping live previews on every push to main.
+# Per-PR preview deploys of the docs site. Builds the docs and publishes them
+# to `gh-pages/pr-preview/pr-<N>/` via rossjrw/pr-preview-action, which also
+# comments the preview URL on the PR and removes the preview when the PR is
+# closed. Production docs (deploy-docs.yml) deploy to the gh-pages ROOT with
+# `clean-exclude: pr-preview/` so the two never clobber each other.
 #
 # ONE-TIME OWNER SETUP (cannot be done from CI): in the repo's GitHub
 # Settings -> Pages, set the build source to "Deploy from a branch:
@@ -13,46 +14,51 @@ name: Deploy Docs
 #   Previews:   https://mikn.github.io/tanstack-realtime/pr-preview/pr-<N>/
 
 on:
-  push:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
     branches: [main]
-  workflow_dispatch:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
-  group: deploy-docs
-  cancel-in-progress: false
+  group: preview-${{ github.event.number }}
+  cancel-in-progress: true
 
 jobs:
-  deploy:
-    name: Build and deploy docs
+  deploy-preview:
+    name: Deploy PR preview
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Install pnpm
+        if: github.event.action != 'closed'
         uses: pnpm/action-setup@v4
 
       - name: Use Node.js 22
+        if: github.event.action != 'closed'
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
 
       - name: Install dependencies
+        if: github.event.action != 'closed'
         run: pnpm install --frozen-lockfile
 
       - name: Build docs site
+        if: github.event.action != 'closed'
         run: pnpm --filter @realtimejs/docs build
 
       - name: Add .nojekyll
+        if: github.event.action != 'closed'
         run: touch packages/docs/dist/.nojekyll
 
-      - name: Deploy to gh-pages
-        uses: JamesIves/github-pages-deploy-action@v4
+      - name: Deploy preview
+        uses: rossjrw/pr-preview-action@v1
         with:
-          branch: gh-pages
-          folder: packages/docs/dist
-          clean-exclude: pr-preview/
+          source-dir: ./packages/docs/dist
+          umbrella-dir: pr-preview

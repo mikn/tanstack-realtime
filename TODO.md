@@ -10,6 +10,13 @@ hygiene and breadth.
 - [ ] Claim the `@realtimejs` npm scope and publish the first `0.x` release.
 - [ ] Decide whether to rename the GitHub repo `mikn/tanstack-realtime` →
       `mikn/realtimejs` (and update `repository`/`homepage`/`bugs` URLs if so).
+- [ ] **One-time GitHub Pages setup** (owner action, cannot be done from CI):
+      in repo **Settings → Pages**, set the build source to **"Deploy from a
+      branch: `gh-pages` / `(root)`"**. Both the production docs deploy
+      (`deploy-docs.yml`) and per-PR previews (`docs-preview.yml`) now publish
+      to the single `gh-pages` branch (Pages allows only one source). After the
+      flip: production serves at `https://mikn.github.io/tanstack-realtime/` and
+      previews at `https://mikn.github.io/tanstack-realtime/pr-preview/pr-<N>/`.
 
 ## Packages & docs
 
