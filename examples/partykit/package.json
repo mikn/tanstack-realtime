@@ -1,0 +1,28 @@
+{
+  "name": "@realtimejs-example/partykit",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:party": "partykit dev",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@realtimejs/adapter-partykit": "workspace:*",
+    "@realtimejs/core": "workspace:*",
+    "@realtimejs/react": "workspace:*",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.10",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "partykit": "0.0.115",
+    "typescript": "^5.9.3",
+    "vite": "^7.0.0"
+  }
+}

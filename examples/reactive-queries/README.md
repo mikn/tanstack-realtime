@@ -63,7 +63,10 @@ anywhere):
 const db = wrapReactiveDb(drizzle(pglite, { schema: { todos } }))
 const reactive = createReactiveQueries()
 const sse = createSseHandler({ onChannelEmpty: reactive.onChannelEmpty })
-reactive.bindPublish((ch, data) => sse.broadcast(ch, data))
+reactive.bindPublish((ch, data) => {
+  sse.broadcast(ch, data) // void
+  return Promise.resolve() // PublishFn must return Promise<void>
+})
 
 const getTodos = reactive.query(async ({ teamId }) =>
   db.select().from(todos).where(eq(todos.teamId, teamId)),

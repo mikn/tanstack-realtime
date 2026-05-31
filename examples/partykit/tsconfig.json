@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "types": ["node"],
+    "paths": {
+      "@realtimejs/react": ["../../packages/react/src/index.ts"],
+      "@realtimejs/core": ["../../packages/core/src/index.ts"],
+      "@realtimejs/adapter-partykit": [
+        "../../packages/adapter-partykit/src/index.ts"
+      ],
+      "@realtimejs/adapter-partykit/server": [
+        "../../packages/adapter-partykit/src/server.ts"
+      ],
+      "@realtimejs/adapter-partykit/protocol": [
+        "../../packages/adapter-partykit/src/protocol.ts"
+      ]
+    }
+  },
+  "include": ["src", "vite.config.ts"]
+}

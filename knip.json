@@ -46,7 +46,10 @@
     "examples/collaborative-todos": {},
     "examples/chat": {},
     "examples/ai-streaming": {},
-    "examples/reactive-queries": {}
+    "examples/reactive-queries": {},
+    "examples/partykit": {
+      "entry": ["src/party/server.ts"]
+    }
   },
   "ignore": ["packages/docs/**"]
 }
