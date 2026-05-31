@@ -164,9 +164,7 @@ function RealtimeDevtoolsInner(props: Omit<RealtimeDevtoolsProps, 'force'>) {
       <button
         type="button"
         aria-label={
-          isOpen()
-            ? 'Close TanStack Realtime Devtools'
-            : 'Open TanStack Realtime Devtools'
+          isOpen() ? 'Close realtime.js Devtools' : 'Open realtime.js Devtools'
         }
         data-testid="realtime-devtools-toggle"
         onClick={handleToggle}

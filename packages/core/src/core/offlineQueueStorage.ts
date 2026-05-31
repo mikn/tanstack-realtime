@@ -48,7 +48,7 @@ export interface OfflineQueueStorage {
 // ---------------------------------------------------------------------------
 
 export interface IndexedDBStorageOptions {
-  /** IndexedDB database name. @default 'tanstack-realtime-queue' */
+  /** IndexedDB database name. @default 'realtimejs-queue' */
   dbName?: string
   /** Object store name. @default 'pending' */
   storeName?: string
@@ -71,7 +71,7 @@ export interface IndexedDBStorageOptions {
 export function createIndexedDBStorage(
   options?: IndexedDBStorageOptions,
 ): OfflineQueueStorage {
-  const dbName = options?.dbName ?? 'tanstack-realtime-queue'
+  const dbName = options?.dbName ?? 'realtimejs-queue'
   const storeName = options?.storeName ?? 'pending'
 
   let dbPromise: Promise<IDBDatabase> | null = null
@@ -153,7 +153,7 @@ export function createIndexedDBStorage(
 // ---------------------------------------------------------------------------
 
 export interface LocalStorageOptions {
-  /** localStorage key. @default 'tanstack-realtime-queue' */
+  /** localStorage key. @default 'realtimejs-queue' */
   key?: string
 }
 
@@ -173,7 +173,7 @@ export interface LocalStorageOptions {
 export function createLocalStorageAdapter(
   options?: LocalStorageOptions,
 ): OfflineQueueStorage {
-  const key = options?.key ?? 'tanstack-realtime-queue'
+  const key = options?.key ?? 'realtimejs-queue'
 
   return {
     load(): Promise<Array<QueuedMessage>> {

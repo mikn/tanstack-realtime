@@ -97,7 +97,7 @@ export function DevtoolsPanel(props: DevtoolsPanelProps) {
       {/* Header */}
       <div style={styles.header}>
         <div style={styles.headerLeft}>
-          <span style={styles.headerTitle}>TanStack Realtime</span>
+          <span style={styles.headerTitle}>realtime.js</span>
           <span style={styles.statusBadge(status())}>
             <span style={styles.statusDot(status())} />
             {status()}

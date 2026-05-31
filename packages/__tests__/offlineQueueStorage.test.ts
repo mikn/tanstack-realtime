@@ -178,7 +178,7 @@ describe('createLocalStorageAdapter', () => {
   })
 
   it('gracefully handles corrupted localStorage data', async () => {
-    localStorage.setItem('tanstack-realtime-queue', 'not-json')
+    localStorage.setItem('realtimejs-queue', 'not-json')
     const storage = createLocalStorageAdapter()
     const result = await storage.load()
     expect(result).toEqual([])

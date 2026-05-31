@@ -1,27 +1,62 @@
-# AGENTS.md — TanStack Realtime
+# AGENTS.md — realtime.js
 
 Guidelines for AI agents and contributors working on this codebase.
 
 ## Project Overview
 
-TanStack Realtime is the realtime synchronization layer for the TanStack ecosystem.
-It connects **TanStack DB** (client-side reactive collections) to live data sources
-over pluggable transports, with optional CRDT convergence, presence, and offline
-support.
+realtime.js is a vendor-neutral realtime/sync library. It moves live data between
+clients and servers over pluggable transports, with optional CRDT convergence,
+presence, streaming, and offline support. The published surface is the
+`@realtimejs/*` scope: `@realtimejs/core` plus framework bindings
+(`@realtimejs/react`, `@realtimejs/vue`, `@realtimejs/solid`), transport adapters,
+and the `realtime.js` one-install meta-package.
 
-### Relationship with TanStack DB
+The library is **not tied to any single framework or backend**. TanStack DB and
+TanStack Start are **supported integrations, not the identity** — they are two of
+the consumers of the core, alongside the framework bindings and the transport
+adapters. Don't frame the project as "the realtime layer for TanStack"; frame it
+as a standalone library that happens to integrate well with them.
 
-TanStack DB owns the client-side data model: collections, transactions, optimistic
-mutations, and the `SyncConfig` protocol (`begin` / `write` / `commit` / `markReady`).
-TanStack Realtime **does not duplicate** any of that. Instead, every collection
-integration (`realtimeCollectionOptions`, `liveChannelOptions`, `tickCollectionOptions`,
-`streamChannelOptions`, etc.) returns a `CollectionConfig` that TanStack DB consumes
-directly via `createCollection()`.
+### Transports & the capability contract
 
-- **Mutations** flow through TanStack DB's transaction system. Realtime's mutation
+Transports are pluggable and self-describe what they support through a capability
+contract: `TransportCapabilities` (e.g. presence, gap recovery, server-assigned
+offsets) returned by `getCapabilities()`. Higher-level features check capabilities
+rather than assuming a transport can do something. Adapters live in their own
+packages:
+
+- `@realtimejs/adapter-sse` — Server-Sent Events transport + server handler.
+- `@realtimejs/adapter-centrifugo` — Centrifugo transport adapter.
+- `@realtimejs/adapter-pusher` — Pusher transport adapter.
+- `@realtimejs/adapter-partykit` — PartyKit transport adapter.
+- `@realtimejs/adapter-conformance` — shared conformance test kit that every
+  adapter runs against, so new adapters prove they honor the contract.
+
+When adding or changing a transport, declare its real capabilities accurately and
+run it through the conformance kit.
+
+### Reactive query engine seam
+
+Server-driven reactive queries go through the `ReactiveQueryEngine` seam in
+`@realtimejs/core` (`packages/core/src/reactive/`). The engine is optional and
+pluggable. `@realtimejs/reactive-drizzle` is the first concrete engine (Drizzle
+ORM); additional engines can be added behind the same seam. Keep core free of
+hard dependencies on any specific ORM — engines plug in, they are not baked in.
+
+### Integration: TanStack DB
+
+When used with **TanStack DB**, TanStack DB owns the client-side data model:
+collections, transactions, optimistic mutations, and the `SyncConfig` protocol
+(`begin` / `write` / `commit` / `markReady`). realtime.js **does not duplicate**
+any of that. Instead, every collection integration
+(`realtimeCollectionOptions`, `liveChannelOptions`, `tickCollectionOptions`,
+`streamChannelOptions`, etc.) returns a `CollectionConfig` that TanStack DB
+consumes directly via `createCollection()`.
+
+- **Mutations** flow through TanStack DB's transaction system. The mutation
   wrappers (`onInsert`, `onUpdate`, `onDelete`) persist to the server and then
   publish the result to the channel for peer sync.
-- **Optimistic rollback** is handled entirely by TanStack DB. Realtime's
+- **Optimistic rollback** is handled entirely by TanStack DB. The
   `optimistic: true` mode adds echo suppression (nonce + clientId) so the
   successful publish-back is not double-applied.
 - **Reads** arrive as channel messages and are written into TanStack DB via the
@@ -30,9 +65,10 @@ directly via `createCollection()`.
 Do not introduce state management that competes with TanStack DB. If you need
 reactive client state, use `@tanstack/store` (the same store TanStack DB uses).
 
-### Relationship with TanStack Start
+### Integration: TanStack Start
 
-TanStack Start provides server functions (via TanStack Router) that are
+`@realtimejs/preset-start` integrates with **TanStack Start**, whose server
+functions (via TanStack Router) are
 **ephemeral** — they spin up, handle one request, and die. There is no persistent
 server process holding connections in memory.
 

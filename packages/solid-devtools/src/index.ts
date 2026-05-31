@@ -1,7 +1,7 @@
 /**
  * @realtimejs/solid-devtools
  *
- * Developer tools panel for inspecting TanStack Realtime client state,
+ * Developer tools panel for inspecting realtime.js client state,
  * channels, messages, presence, offline queue, and connection lifecycle.
  *
  * @example

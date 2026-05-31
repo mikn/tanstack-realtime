@@ -1,4 +1,4 @@
-# Contributing to TanStack Realtime
+# Contributing to realtime.js
 
 Thanks for your interest in contributing! Please read this guide before opening an issue or pull request.
 
@@ -6,20 +6,25 @@ Thanks for your interest in contributing! Please read this guide before opening 
 
 This is a pnpm workspace monorepo with [Nx](https://nx.dev/) for task orchestration. Published packages:
 
-| Directory                     | Package                                                                |
-| ----------------------------- | ---------------------------------------------------------------------- |
-| `packages/core`               | `@realtimejs/core` — core client, collection helpers, CRDTs, and types |
-| `packages/react`              | `@realtimejs/react` — React hooks and provider                         |
-| `packages/solid`              | `@realtimejs/solid` — Solid primitives and provider                    |
-| `packages/vue`                | `@realtimejs/vue` — Vue composables and provider                       |
-| `packages/adapter-centrifugo` | `@realtimejs/adapter-centrifugo` — Centrifugo transport adapter        |
-| `packages/adapter-sse`        | `@realtimejs/adapter-sse` — Server-Sent Events transport adapter       |
-| `packages/preset-start`       | `@realtimejs/preset-start` — TanStack Start preset                     |
-| `packages/react-devtools`     | `@realtimejs/react-devtools` — React developer tools panel             |
-| `packages/solid-devtools`     | `@realtimejs/solid-devtools` — Solid developer tools panel             |
-| `packages/vue-devtools`       | `@realtimejs/vue-devtools` — Vue developer tools panel                 |
-| `packages/docs`               | Documentation site (not published)                                     |
-| `packages/__tests__`          | Integration test suite (not published)                                 |
+| Directory                      | Package                                                                       |
+| ------------------------------ | ----------------------------------------------------------------------------- |
+| `packages/core`                | `@realtimejs/core` — core client, collection helpers, CRDTs, and types        |
+| `packages/react`               | `@realtimejs/react` — React hooks and provider                                |
+| `packages/solid`               | `@realtimejs/solid` — Solid primitives and provider                           |
+| `packages/vue`                 | `@realtimejs/vue` — Vue composables and provider                              |
+| `packages/adapter-sse`         | `@realtimejs/adapter-sse` — Server-Sent Events transport adapter              |
+| `packages/adapter-centrifugo`  | `@realtimejs/adapter-centrifugo` — Centrifugo transport adapter               |
+| `packages/adapter-pusher`      | `@realtimejs/adapter-pusher` — Pusher transport adapter                       |
+| `packages/adapter-partykit`    | `@realtimejs/adapter-partykit` — PartyKit transport adapter                   |
+| `packages/adapter-conformance` | `@realtimejs/adapter-conformance` — shared conformance test kit for adapters  |
+| `packages/preset-start`        | `@realtimejs/preset-start` — TanStack Start preset                            |
+| `packages/reactive-drizzle`    | `@realtimejs/reactive-drizzle` — Drizzle `ReactiveQueryEngine` implementation |
+| `packages/meta`                | `realtime.js` — one-install meta-package re-exporting the common surface      |
+| `packages/react-devtools`      | `@realtimejs/react-devtools` — React developer tools panel                    |
+| `packages/solid-devtools`      | `@realtimejs/solid-devtools` — Solid developer tools panel                    |
+| `packages/vue-devtools`        | `@realtimejs/vue-devtools` — Vue developer tools panel                        |
+| `packages/docs`                | Documentation site (not published)                                            |
+| `packages/__tests__`           | Integration test suite (not published)                                        |
 
 ## Development setup
 
@@ -27,8 +32,8 @@ This is a pnpm workspace monorepo with [Nx](https://nx.dev/) for task orchestrat
 
 ```bash
 # 1. Fork and clone
-git clone https://github.com/<your-fork>/realtime.git
-cd realtime
+git clone https://github.com/<your-fork>/tanstack-realtime.git
+cd tanstack-realtime
 
 # 2. Install dependencies
 pnpm install

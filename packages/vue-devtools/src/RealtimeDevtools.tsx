@@ -128,7 +128,7 @@ function TanStackLogo() {
 // ---------------------------------------------------------------------------
 
 /**
- * Floating devtools toggle + panel for TanStack Realtime.
+ * Floating devtools toggle + panel for realtime.js.
  *
  * Renders nothing in production unless `force` is `true`.
  * Must be placed inside a `<RealtimeProvider>`.
@@ -201,8 +201,8 @@ export const RealtimeDevtools = defineComponent({
           type="button"
           aria-label={
             isOpen.value
-              ? 'Close TanStack Realtime Devtools'
-              : 'Open TanStack Realtime Devtools'
+              ? 'Close realtime.js Devtools'
+              : 'Open realtime.js Devtools'
           }
           data-testid="realtime-devtools-toggle"
           onClick={() => {

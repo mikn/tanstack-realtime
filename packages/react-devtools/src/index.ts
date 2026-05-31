@@ -1,7 +1,7 @@
 /**
  * @realtimejs/react-devtools
  *
- * Developer tools panel for inspecting TanStack Realtime client state,
+ * Developer tools panel for inspecting realtime.js client state,
  * channels, messages, and connection lifecycle.
  *
  * @example
