@@ -41,6 +41,16 @@ function SyncStatus() {
     : null
 }`}
       />
+      <div className="doc-callout">
+        <p>
+          Both <code>createLocalStorageAdapter()</code> and{' '}
+          <code>createIndexedDBStorage()</code> default to the storage key{' '}
+          <code>'realtimejs-queue'</code> (the localStorage key / IndexedDB
+          database name). Override it with the <code>key</code> /{' '}
+          <code>dbName</code> option if you run more than one queue on the same
+          origin. The default <code>maxSize</code> is 1000 messages.
+        </p>
+      </div>
 
       <h2 id="gap-recovery">Gap recovery</h2>
       <p>
@@ -88,6 +98,21 @@ const transport = createCoordinatedTransport({
   transport: () => sseTransport({ url: '/api/realtime' }),
 })`}
       />
+      <div className="doc-callout">
+        <p>
+          <strong>Honest capabilities.</strong> A coordinated transport reports
+          the <em>inner</em> transport&rsquo;s capabilities, so{' '}
+          <code>usePresence</code> degrades correctly. The BroadcastChannel and
+          direct-fallback strategies construct the inner synchronously and
+          auto-derive via <code>getCapabilities</code> &mdash; an SSE inner
+          still reports <code>presence: false</code>. The SharedWorker strategy
+          is the exception: the real transport lives in the worker process and
+          can&rsquo;t be inspected from the tab, so it defaults to the
+          least-capable set. If your worker wraps a presence-capable transport,
+          pass a matching <code>capabilities</code> object to{' '}
+          <code>createCoordinatedTransport</code> to re-enable presence.
+        </p>
+      </div>
 
       <h3>SharedWorker (opt-in)</h3>
       <p>
