@@ -419,12 +419,16 @@ export function centrifugoTransport(
     if (reply.subscribe && !reply.error) {
       const sub = reply.subscribe
       const channel = cmdChannels.get(reply.id)
-      // NOTE: we intentionally do NOT delete the cmdChannels entry here on a
-      // successful subscribe. The entry is consumed by the error branch above
-      // (a subscribe either succeeds OR errors), and is cleared wholesale on
-      // unsubscribe / disconnect / close. Each subscribe uses a fresh command
-      // id, so entries do not collide and stay bounded by the active-channel
-      // count for the connection's lifetime.
+      // NOTE on cmdChannels lifecycle: an entry exists only for the window
+      // between sending a subscribe command and processing its (single) reply.
+      // We read `channel` into a local above, then delete the entry at the END
+      // of this block once all recovery bookkeeping / publication dispatch is
+      // done — nothing below re-reads cmdChannels for this id. Entries are also
+      // cleared by the error branch above (a subscribe either succeeds OR
+      // errors) and wholesale on unsubscribe-via-close / disconnect / close.
+      // Each subscribe uses a fresh, strictly-monotonic command id (never
+      // reused), so deleting after use is safe and the map does not accumulate
+      // stale entries on churny, long-lived connections.
 
       if (channel && !channel.startsWith(presencePrefix)) {
         // Update recovery position if the channel is recoverable.
@@ -447,6 +451,11 @@ export function centrifugoTransport(
           dispatchPublications(channel, sub.publications)
         }
       }
+
+      // The subscribe reply has been fully processed; the channel was captured
+      // into `channel` above, so drop the entry now to prevent slow growth of
+      // cmdChannels on long-lived connections with channel churn.
+      cmdChannels.delete(reply.id)
     }
 
     const p = pending.get(reply.id)

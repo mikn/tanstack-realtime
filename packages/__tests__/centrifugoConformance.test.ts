@@ -156,6 +156,16 @@ class FakeCentrifugoServer {
   private readonly subscribed = new Set<string>()
   /** Latest subscribe command id per channel, for targeting subscribe errors. */
   private readonly lastSubscribeId = new Map<string, number>()
+  /**
+   * Subscribe commands awaiting their (single) reply, keyed by channel. A real
+   * broker answers each subscribe with EXACTLY ONE reply — either a success or
+   * an error, never both. We therefore defer the auto-success to a microtask so
+   * a synchronous `simulateSubscribeError(channel, …)` issued right after
+   * `subscribe(channel)` can claim that pending command and turn its single
+   * reply into an error instead (matching the wire protocol the adapter relies
+   * on: one subscribe id → one reply).
+   */
+  private readonly pendingSubscribes = new Map<string, number>()
   private clientCounter = 0
 
   attach(socket: FakeCentrifugoSocket): void {
@@ -196,9 +206,26 @@ class FakeCentrifugoServer {
         })
       } else if (msg['subscribe'] !== undefined) {
         const ch = (msg['subscribe'] as { channel: string }).channel
-        if (typeof id === 'number') this.lastSubscribeId.set(ch, id)
+        // Register the provider-side subscription synchronously so publications
+        // emitted in the same tick are delivered (the kit asserts delivery
+        // synchronously). The subscribe *reply frame*, however, is deferred to a
+        // microtask so a synchronous simulateSubscribeError() issued right after
+        // subscribe() can claim this command and make its SINGLE reply an error
+        // instead — matching the real wire protocol (one subscribe id → exactly
+        // one reply, success XOR error) the adapter relies on.
         this.subscribed.add(ch)
-        socket.deliver({ id, subscribe: { recoverable: false } })
+        if (typeof id === 'number') {
+          this.lastSubscribeId.set(ch, id)
+          this.pendingSubscribes.set(ch, id)
+          const replyId = id
+          queueMicrotask(() => {
+            if (this.pendingSubscribes.get(ch) !== replyId) return
+            this.pendingSubscribes.delete(ch)
+            socket.deliver({ id: replyId, subscribe: { recoverable: false } })
+          })
+        } else {
+          socket.deliver({ id, subscribe: { recoverable: false } })
+        }
       } else if (msg['unsubscribe'] !== undefined) {
         const ch = (msg['unsubscribe'] as { channel: string }).channel
         this.subscribed.delete(ch)
@@ -240,6 +267,9 @@ class FakeCentrifugoServer {
   emitSubscribeError(channel: string, reason: string, code?: number): void {
     const id = this.lastSubscribeId.get(channel)
     if (id === undefined) return
+    // Claim the pending subscribe so its deferred auto-success is suppressed:
+    // this error becomes the command's single reply, as on the real wire.
+    this.pendingSubscribes.delete(channel)
     this.active?.deliver({ id, error: { code: code ?? 0, message: reason } })
   }
 
@@ -252,6 +282,7 @@ class FakeCentrifugoServer {
   simulateDisconnect(): void {
     this.subscribed.clear()
     this.lastSubscribeId.clear()
+    this.pendingSubscribes.clear()
     this.active?.close()
   }
 }

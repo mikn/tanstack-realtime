@@ -324,4 +324,48 @@ describe('centrifugoTransport server-assisted recovery', () => {
     await wait(60)
     expect(received).toEqual(['a', 'b', 'c'])
   })
+
+  it('recovers correctly across TWO reconnect cycles from the right offset each time', async () => {
+    // Regression guard for the cmdChannels delete-after-read fix: deleting the
+    // cmdChannels entry once a subscribe reply is processed must NOT break a
+    // SECOND recovery round-trip. Each recover re-subscribe uses a fresh
+    // command id and re-populates cmdChannels via resubscribeAll(), so the
+    // second reconnect must still resolve to the channel and replay from the
+    // correct, advanced offset.
+    const received: Array<unknown> = []
+    client.subscribe('room', (data) => received.push(data))
+    await wait(60)
+
+    // --- First gap ---
+    server.publish('room', { n: 1 })
+    await wait(60)
+    expect(received).toEqual([{ n: 1 }])
+
+    server.dropConnection()
+    server.publish('room', { n: 2 }) // gap #1 → replayed on first recovery
+    await wait(200)
+    expect(received).toEqual([{ n: 1 }, { n: 2 }])
+
+    // A live publication between the two drops, to advance the offset further.
+    server.publish('room', { n: 3 })
+    await wait(60)
+    expect(received).toEqual([{ n: 1 }, { n: 2 }, { n: 3 }])
+
+    // --- Second gap ---
+    server.dropConnection()
+    server.publish('room', { n: 4 }) // gap #2 → replayed on second recovery
+    await wait(200)
+    expect(received).toEqual([{ n: 1 }, { n: 2 }, { n: 3 }, { n: 4 }])
+
+    // Two recover re-subscribes happened, each carrying recover:true and the
+    // last-known offset BEFORE its respective drop (3 publications had been
+    // seen before the first drop's offset advanced... offsets are 1 then 3).
+    const cmds = server.subscribeCommandsFor('room')
+    expect(cmds.length).toBe(3)
+    expect(cmds[0]?.recover).toBeFalsy() // initial plain subscribe
+    expect(cmds[1]?.recover).toBe(true) // first recovery
+    expect(cmds[1]?.offset).toBe(1) // last seen offset before first drop
+    expect(cmds[2]?.recover).toBe(true) // second recovery
+    expect(cmds[2]?.offset).toBe(3) // last seen offset before second drop
+  })
 })
