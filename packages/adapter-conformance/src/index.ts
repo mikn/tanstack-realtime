@@ -43,6 +43,21 @@ import type {
  * (rather than skipping) when reconnect driving is missing. Only
  * `simulateSubscribeError` and `emitPresence` are genuinely provider-specific
  * and legitimately skippable.
+ *
+ * ## Async-safe hooks (the kit awaits everything)
+ *
+ * Every simulate/emit hook may return `void` OR `Promise<void>`, and the kit
+ * `await`s each call. Awaiting a non-promise is a no-op, so SYNCHRONOUS fakes
+ * keep working unchanged — but an adapter (or fake) that introduces async
+ * between, say, the connect-send and the connect-reply processing no longer
+ * breaks the kit's same-tick assertions. After the key settle points (after a
+ * reconnect, before the post-reconnect delivery assertion; after a disconnect,
+ * before the negative-phase assertion) the kit also awaits {@link ConformanceHarness.flush}
+ * — which defaults to a single microtask tick — so async re-subscription that
+ * resolves on a microtask is guaranteed to have settled before the assertion.
+ * None of this weakens the teeth: the three-phase reconnect check still requires
+ * phase (b) NOT delivered while disconnected and phase (c) delivered again after
+ * reconnect, so a non-re-subscribing adapter still fails.
  */
 export interface ConformanceHarness {
   /** MANDATORY. Create a fresh transport instance under test (wired to a controllable fake provider). */
@@ -53,17 +68,19 @@ export interface ConformanceHarness {
    * MANDATORY. Simulate the provider/server delivering a message on a channel
    * to the transport. Per the contract above, delivery reaches the subscriber
    * ONLY when the channel is currently subscribed at the provider.
+   *
+   * May return a promise; the kit awaits it (sync fakes return `void`).
    */
-  emitMessage: (channel: string, data: unknown) => void
+  emitMessage: (channel: string, data: unknown) => void | Promise<void>
   /**
    * MANDATORY (core reconnect driving). Drive a disconnect (unexpected drop) on
    * the fake provider. MUST drop the provider-side subscription set so messages
    * are no longer delivered until the transport re-subscribes.
    *
    * Kept optional in the type for ergonomics, but the battery asserts it is
-   * defined and FAILS when it is missing.
+   * defined and FAILS when it is missing. May return a promise; the kit awaits it.
    */
-  simulateDisconnect?: () => void
+  simulateDisconnect?: () => void | Promise<void>
   /**
    * MANDATORY (core reconnect driving — provide this OR
    * {@link ConformanceHarness.simulateConnected}). Drive a reconnect on the
@@ -71,23 +88,48 @@ export interface ConformanceHarness {
    * channels, restoring delivery.
    *
    * Kept optional in the type for ergonomics, but the battery asserts a
-   * reconnect trigger is defined and FAILS when none is provided.
+   * reconnect trigger is defined and FAILS when none is provided. May return a
+   * promise; the kit awaits it (then awaits {@link ConformanceHarness.flush}
+   * before asserting post-reconnect delivery).
    */
-  simulateReconnect?: () => void
+  simulateReconnect?: () => void | Promise<void>
   /**
    * MANDATORY (core reconnect driving — provide this OR
    * {@link ConformanceHarness.simulateReconnect}). Drive a successful
-   * (re)connect on the underlying fake provider.
+   * (re)connect on the underlying fake provider. May return a promise; the kit
+   * awaits it.
    */
-  simulateConnected?: () => void
-  /** OPTIONAL (provider-specific). Simulate the provider rejecting a subscribe (for onSubscribeError checks). */
+  simulateConnected?: () => void | Promise<void>
+  /**
+   * OPTIONAL. Settle point the kit awaits after reconnect/disconnect, before the
+   * delivery (and negative-phase) assertions. Use this when re-subscription (or
+   * a reconnect handshake) resolves on a later microtask/macrotask so the
+   * assertion would otherwise race the re-subscribe. When omitted, the kit
+   * awaits a single microtask tick (`Promise.resolve()`), which already lets
+   * microtask-resolved async re-subscription settle. A fake driving its own
+   * timers (e.g. `vi.advanceTimersByTime`) typically advances them inside
+   * `simulateReconnect`, so the default flush is enough.
+   *
+   * May return a promise; the kit awaits it.
+   */
+  flush?: () => void | Promise<void>
+  /**
+   * OPTIONAL (provider-specific). Simulate the provider rejecting a subscribe
+   * (for onSubscribeError checks). May return a promise; the kit awaits it.
+   */
   simulateSubscribeError?: (
     channel: string,
     reason: string,
     code?: number,
-  ) => void
-  /** OPTIONAL (presence-only). Simulate the provider delivering a member list for a channel. */
-  emitPresence?: (channel: string, members: ReadonlyArray<PresenceUser>) => void
+  ) => void | Promise<void>
+  /**
+   * OPTIONAL (presence-only). Simulate the provider delivering a member list for
+   * a channel. May return a promise; the kit awaits it.
+   */
+  emitPresence?: (
+    channel: string,
+    members: ReadonlyArray<PresenceUser>,
+  ) => void | Promise<void>
   /** Optional adapter name for test titles. */
   name?: string
 }
@@ -95,6 +137,21 @@ export interface ConformanceHarness {
 /** Prefix every `it` title with the adapter name when one is supplied. */
 function titlePrefix(harness: ConformanceHarness): string {
   return harness.name ? `[${harness.name}] ` : ''
+}
+
+/**
+ * Await the harness's settle point. Defaults to a single microtask tick
+ * (`Promise.resolve()`) when the harness provides no `flush`, so async
+ * re-subscription that resolves on a microtask settles before the assertion.
+ * Synchronous fakes are unaffected — a microtask tick between two synchronous
+ * operations is a no-op for state that was already updated synchronously.
+ */
+async function flush(harness: ConformanceHarness): Promise<void> {
+  if (harness.flush) {
+    await harness.flush()
+  } else {
+    await Promise.resolve()
+  }
 }
 
 /**
@@ -169,7 +226,7 @@ export function runAdapterConformance(harness: ConformanceHarness): void {
         await t.connect()
         const got: Array<unknown> = []
         const unsub = t.subscribe('news', (data) => got.push(data))
-        harness.emitMessage('news', { headline: 'hi' })
+        await harness.emitMessage('news', { headline: 'hi' })
         expect(got).toEqual([{ headline: 'hi' }])
         unsub()
         t.disconnect()
@@ -180,7 +237,7 @@ export function runAdapterConformance(harness: ConformanceHarness): void {
         await t.connect()
         const got: Array<unknown> = []
         const unsub = t.subscribe('news', (data) => got.push(data))
-        harness.emitMessage('sports', { headline: 'nope' })
+        await harness.emitMessage('sports', { headline: 'nope' })
         expect(got).toEqual([])
         unsub()
         t.disconnect()
@@ -194,9 +251,9 @@ export function runAdapterConformance(harness: ConformanceHarness): void {
         await t.connect()
         const got: Array<unknown> = []
         const unsub = t.subscribe('ch', (data) => got.push(data))
-        harness.emitMessage('ch', 'first')
+        await harness.emitMessage('ch', 'first')
         unsub()
-        harness.emitMessage('ch', 'second')
+        await harness.emitMessage('ch', 'second')
         expect(got).toEqual(['first'])
         t.disconnect()
       })
@@ -208,13 +265,13 @@ export function runAdapterConformance(harness: ConformanceHarness): void {
         const b: Array<unknown> = []
         const unsubA = t.subscribe('ch', (data) => a.push(data))
         const unsubB = t.subscribe('ch', (data) => b.push(data))
-        harness.emitMessage('ch', 'one')
+        await harness.emitMessage('ch', 'one')
         unsubA()
-        harness.emitMessage('ch', 'two')
+        await harness.emitMessage('ch', 'two')
         expect(a).toEqual(['one'])
         expect(b).toEqual(['one', 'two'])
         unsubB()
-        harness.emitMessage('ch', 'three')
+        await harness.emitMessage('ch', 'three')
         expect(b).toEqual(['one', 'two'])
         t.disconnect()
       })
@@ -273,15 +330,20 @@ export function runAdapterConformance(harness: ConformanceHarness): void {
         const unsub = t.subscribe('ch', (data) => got.push(data))
 
         // (a) Subscribed + connected → delivered.
-        harness.emitMessage('ch', 'before')
+        await harness.emitMessage('ch', 'before')
         expect(got).toEqual(['before'])
 
         // (b) NEGATIVE PHASE — this is what gives the check teeth. After a
         // disconnect the provider drops the subscription, so a message is NOT
         // delivered until the transport re-subscribes. If delivery did not stop
-        // here, phase (c) would prove nothing.
-        simulateDisconnect()
-        harness.emitMessage('ch', 'while-disconnected')
+        // here, phase (c) would prove nothing. We await the disconnect hook and a
+        // settle point so any async teardown completes — but delivery must STILL
+        // be suspended: a re-subscribing adapter has nothing to re-subscribe to
+        // yet (it has not reconnected), and a non-re-subscribing adapter never
+        // restores it. Either way the negative assertion keeps its teeth.
+        await simulateDisconnect()
+        await flush(harness)
+        await harness.emitMessage('ch', 'while-disconnected')
         expect(
           got,
           'message emitted while disconnected must NOT be delivered (provider dropped the subscription)',
@@ -289,9 +351,15 @@ export function runAdapterConformance(harness: ConformanceHarness): void {
 
         // (c) After reconnect the adapter MUST re-subscribe its active channels
         // (deferred-subscribe contract), restoring delivery. A no-op transport
-        // that never re-subscribes fails here.
-        reconnect!()
-        harness.emitMessage('ch', 'after')
+        // that never re-subscribes fails here. We await the reconnect hook AND a
+        // settle point (default: a microtask tick) so async re-subscription that
+        // resolves on a microtask has run before we emit + assert. The teeth are
+        // unchanged: the emit still only lands if the adapter actually
+        // re-subscribed; awaiting a settle point cannot make a non-re-subscribing
+        // adapter pass, it only removes the race for a CORRECT async adapter.
+        await reconnect!()
+        await flush(harness)
+        await harness.emitMessage('ch', 'after')
         expect(
           got,
           'after reconnect the adapter must have re-subscribed, so delivery resumes',
@@ -321,7 +389,7 @@ export function runAdapterConformance(harness: ConformanceHarness): void {
             errors.push({ channel, reason, code })
           })
           t.subscribe('denied', () => {})
-          harness.simulateSubscribeError!('denied', 'forbidden', 403)
+          await harness.simulateSubscribeError!('denied', 'forbidden', 403)
           expect(errors).toEqual([
             { channel: 'denied', reason: 'forbidden', code: 403 },
           ])
@@ -390,7 +458,7 @@ export function runAdapterConformance(harness: ConformanceHarness): void {
             { connectionId: 'conn-a', data: { name: 'alice' } },
             { connectionId: 'conn-b', data: { name: 'bob' } },
           ]
-          harness.emitPresence!('room', members)
+          await harness.emitPresence!('room', members)
           expect(lists.length).toBeGreaterThan(0)
           const reported = lists[lists.length - 1] ?? []
           // Every remote member the provider delivered is reported. (The kit

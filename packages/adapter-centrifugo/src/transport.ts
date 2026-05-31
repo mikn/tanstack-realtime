@@ -408,35 +408,23 @@ export function centrifugoTransport(
       }
     }
 
-    const p = pending.get(reply.id)
-    if (!p) return
-    pending.delete(reply.id)
-
-    if (reply.error) {
-      p.reject(
-        new Error(
-          `[realtime:centrifugo] Command ${reply.id} error ${reply.error.code}: ${reply.error.message}`,
-        ),
-      )
-      return
-    }
-
-    if (reply.connect) {
-      centrifugoClientId = reply.connect.client
-      // Re-subscribe active channels as soon as the connect reply is processed,
-      // in the SAME turn the connection becomes usable. Driving re-subscription
-      // from the connect-reply handler (rather than from a later microtask in
-      // the socket 'open' continuation) closes the window between "connected"
-      // and "re-subscribed" in which a freshly-arriving publication would be
-      // dropped because the server has not yet seen our subscribe command.
-      resubscribeAll()
-    }
-
-    // Process subscribe replies — update recovery state and dispatch missed pubs.
-    if (reply.subscribe) {
+    // Process subscribe replies BEFORE the pending-map check, because the
+    // INITIAL subscribe is sent fire-and-forget via send() (not sendCmd()), so
+    // it has NO pending entry — yet its reply carries the channel's recoverable
+    // epoch/offset that server-assisted recovery depends on. Doing this after an
+    // early `if (!p) return` would silently drop recovery state for every
+    // first-time subscribe, leaving channelRecovery empty so reconnects fall
+    // back to a plain (non-recovering) subscribe. Recover re-subscribes use
+    // sendCmd() and DO have a pending entry; their reply still resolves below.
+    if (reply.subscribe && !reply.error) {
       const sub = reply.subscribe
       const channel = cmdChannels.get(reply.id)
-      cmdChannels.delete(reply.id)
+      // NOTE: we intentionally do NOT delete the cmdChannels entry here on a
+      // successful subscribe. The entry is consumed by the error branch above
+      // (a subscribe either succeeds OR errors), and is cleared wholesale on
+      // unsubscribe / disconnect / close. Each subscribe uses a fresh command
+      // id, so entries do not collide and stay bounded by the active-channel
+      // count for the connection's lifetime.
 
       if (channel && !channel.startsWith(presencePrefix)) {
         // Update recovery position if the channel is recoverable.
@@ -459,6 +447,30 @@ export function centrifugoTransport(
           dispatchPublications(channel, sub.publications)
         }
       }
+    }
+
+    const p = pending.get(reply.id)
+    if (!p) return
+    pending.delete(reply.id)
+
+    if (reply.error) {
+      p.reject(
+        new Error(
+          `[realtime:centrifugo] Command ${reply.id} error ${reply.error.code}: ${reply.error.message}`,
+        ),
+      )
+      return
+    }
+
+    if (reply.connect) {
+      centrifugoClientId = reply.connect.client
+      // Re-subscribe active channels as soon as the connect reply is processed,
+      // in the SAME turn the connection becomes usable. Driving re-subscription
+      // from the connect-reply handler (rather than from a later microtask in
+      // the socket 'open' continuation) closes the window between "connected"
+      // and "re-subscribed" in which a freshly-arriving publication would be
+      // dropped because the server has not yet seen our subscribe command.
+      resubscribeAll()
     }
 
     p.resolve(reply)

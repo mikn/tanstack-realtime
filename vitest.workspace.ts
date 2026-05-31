@@ -67,6 +67,7 @@ export default defineWorkspace([
       include: [
         'packages/__tests__/stream.test.ts',
         'packages/__tests__/centrifugo.test.ts',
+        'packages/__tests__/centrifugoRecovery.test.ts',
         'packages/__tests__/centrifugoConformance.test.ts',
         'packages/__tests__/pusherConformance.test.ts',
         'packages/__tests__/partykitConformance.test.ts',
