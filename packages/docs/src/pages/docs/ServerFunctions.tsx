@@ -38,15 +38,26 @@ export function ServerFunctions() {
 
       <h2 id="server-setup">1. Server setup</h2>
       <p>
-        Create the realtime handler with <code>createStartHandler</code> from
-        the TanStack Start preset and mount it on an API route.
+        Two packages cooperate on the server.{' '}
+        <code>@realtimejs/preset-start</code> owns the transport &mdash; the SSE
+        handler, <code>publish</code>, and auth. For the auto-reactive{' '}
+        <code>realtime.query()</code> / <code>realtime.mutation()</code> layer
+        below you also compose <code>@realtimejs/reactive-drizzle</code>, the
+        Drizzle/Postgres engine. Create both, wire them together, and re-export
+        a single <code>realtime</code> object the rest of the app imports.
       </p>
       <CodeBlock
         title="app/server/realtime.ts"
         code={`import { createStartHandler } from '@realtimejs/preset-start'
+import { createReactiveQueries } from '@realtimejs/reactive-drizzle'
 import { getSession } from './auth'
 
-export const realtime = createStartHandler({
+// 1. Create the reactive engine first — the handler needs its onChannelEmpty.
+const reactive = createReactiveQueries()
+
+// 2. Create the transport handler (auth optional — add it any time).
+const handler = createStartHandler({
+  onChannelEmpty: reactive.onChannelEmpty,
   getUser: async (req) => {
     const session = await getSession(req)
     return session ? { userId: session.userId } : null
@@ -56,8 +67,36 @@ export const realtime = createStartHandler({
     publish: !!userId,  // clients publish mutation results back to the channel
     presence: true,
   }),
-})`}
+})
+
+// 3. Wire the handler's publish back into the engine so invalidations fan out.
+reactive.bindPublish(handler.publish)
+
+// 4. Re-export one object — \`realtime.handle\` for the route,
+//    \`realtime.query\`/\`realtime.mutation\` for your server functions.
+export const realtime = {
+  handle: handler.handle,
+  publish: handler.publish,
+  query: reactive.query,
+  mutation: reactive.mutation,
+}`}
       />
+      <div className="doc-callout">
+        <p>
+          <strong>
+            <code>query</code>/<code>mutation</code> are not on the handler.
+          </strong>{' '}
+          <code>createStartHandler</code> returns{' '}
+          <code>{'{ handle, publish, createStream, dispose }'}</code> &mdash;
+          the reactive wrappers come from <code>createReactiveQueries()</code>.
+          The composed <code>realtime</code> object above is the only thing the
+          rest of the app sees. If your stack isn&rsquo;t Drizzle/Postgres, skip{' '}
+          <code>@realtimejs/reactive-drizzle</code> and use the REST collection
+          pattern (steps 3&ndash;6) instead. See{' '}
+          <a href="#/docs/getting-started">Getting Started</a> for the same
+          wiring.
+        </p>
+      </div>
       <CodeBlock
         title="app/routes/api/realtime.ts"
         code={`import { createAPIFileRoute } from '@tanstack/start/api'
@@ -324,6 +363,7 @@ export const updateTodo = createServerFn({ method: 'POST' })
       <CodeBlock
         title="app/server/realtime.ts (Redis backend)"
         code={`import { createStartHandler, type PublishBackend } from '@realtimejs/preset-start'
+import { createReactiveQueries } from '@realtimejs/reactive-drizzle'
 import Redis from 'ioredis'
 
 const pub = new Redis(process.env.REDIS_URL!)
@@ -343,8 +383,22 @@ const backend: PublishBackend = {
   },
 }
 
-export const realtime = createStartHandler({ backend, getUser, authorize })
-export const realtimePublish = realtime.publish`}
+// Same composition as above — the only change is the \`backend\` option.
+const reactive = createReactiveQueries()
+const handler = createStartHandler({
+  backend,
+  getUser,
+  authorize,
+  onChannelEmpty: reactive.onChannelEmpty,
+})
+reactive.bindPublish(handler.publish)
+
+export const realtime = {
+  handle: handler.handle,
+  publish: handler.publish,
+  query: reactive.query,
+  mutation: reactive.mutation,
+}`}
       />
       <p>
         No changes needed in the server functions or the collection — the

@@ -39,8 +39,29 @@ export function ReactiveQueries() {
       </div>
 
       <h2 id="server-setup">Server — realtime.query()</h2>
+      <div className="doc-callout">
+        <p>
+          <strong>
+            Where does <code>realtime.query</code> come from?
+          </strong>{' '}
+          It is <em>not</em> a method on the transport handler.{' '}
+          <code>createStartHandler</code> (from{' '}
+          <code>@realtimejs/preset-start</code>) returns{' '}
+          <code>{'{ handle, publish, createStream, dispose }'}</code> &mdash;
+          the reactive <code>query</code>/<code>mutation</code> wrappers come
+          from <code>createReactiveQueries()</code> in{' '}
+          <code>@realtimejs/reactive-drizzle</code> (the Drizzle/Postgres
+          engine, the one reactive engine that ships today). You compose the two
+          once and re-export a single <code>realtime</code> object. See{' '}
+          <a href="#/docs/server-functions">TanStack Start + Drizzle</a> and{' '}
+          <a href="#/docs/getting-started">Getting Started</a> for the exact
+          wiring. If your stack isn&rsquo;t Drizzle/Postgres, use the
+          vendor-neutral <a href="#/docs/collections">collection</a> /{' '}
+          <a href="#/docs/channels">channel</a> primitives instead.
+        </p>
+      </div>
       <p>
-        Import the <code>realtime</code> handler created in your server setup
+        Import the composed <code>realtime</code> object from your server setup
         and wrap your query function. The wrapped function is callable on both
         server and client.
       </p>

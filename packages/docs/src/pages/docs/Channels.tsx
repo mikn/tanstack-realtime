@@ -275,15 +275,13 @@ function ChatRoom({ roomId }: { roomId: string }) {
       <CodeBlock
         title="server/realtime.ts"
         code={`import { createValidatedPublish } from '@realtimejs/core'
-import { sseHandler } from './realtime.server'
+import { realtime } from './realtime'
 import { todoSchema } from '../shared/schemas'
 
+// \`realtime.publish\` is the transport-agnostic PublishFn from
+// createStartHandler — see TanStack Start + Drizzle for the composition.
 const validatedPublish = createValidatedPublish({
-  publish: (channel, data) => {
-    const ch = typeof channel === 'string' ? channel : serializeKey(channel)
-    sseHandler.broadcast(ch, data)
-    return Promise.resolve()
-  },
+  publish: realtime.publish,
 
   validate: async ({ channel, data }) => {
     if (channel.namespace === 'todos') {
@@ -304,20 +302,23 @@ const validatedPublish = createValidatedPublish({
       </p>
       <CodeBlock
         title="server/functions/todos.ts"
-        code={`import { validatedPublish } from '../realtime'
+        code={`import { createServerFn } from '@tanstack/start'
+import { validatedPublish } from '../realtime'
 
-export const updateTodo = createServerFn()(async ({ id, data }) => {
-  const updated = await db.todos.update(id, data)
+export const updateTodo = createServerFn({ method: 'POST' }).handler(
+  async ({ data }: { data: { id: string; projectId: string; title: string } }) => {
+    const updated = await db.todos.update(data.id, data)
 
-  // Publishes only if validation passes.
-  // Throws PublishValidationError on rejection.
-  await validatedPublish(['todos', { projectId }], {
-    action: 'update',
-    data: updated,
-  })
+    // Publishes only if validation passes.
+    // Throws PublishValidationError on rejection.
+    await validatedPublish(['todos', { projectId: data.projectId }], {
+      action: 'update',
+      data: updated,
+    })
 
-  return updated
-})`}
+    return updated
+  },
+)`}
       />
       <div className="doc-callout">
         <p>
@@ -344,8 +345,26 @@ export const updateTodo = createServerFn()(async ({ id, data }) => {
         </p>
       </div>
 
+      <div className="doc-callout">
+        <p>
+          <strong>Tracking who is connected?</strong> Pub/sub channels are
+          fire-and-forget &mdash; they don&rsquo;t track membership. For online
+          users, shared cursors, and typing presence use{' '}
+          <a href="#/docs/presence">
+            <code>usePresence</code>
+          </a>{' '}
+          instead, which needs a presence-capable transport (Centrifugo, Pusher,
+          PartyKit). Raw <code>useSubscribe</code>/<code>usePublish</code> work
+          on any transport, including receive-only SSE.
+        </p>
+      </div>
+
       <h2 id="recipes">Recipes</h2>
       <ul>
+        <li>
+          <a href="#/docs/presence">Presence</a> &mdash; online users, shared
+          cursors, and typing indicators on a presence-capable transport
+        </li>
         <li>
           <a href="#/docs/read-receipts">Read Receipts</a> &mdash; track which
           messages each user has seen using a per-user high-water mark

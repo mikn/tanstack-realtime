@@ -188,6 +188,45 @@ function AIResponse({ requestId }: { requestId: string }) {
       />
 
       <h2 id="server-side">Server-side streaming</h2>
+      <p>
+        On the server, push events onto the channel the client subscribes to.
+        The TanStack Start preset exposes <code>realtime.createStream()</code>{' '}
+        (from <code>createStartHandler</code>) which wraps{' '}
+        <code>createServerStream</code> and uses the handler&rsquo;s{' '}
+        <code>publish</code> &mdash; so the same call works across multiple
+        server processes when a <code>PublishBackend</code> is configured. See{' '}
+        <a href="#/docs/server-functions">TanStack Start + Drizzle</a> for the{' '}
+        <code>realtime</code> composition.
+      </p>
+      <CodeBlock
+        title="app/server/functions/chat.ts"
+        code={`import { createServerFn } from '@tanstack/start'
+import { realtime } from '../realtime'
+
+export const askAI = createServerFn({ method: 'POST' }).handler(
+  async ({ data }: { data: { requestId: string; prompt: string } }) => {
+    const stream = realtime.createStream({
+      channel: ['ai', { requestId: data.requestId }],
+    })
+
+    try {
+      for await (const chunk of openai.stream(data.prompt)) {
+        await stream.push({ type: 'token', token: chunk.text })
+      }
+      await stream.done()
+    } catch (err) {
+      await stream.error(String(err))
+    }
+  },
+)`}
+      />
+      <p>
+        Outside TanStack Start, build the stream directly with{' '}
+        <code>createServerStream</code> from <code>@realtimejs/core</code> and
+        pass any <code>PublishFn</code> &mdash; for the SSE adapter that is{' '}
+        <code>sseHandler.broadcast</code>. This variant also takes an optional{' '}
+        <code>hmacKey</code> and server-side <code>checkpoint</code> config:
+      </p>
       <CodeBlock
         title="server/routes/chat.ts"
         code={`import { createServerStream } from '@realtimejs/core'
@@ -350,6 +389,23 @@ const stream = createServerStream({
           checkpoints every 50th event.
         </p>
       </div>
+
+      <h2 id="see-also">See also</h2>
+      <ul>
+        <li>
+          <a href="#/docs/channels">Channels &amp; Pub/Sub</a> &mdash; the raw{' '}
+          <code>subscribe</code>/<code>publish</code> layer streams are built on
+        </li>
+        <li>
+          <a href="#/docs/server-functions">TanStack Start + Drizzle</a> &mdash;
+          the <code>realtime.createStream()</code> composition and server wiring
+        </li>
+        <li>
+          <a href="#/docs/server-hooks">Server Lifecycle Hooks</a> &mdash;{' '}
+          <code>onFirstSubscriber</code> / <code>onChannelEmpty</code> for
+          starting and stopping producers
+        </li>
+      </ul>
     </article>
   )
 }
