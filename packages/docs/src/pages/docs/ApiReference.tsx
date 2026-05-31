@@ -1332,7 +1332,7 @@ export function ApiReference() {
             <td>
               <code>
                 (channel: QueryKey | string, onMessage: (data: unknown) =&gt;
-                void) =&gt; void
+                void) =&gt; {'{'} subscribeError: SubscribeError | null {'}'}
               </code>
             </td>
             <td>

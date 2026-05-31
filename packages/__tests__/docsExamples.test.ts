@@ -1,5 +1,5 @@
 /**
- * High-fidelity tests for every documented pattern on the TanStack Realtime
+ * High-fidelity tests for every documented pattern on the realtime.js
  * marketing site (packages/docs/src/App.tsx).
  *
  * Each describe block maps to a section of the documentation and verifies the

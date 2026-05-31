@@ -45,7 +45,7 @@ import type {
 // ---------------------------------------------------------------------------
 
 export interface BroadcastChannelTransportOptions {
-  /** BroadcastChannel name shared across tabs. @default 'tanstack-realtime' */
+  /** BroadcastChannel name shared across tabs. @default 'realtimejs' */
   name?: string
   /** Leader heartbeat interval in ms. @default 2000 */
   heartbeatMs?: number
@@ -161,7 +161,7 @@ export function createBroadcastChannelTransport(
   options: BroadcastChannelTransportOptions = {},
 ): RealtimeTransport & PresenceCapable {
   const {
-    name = 'tanstack-realtime',
+    name = 'realtimejs',
     heartbeatMs = 2000,
     leaderTimeoutMs = 6000,
     publishTimeout = 10_000,

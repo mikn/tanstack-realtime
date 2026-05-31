@@ -738,7 +738,7 @@ export const realtimePublish = createValidatedPublish({
           </tr>
           <tr>
             <td>
-              <code>handler.broadcast(channel, data)</code>
+              <code>sseHandler.broadcast(channel, data)</code>
             </td>
             <td>
               <code>@realtimejs/adapter-sse</code>
@@ -750,7 +750,7 @@ export const realtimePublish = createValidatedPublish({
           </tr>
           <tr>
             <td>
-              <code>handler.connectionCount()</code>
+              <code>sseHandler.connectionCount()</code>
             </td>
             <td>
               <code>@realtimejs/adapter-sse</code>

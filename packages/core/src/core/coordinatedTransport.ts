@@ -79,7 +79,7 @@ export interface CoordinatedTransportOptions {
   /**
    * BroadcastChannel name used for tab coordination.
    * Only relevant when BroadcastChannel is the selected strategy.
-   * @default 'tanstack-realtime'
+   * @default 'realtimejs'
    */
   channelName?: string
 
