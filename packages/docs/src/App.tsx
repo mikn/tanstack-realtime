@@ -32,7 +32,7 @@ import { VueComposables } from './pages/docs/VueComposables'
 import { Devtools } from './pages/docs/Devtools'
 import { Examples } from './pages/docs/Examples'
 import { Tutorial } from './pages/docs/Tutorial'
-import { WhyTanstackRealtime } from './pages/docs/WhyTanstackRealtime'
+import { Why } from './pages/docs/Why'
 
 // ---------------------------------------------------------------------------
 // Simple hash router
@@ -77,7 +77,7 @@ const docRoutes: Partial<Record<string, () => React.JSX.Element>> = {
   '#/docs/testing': Testing,
   '#/docs/choosing-a-pattern': ChoosingAPattern,
   '#/docs/tutorial': Tutorial,
-  '#/docs/why': WhyTanstackRealtime,
+  '#/docs/why': Why,
   '#/docs/solid-primitives': SolidPrimitives,
   '#/docs/vue-composables': VueComposables,
   '#/docs/devtools': Devtools,

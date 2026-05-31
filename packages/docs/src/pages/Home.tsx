@@ -81,18 +81,23 @@ const { data: active } = useLiveQuery(
     },
     {
       title: 'Presence',
-      desc: 'Who is online, cursor positions, typing indicators. Same transport connection.',
+      desc: 'Who is online, cursor positions, typing indicators. Needs a presence-capable transport (Centrifugo, Pusher, PartyKit).',
       code: `const { others } = usePresence(roomPresence, {
-  initialData: { cursor: { x: 0, y: 0 }, name },
+  params: { roomId },
+  initial: { cursor: { x: 0, y: 0 }, name },
 })`,
     },
     {
       title: 'Streaming',
       desc: 'Reduce-based state from ordered event streams. Resumable with HMAC checkpoints.',
-      code: `const { state, status } = useStream(aiStream, {
-  initial: '',
-  reduce: (text, token) => text + token,
-})`,
+      code: `const aiStream = createStreamChannel({
+  id: 'ai',
+  channel: (p: { requestId: string }) => ['ai', p],
+  initial: { content: '' },
+  reduce: (s, e: { token?: string }) => ({ content: s.content + (e.token ?? '') }),
+})
+
+const { state, status } = useStream(aiStream, { params: { requestId } })`,
     },
   ]
 
@@ -294,7 +299,7 @@ function Features() {
       features: [
         {
           title: 'Transport-agnostic',
-          desc: 'SSE or Centrifugo (WebSocket). Swap transports without changing application code.',
+          desc: 'SSE, Centrifugo, Pusher/Soketi, or PartyKit. Swap transports without changing application code.',
         },
         {
           title: 'Type-safe end to end',
@@ -333,6 +338,57 @@ function Features() {
             </div>
           </div>
         ))}
+      </div>
+    </section>
+  )
+}
+
+function Transports() {
+  const transports = [
+    {
+      title: 'SSE',
+      tag: 'Serverless-friendly',
+      desc: 'Receive-only HTTP. Works behind every proxy and CDN, runs on edge and serverless. The TanStack Start preset uses it under the hood. No presence — pair it with a provider for that.',
+    },
+    {
+      title: 'Centrifugo',
+      tag: 'Self-hosted scale',
+      desc: 'WebSocket server you run. Bidirectional, with presence and gap replay built in. Scales across nodes natively.',
+    },
+    {
+      title: 'Pusher / Soketi',
+      tag: 'Managed or self-hosted',
+      desc: 'Hosted Pusher with zero servers, or self-host Soketi (Pusher-protocol compatible). Presence via presence channels.',
+    },
+    {
+      title: 'PartyKit',
+      tag: 'Edge / Durable Objects',
+      desc: 'Cloudflare Durable Objects at the edge. Bidirectional with presence; you deploy a small PartyKit server.',
+    },
+  ]
+  return (
+    <section id="transports" className="section">
+      <div className="container">
+        <h2>Bring your own transport</h2>
+        <p className="section-sub">
+          Four adapters ship today. Application code never references the
+          transport &mdash; swap one import and your collections, hooks, and
+          channels keep working. SSE handles the connection; for presence and
+          multi-instance fan-out, reach for a provider or add a{' '}
+          <code>PublishBackend</code>. See the{' '}
+          <a href="#/docs/transports">capability matrix</a> for the honest
+          per-provider breakdown.
+        </p>
+        <div className="features-grid">
+          {transports.map((t) => (
+            <div key={t.title} className="feature-card">
+              <h3>{t.title}</h3>
+              <p>
+                <strong>{t.tag}.</strong> {t.desc}
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   )
@@ -458,6 +514,51 @@ function Ecosystem() {
   )
 }
 
+function RunnableExamples() {
+  const examples = [
+    {
+      title: 'Collaborative todos',
+      desc: 'Live collections plus field-level CRDTs — concurrent edits merge with no conflicts.',
+      href: 'https://github.com/mikn/tanstack-realtime/tree/main/examples/collaborative-todos',
+    },
+    {
+      title: 'Chat',
+      desc: 'Channels and pub/sub — append-only live channels with history and typing indicators.',
+      href: 'https://github.com/mikn/tanstack-realtime/tree/main/examples/chat',
+    },
+    {
+      title: 'AI streaming',
+      desc: 'Reduce-based streaming state — ordered, resumable token streams to the client.',
+      href: 'https://github.com/mikn/tanstack-realtime/tree/main/examples/ai-streaming',
+    },
+  ]
+  return (
+    <section id="examples" className="section">
+      <div className="container">
+        <h2>Runnable examples</h2>
+        <p className="section-sub">
+          Full apps you can clone and run. Each one shows a different slice of
+          the library.
+        </p>
+        <div className="ecosystem-grid">
+          {examples.map((ex) => (
+            <a
+              key={ex.title}
+              className="eco-card"
+              href={ex.href}
+              target="_blank"
+              rel="noopener"
+            >
+              <h3>{ex.title}</h3>
+              <p>{ex.desc}</p>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function Community() {
   return (
     <section className="section">
@@ -558,8 +659,10 @@ export function Home() {
       <Spectrum />
       <Positioning />
       <Features />
+      <Transports />
       <QuickStart />
       <Ecosystem />
+      <RunnableExamples />
       <Community />
       <Footer />
     </>

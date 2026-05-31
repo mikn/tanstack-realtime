@@ -21,32 +21,78 @@ export function GettingStarted() {
       </div>
 
       <h2 id="installation">Installation</h2>
+      <p>
+        Three pieces: the framework package (<code>@realtimejs/react</code>,{' '}
+        which re-exports <code>@realtimejs/core</code>), a transport adapter,
+        and — for this guide&rsquo;s auto-reactive server queries — the server
+        preset plus the Drizzle engine. The meta package{' '}
+        <code>realtime.js</code> is also published if you prefer a single
+        dependency.
+      </p>
       <FrameworkTabs
         react={{
-          code: `npm i @realtimejs/core @realtimejs/react \\
-      @realtimejs/preset-start @realtimejs/adapter-sse`,
+          code: `npm i @realtimejs/core @realtimejs/react @realtimejs/adapter-sse \\
+      @realtimejs/preset-start @realtimejs/reactive-drizzle`,
         }}
         solid={{
-          code: `npm i @realtimejs/core @realtimejs/solid \\
-      @realtimejs/preset-start @realtimejs/adapter-sse`,
+          code: `npm i @realtimejs/core @realtimejs/solid @realtimejs/adapter-sse \\
+      @realtimejs/preset-start @realtimejs/reactive-drizzle`,
         }}
         vue={{
-          code: `npm i @realtimejs/core @realtimejs/vue \\
-      @realtimejs/preset-start @realtimejs/adapter-sse`,
+          code: `npm i @realtimejs/core @realtimejs/vue @realtimejs/adapter-sse \\
+      @realtimejs/preset-start @realtimejs/reactive-drizzle`,
         }}
       />
+      <div className="doc-callout">
+        <p>
+          <strong>Why two server packages?</strong>{' '}
+          <code>@realtimejs/preset-start</code> owns the transport (the SSE
+          handler, <code>publish</code>, auth). The auto-reactive query layer
+          behind <code>realtime.query()</code> /{' '}
+          <code>realtime.mutation()</code> ships{' '}
+          <strong>one engine today</strong> &mdash;{' '}
+          <code>@realtimejs/reactive-drizzle</code> (Drizzle ORM + Postgres). If
+          your stack isn&rsquo;t Drizzle/Postgres, skip it and use the
+          vendor-neutral primitives below (<code>useRealtimeCollection</code>,
+          channels, presence) on any backend &mdash; see{' '}
+          <a href="#/docs/why">Why realtime.js</a> for the full capability
+          breakdown.
+        </p>
+      </div>
 
       <h2 id="server-setup">Server setup</h2>
       <p>
-        Create a realtime handler. This is the server-side entry point that
-        manages SSE connections and coordinates live updates.
+        Two packages cooperate here. <code>@realtimejs/preset-start</code> owns
+        the transport (SSE connections, <code>publish</code>, auth).{' '}
+        <code>@realtimejs/reactive-drizzle</code> owns reactivity (the{' '}
+        <code>query</code>/<code>mutation</code> wrappers that derive channels
+        and auto-invalidate). Compose them once and re-export a single{' '}
+        <code>realtime</code> object that the rest of the app imports.
       </p>
       <CodeBlock
         title="app/server/realtime.ts"
         code={`import { createStartHandler } from '@realtimejs/preset-start'
+import { createReactiveQueries } from '@realtimejs/reactive-drizzle'
 
-// Minimal setup — no auth required to get started
-export const realtime = createStartHandler({})`}
+// 1. Create the reactive engine first — the handler needs its onChannelEmpty.
+const reactive = createReactiveQueries()
+
+// 2. Create the transport handler (no auth required to get started).
+const handler = createStartHandler({
+  onChannelEmpty: reactive.onChannelEmpty,
+})
+
+// 3. Wire the handler's publish back into the engine so invalidations fan out.
+reactive.bindPublish(handler.publish)
+
+// 4. Re-export one object — \`realtime.handle\` for the route,
+//    \`realtime.query\`/\`realtime.mutation\` for your server functions.
+export const realtime = {
+  handle: handler.handle,
+  publish: handler.publish,
+  query: reactive.query,
+  mutation: reactive.mutation,
+}`}
       />
       <div className="doc-callout">
         <p>

@@ -1,6 +1,6 @@
 import { CodeBlock } from '../../components/CodeBlock'
 
-export function WhyTanstackRealtime() {
+export function Why() {
   return (
     <article className="doc-article">
       <h1>Why realtime.js</h1>
@@ -257,6 +257,14 @@ transport: centrifugoTransport({ url: 'wss://rt.example.com/connection/websocket
         <li>
           <a href="#/docs/choosing-a-pattern">Choosing a Pattern</a> &mdash;
           which hooks to use
+        </li>
+        <li>
+          <a href="#/docs/transports">Transports</a> &mdash; the per-provider
+          capability matrix and the serverless-vs-fan-out architecture
+        </li>
+        <li>
+          <a href="#/docs/examples">Examples</a> &mdash; runnable apps:
+          collaborative todos (CRDTs), chat (channels), and AI streaming
         </li>
       </ul>
     </article>

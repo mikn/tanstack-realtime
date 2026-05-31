@@ -57,7 +57,7 @@ const sections = [
 ]
 
 const pageMap: Record<string, string> = {
-  '#/docs/why': 'WhyTanstackRealtime.tsx',
+  '#/docs/why': 'Why.tsx',
   '#/docs/getting-started': 'GettingStarted.tsx',
   '#/docs/tutorial': 'Tutorial.tsx',
   '#/docs/collections': 'Collections.tsx',
