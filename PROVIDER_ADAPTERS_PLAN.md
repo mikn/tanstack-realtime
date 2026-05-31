@@ -17,10 +17,13 @@ Final gate state: lint 0 errors, typecheck 0, **1053 tests pass / 3 skip**, buil
 
 Outcome: "commoditise most WS providers" is now backed by **three conformant adapters across three infra models** (self-host WS / managed SaaS+self-host / edge-DO) plus the conformance kit that guarantees future adapters behave the same — and the kit already earned its keep by catching real reconnect bugs in two adapters.
 
-### Deferred follow-ups (logged, non-blocking)
+### Deferred follow-ups — RESOLVED ✅
 
-- A behavioral gap-replay test for Centrifugo's `serverAssistedRecovery` (currently verified by inspection + declaration, not a recoverable-channel test).
-- The conformance harness's synchronous interleaving is correct but fragile (documented).
+- ✅ **Centrifugo `serverAssistedRecovery` behavioral test (R2, `a1a5e8e`).** Added a recoverable-channel gap-replay test — which **caught that recovery was effectively dead end-to-end** (recovery state was dropped for fire-and-forget initial subscribes, so reconnects fell back to non-recovering subscribes). Fixed in `handleReply`; now proven with ordered/once/no-gap replay across two reconnect cycles. Follow-up leak from the fix (`cmdChannels`) closed in `a6f0ff6`.
+- ✅ **Conformance harness fragility (R2, `a1a5e8e`).** Kit hardened to await async reconnect handshakes (awaitable hooks + `flush`) with the three-phase teeth proven intact.
+- ✅ **Reactive query channel collision (R1, `3bd31fe`/`7cecbf5`).** Channels now carry a 64-bit full-SQL discriminator so distinct result-sets never share a channel; client is a `Set<cacheKey>` fan-out; `matches`-path collision + bigint-param crash also closed.
+
+All resolved via the TPM + 3-agent relay; final suite **1074 pass / 3 skip**, build 19 projects, lint/typecheck/knip/size green.
 
 > Goal: make the central claim true. We don't host the socket — we normalize
 > whoever does. Deliverable is a provider-adapter LAYER (contract + conformance
