@@ -25,8 +25,9 @@ export function Tutorial() {
         code={`npx create-start-app@latest task-board
 cd task-board
 
-npm i @tanstack/realtime @tanstack/react-realtime \\
-      @tanstack/realtime-preset-start @tanstack/realtime-adapter-sse \\
+npm i @realtimejs/core @realtimejs/react \\
+      @realtimejs/preset-start @realtimejs/adapter-sse \\
+      @realtimejs/reactive-drizzle \\
       @tanstack/db @tanstack/react-db \\
       drizzle-orm postgres
 npm i -D drizzle-kit`}
@@ -71,14 +72,31 @@ export const db = drizzle(client)`}
         Two files: a handler and a route. This is all the server infrastructure
         you need.
       </p>
+      <p>
+        <code>@realtimejs/preset-start</code> owns the SSE transport;{' '}
+        <code>@realtimejs/reactive-drizzle</code> owns the auto-invalidating{' '}
+        <code>query</code>/<code>mutation</code> wrappers. Compose them and
+        re-export one <code>realtime</code> object.
+      </p>
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
+import { createReactiveQueries } from '@realtimejs/reactive-drizzle'
 
-export const realtime = createStartHandler({})
+const reactive = createReactiveQueries()
+const handler = createStartHandler({
+  onChannelEmpty: reactive.onChannelEmpty,
+})
+reactive.bindPublish(handler.publish)
 
-// That's it. Add getUser/authorize later for auth.
-// See: https://tanstack.com/realtime/docs/authentication`}
+// One object for the whole app. Add getUser/authorize to createStartHandler
+// later for auth — see the Authentication guide.
+export const realtime = {
+  handle: handler.handle,
+  publish: handler.publish,
+  query: reactive.query,
+  mutation: reactive.mutation,
+}`}
       />
       <CodeBlock
         title="app/routes/api/realtime.ts"
@@ -141,8 +159,8 @@ export const deleteTask = realtime.mutation(
       <p>Create a realtime client and wrap your app with the provider.</p>
       <CodeBlock
         title="app/client/realtime.ts"
-        code={`import { createRealtimeClient } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+        code={`import { createRealtimeClient } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
 export const realtimeClient = createRealtimeClient({
   transport: sseTransport({ url: '/api/realtime' }),
@@ -150,7 +168,7 @@ export const realtimeClient = createRealtimeClient({
       />
       <CodeBlock
         title="app/root.tsx"
-        code={`import { RealtimeProvider } from '@tanstack/react-realtime'
+        code={`import { RealtimeProvider } from '@realtimejs/react'
 import { realtimeClient } from './client/realtime'
 
 export function App() {
@@ -170,7 +188,7 @@ export function App() {
       </p>
       <CodeBlock
         title="app/features/board/TaskBoard.tsx"
-        code={`import { useQuery, useMutation } from '@tanstack/react-realtime'
+        code={`import { useQuery, useMutation } from '@realtimejs/react'
 import { useLiveQuery } from '@tanstack/react-db'
 import { getTasks, createTask, updateTask } from '../../server/tasks'
 
@@ -212,35 +230,54 @@ export function TaskBoard({ projectId }: { projectId: string }) {
       />
 
       <h2 id="step-7">Step 7: Add presence</h2>
+      <div className="doc-callout">
+        <p>
+          <strong>Presence needs a presence-capable transport.</strong> Presence
+          tracks server-held membership state, so it requires a bidirectional
+          transport &mdash; Centrifugo, Pusher/Soketi, or PartyKit. The
+          receive-only <code>sseTransport</code> from the previous steps reports{' '}
+          <code>capabilities.presence = false</code>, and{' '}
+          <code>usePresence</code> will throw against it. Swap the
+          client&rsquo;s transport for a presence-capable one (your queries,
+          mutations, and channels keep working unchanged) before adding this
+          step. See the{' '}
+          <a href="#/docs/transports">Transports capability matrix</a> and the{' '}
+          <a href="#/docs/centrifugo">Centrifugo guide</a>.
+        </p>
+      </div>
       <p>
-        Show who&rsquo;s viewing the board right now. This uses the same SSE
-        connection &mdash; no additional infrastructure.
+        Define a presence channel, then read it with <code>usePresence</code>.
+        The current user joins with <code>initial</code> data on mount and is
+        excluded from <code>others</code>.
       </p>
       <CodeBlock
-        title="app/features/board/OnlineUsers.tsx"
-        code={`import { usePresence } from '@tanstack/react-realtime'
-import { presenceChannelOptions } from '@tanstack/realtime'
-import { realtimeClient } from '../../client/realtime'
+        title="app/features/board/presence.ts"
+        code={`import { createPresenceChannel } from '@realtimejs/core'
 
-const boardPresence = (projectId: string) =>
-  presenceChannelOptions({
-    client: realtimeClient,
-    channel: ['board-presence', { projectId }],
-  })
+export const boardPresence = createPresenceChannel({
+  id: 'board-presence',
+  channel: (params: { projectId: string }) => ['board-presence', params],
+})`}
+      />
+      <CodeBlock
+        title="app/features/board/OnlineUsers.tsx"
+        code={`import { usePresence } from '@realtimejs/react'
+import { boardPresence } from './presence'
 
 export function OnlineUsers({ projectId, userName }: {
   projectId: string
   userName: string
 }) {
-  const { others } = usePresence(boardPresence(projectId), {
-    initialData: { name: userName },
+  const { others } = usePresence<{ name: string }>(boardPresence, {
+    params: { projectId },
+    initial: { name: userName },
   })
 
   return (
     <div className="online-users">
       <span className="you">You</span>
       {others.map(user => (
-        <span key={user.clientId} className="user-badge">
+        <span key={user.connectionId} className="user-badge">
           {user.data.name}
         </span>
       ))}
@@ -254,8 +291,9 @@ export function OnlineUsers({ projectId, userName }: {
       <p>
         Open <code>http://localhost:3000</code> in two browser tabs. Add a task
         in one &mdash; it appears instantly in the other. Move a task to
-        &ldquo;Done&rdquo; &mdash; both tabs update. The presence indicator
-        shows both tabs as online users.
+        &ldquo;Done&rdquo; &mdash; both tabs update. If you wired up a
+        presence-capable transport in Step 7, the presence indicator shows both
+        tabs as online users.
       </p>
 
       <h2 id="next-level">Next steps</h2>

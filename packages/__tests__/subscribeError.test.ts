@@ -18,8 +18,8 @@ import {
   createRealtimeClient,
   liveChannelOptions,
   realtimeCollectionOptions,
-} from '@tanstack/realtime'
-import type { ConnectionStatus, RealtimeTransport } from '@tanstack/realtime'
+} from '@realtimejs/core'
+import type { ConnectionStatus, RealtimeTransport } from '@realtimejs/core'
 import type { CollectionConfig } from '@tanstack/db'
 
 // ---------------------------------------------------------------------------

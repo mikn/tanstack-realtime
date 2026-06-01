@@ -3,7 +3,7 @@
  * SyncedPanel — exercises useSyncedCounter and useSyncedSet.
  * Patterns: PN-Counter CRDT and OR-Set CRDT.
  */
-import { useSyncedCounter, useSyncedSet } from '@tanstack/vue-realtime'
+import { useSyncedCounter, useSyncedSet } from '@realtimejs/vue'
 import { sharedCounter, sharedSet } from '../defs.js'
 
 const {

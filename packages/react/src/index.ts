@@ -1,0 +1,97 @@
+/**
+ * @realtimejs/react
+ *
+ * React provider and hooks for @realtimejs/core.
+ */
+
+// Re-export everything from the framework-agnostic core so consumers only
+// need a single import: `import { createRealtimeClient, useRealtime } from '@realtimejs/react'`
+export * from '@realtimejs/core'
+
+export { RealtimeProvider } from './RealtimeProvider.js'
+export type { RealtimeProviderProps } from './RealtimeProvider.js'
+
+export { useRealtime } from './useRealtime.js'
+export type { UseRealtimeResult } from './useRealtime.js'
+
+export { useConnectionStatus } from './useConnectionStatus.js'
+
+export { usePresence } from './usePresence.js'
+export type { UsePresenceOptions, UsePresenceResult } from './usePresence.js'
+
+export { useSubscribe } from './useSubscribe.js'
+export type { UseSubscribeResult } from './useSubscribe.js'
+
+export { usePublish } from './usePublish.js'
+
+export { useChannel } from './useChannel.js'
+export type { UseChannelResult } from './useChannel.js'
+
+export { useStream } from './useStream.js'
+export type { UseStreamOptions, UseStreamResult } from './useStream.js'
+
+export { useRealtimeCollection } from './useRealtimeCollection.js'
+export type { UseRealtimeCollectionConfig } from './useRealtimeCollection.js'
+
+export { useLiveChannel } from './useLiveChannel.js'
+export type { UseLiveChannelConfig } from './useLiveChannel.js'
+
+// Testing utilities
+export {
+  createTestRealtimeProvider,
+  createTestRealtimeProviderWithPresence,
+} from './TestRealtimeProvider.js'
+export type {
+  TestRealtimeProviderProps,
+  TestRealtimeProviderResult,
+  TestRealtimeProviderWithPresenceResult,
+} from './TestRealtimeProvider.js'
+
+// Convenience hooks for common real-time UI patterns
+export { useIsConnected } from './useIsConnected.js'
+
+export { useLatestMessage } from './useLatestMessage.js'
+export type { UseLatestMessageResult } from './useLatestMessage.js'
+
+export { useChannelHistory } from './useChannelHistory.js'
+export type {
+  UseChannelHistoryOptions,
+  UseChannelHistoryResult,
+} from './useChannelHistory.js'
+
+export { useTypingIndicator } from './useTypingIndicator.js'
+export type {
+  UseTypingIndicatorOptions,
+  UseTypingIndicatorResult,
+} from './useTypingIndicator.js'
+
+export { useChannelStats } from './useChannelStats.js'
+export type { UseChannelStatsResult } from './useChannelStats.js'
+
+export { useOnReconnect } from './useOnReconnect.js'
+
+export { useQuery } from './useQuery.js'
+export type { UseQueryOptions } from './useQuery.js'
+
+export { usePaginatedQuery } from './usePaginatedQuery.js'
+export type {
+  UsePaginatedQueryOptions,
+  PaginatedPage,
+} from './usePaginatedQuery.js'
+
+export { useMutation } from './useMutation.js'
+export type { UseMutationOptions } from './useMutation.js'
+
+// CRDT standalone hooks
+export { useSyncedCounter } from './useSyncedCounter.js'
+export type {
+  UseSyncedCounterOptions,
+  UseSyncedCounterResult,
+} from './useSyncedCounter.js'
+export { useSyncedValue } from './useSyncedValue.js'
+export type {
+  UseSyncedValueOptions,
+  UseSyncedValueResult,
+} from './useSyncedValue.js'
+export { useSyncedSet } from './useSyncedSet.js'
+export type { UseSyncedSetOptions, UseSyncedSetResult } from './useSyncedSet.js'

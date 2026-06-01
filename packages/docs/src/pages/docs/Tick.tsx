@@ -14,6 +14,18 @@ export function Tick() {
         dashboards, and real-time simulations.
       </p>
 
+      <div className="doc-callout">
+        <p>
+          <strong>Specialized path.</strong> Tick batching is a niche feature
+          for the rare cases where you publish many updates per second per
+          entity. Most realtime apps never need it &mdash; reach for{' '}
+          <a href="#/docs/reactive-queries">reactive queries</a>,{' '}
+          <a href="#/docs/channels">channels</a>, or{' '}
+          <a href="#/docs/presence">presence</a> first. Use tick batching only
+          when per-event publishing is genuinely too expensive.
+        </p>
+      </div>
+
       <h2 id="how">How it works</h2>
       <p>
         <code>useTickBatching</code> registers tick-batching hooks on any
@@ -26,8 +38,8 @@ export function Tick() {
       </p>
       <CodeBlock
         title="realtime/tickSetup.ts"
-        code={`import { useTickBatching } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+        code={`import { useTickBatching } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
 const transport = sseTransport({ url: '/api/realtime' })
 
@@ -60,7 +72,7 @@ const tick = useTickBatching(transport, {
       <CodeBlock
         title="features/game/players.ts"
         code={`import { createCollection } from '@tanstack/db'
-import { tickCollectionOptions } from '@tanstack/realtime'
+import { tickCollectionOptions } from '@realtimejs/core'
 import { tick } from '../../realtime/tickSetup'
 
 interface Player {
@@ -174,8 +186,8 @@ function GameLoop({ myPlayerId }: { myPlayerId: string }) {
       </p>
       <CodeBlock
         title="features/metrics/metricsSetup.ts"
-        code={`import { useTickBatching } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+        code={`import { useTickBatching } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
 const transport = sseTransport({ url: '/api/realtime' })
 
@@ -185,7 +197,7 @@ export const metricsTick = useTickBatching(transport, { tickMs: 100 })`}
       <CodeBlock
         title="features/metrics/serverMetrics.ts"
         code={`import { createCollection } from '@tanstack/db'
-import { tickCollectionOptions } from '@tanstack/realtime'
+import { tickCollectionOptions } from '@realtimejs/core'
 import { metricsTick } from './metricsSetup'
 
 interface ServerMetric {

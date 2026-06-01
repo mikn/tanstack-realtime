@@ -5,7 +5,7 @@
  * Re-announces presence every 2 s so late-joining peers can discover us.
  */
 import { For, Show, createEffect, onCleanup } from 'solid-js'
-import { usePresence, useSyncedValue } from '@tanstack/solid-realtime'
+import { usePresence, useSyncedValue } from '@realtimejs/solid'
 import { roomPresence, sharedValue } from '../defs.js'
 import { userId } from '../transport.js'
 

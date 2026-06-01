@@ -1,5 +1,5 @@
 /**
- * World-class multi-user integration scenarios for @tanstack/realtime.
+ * World-class multi-user integration scenarios for @realtimejs/core.
  *
  * Call registerScenarios() from a Playwright spec file.  The baseURL is
  * injected by the project configuration so the same 23 scenarios run against

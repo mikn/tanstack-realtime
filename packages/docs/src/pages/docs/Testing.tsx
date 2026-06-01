@@ -5,299 +5,393 @@ export function Testing() {
     <article className="doc-article">
       <h1>Testing</h1>
       <p className="doc-lead">
-        Test your realtime features with a mock transport. No server or
-        WebSocket connection required.
+        realtime.js ships its testing utilities in the box. Use{' '}
+        <code>createMockTransport</code> and{' '}
+        <code>createMockPresenceTransport</code> from{' '}
+        <code>@realtimejs/core</code> to drive subscriptions, publishes, and
+        connection state synchronously &mdash; no server, socket, or fake timers
+        required.
       </p>
 
-      <h2 id="mock-transport">Create a mock transport</h2>
-      <p>
-        The simplest way to test realtime code is to build a mock that satisfies
-        the <code>RealtimeTransport</code> interface. The mock stores listeners
-        in memory and lets you fire events synchronously from your test code.
-      </p>
-      <CodeBlock
-        title="test/mock-transport.ts"
-        code={`import { Store } from '@tanstack/store'
-import type { RealtimeTransport, ConnectionStatus } from '@tanstack/realtime'
+      <div className="doc-callout">
+        <p>These are the same mocks the library uses internally:</p>
+        <ul>
+          <li>
+            <code>createMockTransport()</code> &mdash; a full{' '}
+            <code>RealtimeTransport</code> with <code>simulateMessage</code>,{' '}
+            <code>simulateDisconnect</code>/<code>simulateReconnect</code>,{' '}
+            <code>simulateSubscribeError</code>, and a <code>publishLog</code>.
+          </li>
+          <li>
+            <code>createMockPresenceTransport()</code> &mdash; everything above,
+            plus <code>simulatePresenceJoin</code>,{' '}
+            <code>simulatePresenceLeave</code>, and{' '}
+            <code>getPresenceState</code>.
+          </li>
+          <li>
+            <code>createTestRealtimeProvider()</code> /{' '}
+            <code>createTestRealtimeProviderWithPresence()</code> from{' '}
+            <code>@realtimejs/react</code> &mdash; a pre-wired{' '}
+            <code>wrapper</code> for Testing Library&rsquo;s{' '}
+            <code>renderHook</code>/<code>render</code>. (Solid and Vue ship the
+            same factories.)
+          </li>
+        </ul>
+      </div>
 
-function createMockTransport(): RealtimeTransport & {
-  simulateMessage: (channel: string, data: unknown) => void
-  publishLog: Array<{ channel: string; data: unknown }>
-} {
-  const listeners = new Map<string, Set<(data: unknown) => void>>()
-  const store = new Store<ConnectionStatus>('connected')
-  const publishLog: Array<{ channel: string; data: unknown }> = []
-
-  return {
-    store,
-    publishLog,
-    async connect() {},
-    disconnect() {},
-    subscribe(channel, onMessage) {
-      if (!listeners.has(channel)) listeners.set(channel, new Set())
-      listeners.get(channel)!.add(onMessage)
-      return () => { listeners.get(channel)?.delete(onMessage) }
-    },
-    async publish(channel, data) {
-      publishLog.push({ channel, data })
-    },
-    simulateMessage(channel, data) {
-      const cbs = listeners.get(channel)
-      if (cbs) for (const cb of cbs) cb(data)
-    },
-  }
-}`}
-      />
+      <h2 id="mock-transport">The mock transport</h2>
       <p>
-        Two helpers make assertions easy: <code>simulateMessage()</code>{' '}
-        triggers events synchronously so your test can assert on the result
-        immediately, and <code>publishLog</code> records every outgoing publish
-        so you can verify what the client sent without a real server.
-      </p>
-
-      <h2 id="presence-mock">Add presence support</h2>
-      <p>
-        If your feature uses presence (who is online, cursor positions, typing
-        indicators), extend the base mock with the <code>PresenceCapable</code>{' '}
-        interface. The <code>triggerPresence()</code> helper lets you simulate
-        presence updates from other users.
+        <code>createMockTransport()</code> returns a transport that satisfies
+        the full <code>RealtimeTransport</code> contract. It starts in{' '}
+        <code>'connected'</code> state and models a real provider: a message
+        only reaches a subscriber when the channel is currently subscribed{' '}
+        <em>at the provider</em>, so a message emitted while disconnected is not
+        delivered until the transport re-subscribes on reconnect.
       </p>
       <CodeBlock
-        title="test/mock-transport-presence.ts"
-        code={`import type { PresenceCapable, PresenceUser } from '@tanstack/realtime'
+        title="test/transport.test.ts"
+        code={`import { describe, it, expect } from 'vitest'
+import { createMockTransport } from '@realtimejs/core'
 
-function createMockTransportWithPresence(): RealtimeTransport & PresenceCapable & {
-  simulateMessage: (channel: string, data: unknown) => void
-  triggerPresence: (channel: string, users: ReadonlyArray<PresenceUser>) => void
-  publishLog: Array<{ channel: string; data: unknown }>
-} {
-  const base = createMockTransport()
-  const presenceListeners = new Map<string, Set<(users: ReadonlyArray<PresenceUser>) => void>>()
+describe('mock transport', () => {
+  it('delivers subscribed messages and records publishes', async () => {
+    const transport = createMockTransport()
+    await transport.connect()
 
-  return {
-    ...base,
-    joinPresence: () => {},
-    updatePresence: () => {},
-    leavePresence: () => {},
-    onPresenceChange(channel, cb) {
-      if (!presenceListeners.has(channel)) presenceListeners.set(channel, new Set())
-      presenceListeners.get(channel)!.add(cb)
-      return () => { presenceListeners.get(channel)?.delete(cb) }
-    },
-    triggerPresence(channel, users) {
-      const cbs = presenceListeners.get(channel)
-      if (cbs) for (const cb of cbs) cb(users)
-    },
-  }
-}`}
+    const received: unknown[] = []
+    const unsub = transport.subscribe('tasks', (d) => received.push(d))
+
+    // Push a server event synchronously
+    transport.simulateMessage('tasks', { action: 'insert', data: { id: '1' } })
+    expect(received).toHaveLength(1)
+
+    // Outgoing publishes are recorded for assertions
+    await transport.publish('tasks', { action: 'update', data: { id: '1' } })
+    expect(transport.publishLog).toHaveLength(1)
+    expect(transport.publishLog[0]).toMatchObject({ channel: 'tasks' })
+
+    unsub()
+    transport.disconnect()
+  })
+})`}
+      />
+      <p>
+        Pass <code>initialStatus</code> to start disconnected, and{' '}
+        <code>capabilities</code> to exercise capability-gated code paths (for
+        example, declaring <code>{`{ serverAssistedRecovery: true }`}</code> to
+        test a branch that only runs on recovery-capable transports):
+      </p>
+      <CodeBlock
+        code={`const transport = createMockTransport({
+  initialStatus: 'disconnected',
+  capabilities: {
+    presence: false,
+    serverAssistedRecovery: true,
+    history: false,
+    ephemeral: true,
+  },
+})`}
       />
 
-      <h2 id="testing-collection">Testing a collection</h2>
+      <h2 id="testing-collection">Testing a collection hook</h2>
       <p>
-        Collections are the core data primitive in TanStack Realtime. To test
-        one, create a mock transport, wire up a client, and drive the sync
-        handler manually. This example uses Vitest to verify that a server-side
-        insert event is received correctly.
+        Collections are the core data primitive. To test one, build a mock
+        transport, wire a client, and pass{' '}
+        <code>realtimeCollectionOptions</code> to TanStack DB&rsquo;s{' '}
+        <code>createCollection</code>. Then push a server event with{' '}
+        <code>simulateMessage</code> and assert on the collection state.
       </p>
       <CodeBlock
         title="test/task-collection.test.ts"
         code={`import { describe, it, expect } from 'vitest'
-import { createRealtimeClient, realtimeCollectionOptions } from '@tanstack/realtime'
+import { createCollection } from '@tanstack/db'
+import {
+  createMockTransport,
+  createRealtimeClient,
+  realtimeCollectionOptions,
+} from '@realtimejs/core'
+
+interface Task {
+  id: string
+  title: string
+}
 
 describe('task collection', () => {
-  it('receives server inserts', () => {
+  it('applies a server insert', async () => {
     const transport = createMockTransport()
     const client = createRealtimeClient({ transport })
+    await client.connect()
 
-    const config = realtimeCollectionOptions({
-      client,
-      channel: 'tasks',
-      getKey: (t: { id: string }) => t.id,
-    })
+    const tasks = createCollection(
+      realtimeCollectionOptions<Task, string>({
+        client,
+        channel: 'tasks',
+        getKey: (t) => t.id,
+      }),
+    )
 
-    // Drive the sync manually
-    const ops: Array<{ type: string; value?: unknown }> = []
-    config.sync.sync({
-      collection: null as any,
-      begin: () => {},
-      write: (op) => ops.push(op),
-      commit: () => {},
-      markReady: () => {},
-      truncate: () => {},
-    })
-
-    // Simulate a server event
+    // Simulate the server broadcasting an insert
     transport.simulateMessage('tasks', {
       action: 'insert',
       data: { id: '1', title: 'Buy milk' },
     })
 
-    expect(ops).toContainEqual(
-      expect.objectContaining({ type: 'insert' })
-    )
+    expect(tasks.get('1')).toMatchObject({ title: 'Buy milk' })
   })
 })`}
       />
       <p>
-        The same pattern works for <code>update</code> and <code>delete</code>{' '}
-        actions. Emit the corresponding event and assert that the sync handler
-        received the expected operation type.
+        The same pattern covers <code>update</code> and <code>delete</code>{' '}
+        actions &mdash; emit the corresponding event and assert the collection
+        reflects it.
       </p>
 
-      <h2 id="testing-react">Testing React hooks</h2>
+      <h2 id="testing-react">Testing a React hook</h2>
       <p>
-        React hooks that consume realtime data need a{' '}
-        <code>RealtimeProvider</code> in the component tree. Use{' '}
-        <code>createTestRealtimeProvider</code> from{' '}
-        <code>@tanstack/react-realtime</code> to get a pre-wired wrapper,
-        transport, and client in one call:
+        Hooks that read realtime data need a <code>RealtimeProvider</code> in
+        the tree. <code>createTestRealtimeProvider()</code> from{' '}
+        <code>@realtimejs/react</code> returns a <code>wrapper</code>, the{' '}
+        <code>transport</code>, and the <code>client</code> in one call. The
+        provider mounts with <code>autoConnect=false</code> and the transport
+        starts <code>'connected'</code>, so your test controls the connection
+        lifecycle explicitly.
       </p>
       <CodeBlock
-        title="test/my-hook.test.tsx"
-        code={`import { renderHook } from '@testing-library/react'
-import { createTestRealtimeProvider, useSubscribe } from '@tanstack/react-realtime'
+        title="test/use-subscribe.test.tsx"
+        code={`import { it, expect } from 'vitest'
+import { renderHook, act } from '@testing-library/react'
+import {
+  createTestRealtimeProvider,
+  useSubscribe,
+  usePublish,
+} from '@realtimejs/react'
 
 it('receives messages', () => {
   const { wrapper, transport } = createTestRealtimeProvider()
   const messages: unknown[] = []
-  renderHook(() => useSubscribe('ch', (d) => messages.push(d)), { wrapper })
 
-  transport.simulateMessage('ch', { hello: 'world' })
+  renderHook(() => useSubscribe('chat', (d) => messages.push(d)), { wrapper })
+
+  act(() => transport.simulateMessage('chat', { hello: 'world' }))
   expect(messages).toHaveLength(1)
+})
+
+it('records optimistic publishes', async () => {
+  const { wrapper, transport } = createTestRealtimeProvider()
+  const { result } = renderHook(() => usePublish('votes'), { wrapper })
+
+  await act(() => result.current({ delta: 1 }))
+  expect(transport.publishLog).toContainEqual(
+    expect.objectContaining({ channel: 'votes' }),
+  )
 })`}
       />
       <p>
-        The returned <code>transport</code> is a full <code>MockTransport</code>{' '}
-        &mdash; call <code>transport.simulateMessage()</code> to push server
-        events and inspect <code>transport.publishLog</code> for outgoing
-        messages. Pass your own <code>transport</code> or <code>client</code> to
-        customize.
+        Pass your own <code>transport</code> or <code>client</code> to override
+        the defaults &mdash; useful for sharing one mock across several{' '}
+        <code>renderHook</code> calls or for injecting custom capabilities.
       </p>
 
       <h2 id="testing-presence">Testing presence</h2>
       <p>
-        With the presence-capable mock from earlier, you can simulate other
-        users joining and leaving a channel. Call <code>triggerPresence()</code>{' '}
-        with the list of currently present users and assert that your component
-        or callback updates accordingly.
+        For presence hooks (<code>usePresence</code>), use{' '}
+        <code>createMockPresenceTransport()</code> or, in React,{' '}
+        <code>createTestRealtimeProviderWithPresence()</code>. The presence mock
+        adds <code>simulatePresenceJoin</code>,{' '}
+        <code>simulatePresenceLeave</code>, and <code>getPresenceState</code>,
+        and declares <code>presence: true</code> in its capabilities so{' '}
+        <code>usePresence</code> does not throw.
       </p>
       <CodeBlock
-        title="test/presence.test.ts"
-        code={`it('updates when a user joins', () => {
-  const transport = createMockTransportWithPresence()
-  const client = createRealtimeClient({ transport })
+        title="test/use-presence.test.tsx"
+        code={`import { it, expect } from 'vitest'
+import { renderHook, act } from '@testing-library/react'
+import {
+  createTestRealtimeProviderWithPresence,
+  usePresence,
+} from '@realtimejs/react'
+import { roomPresence } from '../app/presence'
 
-  const users: Array<ReadonlyArray<PresenceUser>> = []
-  transport.onPresenceChange('room:1', (list) => {
-    users.push(list)
+it('reports remote members and your own state', () => {
+  const { wrapper, transport } = createTestRealtimeProviderWithPresence()
+
+  const { result } = renderHook(
+    () =>
+      usePresence(roomPresence, {
+        params: { roomId: 'r1' },
+        initial: { name: 'Alice' },
+      }),
+    { wrapper },
+  )
+
+  act(() => {
+    transport.simulatePresenceJoin('room:roomId=r1', {
+      connectionId: 'peer-1',
+      data: { name: 'Bob' },
+    })
   })
 
-  // Simulate two users joining
-  transport.triggerPresence('room:1', [
-    { connectionId: 'alice', data: { cursor: { x: 10, y: 20 } } },
-    { connectionId: 'bob', data: { cursor: { x: 50, y: 60 } } },
-  ])
+  expect(result.current.others).toHaveLength(1)
+  expect((result.current.others[0].data as { name: string }).name).toBe('Bob')
+  expect(result.current.self.name).toBe('Alice')
 
-  expect(users[0]).toHaveLength(2)
-  expect(users[0]![0]!.connectionId).toBe('alice')
-})
-
-it('updates when a user leaves', () => {
-  const transport = createMockTransportWithPresence()
-  const client = createRealtimeClient({ transport })
-
-  const users: Array<ReadonlyArray<PresenceUser>> = []
-  transport.onPresenceChange('room:1', (list) => {
-    users.push(list)
-  })
-
-  // First: two users present
-  transport.triggerPresence('room:1', [
-    { connectionId: 'alice', data: {} },
-    { connectionId: 'bob', data: {} },
-  ])
-
-  // Then: bob leaves
-  transport.triggerPresence('room:1', [
-    { connectionId: 'alice', data: {} },
-  ])
-
-  expect(users[1]).toHaveLength(1)
+  act(() => transport.simulatePresenceLeave('room:roomId=r1', 'peer-1'))
+  expect(result.current.others).toHaveLength(0)
 })`}
       />
 
       <h2 id="connection-states">Simulating connection states</h2>
       <p>
-        The mock transport exposes a <code>store</code> powered by{' '}
-        <code>@tanstack/store</code>. Change its value to simulate
-        disconnect/reconnect scenarios and verify that your UI responds
-        correctly.
+        Drive disconnect/reconnect with the dedicated helpers rather than poking
+        the store directly &mdash; they faithfully model the provider dropping
+        and re-establishing subscriptions, so your retry logic and offline
+        banners are tested against real transport semantics.
       </p>
       <CodeBlock
         title="test/connection.test.ts"
-        code={`it('shows reconnecting state', () => {
+        code={`import { it, expect } from 'vitest'
+import { createMockTransport } from '@realtimejs/core'
+
+it('suspends and resumes delivery across a reconnect', async () => {
   const transport = createMockTransport()
-  const client = createRealtimeClient({ transport })
+  await transport.connect()
 
-  // Simulate a connection drop
-  transport.store.setState(() => 'reconnecting')
-  // ... assert UI shows reconnecting indicator ...
+  const received: unknown[] = []
+  transport.subscribe('chat', (d) => received.push(d))
 
-  // Simulate recovery
-  transport.store.setState(() => 'connected')
-  // ... assert UI returns to normal ...
-})
+  transport.simulateMessage('chat', 'before')
+  expect(received).toEqual(['before'])
 
-it('shows disconnected state', () => {
-  const transport = createMockTransport()
+  // While disconnected the provider drops the subscription — nothing delivered
+  transport.simulateDisconnect() // store → 'reconnecting'
+  transport.simulateMessage('chat', 'while-down')
+  expect(received).toEqual(['before'])
 
-  transport.store.setState(() => 'disconnected')
-  // ... assert UI shows offline banner ...
+  // On reconnect the transport re-subscribes and delivery resumes
+  transport.simulateReconnect() // store → 'connected'
+  transport.simulateMessage('chat', 'after')
+  expect(received).toEqual(['before', 'after'])
 })`}
       />
       <p>
-        This is especially useful for testing retry logic, offline banners, and
-        optimistic-update rollback behavior without actually dropping a network
-        connection.
+        The transport&rsquo;s <code>store</code> (a <code>@tanstack/store</code>{' '}
+        <code>Store&lt;ConnectionStatus&gt;</code>) is observable too &mdash;
+        subscribe to it to assert your UI reflects <code>'connecting'</code>,{' '}
+        <code>'reconnecting'</code>, and <code>'disconnected'</code> states.
       </p>
 
-      <h2 id="optimistic-updates">Testing optimistic updates</h2>
+      <h2 id="optimistic-updates">Testing optimistic rollback</h2>
       <p>
-        When a client publishes an optimistic update, the collection applies it
-        immediately and waits for the server echo to confirm it. In tests, you
-        control both sides: call the mutation to apply the optimistic update,
-        then call <code>transport.simulateMessage()</code> to simulate the
-        server echo. Because <code>publishLog</code> records every outgoing
-        publish, you can assert that the client sent the correct payload and
-        that the echo was properly deduplicated (the collection should not apply
-        the same change twice).
+        An optimistic mutation applies locally and is published immediately; the
+        collection keeps the optimistic value until the server confirms (echo)
+        or the mutation rejects (rollback). In a test you control both sides:{' '}
+        <code>publishLog</code> proves what was sent, and{' '}
+        <code>simulateMessage</code> lets you confirm the echo &mdash; or you
+        let the mutation reject and assert the collection reverts.
       </p>
       <CodeBlock
         title="test/optimistic.test.ts"
-        code={`// 1. Apply optimistic update via client
-// 2. Check publishLog for the outgoing message
-expect(transport.publishLog).toHaveLength(1)
-expect(transport.publishLog[0]).toMatchObject({
-  channel: 'tasks',
-  data: expect.objectContaining({ action: 'update' }),
-})
+        code={`import { it, expect } from 'vitest'
+import { createCollection } from '@tanstack/db'
+import {
+  createMockTransport,
+  createRealtimeClient,
+  realtimeCollectionOptions,
+} from '@realtimejs/core'
 
-// 3. Echo the same event back from the "server"
-transport.simulateMessage('tasks', transport.publishLog[0]!.data)
+interface Task { id: string; title: string }
 
-// 4. Assert the collection did not duplicate the update`}
+it('rolls back when the mutation fails', async () => {
+  const transport = createMockTransport()
+  const client = createRealtimeClient({ transport })
+  await client.connect()
+
+  const tasks = createCollection(
+    realtimeCollectionOptions<Task, string>({
+      client,
+      channel: 'tasks',
+      getKey: (t) => t.id,
+      onUpdate: async () => {
+        throw new Error('server rejected') // forces rollback
+      },
+    }),
+  )
+
+  transport.simulateMessage('tasks', {
+    action: 'insert',
+    data: { id: '1', title: 'original' },
+  })
+
+  // Optimistic update applies immediately…
+  const tx = tasks.update('1', (draft) => {
+    draft.title = 'edited'
+  })
+  expect(tasks.get('1')?.title).toBe('edited')
+
+  // …then rolls back to the confirmed value when onUpdate throws
+  await tx.isPersisted.promise.catch(() => {})
+  expect(tasks.get('1')?.title).toBe('original')
+})`}
       />
 
+      <h2 id="conformance">Testing a custom transport adapter</h2>
+      <p>
+        Writing your own transport? Don&rsquo;t hand-roll its tests. The{' '}
+        <code>@realtimejs/adapter-conformance</code> package exports{' '}
+        <code>runAdapterConformance(harness)</code> &mdash; the exact battery
+        every first-party adapter (and the in-repo mocks) passes. It proves your
+        transport honors the <code>RealtimeTransport</code> contract (lifecycle,
+        subscribe/deliver, channel isolation, unsubscribe, publish, and the{' '}
+        <strong>reconnect re-subscribe</strong> guarantee) and that its declared{' '}
+        <code>capabilities</code> match observable behavior.
+      </p>
+      <CodeBlock
+        title="my-transport.conformance.test.ts"
+        code={`import { runAdapterConformance } from '@realtimejs/adapter-conformance'
+import { myTransport } from './my-transport'
+import { createFakeProvider } from './fake-provider'
+
+// Call it at the top level — it registers its own describe/it blocks.
+runAdapterConformance({
+  name: 'my-transport',
+  createTransport: () => myTransport({ provider: createFakeProvider() }),
+  capabilities: {
+    presence: true,
+    serverAssistedRecovery: false,
+    history: false,
+    ephemeral: true,
+  },
+  // Deliver ONLY to channels currently subscribed at the provider:
+  emitMessage: (channel, data) => fakeProvider.deliver(channel, data),
+  // Drop the provider-side subscription set:
+  simulateDisconnect: () => fakeProvider.drop(),
+  // Reconnect — the transport must re-subscribe its active channels:
+  simulateReconnect: () => fakeProvider.reconnect(),
+  // Optional, provider-specific:
+  simulateSubscribeError: (ch, reason, code) => fakeProvider.reject(ch, reason, code),
+  emitPresence: (ch, members) => fakeProvider.presence(ch, members),
+})`}
+      />
       <div className="doc-callout">
         <p>
-          These patterns are the same ones used internally by TanStack
-          Realtime's own test suite (30+ test files). If it works for the
-          library itself, it will work for your application.
+          The presence sub-battery only runs when you declare{' '}
+          <code>presence: true</code>, and the kit asserts that{' '}
+          <code>hasPresence(transport)</code> agrees with the declared flag
+          &mdash; no half-implemented presence. The{' '}
+          <code>serverAssistedRecovery</code>, <code>history</code>, and{' '}
+          <code>ephemeral</code> flags are verified for honesty/consistency but
+          are declaration-only (the kit has no provider-side view to exercise
+          them behaviorally). See the <a href="#/docs/transports">Transports</a>{' '}
+          page&rsquo;s capability contract section for the full picture.
         </p>
       </div>
 
       <h2 id="see-also">See also</h2>
       <ul>
+        <li>
+          <a href="#/docs/transports">Transports</a> &mdash; the capability
+          contract and how adapters declare what they support
+        </li>
         <li>
           <a href="#/docs/error-reference">Error Reference</a> &mdash; every
           error code the library can throw, with causes and fixes

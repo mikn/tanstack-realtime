@@ -15,9 +15,9 @@ import {
   createMockTransport,
   createRealtimeClient,
   hasPresence,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 
-import type { RealtimeTransport } from '@tanstack/realtime'
+import type { RealtimeTransport } from '@realtimejs/core'
 
 // ---------------------------------------------------------------------------
 // hasPresence type guard

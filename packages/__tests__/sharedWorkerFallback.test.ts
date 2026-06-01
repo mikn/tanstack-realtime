@@ -20,12 +20,12 @@ import { Store } from '@tanstack/store'
 import {
   createSharedWorkerTransport,
   isSharedWorkerSupported,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 import type {
   ConnectionStatus,
   PresenceCapable,
   RealtimeTransport,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 
 // ---------------------------------------------------------------------------
 // Minimal RealtimeTransport & PresenceCapable stub for fallback testing

@@ -4,13 +4,13 @@ export function ApiReference() {
       <h1>API Reference</h1>
       <p className="doc-lead">
         Complete reference for all exported functions, hooks, types, and
-        utilities across the TanStack Realtime packages.
+        utilities across the realtime.js packages.
       </p>
 
       {/* ------------------------------------------------------------------ */}
-      {/* @tanstack/realtime                                                   */}
+      {/* @realtimejs/core                                                   */}
       {/* ------------------------------------------------------------------ */}
-      <h2 id="realtime-core">@tanstack/realtime</h2>
+      <h2 id="realtime-core">@realtimejs/core</h2>
       <p>
         Framework-agnostic core. Includes the client factory, collection
         helpers, CRDT primitives, transport utilities, and server-side
@@ -80,13 +80,33 @@ export function ApiReference() {
               <code>PresenceCapable</code> interface.
             </td>
           </tr>
+          <tr>
+            <td>
+              <code>getCapabilities</code>
+            </td>
+            <td>
+              <code>
+                (transport: RealtimeTransport) =&gt; TransportCapabilities
+              </code>
+            </td>
+            <td>
+              Returns the declared <code>TransportCapabilities</code> (
+              <code>presence</code>, <code>serverAssistedRecovery</code>,{' '}
+              <code>history</code>, <code>ephemeral</code>). If the transport
+              doesn&rsquo;t declare <code>capabilities</code>, a conservative
+              default is derived from its shape (<code>presence</code> via{' '}
+              <code>hasPresence</code>, everything else assumed least-capable
+              except <code>ephemeral</code>). Use it to degrade UI gracefully
+              when a feature is unavailable.
+            </td>
+          </tr>
         </tbody>
       </table>
 
       <p>
         Import:{' '}
         <code>
-          import {'{'} createRealtimeClient {'}'} from '@tanstack/realtime'
+          import {'{'} createRealtimeClient {'}'} from '@realtimejs/core'
         </code>
       </p>
 
@@ -587,7 +607,7 @@ export function ApiReference() {
       <p>
         Import:{' '}
         <code>
-          import {'{'} pnValue, mergePn {'}'} from '@tanstack/realtime'
+          import {'{'} pnValue, mergePn {'}'} from '@realtimejs/core'
         </code>
       </p>
 
@@ -733,6 +753,19 @@ export function ApiReference() {
             <td>
               Wrap a <code>PublishFn</code> with per-channel permission checks
               and an optional payload validation function.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>PublishValidationError</code>
+            </td>
+            <td>
+              <code>class PublishValidationError extends Error</code>
+            </td>
+            <td>
+              Thrown by a <code>createValidatedPublish</code> publish when the
+              payload validation function rejects the message. Carries the
+              validation <code>reason</code> as its message.
             </td>
           </tr>
           <tr>
@@ -1207,17 +1240,17 @@ export function ApiReference() {
       </table>
 
       {/* ------------------------------------------------------------------ */}
-      {/* @tanstack/react-realtime                                            */}
+      {/* @realtimejs/react                                            */}
       {/* ------------------------------------------------------------------ */}
-      <h2 id="react-realtime">@tanstack/react-realtime</h2>
+      <h2 id="react">@realtimejs/react</h2>
       <p>
         React provider and hooks. Re-exports everything from{' '}
-        <code>@tanstack/realtime</code> so you only need one import.
+        <code>@realtimejs/core</code> so you only need one import.
       </p>
       <p>
         Import:{' '}
         <code>
-          import {'{'} useRealtime {'}'} from '@tanstack/react-realtime'
+          import {'{'} useRealtime {'}'} from '@realtimejs/react'
         </code>
       </p>
 
@@ -1299,7 +1332,7 @@ export function ApiReference() {
             <td>
               <code>
                 (channel: QueryKey | string, onMessage: (data: unknown) =&gt;
-                void) =&gt; void
+                void) =&gt; {'{'} subscribeError: SubscribeError | null {'}'}
               </code>
             </td>
             <td>
@@ -1366,8 +1399,10 @@ export function ApiReference() {
             </td>
             <td>
               Joins a presence channel on mount and returns <code>others</code>{' '}
-              (other connected users) and <code>updatePresence</code>. Leaves on
-              unmount.
+              (other connected users, keyed by <code>connectionId</code>),{' '}
+              <code>self</code> (your own last-sent data), and{' '}
+              <code>updatePresence</code>. Leaves on unmount. Requires a
+              presence-capable transport.
             </td>
           </tr>
         </tbody>
@@ -1516,9 +1551,9 @@ export function ApiReference() {
       </table>
 
       {/* ------------------------------------------------------------------ */}
-      {/* @tanstack/realtime-adapter-sse                                      */}
+      {/* @realtimejs/adapter-sse                                      */}
       {/* ------------------------------------------------------------------ */}
-      <h2 id="adapter-sse">@tanstack/realtime-adapter-sse</h2>
+      <h2 id="adapter-sse">@realtimejs/adapter-sse</h2>
       <p>
         Server-Sent Events (SSE) transport adapter. Provides both the client
         transport and the server handler.
@@ -1821,14 +1856,14 @@ export function ApiReference() {
         Import:{' '}
         <code>
           import {'{'} sseTransport, createSseHandler {'}'} from
-          '@tanstack/realtime-adapter-sse'
+          '@realtimejs/adapter-sse'
         </code>
       </p>
 
       {/* ------------------------------------------------------------------ */}
-      {/* @tanstack/realtime-adapter-centrifugo                               */}
+      {/* @realtimejs/adapter-centrifugo                               */}
       {/* ------------------------------------------------------------------ */}
-      <h2 id="adapter-centrifugo">@tanstack/realtime-adapter-centrifugo</h2>
+      <h2 id="adapter-centrifugo">@realtimejs/adapter-centrifugo</h2>
       <p>
         Centrifugo v4+ WebSocket transport adapter with built-in presence and
         epoch/offset recovery.
@@ -1968,14 +2003,220 @@ export function ApiReference() {
         Import:{' '}
         <code>
           import {'{'} centrifugoTransport {'}'} from
-          '@tanstack/realtime-adapter-centrifugo'
+          '@realtimejs/adapter-centrifugo'
         </code>
       </p>
 
       {/* ------------------------------------------------------------------ */}
-      {/* @tanstack/realtime-preset-start                                     */}
+      {/* @realtimejs/adapter-pusher                                         */}
       {/* ------------------------------------------------------------------ */}
-      <h2 id="preset-start">@tanstack/realtime-preset-start</h2>
+      <h2 id="adapter-pusher">@realtimejs/adapter-pusher</h2>
+      <p>
+        Pusher Channels (hosted) and self-hosted Soketi transport adapter.
+        Soketi speaks the Pusher protocol, so the same adapter works against
+        both — point <code>wsHost</code>/<code>wsPort</code> at Soketi for
+        self-hosting. Presence-capable.
+      </p>
+      <table className="api-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Signature</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <code>pusherTransport</code>
+            </td>
+            <td>
+              <code>
+                (options: PusherTransportOptions) =&gt; RealtimeTransport &amp;
+                PresenceCapable
+              </code>
+            </td>
+            <td>
+              Creates a transport over the Pusher protocol. Binds a single{' '}
+              <code>'message'</code> event per channel; presence channels map to{' '}
+              <code>presence-&lt;channel&gt;</code>; client publishes use a
+              Pusher client event (private/presence channels with client events
+              enabled). Public fan-out is server-published via the Pusher HTTP
+              API. Also exports the protocol constants{' '}
+              <code>PUSHER_MESSAGE_EVENT</code>,{' '}
+              <code>PUSHER_CLIENT_MESSAGE_EVENT</code>, and{' '}
+              <code>PUSHER_PRESENCE_PREFIX</code>.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Import:{' '}
+        <code>
+          import {'{'} pusherTransport {'}'} from '@realtimejs/adapter-pusher'
+        </code>
+      </p>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* @realtimejs/adapter-partykit                                       */}
+      {/* ------------------------------------------------------------------ */}
+      <h2 id="adapter-partykit">@realtimejs/adapter-partykit</h2>
+      <p>
+        PartyKit / Cloudflare Durable Objects transport adapter. Multiplexes all
+        realtime.js channels over a single PartyKit room connection (the
+        &ldquo;hub&rdquo;), routing each channel inside JSON envelopes. Presence
+        is backed by Durable Object membership. A reference room server is
+        available at <code>@realtimejs/adapter-partykit/server</code>.
+      </p>
+      <table className="api-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Signature</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <code>partykitTransport</code>
+            </td>
+            <td>
+              <code>
+                (options: PartyKitTransportOptions) =&gt; RealtimeTransport
+                &amp; PresenceCapable
+              </code>
+            </td>
+            <td>
+              Creates a transport that connects to a PartyKit room. Learns its
+              own <code>connectionId</code> from the server&rsquo;s{' '}
+              <code>connected</code> envelope and excludes self from reported
+              presence members.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Import:{' '}
+        <code>
+          import {'{'} partykitTransport {'}'} from
+          '@realtimejs/adapter-partykit'
+        </code>
+      </p>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* @realtimejs/reactive-drizzle                                       */}
+      {/* ------------------------------------------------------------------ */}
+      <h2 id="reactive-drizzle">@realtimejs/reactive-drizzle</h2>
+      <p>
+        Optional Drizzle/Postgres reactive-query engine for{' '}
+        <code>@realtimejs/core</code>. Kept separate so the core install carries
+        zero <code>drizzle-orm</code> dependencies. Composes with{' '}
+        <code>createStartHandler</code>: the handler owns the transport, this
+        package owns the reactive engine (auto-derived channels, predicate
+        matching, automatic invalidation).
+      </p>
+      <table className="api-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Signature</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <code>createReactiveQueries</code>
+            </td>
+            <td>
+              <code>
+                (options?: CreateReactiveQueriesOptions) =&gt; ReactiveQueries
+              </code>
+            </td>
+            <td>
+              Creates the reactive engine. Returns <code>query</code>,{' '}
+              <code>mutation</code>, <code>invalidate</code>,{' '}
+              <code>bindPublish</code>, and <code>onChannelEmpty</code>. Wire{' '}
+              <code>bindPublish(handler.publish)</code> after creating the
+              handler so invalidations fan out.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>createDrizzleEngine</code>
+            </td>
+            <td>
+              <code>(...) =&gt; ReactiveQueryEngine</code>
+            </td>
+            <td>
+              The Drizzle implementation of the neutral{' '}
+              <code>ReactiveQueryEngine</code> seam (also exported as{' '}
+              <code>drizzleEngine</code>). Implement your own engine to back the
+              seam with a different store.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Import:{' '}
+        <code>
+          import {'{'} createReactiveQueries {'}'} from
+          '@realtimejs/reactive-drizzle'
+        </code>
+      </p>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* @realtimejs/adapter-conformance                                    */}
+      {/* ------------------------------------------------------------------ */}
+      <h2 id="adapter-conformance">@realtimejs/adapter-conformance</h2>
+      <p>
+        A Vitest conformance battery for custom transport authors. Wire your
+        adapter to a controllable fake provider via the{' '}
+        <code>ConformanceHarness</code> hooks and the kit drives it against the{' '}
+        <code>RealtimeTransport</code> (+ <code>PresenceCapable</code>) contract
+        — including the three-phase reconnect-resubscribe check.
+      </p>
+      <table className="api-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Signature</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <code>runAdapterConformance</code>
+            </td>
+            <td>
+              <code>(harness: ConformanceHarness) =&gt; void</code>
+            </td>
+            <td>
+              Registers the conformance <code>describe</code>/<code>it</code>{' '}
+              blocks. Call it from a <code>*.test.ts</code> in your adapter
+              package. The harness supplies <code>createTransport</code>,{' '}
+              <code>capabilities</code>, <code>emitMessage</code>, disconnect/
+              reconnect triggers, and optional{' '}
+              <code>simulateSubscribeError</code>/<code>emitPresence</code>{' '}
+              hooks.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Import:{' '}
+        <code>
+          import {'{'} runAdapterConformance {'}'} from
+          '@realtimejs/adapter-conformance'
+        </code>
+      </p>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* @realtimejs/preset-start                                     */}
+      {/* ------------------------------------------------------------------ */}
+      <h2 id="preset-start">@realtimejs/preset-start</h2>
       <p>
         TanStack Start / TanStack Router server-side preset. Composes{' '}
         <code>createSseHandler</code> with a pluggable{' '}
@@ -2155,8 +2396,7 @@ export function ApiReference() {
       <p>
         Import:{' '}
         <code>
-          import {'{'} createStartHandler {'}'} from
-          '@tanstack/realtime-preset-start'
+          import {'{'} createStartHandler {'}'} from '@realtimejs/preset-start'
         </code>
       </p>
 
@@ -2180,7 +2420,7 @@ export function ApiReference() {
               <code>RealtimeClient</code>
             </td>
             <td>
-              <code>@tanstack/realtime</code>
+              <code>@realtimejs/core</code>
             </td>
             <td>
               The client object returned by <code>createRealtimeClient</code>.
@@ -2191,7 +2431,7 @@ export function ApiReference() {
               <code>RealtimeTransport</code>
             </td>
             <td>
-              <code>@tanstack/realtime</code>
+              <code>@realtimejs/core</code>
             </td>
             <td>
               Core transport interface (connect, disconnect, subscribe,
@@ -2203,7 +2443,7 @@ export function ApiReference() {
               <code>PresenceCapable</code>
             </td>
             <td>
-              <code>@tanstack/realtime</code>
+              <code>@realtimejs/core</code>
             </td>
             <td>
               Optional transport extension for joinPresence, updatePresence,
@@ -2212,10 +2452,25 @@ export function ApiReference() {
           </tr>
           <tr>
             <td>
+              <code>TransportCapabilities</code>
+            </td>
+            <td>
+              <code>@realtimejs/core</code>
+            </td>
+            <td>
+              <code>
+                {'{'} presence; serverAssistedRecovery; history; ephemeral {'}'}
+              </code>{' '}
+              — what a transport supports. Read via <code>getCapabilities</code>
+              .
+            </td>
+          </tr>
+          <tr>
+            <td>
               <code>ConnectionStatus</code>
             </td>
             <td>
-              <code>@tanstack/realtime</code>
+              <code>@realtimejs/core</code>
             </td>
             <td>
               <code>
@@ -2228,7 +2483,7 @@ export function ApiReference() {
               <code>QueryKey</code>
             </td>
             <td>
-              <code>@tanstack/realtime</code>
+              <code>@realtimejs/core</code>
             </td>
             <td>
               Array channel key, e.g.{' '}
@@ -2243,7 +2498,7 @@ export function ApiReference() {
               <code>PresenceUser&lt;TData&gt;</code>
             </td>
             <td>
-              <code>@tanstack/realtime</code>
+              <code>@realtimejs/core</code>
             </td>
             <td>
               <code>
@@ -2257,7 +2512,7 @@ export function ApiReference() {
               <code>ServerStream&lt;TEvent&gt;</code>
             </td>
             <td>
-              <code>@tanstack/realtime</code>
+              <code>@realtimejs/core</code>
             </td>
             <td>
               Handle with <code>push(event)</code>, <code>done()</code>, and{' '}
@@ -2269,7 +2524,7 @@ export function ApiReference() {
               <code>StreamStatus</code>
             </td>
             <td>
-              <code>@tanstack/realtime</code>
+              <code>@realtimejs/core</code>
             </td>
             <td>
               <code>'pending' | 'streaming' | 'done' | 'error' | 'stale'</code>
@@ -2280,7 +2535,7 @@ export function ApiReference() {
               <code>PublishFn</code>
             </td>
             <td>
-              <code>@tanstack/realtime</code>
+              <code>@realtimejs/core</code>
             </td>
             <td>
               <code>

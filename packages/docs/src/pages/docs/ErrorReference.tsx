@@ -5,8 +5,8 @@ export function ErrorReference() {
     <article className="doc-article">
       <h1>Error Reference</h1>
       <p className="doc-lead">
-        This page documents every error type in TanStack Realtime, what triggers
-        it, and how to handle it.
+        This page documents every error type in realtime.js, what triggers it,
+        and how to handle it.
       </p>
 
       {/* ------------------------------------------------------------------ */}
@@ -58,7 +58,7 @@ export function ErrorReference() {
       </p>
       <CodeBlock
         title="server function"
-        code={`import { ConflictError } from '@tanstack/realtime'
+        code={`import { ConflictError } from '@realtimejs/core'
 
 export const updateTodo = createServerFn({ method: 'POST' })
   .handler(async ({ data }: { data: Todo }) => {
@@ -79,7 +79,7 @@ export const updateTodo = createServerFn({ method: 'POST' })
       />
       <CodeBlock
         title="collection config"
-        code={`import { isConflictError } from '@tanstack/realtime'
+        code={`import { isConflictError } from '@realtimejs/core'
 
 realtimeCollectionOptions({
   // ...
@@ -162,7 +162,7 @@ realtimeCollectionOptions({
       />
       <CodeBlock
         title="client transport"
-        code={`import { sseTransport } from '@tanstack/realtime-adapter-sse'
+        code={`import { sseTransport } from '@realtimejs/adapter-sse'
 
 const transport = sseTransport({
   url: '/api/realtime',
@@ -259,8 +259,8 @@ const transport = sseTransport({
 
       <h3>How to handle</h3>
       <CodeBlock
-        code={`import { useOfflineQueue } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+        code={`import { useOfflineQueue } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
 const transport = sseTransport({ url: '/api/realtime' })
 useOfflineQueue(transport, {
@@ -311,8 +311,8 @@ useOfflineQueue(transport, {
 
       <h3>How to handle</h3>
       <CodeBlock
-        code={`import { useGapRecovery } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+        code={`import { useGapRecovery } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
 const transport = sseTransport({ url: '/api/realtime' })
 useGapRecovery(transport, {
@@ -362,7 +362,7 @@ useGapRecovery(transport, {
   STREAM_DONE,
   STREAM_ERROR,
   createStreamChannel,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 
 const aiResponseStream = createStreamChannel({
   id: 'ai-response',
@@ -380,7 +380,7 @@ const aiResponseStream = createStreamChannel({
 
       <h3>How to handle</h3>
       <CodeBlock
-        code={`import { useStream } from '@tanstack/react-realtime'
+        code={`import { useStream } from '@realtimejs/react'
 
 function AIResponse({ requestId }: { requestId: string }) {
   const { state, status, error } = useStream(aiResponseStream, {
@@ -491,7 +491,7 @@ try {
 
       <h3>How to handle</h3>
       <CodeBlock
-        code={`import { useRealtime } from '@tanstack/react-realtime'
+        code={`import { useRealtime } from '@realtimejs/react'
 
 function ConnectionBanner() {
   const { status, client } = useRealtime()

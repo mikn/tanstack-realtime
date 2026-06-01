@@ -80,7 +80,7 @@ export default [
     // does not understand this pattern and reports false positives for Vue
     // composables called inside setup(). Disable it for Vue devtools tsx files.
     name: 'tanstack/realtime/vue-devtools',
-    files: ['packages/vue-realtime-devtools/**/*.tsx'],
+    files: ['packages/vue-devtools/**/*.tsx'],
     rules: {
       'react-hooks/rules-of-hooks': 'off',
     },

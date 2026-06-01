@@ -1,0 +1,52 @@
+{
+  "name": "@realtimejs/preset-start",
+  "version": "0.1.0",
+  "description": "TanStack Start / TanStack Router preset for @realtimejs/core — transport-agnostic server-side publishing",
+  "type": "module",
+  "license": "MIT",
+  "author": "mikn",
+  "homepage": "https://github.com/mikn/tanstack-realtime#readme",
+  "bugs": {
+    "url": "https://github.com/mikn/tanstack-realtime/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mikn/tanstack-realtime.git",
+    "directory": "packages/preset-start"
+  },
+  "keywords": [
+    "realtime",
+    "tanstack-start",
+    "tanstack-router",
+    "preset"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup"
+  },
+  "dependencies": {
+    "@realtimejs/core": "workspace:*",
+    "@realtimejs/adapter-sse": "workspace:*"
+  }
+}

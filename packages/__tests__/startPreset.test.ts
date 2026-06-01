@@ -1,5 +1,5 @@
 /**
- * Tests for @tanstack/realtime-preset-start — createStartHandler
+ * Tests for @realtimejs/preset-start — createStartHandler
  *
  * Covers:
  * - createStartHandler: delegates GET/POST/OPTIONS to the underlying SSE handler
@@ -14,9 +14,9 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { createStartHandler } from '@tanstack/realtime-preset-start'
-import { STREAM_DONE, STREAM_ERROR, serializeKey } from '@tanstack/realtime'
-import type { PublishBackend } from '@tanstack/realtime-preset-start'
+import { createStartHandler } from '@realtimejs/preset-start'
+import { STREAM_DONE, STREAM_ERROR, serializeKey } from '@realtimejs/core'
+import type { PublishBackend } from '@realtimejs/preset-start'
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -32,7 +32,7 @@ import { VueComposables } from './pages/docs/VueComposables'
 import { Devtools } from './pages/docs/Devtools'
 import { Examples } from './pages/docs/Examples'
 import { Tutorial } from './pages/docs/Tutorial'
-import { WhyTanstackRealtime } from './pages/docs/WhyTanstackRealtime'
+import { Why } from './pages/docs/Why'
 
 // ---------------------------------------------------------------------------
 // Simple hash router
@@ -77,7 +77,7 @@ const docRoutes: Partial<Record<string, () => React.JSX.Element>> = {
   '#/docs/testing': Testing,
   '#/docs/choosing-a-pattern': ChoosingAPattern,
   '#/docs/tutorial': Tutorial,
-  '#/docs/why': WhyTanstackRealtime,
+  '#/docs/why': Why,
   '#/docs/solid-primitives': SolidPrimitives,
   '#/docs/vue-composables': VueComposables,
   '#/docs/devtools': Devtools,
@@ -89,7 +89,7 @@ const docRoutes: Partial<Record<string, () => React.JSX.Element>> = {
 // ---------------------------------------------------------------------------
 
 const docOrder = [
-  { hash: '#/docs/why', label: 'Why TanStack Realtime' },
+  { hash: '#/docs/why', label: 'Why realtime.js' },
   { hash: '#/docs/getting-started', label: 'Getting Started' },
   { hash: '#/docs/tutorial', label: 'Tutorial: Task Board' },
   { hash: '#/docs/collections', label: 'Collections' },
@@ -154,8 +154,9 @@ function DisclaimerBar() {
   return (
     <div className="disclaimer-bar">
       <span>
-        <strong>Unofficial project</strong> — exploring an architecture for
-        TanStack Realtime. Not affiliated with or endorsed by TanStack.{' '}
+        <strong>Experimental &middot; pre-1.0</strong> — the API still moves and
+        it has not been hardened in production. Independent and vendor-neutral;
+        not affiliated with or endorsed by TanStack.{' '}
         <a
           href="https://github.com/mikn/tanstack-realtime"
           target="_blank"
@@ -180,8 +181,8 @@ function DocsNav({
     <nav className="nav">
       <div className="nav-inner">
         <a href="#/" className="nav-logo">
-          <span className="logo-tan">TanStack</span>{' '}
-          <span className="logo-realtime">Realtime</span>
+          <span className="logo-tan">realtime</span>
+          <span className="logo-realtime">.js</span>
         </a>
         <div className="nav-links">
           {isHome ? (

@@ -7,7 +7,7 @@
  * transitions to 'done' status.
  */
 
-import { useStream } from '@tanstack/react-realtime'
+import { useStream } from '@realtimejs/react'
 import { textStream } from '../defs.js'
 import { client } from '../transport.js'
 

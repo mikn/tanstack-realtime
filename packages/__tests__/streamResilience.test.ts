@@ -19,8 +19,8 @@ import {
   createServerStream,
   serverStreamCallbacks,
   streamChannelOptions,
-} from '@tanstack/realtime'
-import type { PublishFn, RealtimeTransport } from '@tanstack/realtime'
+} from '@realtimejs/core'
+import type { PublishFn, RealtimeTransport } from '@realtimejs/core'
 
 // ---------------------------------------------------------------------------
 // Mock transport — synchronous event dispatch, no network

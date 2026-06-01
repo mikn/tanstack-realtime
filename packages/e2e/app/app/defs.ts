@@ -9,7 +9,7 @@ import {
   defineSyncedCounter,
   defineSyncedSet,
   defineSyncedValue,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 
 // ---------------------------------------------------------------------------
 // Presence channel — usePresence

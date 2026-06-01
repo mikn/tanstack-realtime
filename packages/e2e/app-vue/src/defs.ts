@@ -9,7 +9,7 @@ import {
   defineSyncedCounter,
   defineSyncedSet,
   defineSyncedValue,
-} from '@tanstack/vue-realtime'
+} from '@realtimejs/vue'
 
 // ---------------------------------------------------------------------------
 // Presence channel — usePresence

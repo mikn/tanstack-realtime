@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { createSseHandler } from '@tanstack/realtime-adapter-sse'
+import { createSseHandler } from '@realtimejs/adapter-sse'
 
 // ---------------------------------------------------------------------------
 // SSE Helpers

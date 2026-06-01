@@ -4,7 +4,7 @@
  * Pattern: append-only event stream (chat messages).
  */
 import { ref } from 'vue'
-import { liveChannelOptions } from '@tanstack/vue-realtime'
+import { liveChannelOptions } from '@realtimejs/vue'
 import { client, userId } from '../transport.js'
 import { useCollectionSync } from '../useCollectionSync.js'
 

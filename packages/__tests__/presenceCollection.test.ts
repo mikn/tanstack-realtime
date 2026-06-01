@@ -15,17 +15,14 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { Store } from '@tanstack/store'
-import {
-  createRealtimeClient,
-  presenceChannelOptions,
-} from '@tanstack/realtime'
+import { createRealtimeClient, presenceChannelOptions } from '@realtimejs/core'
 import type { CollectionConfig } from '@tanstack/db'
 import type {
   ConnectionStatus,
   PresenceCapable,
   PresenceUser,
   RealtimeTransport,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 
 // ---------------------------------------------------------------------------
 // Mock transport with controllable presence events

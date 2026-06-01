@@ -1,22 +1,32 @@
 name: Deploy Docs
 
+# Production docs deploy. Publishes the built docs site to the ROOT of the
+# `gh-pages` branch. Per-PR previews (see docs-preview.yml) live under
+# `gh-pages/pr-preview/`, so this deploy uses `clean-exclude: pr-preview/` to
+# avoid wiping live previews on every push to main.
+#
+# ONE-TIME OWNER SETUP (cannot be done from CI): in the repo's GitHub
+# Settings -> Pages, set the build source to "Deploy from a branch:
+# gh-pages / (root)". GitHub Pages allows only one source, so both production
+# and previews are served from the single gh-pages branch.
+#   Production: https://mikn.github.io/tanstack-realtime/
+#   Previews:   https://mikn.github.io/tanstack-realtime/pr-preview/pr-<N>/
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: pages
+  group: deploy-docs
   cancel-in-progress: false
 
 jobs:
-  build:
-    name: Build docs
+  deploy:
+    name: Build and deploy docs
     runs-on: ubuntu-latest
 
     steps:
@@ -35,25 +45,14 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build docs site
-        run: pnpm --filter @tanstack/realtime-docs build
+        run: pnpm --filter @realtimejs/docs build
 
       - name: Add .nojekyll
         run: touch packages/docs/dist/.nojekyll
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Deploy to gh-pages
+        uses: JamesIves/github-pages-deploy-action@v4
         with:
-          path: packages/docs/dist
-
-  deploy:
-    name: Deploy to GitHub Pages
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          branch: gh-pages
+          folder: packages/docs/dist
+          clean-exclude: pr-preview/

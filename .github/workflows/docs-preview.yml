@@ -1,0 +1,64 @@
+name: Docs Preview
+
+# Per-PR preview deploys of the docs site. Builds the docs and publishes them
+# to `gh-pages/pr-preview/pr-<N>/` via rossjrw/pr-preview-action, which also
+# comments the preview URL on the PR and removes the preview when the PR is
+# closed. Production docs (deploy-docs.yml) deploy to the gh-pages ROOT with
+# `clean-exclude: pr-preview/` so the two never clobber each other.
+#
+# ONE-TIME OWNER SETUP (cannot be done from CI): in the repo's GitHub
+# Settings -> Pages, set the build source to "Deploy from a branch:
+# gh-pages / (root)". GitHub Pages allows only one source, so both production
+# and previews are served from the single gh-pages branch.
+#   Production: https://mikn.github.io/tanstack-realtime/
+#   Previews:   https://mikn.github.io/tanstack-realtime/pr-preview/pr-<N>/
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: preview-${{ github.event.number }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-preview:
+    name: Deploy PR preview
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        if: github.event.action != 'closed'
+        uses: pnpm/action-setup@v4
+
+      - name: Use Node.js 22
+        if: github.event.action != 'closed'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        if: github.event.action != 'closed'
+        run: pnpm install --frozen-lockfile
+
+      - name: Build docs site
+        if: github.event.action != 'closed'
+        run: pnpm --filter @realtimejs/docs build
+
+      - name: Add .nojekyll
+        if: github.event.action != 'closed'
+        run: touch packages/docs/dist/.nojekyll
+
+      - name: Deploy preview
+        uses: rossjrw/pr-preview-action@v1
+        with:
+          source-dir: ./packages/docs/dist
+          umbrella-dir: pr-preview

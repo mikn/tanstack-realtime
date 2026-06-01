@@ -7,7 +7,7 @@
  */
 
 import { useRef, useState } from 'react'
-import { liveChannelOptions } from '@tanstack/realtime'
+import { liveChannelOptions } from '@realtimejs/core'
 import { client, userId } from '../transport.js'
 import { useCollectionSync } from '../useCollectionSync.js'
 

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>realtime.js — AI Streaming</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: system-ui, sans-serif;
+        background: #f5f5f5;
+        color: #111;
+        padding: 24px;
+        max-width: 640px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 20px;
+        margin-bottom: 4px;
+      }
+      p.sub {
+        color: #666;
+        font-size: 13px;
+        margin-bottom: 16px;
+      }
+      p.sub code {
+        background: #e5e7eb;
+        border-radius: 4px;
+        padding: 1px 4px;
+        font-size: 12px;
+      }
+      button {
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-size: 14px;
+        cursor: pointer;
+        margin-bottom: 16px;
+      }
+      button:hover {
+        background: #1d4ed8;
+      }
+      .stream {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 16px;
+      }
+      .badge {
+        display: inline-block;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 2px 8px;
+        border-radius: 999px;
+        margin-bottom: 12px;
+        background: #e5e7eb;
+        color: #374151;
+      }
+      .badge.streaming {
+        background: #dbeafe;
+        color: #1d4ed8;
+      }
+      .badge.done {
+        background: #dcfce7;
+        color: #15803d;
+      }
+      .badge.error {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
+      .content {
+        font-size: 15px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+      }
+      .muted {
+        color: #6b7280;
+        font-size: 13px;
+        margin-bottom: 8px;
+      }
+      .err {
+        color: #b91c1c;
+        font-size: 13px;
+        margin-bottom: 8px;
+      }
+      .caret {
+        color: #2563eb;
+        animation: blink 1s steps(2) infinite;
+      }
+      @keyframes blink {
+        0%,
+        50% {
+          opacity: 1;
+        }
+        50.01%,
+        100% {
+          opacity: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

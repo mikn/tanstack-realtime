@@ -3,7 +3,7 @@
  * Pattern: short-lived state that auto-expires after a TTL.
  */
 import { For, Show } from 'solid-js'
-import { ephemeralLiveOptions } from '@tanstack/realtime'
+import { ephemeralLiveOptions } from '@realtimejs/core'
 import { client, userId } from '../transport.js'
 import { createCollectionSync } from '../createCollectionSync.js'
 

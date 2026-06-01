@@ -10,8 +10,8 @@ import {
   createRealtimeClient,
   createStreamChannel,
   streamChannelOptions,
-} from '@tanstack/realtime'
-import type { RealtimeTransport } from '@tanstack/realtime'
+} from '@realtimejs/core'
+import type { RealtimeTransport } from '@realtimejs/core'
 
 // ---------------------------------------------------------------------------
 // Mock transport — synchronous event dispatch, no network

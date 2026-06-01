@@ -6,13 +6,13 @@ export function Authentication() {
       <h1>Authentication</h1>
       <p className="doc-lead">
         Authentication is the first thing you configure when moving to
-        production. TanStack Realtime validates every connection and every
-        action &mdash; subscribe, publish, presence &mdash; so only authorized
-        users reach your channels.
+        production. realtime.js validates every connection and every action
+        &mdash; subscribe, publish, presence &mdash; so only authorized users
+        reach your channels.
       </p>
 
       <div className="doc-callout">
-        <p>Auth in TanStack Realtime is split into two layers:</p>
+        <p>Auth in realtime.js is split into two layers:</p>
         <ul>
           <li>
             <strong>Server-side</strong> &mdash; <code>getUser</code> identifies
@@ -49,7 +49,7 @@ export function Authentication() {
       </p>
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
 import { verifyJwt } from './auth'
 
 export const realtime = createStartHandler({
@@ -78,7 +78,7 @@ export const realtime = createStartHandler({
         permitted on all channels.
       </p>
       <p>
-        Pass the <code>AuthorizeFn</code> from <code>@tanstack/realtime</code>{' '}
+        Pass the <code>AuthorizeFn</code> from <code>@realtimejs/core</code>{' '}
         &mdash; it works across <strong>all presets</strong> (
         <code>createSseHandler</code> and <code>createStartHandler</code>). See
         the <a href="#unified-authorize">unified AuthorizeFn</a> section below
@@ -91,7 +91,7 @@ export const realtime = createStartHandler({
       <div className="doc-callout">
         <p>
           <strong>Recommended:</strong> The <code>AuthorizeFn</code> signature
-          from <code>@tanstack/realtime</code> works across{' '}
+          from <code>@realtimejs/core</code> works across{' '}
           <strong>all presets</strong> &mdash; <code>createSseHandler</code> and{' '}
           <code>createStartHandler</code>. Write one authorize function and use
           it everywhere.
@@ -124,7 +124,7 @@ interface ChannelPermissions {
       </p>
       <CodeBlock
         title="app/server/authorize.ts"
-        code={`import type { AuthorizeFn, ChannelPermissions } from '@tanstack/realtime'
+        code={`import type { AuthorizeFn, ChannelPermissions } from '@realtimejs/core'
 import { db } from './db'
 
 export const authorize: AuthorizeFn = async (
@@ -179,8 +179,8 @@ const sseHandler = createSseHandler({ getUser, authorize })`}
       </p>
       <CodeBlock
         title="app/client/realtime.ts"
-        code={`import { createRealtimeClient } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+        code={`import { createRealtimeClient } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
 export const realtimeClient = createRealtimeClient({
   transport: sseTransport({
@@ -249,8 +249,8 @@ export const realtimeClient = createRealtimeClient({
       </ul>
       <CodeBlock
         title="app/client/realtime.ts — Centrifugo"
-        code={`import { createRealtimeClient } from '@tanstack/realtime'
-import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
+        code={`import { createRealtimeClient } from '@realtimejs/core'
+import { centrifugoTransport } from '@realtimejs/adapter-centrifugo'
 
 export const realtimeClient = createRealtimeClient({
   transport: centrifugoTransport({
@@ -307,7 +307,7 @@ export async function GET({ request }: { request: Request }) {
       </p>
       <CodeBlock
         title="app/server/realtime.ts — Zod validation"
-        code={`import { createValidatedPublish, serializeKey } from '@tanstack/realtime'
+        code={`import { createValidatedPublish, serializeKey } from '@realtimejs/core'
 import { z } from 'zod'
 
 const todoSchema = z.object({

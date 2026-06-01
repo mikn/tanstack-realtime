@@ -8,7 +8,7 @@
  * useSyncedValue is demoed in PresencePanel to spread coverage.
  */
 
-import { useSyncedCounter, useSyncedSet } from '@tanstack/react-realtime'
+import { useSyncedCounter, useSyncedSet } from '@realtimejs/react'
 import { sharedCounter, sharedSet } from '../defs.js'
 
 export function SyncedPanel() {

@@ -3,7 +3,7 @@
  * StatusBar — shows the current connection status and active user ID.
  * data-testid="status" carries the raw status string for Playwright assertions.
  */
-import { useConnectionStatus } from '@tanstack/vue-realtime'
+import { useConnectionStatus } from '@realtimejs/vue'
 import { userId } from '../transport.js'
 
 const status = useConnectionStatus()

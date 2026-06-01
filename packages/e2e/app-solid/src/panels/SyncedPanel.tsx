@@ -3,7 +3,7 @@
  * Patterns: PN-Counter CRDT and OR-Set CRDT.
  */
 import { For, Show } from 'solid-js'
-import { useSyncedCounter, useSyncedSet } from '@tanstack/solid-realtime'
+import { useSyncedCounter, useSyncedSet } from '@realtimejs/solid'
 import { sharedCounter, sharedSet } from '../defs.js'
 
 export function SyncedPanel() {

@@ -6,26 +6,28 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { serializeKey } from '@tanstack/realtime'
-import {
-  createStartHandler,
-  wrapReactiveDb,
-} from '@tanstack/realtime-preset-start'
+import { serializeKey } from '@realtimejs/core'
+import { createStartHandler } from '@realtimejs/preset-start'
 import {
   REALTIME_BATCH_CHANNEL,
-  createSubscriptionManager,
-} from '../realtime-preset-start/src/subscription-manager.js'
-import {
   ReactivePredicateParseError,
   compilePredicate,
+  createReactiveQueries,
+  createSubscriptionManager,
   deriveChannelKey,
   extractEqualityConditions,
   extractReferencedColumns,
-} from '../realtime-preset-start/src/compile-predicate.js'
-import { runInReactiveContext } from '../realtime-preset-start/src/reactive-db.js'
-import { createLoader } from '../realtime-preset-start/src/reactive-loader.js'
-import { createMutationHandler } from '../realtime-preset-start/src/reactive-mutation.js'
-import type { SubscriptionEntry } from '../realtime-preset-start/src/subscription-manager.js'
+  runInReactiveContext,
+  wrapReactiveDb,
+} from '@realtimejs/reactive-drizzle'
+import { createLoader } from '../reactive-drizzle/src/reactive-loader.js'
+import { createMutationHandler } from '../reactive-drizzle/src/reactive-mutation.js'
+import type {
+  CapturedRead,
+  ReactiveQueryEngine,
+  SubscriptionEntry,
+  WriteDescriptor,
+} from '@realtimejs/reactive-drizzle'
 
 // ---------------------------------------------------------------------------
 // Drizzle-compatible fake table objects
@@ -405,10 +407,13 @@ describe('wrapReactiveDb', () => {
     })
 
     expect(ctx.writes).toHaveLength(1)
-    expect(ctx.writes[0].table).toBe('todos')
-    expect(ctx.writes[0].operation).toBe('update')
-    expect(ctx.writes[0].updatedColumns).toEqual(['done'])
-    expect(ctx.writes[0].affectedRows).toEqual(updatedRows)
+    const write = ctx.writes[0]
+    expect(write.table).toBe('todos')
+    expect(write.operation).toBe('update')
+    expect(
+      write.operation === 'update' ? write.updatedColumns : undefined,
+    ).toEqual(['done'])
+    expect(write.affectedRows).toEqual(updatedRows)
   })
 })
 
@@ -549,6 +554,36 @@ describe('SubscriptionManager', () => {
     expect(entryV1.requery).not.toHaveBeenCalled()
   })
 
+  it('register: a DISTINCT entry overwriting the same channel warns once (loud, not silent)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const publishFn = vi.fn().mockResolvedValue(undefined)
+      const mgr = createSubscriptionManager(publishFn)
+      // distinct compiled matcher sources on the same channel → collision
+      mgr.register(makeEntry('ch-A', 'todos', (row) => row.teamId === 'OLD'))
+      mgr.register(makeEntry('ch-A', 'todos', (row) => row.teamId === 'NEW'))
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(warn.mock.calls[0]?.[0]).toContain('[realtime:reactive]')
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('register: an identical re-registration does NOT warn', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const publishFn = vi.fn().mockResolvedValue(undefined)
+      const mgr = createSubscriptionManager(publishFn)
+      // identical predicate (same table/sql/params/matcher source) → no warn
+      const matcher = (row: Record<string, unknown>) => row.teamId === 'A'
+      mgr.register(makeEntry('ch-A', 'todos', matcher))
+      mgr.register(makeEntry('ch-A', 'todos', matcher))
+      expect(warn).not.toHaveBeenCalled()
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
   // ------- Conservative UPDATE invalidation -----------------------------------
 
   it('UPDATE: non-matching post-update row still invalidates if predicate column was set', async () => {
@@ -660,6 +695,66 @@ describe('SubscriptionManager', () => {
     expect(activeEntry.requery).not.toHaveBeenCalled()
     expect(publishFn).not.toHaveBeenCalled()
   })
+
+  it('two queries differing only in a RANGE predicate get distinct channels; a write matching one invalidates only it', async () => {
+    const dkCols = {
+      teamId: { name: 'team_id' },
+      priority: { name: 'priority' },
+    }
+    const publishFn = vi.fn().mockResolvedValue(undefined)
+    const mgr = createSubscriptionManager(publishFn)
+
+    // Both queries share the same top-level equality (team_id = $1) so the OLD
+    // lossy derivation collided them onto one channel; the full-SQL discriminator
+    // now separates them.
+    const allChannel = deriveChannelKey(
+      'todos',
+      'SELECT * FROM "todos" WHERE "todos"."team_id" = $1',
+      ['A'],
+      dkCols,
+    )
+    const highChannel = deriveChannelKey(
+      'todos',
+      'SELECT * FROM "todos" WHERE "todos"."team_id" = $1 AND "todos"."priority" > $2',
+      ['A', 5],
+      dkCols,
+    )
+    expect(allChannel).not.toBe(highChannel)
+
+    // "all team A" matches any team-A row; "high priority" needs priority > 5.
+    const allEntry = makeEntry(allChannel, 'todos', (row) => row.teamId === 'A')
+    const highEntry = makeEntry(
+      highChannel,
+      'todos',
+      (row) => row.teamId === 'A' && (row.priority as number) > 5,
+    )
+    mgr.register(allEntry)
+    mgr.register(highEntry)
+
+    // Both entries survive — distinct channels, neither overwrote the other.
+    expect(mgr.activeChannels().has(allChannel)).toBe(true)
+    expect(mgr.activeChannels().has(highChannel)).toBe(true)
+
+    // Insert a LOW-priority team-A row: matches "all" but not "high priority".
+    await mgr.invalidate([
+      {
+        table: 'todos',
+        operation: 'insert',
+        affectedRows: [{ teamId: 'A', priority: 1 }],
+      },
+    ])
+
+    expect(allEntry.requery).toHaveBeenCalledTimes(1)
+    expect(highEntry.requery).not.toHaveBeenCalled()
+  })
+
+  it('two byte-identical queries derive the same channel (last register wins, identical requery semantics)', () => {
+    const dkCols = { teamId: { name: 'team_id' } }
+    const sql = 'SELECT * FROM "todos" WHERE "todos"."team_id" = $1'
+    const chA = deriveChannelKey('todos', sql, ['A'], dkCols)
+    const chB = deriveChannelKey('todos', sql, ['A'], dkCols)
+    expect(chA).toBe(chB)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -724,29 +819,183 @@ describe('extractEqualityConditions', () => {
 describe('deriveChannelKey', () => {
   const dkCols = { teamId: { name: 'team_id' } }
 
-  it('equality conditions → serializeKey([table, conditions])', () => {
+  it('equality conditions → serializeKey([table, conditions]) prefix + :q=<hash> discriminator', () => {
     const key = deriveChannelKey(
       'todos',
       '"todos"."team_id" = $1',
       ['A'],
       dkCols,
     )
-    expect(key).toBe(serializeKey(['todos', { teamId: 'A' }]))
+    // Human-readable prefix preserved for debuggability.
+    expect(
+      key.startsWith(serializeKey(['todos', { teamId: 'A' }]) + ':q='),
+    ).toBe(true)
   })
 
-  it('no equality conditions → serializeKey([table])', () => {
+  it('no equality conditions → serializeKey([table]) prefix + :q=<hash> discriminator', () => {
     const key = deriveChannelKey(
       'todos',
       '"todos"."team_id" > $1',
       ['A'],
       dkCols,
     )
+    expect(key.startsWith(serializeKey(['todos']) + ':q=')).toBe(true)
+  })
+
+  it('undefined whereSQL with no matcher → bare serializeKey([table]), no discriminator', () => {
+    const key = deriveChannelKey('todos', undefined, [], dkCols)
     expect(key).toBe(serializeKey(['todos']))
   })
 
-  it('undefined whereSQL → serializeKey([table])', () => {
-    const key = deriveChannelKey('todos', undefined, [], dkCols)
-    expect(key).toBe(serializeKey(['todos']))
+  it('matches escape hatch → serializeKey([table]) prefix + :q=<hash> discriminator derived from matcher source', () => {
+    const matcher = (row: Record<string, unknown>) => row.teamId === 'A'
+    const key = deriveChannelKey('todos', undefined, [], dkCols, matcher)
+    expect(key.startsWith(serializeKey(['todos']) + ':q=')).toBe(true)
+  })
+
+  it('matches escape hatch: two DIFFERENT matcher functions on the same table → DIFFERENT channels', () => {
+    const a = deriveChannelKey(
+      'todos',
+      undefined,
+      [],
+      dkCols,
+      (row: Record<string, unknown>) => row.teamId === 'A',
+    )
+    const b = deriveChannelKey(
+      'todos',
+      undefined,
+      [],
+      dkCols,
+      (row: Record<string, unknown>) => row.teamId === 'B',
+    )
+    expect(a).not.toBe(b)
+    // both still carry the shared readable prefix
+    expect(a.startsWith(serializeKey(['todos']) + ':q=')).toBe(true)
+    expect(b.startsWith(serializeKey(['todos']) + ':q=')).toBe(true)
+  })
+
+  it('matches escape hatch: an identical matcher (same source) reuse → SAME channel', () => {
+    const matcher = (row: Record<string, unknown>) => row.teamId === 'A'
+    const a = deriveChannelKey('todos', undefined, [], dkCols, matcher)
+    const b = deriveChannelKey('todos', undefined, [], dkCols, matcher)
+    // distinct closures with identical source also collapse to the same channel
+    const c = deriveChannelKey(
+      'todos',
+      undefined,
+      [],
+      dkCols,
+      (row: Record<string, unknown>) => row.teamId === 'A',
+    )
+    expect(a).toBe(b)
+    expect(a).toBe(c)
+  })
+
+  it('byte-identical queries derive the SAME channel (deterministic)', () => {
+    const a = deriveChannelKey('todos', '"todos"."team_id" = $1', ['A'], dkCols)
+    const b = deriveChannelKey('todos', '"todos"."team_id" = $1', ['A'], dkCols)
+    expect(a).toBe(b)
+  })
+
+  it('a range predicate added to an equality query yields a DIFFERENT channel (lossy-collision fixed)', () => {
+    // Both share the same top-level equality prefix (team_id = $1), so the OLD
+    // derivation collided them. The full-SQL discriminator now separates them.
+    const eqOnly = deriveChannelKey(
+      'todos',
+      'SELECT * FROM "todos" WHERE "todos"."team_id" = $1',
+      ['A'],
+      dkCols,
+    )
+    const eqPlusRange = deriveChannelKey(
+      'todos',
+      'SELECT * FROM "todos" WHERE "todos"."team_id" = $1 AND "todos"."priority" > $2',
+      ['A', 5],
+      dkCols,
+    )
+    expect(eqOnly).not.toBe(eqPlusRange)
+    // Both still carry the shared human-readable prefix.
+    expect(
+      eqOnly.startsWith(serializeKey(['todos', { teamId: 'A' }]) + ':q='),
+    ).toBe(true)
+    expect(
+      eqPlusRange.startsWith(serializeKey(['todos', { teamId: 'A' }]) + ':q='),
+    ).toBe(true)
+  })
+
+  it('differing SELECT columns (same WHERE) yield DIFFERENT channels (shape difference)', () => {
+    const star = deriveChannelKey(
+      'todos',
+      'SELECT * FROM "todos" WHERE "todos"."team_id" = $1',
+      ['A'],
+      dkCols,
+    )
+    const projected = deriveChannelKey(
+      'todos',
+      'SELECT "todos"."id", "todos"."title" FROM "todos" WHERE "todos"."team_id" = $1',
+      ['A'],
+      dkCols,
+    )
+    expect(star).not.toBe(projected)
+  })
+
+  it('differing bound params yield DIFFERENT channels', () => {
+    const a = deriveChannelKey('todos', '"todos"."team_id" = $1', ['A'], dkCols)
+    const b = deriveChannelKey('todos', '"todos"."team_id" = $1', ['B'], dkCols)
+    expect(a).not.toBe(b)
+  })
+
+  // ----- 64-bit discriminator: format + determinism -------------------------
+
+  it('discriminator is FIXED-LENGTH (Centrifugo-safe): exactly 14 base36 chars after :q=', () => {
+    // The discriminator must be bounded regardless of query size so the channel
+    // never exceeds Centrifugo's 255-char channel-name cap.
+    const longSql =
+      'SELECT * FROM "todos" WHERE "todos"."team_id" = $1 ' +
+      'AND "todos"."title" IN (' +
+      Array.from({ length: 200 }, (_unused, i) => `'value-${i}'`).join(', ') +
+      ')'
+    const key = deriveChannelKey('todos', longSql, ['A'], dkCols)
+    const token = key.slice(key.lastIndexOf(':q=') + 3)
+    expect(token).toMatch(/^[0-9a-z]{14}$/)
+  })
+
+  it('discriminator is deterministic across repeated calls (horizontal-scaling stable)', () => {
+    const sql = 'SELECT * FROM "todos" WHERE "todos"."team_id" = $1'
+    const tokenOf = () => {
+      const k = deriveChannelKey('todos', sql, ['A'], dkCols)
+      return k.slice(k.lastIndexOf(':q=') + 3)
+    }
+    expect(tokenOf()).toBe(tokenOf())
+  })
+
+  // ----- bigint-safe params -------------------------------------------------
+
+  it('a bigint param derives a channel WITHOUT throwing', () => {
+    expect(() =>
+      deriveChannelKey('todos', '"todos"."team_id" = $1', [123n], dkCols),
+    ).not.toThrow()
+  })
+
+  it('two different bigint values yield DIFFERENT channels', () => {
+    const a = deriveChannelKey('todos', '"todos"."team_id" = $1', [1n], dkCols)
+    const b = deriveChannelKey('todos', '"todos"."team_id" = $1', [2n], dkCols)
+    expect(a).not.toBe(b)
+  })
+
+  it('bigint 1n, number 1, and string "1" do NOT collide (n-suffix disambiguation)', () => {
+    const big = deriveChannelKey(
+      'todos',
+      '"todos"."team_id" = $1',
+      [1n],
+      dkCols,
+    )
+    const num = deriveChannelKey('todos', '"todos"."team_id" = $1', [1], dkCols)
+    const str = deriveChannelKey(
+      'todos',
+      '"todos"."team_id" = $1',
+      ['1'],
+      dkCols,
+    )
+    expect(new Set([big, num, str]).size).toBe(3)
   })
 })
 
@@ -846,7 +1095,13 @@ describe('createLoader', () => {
     await loader.load()
 
     const registered = mockMgr.register.mock.calls[0][0]
-    expect(registered.channel).toBe(serializeKey(['todos', { teamId: 'A' }]))
+    // Prefix is the human-readable equality key; the :q=<hash> discriminator
+    // (derived from the full SQL) is appended to keep distinct queries distinct.
+    expect(
+      registered.channel.startsWith(
+        serializeKey(['todos', { teamId: 'A' }]) + ':q=',
+      ),
+    ).toBe(true)
   })
 
   it('explicit channel override overrides auto-derivation', async () => {
@@ -946,9 +1201,11 @@ describe('createLoader', () => {
     await loader.load()
 
     const registered = mockMgr.register.mock.calls[0][0]
-    expect(registered.channel).toBe(
-      serializeKey(['todos', { teamId: 'team-42' }]),
-    )
+    expect(
+      registered.channel.startsWith(
+        serializeKey(['todos', { teamId: 'team-42' }]) + ':q=',
+      ),
+    ).toBe(true)
   })
 
   it('no-WHERE auto path: query without .where() registers table-level subscription with match-all predicate', async () => {
@@ -971,8 +1228,11 @@ describe('createLoader', () => {
     expect(mockMgr.register).toHaveBeenCalledTimes(1)
     const registered = mockMgr.register.mock.calls[0][0]
     expect(registered.predicate.table).toBe('todos')
-    // channel should be table-level
-    expect(registered.channel).toBe(serializeKey(['todos']))
+    // channel is table-level prefix + full-SQL discriminator: two whole-table
+    // reads that differ in SELECT/ORDER BY get distinct channels.
+    expect(registered.channel.startsWith(serializeKey(['todos']) + ':q=')).toBe(
+      true,
+    )
     // predicate should match any row (match-all)
     expect(registered.predicate.compiled({ teamId: 'anything' })).toBe(true)
     expect(registered.predicate.compiled({})).toBe(true)
@@ -1088,10 +1348,15 @@ describe('createMutationHandler', () => {
 })
 
 // ---------------------------------------------------------------------------
-// createStartHandler — integration
+// createReactiveQueries + createStartHandler — integration
+//
+// The reactive engine now lives in @realtimejs/reactive-drizzle and
+// composes with the transport handler from @realtimejs/preset-start.
+// These tests preserve the original end-to-end coverage of query/mutation/
+// invalidate/subscriptionManager, now exercised through createReactiveQueries.
 // ---------------------------------------------------------------------------
 
-describe('createStartHandler — reactive integration', () => {
+describe('createReactiveQueries — reactive integration', () => {
   function makeReactiveDb(queryResult: Array<any>, insertResult: Array<any>) {
     const returningBuilder: any = {
       toSQL: () => ({ sql: 'INSERT INTO todos RETURNING *', params: [] }),
@@ -1119,27 +1384,30 @@ describe('createStartHandler — reactive integration', () => {
   }
 
   it('query() + mutation() end-to-end: only matching channel invalidated', async () => {
-    const realtime = createStartHandler({})
+    const handler = createStartHandler({})
+    const reactive = createReactiveQueries({ publish: handler.publish })
     const wrappedDb = makeReactiveDb(
       [{ id: 1, teamId: 'A' }],
       [{ id: 2, teamId: 'A' }],
     )
 
     // Register subscription via the new factory API
-    const getRows = realtime.query(
+    const getRows = reactive.query(
       async () => await wrappedDb.select().from(fakeTable),
     )
     await getRows(undefined)
 
-    const expectedChannel = serializeKey(['todos', { teamId: 'A' }])
+    const expectedPrefix = serializeKey(['todos', { teamId: 'A' }]) + ':q='
     expect(
-      realtime.subscriptionManager.activeChannels().has(expectedChannel),
+      Array.from(reactive.subscriptionManager.activeChannels()).some((c) =>
+        c.startsWith(expectedPrefix),
+      ),
     ).toBe(true)
 
     // Trigger mutation via the new factory API
-    const invalidateSpy = vi.spyOn(realtime.subscriptionManager, 'invalidate')
+    const invalidateSpy = vi.spyOn(reactive.subscriptionManager, 'invalidate')
 
-    const doInsert = realtime.mutation(
+    const doInsert = reactive.mutation(
       async () =>
         await wrappedDb.insert(fakeTable).values({ teamId: 'A' }).returning(),
     )
@@ -1159,14 +1427,15 @@ describe('createStartHandler — reactive integration', () => {
         return Promise.resolve()
       }),
     }
-    const realtime2 = createStartHandler({ backend })
+    const handler2 = createStartHandler({ backend })
+    const reactive2 = createReactiveQueries({ publish: handler2.publish })
     const wrappedDb2 = makeReactiveDb([{ id: 1, teamId: 'A' }], [])
-    const getRows2 = realtime2.query(
+    const getRows2 = reactive2.query(
       async () => await wrappedDb2.select().from(fakeTable),
     )
     await getRows2(undefined)
 
-    await realtime2.invalidate([
+    await reactive2.invalidate([
       { table: 'todos', operation: 'insert', affectedRows: [] },
     ])
 
@@ -1180,36 +1449,85 @@ describe('createStartHandler — reactive integration', () => {
     expect(updates.some((u) => u.channel.includes('todos'))).toBe(true)
   })
 
-  it('realtime.invalidate([{ table, affectedRows }]) works directly', async () => {
-    const realtime = createStartHandler({})
+  it('reactive.invalidate([{ table, affectedRows }]) works directly', async () => {
+    const handler = createStartHandler({})
+    const reactive = createReactiveQueries({ publish: handler.publish })
     const wrappedDb = makeReactiveDb([{ id: 1, teamId: 'A' }], [])
 
-    const getRows = realtime.query(
+    const getRows = reactive.query(
       async () => await wrappedDb.select().from(fakeTable),
     )
     await getRows(undefined)
 
     // Direct invalidation with matching rows
-    const invalidateSpy = vi.spyOn(realtime.subscriptionManager, 'invalidate')
-    await realtime.invalidate([
+    const invalidateSpy = vi.spyOn(reactive.subscriptionManager, 'invalidate')
+    await reactive.invalidate([
       { table: 'todos', operation: 'insert', affectedRows: [{ teamId: 'A' }] },
     ])
 
     expect(invalidateSpy).toHaveBeenCalledTimes(1)
   })
 
-  it('realtime.subscriptionManager is an instance of SubscriptionManager', () => {
-    const realtime = createStartHandler({})
+  it('reactive.subscriptionManager is an instance of SubscriptionManager', () => {
+    const reactive = createReactiveQueries({})
     // Check that subscriptionManager has the expected interface
-    expect(realtime.subscriptionManager).toBeDefined()
-    expect(typeof realtime.subscriptionManager.register).toBe('function')
-    expect(typeof realtime.subscriptionManager.unregister).toBe('function')
-    expect(typeof realtime.subscriptionManager.invalidate).toBe('function')
-    expect(typeof realtime.subscriptionManager.activeChannels).toBe('function')
+    expect(reactive.subscriptionManager).toBeDefined()
+    expect(typeof reactive.subscriptionManager.register).toBe('function')
+    expect(typeof reactive.subscriptionManager.unregister).toBe('function')
+    expect(typeof reactive.subscriptionManager.invalidate).toBe('function')
+    expect(typeof reactive.subscriptionManager.activeChannels).toBe('function')
+  })
+
+  it('onChannelEmpty unregisters channels but never the batch channel', () => {
+    const reactive = createReactiveQueries({})
+    reactive.subscriptionManager.register(
+      makeEntry('ch-A', 'todos', () => true),
+    )
+    reactive.subscriptionManager.register(
+      makeEntry(REALTIME_BATCH_CHANNEL, 'todos', () => true),
+    )
+
+    reactive.onChannelEmpty('ch-A')
+    expect(reactive.subscriptionManager.activeChannels().has('ch-A')).toBe(
+      false,
+    )
+
+    // The batch channel must survive — it's always needed for invalidation.
+    reactive.onChannelEmpty(REALTIME_BATCH_CHANNEL)
+    expect(
+      reactive.subscriptionManager.activeChannels().has(REALTIME_BATCH_CHANNEL),
+    ).toBe(true)
+  })
+
+  it('bindPublish injects publish after construction', async () => {
+    const published: Array<{ ch: string; data: unknown }> = []
+    const handler = createStartHandler({
+      backend: {
+        publish: (ch: string, data: unknown) => {
+          published.push({ ch, data })
+          return Promise.resolve()
+        },
+      },
+    })
+    // Construct the reactive engine BEFORE the handler's publish is wired in.
+    const reactive = createReactiveQueries({})
+    const wrappedDb = makeReactiveDb([{ id: 1, teamId: 'A' }], [])
+    const getRows = reactive.query(
+      async () => await wrappedDb.select().from(fakeTable),
+    )
+    await getRows(undefined)
+
+    // Inject publish, then invalidate — the batch message should fan out.
+    reactive.bindPublish(handler.publish)
+    await reactive.invalidate([
+      { table: 'todos', operation: 'insert', affectedRows: [] },
+    ])
+
+    expect(published.some((p) => p.ch === REALTIME_BATCH_CHANNEL)).toBe(true)
   })
 
   it('query without .where() registers table-level subscription and does not throw', async () => {
-    const realtime = createStartHandler({})
+    const reactive = createReactiveQueries({})
     const fakeResult = [{ id: 1 }]
     const fakeBuilder = makeFakeBuilder('SELECT * FROM "todos"', [], fakeResult)
 
@@ -1221,15 +1539,308 @@ describe('createStartHandler — reactive integration', () => {
     const wrappedDb = wrapReactiveDb(rawDb)
 
     // Should not throw even though there is no WHERE clause
-    const getRows = realtime.query(
+    const getRows = reactive.query(
       async () => await wrappedDb.select().from(fakeTable),
     )
     const { data } = await getRows(undefined)
 
     expect(data).toEqual(fakeResult)
-    const expectedChannel = serializeKey(['todos'])
+    const expectedPrefix = serializeKey(['todos']) + ':q='
     expect(
-      realtime.subscriptionManager.activeChannels().has(expectedChannel),
+      Array.from(reactive.subscriptionManager.activeChannels()).some((c) =>
+        c.startsWith(expectedPrefix),
+      ),
     ).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Pluggable engine seam: a custom ReactiveQueryEngine (no Drizzle/pgsql at all)
+// drives createReactiveQueries' query/mutation/invalidate orchestration.
+// ---------------------------------------------------------------------------
+
+describe('createReactiveQueries — custom engine seam', () => {
+  // A trivial engine with ZERO Drizzle/pgsql involvement: it derives the read
+  // metadata from a plain object the queryFn returns, and captures writes from
+  // a plain object the mutationFn returns. This proves the orchestration is
+  // vendor-neutral and depends only on the ReactiveQueryEngine interface.
+  function makeFakeEngine(): ReactiveQueryEngine {
+    return {
+      async captureReads<T>(
+        queryFn: () => Promise<T>,
+        channelOverride?: any,
+      ): Promise<{ result: T; reads: ReadonlyArray<CapturedRead> }> {
+        const result = (await queryFn()) as any
+        const channel =
+          channelOverride !== undefined
+            ? typeof channelOverride === 'string'
+              ? channelOverride
+              : serializeKey(channelOverride)
+            : `fake:${result.table}:${result.teamId}`
+        return {
+          result: result.rows as T,
+          reads: [
+            {
+              table: result.table,
+              compiled: (row: Record<string, unknown>) =>
+                row['teamId'] === result.teamId,
+              referencedColumns: new Set(['teamId']),
+              channel,
+            },
+          ],
+        }
+      },
+      async captureWrites<T>(
+        mutationFn: () => Promise<T>,
+      ): Promise<{ result: T; writes: ReadonlyArray<WriteDescriptor> }> {
+        const result = (await mutationFn()) as any
+        return {
+          result: result.result as T,
+          writes: result.writes as ReadonlyArray<WriteDescriptor>,
+        }
+      },
+    }
+  }
+
+  it('drives query/mutation/invalidate without any Drizzle involvement', async () => {
+    const published: Array<{ ch: string; data: unknown }> = []
+    const handler = createStartHandler({
+      backend: {
+        publish: (ch: string, data: unknown) => {
+          published.push({ ch, data })
+          return Promise.resolve()
+        },
+      },
+    })
+
+    const reactive = createReactiveQueries({
+      engine: makeFakeEngine(),
+      publish: handler.publish,
+    })
+
+    // query() registers a subscription whose channel comes from the fake engine.
+    const getRows = reactive.query((args: { teamId: string }) =>
+      Promise.resolve({
+        table: 'widgets',
+        teamId: args.teamId,
+        rows: [{ id: 1, teamId: args.teamId }],
+      }),
+    )
+    const { data, channel } = await getRows({ teamId: 'A' })
+
+    expect(data).toEqual([{ id: 1, teamId: 'A' }])
+    expect(channel).toBe('fake:widgets:A')
+    expect(reactive.subscriptionManager.activeChannels().has(channel)).toBe(
+      true,
+    )
+
+    // mutation() captures writes via the engine and invalidates the matching sub.
+    const doInsert = reactive.mutation(() =>
+      Promise.resolve({
+        result: 'ok',
+        writes: [
+          {
+            table: 'widgets',
+            operation: 'insert' as const,
+            affectedRows: [{ id: 2, teamId: 'A' }],
+          },
+        ],
+      }),
+    )
+    const mutationResult = await doInsert(undefined)
+    expect(mutationResult).toBe('ok')
+
+    // The matching channel was re-queried and a batch message published.
+    const batchMsg = published.find((p) => p.ch === REALTIME_BATCH_CHANNEL)
+    expect(batchMsg).toBeDefined()
+    const updates = (batchMsg!.data as { updates: Array<{ channel: string }> })
+      .updates
+    expect(updates.some((u) => u.channel === 'fake:widgets:A')).toBe(true)
+  })
+
+  it('a non-matching write does not invalidate the subscription', async () => {
+    const published: Array<{ ch: string; data: unknown }> = []
+    const handler = createStartHandler({
+      backend: {
+        publish: (ch: string, data: unknown) => {
+          published.push({ ch, data })
+          return Promise.resolve()
+        },
+      },
+    })
+    const reactive = createReactiveQueries({
+      engine: makeFakeEngine(),
+      publish: handler.publish,
+    })
+    const getRows = reactive.query((args: { teamId: string }) =>
+      Promise.resolve({
+        table: 'widgets',
+        teamId: args.teamId,
+        rows: [],
+      }),
+    )
+    const { channel } = await getRows({ teamId: 'A' })
+
+    const invalidateSpy = vi.spyOn(reactive.subscriptionManager, 'invalidate')
+    const doInsert = reactive.mutation(() =>
+      Promise.resolve({
+        result: undefined,
+        writes: [
+          {
+            table: 'widgets',
+            operation: 'insert' as const,
+            affectedRows: [{ id: 9, teamId: 'B' }], // different team — no match
+          },
+        ],
+      }),
+    )
+    await doInsert(undefined)
+
+    // invalidate is always called with the writes; but no channel matched, so
+    // nothing should be re-queried for team A.
+    expect(invalidateSpy).toHaveBeenCalledTimes(1)
+
+    // Crucially: NO batch message must be published on a non-matching write.
+    // Capturing published messages (like the matching seam test) means this
+    // would actually catch an erroneous invalidation, not just a spy count.
+    expect(published.some((p) => p.ch === REALTIME_BATCH_CHANNEL)).toBe(false)
+    const allPublishedChannels = published.flatMap((p) => {
+      if (p.ch !== REALTIME_BATCH_CHANNEL) return [p.ch]
+      const msg = p.data as { updates: Array<{ channel: string }> }
+      return msg.updates.map((u) => u.channel)
+    })
+    expect(allPublishedChannels).not.toContain(channel)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Multi-table reactive query (WP-C): a query that reads TWO tables in separate
+// select().from() calls must register/return BOTH channels and stay live to
+// writes on either table — but not to writes on an unrelated table.
+// ---------------------------------------------------------------------------
+
+describe('createReactiveQueries — multi-table query (WP-C)', () => {
+  const projectsColumns = { teamId: { name: 'team_id' } }
+  const fakeProjects = makeFakeTable('projects', projectsColumns)
+
+  // A wrapped db whose select().from(table) returns a builder whose SQL
+  // matches the table passed in. The reactive proxy reads the table name from
+  // the table object (getTableName), and the WHERE SQL from toSQL().
+  function makeMultiTableDb() {
+    const rawDb: any = {
+      select: () => ({
+        from: (t: any) => {
+          const name = t[DRIZZLE_NAME_SYM] as string
+          return makeFakeBuilder(
+            `SELECT * FROM "${name}" WHERE "${name}"."team_id" = $1`,
+            ['A'],
+            [{ id: 1, teamId: 'A', _from: name }],
+          )
+        },
+      }),
+    }
+    return wrapReactiveDb(rawDb)
+  }
+
+  function makeMultiTableQuery(
+    reactive: ReturnType<typeof createReactiveQueries>,
+  ) {
+    const db = makeMultiTableDb()
+    return reactive.query(async () => {
+      const todos = await db.select().from(fakeTable)
+      const projects = await db.select().from(fakeProjects)
+      return { todos, projects }
+    })
+  }
+
+  it('returns and registers BOTH channels', async () => {
+    const reactive = createReactiveQueries({})
+    const { channel, channels } = await makeMultiTableQuery(reactive)(undefined)
+
+    const todosPrefix = serializeKey(['todos', { teamId: 'A' }]) + ':q='
+    const projectsPrefix = serializeKey(['projects', { teamId: 'A' }]) + ':q='
+
+    // channel is back-compat (channels[0]); channels lists every read. Each now
+    // carries the full-SQL discriminator suffix appended to its prefix.
+    expect(channel.startsWith(todosPrefix)).toBe(true)
+    expect(channels).toHaveLength(2)
+    expect(channels![0].startsWith(todosPrefix)).toBe(true)
+    expect(channels![1].startsWith(projectsPrefix)).toBe(true)
+
+    const active = reactive.subscriptionManager.activeChannels()
+    expect(Array.from(active).some((c) => c.startsWith(todosPrefix))).toBe(true)
+    expect(Array.from(active).some((c) => c.startsWith(projectsPrefix))).toBe(
+      true,
+    )
+  })
+
+  it('a write to the FIRST table invalidates the query', async () => {
+    const handler = createStartHandler({})
+    const reactive = createReactiveQueries({ publish: handler.publish })
+    await makeMultiTableQuery(reactive)(undefined)
+
+    const invalidateSpy = vi.spyOn(reactive.subscriptionManager, 'invalidate')
+    await reactive.invalidate([
+      { table: 'todos', operation: 'insert', affectedRows: [{ teamId: 'A' }] },
+    ])
+    expect(invalidateSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('a write to the SECOND table ALSO invalidates the query (the bug WP-C fixes)', async () => {
+    const published: Array<{ ch: string; data: unknown }> = []
+    const handler = createStartHandler({
+      backend: {
+        publish: (ch: string, data: unknown) => {
+          published.push({ ch, data })
+          return Promise.resolve()
+        },
+      },
+    })
+    const reactive = createReactiveQueries({ publish: handler.publish })
+    await makeMultiTableQuery(reactive)(undefined)
+
+    await reactive.invalidate([
+      {
+        table: 'projects',
+        operation: 'insert',
+        affectedRows: [{ teamId: 'A' }],
+      },
+    ])
+
+    const batchMsg = published.find((p) => p.ch === REALTIME_BATCH_CHANNEL)
+    expect(batchMsg).toBeDefined()
+    const updates = (batchMsg!.data as { updates: Array<{ channel: string }> })
+      .updates
+    expect(
+      updates.some((u) =>
+        u.channel.startsWith(
+          serializeKey(['projects', { teamId: 'A' }]) + ':q=',
+        ),
+      ),
+    ).toBe(true)
+  })
+
+  it('a write to an UNRELATED table does not invalidate the query', async () => {
+    const published: Array<{ ch: string; data: unknown }> = []
+    const handler = createStartHandler({
+      backend: {
+        publish: (ch: string, data: unknown) => {
+          published.push({ ch, data })
+          return Promise.resolve()
+        },
+      },
+    })
+    const reactive = createReactiveQueries({ publish: handler.publish })
+    await makeMultiTableQuery(reactive)(undefined)
+
+    await reactive.invalidate([
+      {
+        table: 'widgets',
+        operation: 'insert',
+        affectedRows: [{ teamId: 'A' }],
+      },
+    ])
+
+    expect(published.some((p) => p.ch === REALTIME_BATCH_CHANNEL)).toBe(false)
   })
 })

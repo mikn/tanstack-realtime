@@ -3,7 +3,7 @@
  * Pattern: server-synced collection with insert / delete semantics.
  */
 import { For, createSignal } from 'solid-js'
-import { realtimeCollectionOptions } from '@tanstack/realtime'
+import { realtimeCollectionOptions } from '@realtimejs/core'
 import { client, userId } from '../transport.js'
 import { createCollectionSync } from '../createCollectionSync.js'
 

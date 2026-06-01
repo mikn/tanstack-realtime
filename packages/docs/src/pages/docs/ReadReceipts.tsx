@@ -236,9 +236,9 @@ export function ReadReceipts() {
     <article className="doc-article">
       <h1>Read Receipts</h1>
       <p className="doc-lead">
-        Show users when their messages have been seen. TanStack Realtime
-        supports two approaches: <strong>presence-based</strong> for ephemeral
-        "last seen" state that lives only while users are connected, and{' '}
+        Show users when their messages have been seen. realtime.js supports two
+        approaches: <strong>presence-based</strong> for ephemeral "last seen"
+        state that lives only while users are connected, and{' '}
         <strong>collection-based</strong> for durable read receipts persisted to
         your database.
       </p>
@@ -277,7 +277,7 @@ export function ReadReceipts() {
       <h3 id="presence-channel">1. Define the presence channel</h3>
       <CodeBlock
         title="features/chat/presence.ts"
-        code={`import { createPresenceChannel } from '@tanstack/realtime'
+        code={`import { createPresenceChannel } from '@realtimejs/core'
 
 export interface ChatPresenceData {
   userId: string
@@ -303,7 +303,7 @@ export const chatPresence = createPresenceChannel({
       </p>
       <CodeBlock
         title="features/chat/ChatRoom.tsx"
-        code={`import { usePresence } from '@tanstack/react-realtime'
+        code={`import { usePresence } from '@realtimejs/react'
 import { chatPresence, type ChatPresenceData } from './presence'
 
 function ChatRoom({ roomId, currentUser }: { roomId: string; currentUser: User }) {
@@ -343,7 +343,7 @@ function ChatRoom({ roomId, currentUser }: { roomId: string; currentUser: User }
       </p>
       <CodeBlock
         title="features/chat/MessageList.tsx"
-        code={`import type { PresenceUser } from '@tanstack/react-realtime'
+        code={`import type { PresenceUser } from '@realtimejs/react'
 import type { ChatPresenceData } from './presence'
 
 interface Props {
@@ -483,7 +483,7 @@ export const readReceiptsOptions = (roomId: string) => ({
       </p>
       <CodeBlock
         title="features/chat/ChatRoom.tsx"
-        code={`import { useRealtimeCollection } from '@tanstack/react-realtime'
+        code={`import { useRealtimeCollection } from '@realtimejs/react'
 import { useLiveQuery } from '@tanstack/react-db'
 import { readReceiptsOptions } from './readReceiptsCollection'
 import type { ReadReceipt } from '../../db/schema'

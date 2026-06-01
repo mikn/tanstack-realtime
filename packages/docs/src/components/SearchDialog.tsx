@@ -10,11 +10,25 @@ interface SearchEntry {
 const searchIndex: Array<SearchEntry> = [
   // Overview
   {
+    label: 'Why realtime.js',
+    hash: '#/docs/why',
+    section: 'Overview',
+    keywords:
+      'why bring your own backend vendor-neutral no platform no lock-in no per-seat sync convex comparison capability matrix progressive adoption',
+  },
+  {
     label: 'Getting Started',
     hash: '#/docs/getting-started',
     section: 'Overview',
     keywords:
-      'install setup quick start server handler createStartHandler provider',
+      'install setup quick start server handler createStartHandler createReactiveQueries provider transport',
+  },
+  {
+    label: 'Tutorial: Task Board',
+    hash: '#/docs/tutorial',
+    section: 'Overview',
+    keywords:
+      'tutorial task board walkthrough end-to-end preset-start adapter-sse reactive-drizzle drizzle schema presence',
   },
   {
     label: 'Collections',
@@ -117,7 +131,7 @@ const searchIndex: Array<SearchEntry> = [
     hash: '#/docs/transports',
     section: 'Infrastructure',
     keywords:
-      'transport SSE websocket centrifugo adapter sseTransport centrifugoTransport',
+      'transport SSE websocket centrifugo adapter sseTransport centrifugoTransport pusher soketi partykit durable objects pusherTransport partykitTransport capabilities conformance',
   },
   {
     label: 'Resilience',

@@ -3,8 +3,8 @@
  * Styles and HTML shell live in index.html (Vite entry point).
  */
 import { Outlet, createRootRoute } from '@tanstack/react-router'
-import { RealtimeProvider } from '@tanstack/react-realtime'
-import { RealtimeDevtools } from '@tanstack/react-realtime-devtools'
+import { RealtimeProvider } from '@realtimejs/react'
+import { RealtimeDevtools } from '@realtimejs/react-devtools'
 import { client } from '../transport.js'
 
 export const Route = createRootRoute({

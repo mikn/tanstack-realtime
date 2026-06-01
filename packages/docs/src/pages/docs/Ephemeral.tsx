@@ -420,7 +420,7 @@ export function Ephemeral() {
       </p>
       <CodeBlock
         title="server/routes/reactions.ts"
-        code={`import { createValidatedPublish } from '@tanstack/realtime'
+        code={`import { createValidatedPublish } from '@realtimejs/core'
 import { realtime } from './realtime.server'
 
 // Validate and re-broadcast incoming reaction events.
@@ -453,7 +453,7 @@ export const publishReaction = createValidatedPublish({
       <CodeBlock
         title="features/reactions/collection.ts"
         code={`import { createCollection } from '@tanstack/db'
-import { ephemeralLiveOptions } from '@tanstack/realtime'
+import { ephemeralLiveOptions } from '@realtimejs/core'
 import { realtimeClient } from '../client'
 
 interface Reaction {
@@ -485,7 +485,7 @@ export const reactionsCollection = createCollection(
       <CodeBlock
         title="features/reactions/ReactionBar.tsx"
         code={`import { useLiveQuery } from '@tanstack/react-db'
-import { usePublish } from '@tanstack/react-realtime'
+import { usePublish } from '@realtimejs/react'
 import { reactionsCollection } from './collection'
 
 const EMOJIS = ['👍', '❤️', '😂', '🔥', '🎉']
@@ -553,7 +553,7 @@ function ReactionBar({ postId }: { postId: string }) {
       <CodeBlock
         title="features/viewing/collection.ts"
         code={`import { createCollection } from '@tanstack/db'
-import { ephemeralLiveOptions } from '@tanstack/realtime'
+import { ephemeralLiveOptions } from '@realtimejs/core'
 import { realtimeClient } from '../client'
 
 interface Viewer {
@@ -589,7 +589,7 @@ export const viewersCollection = createCollection(
         title="features/viewing/ViewingIndicator.tsx"
         code={`import { useEffect } from 'react'
 import { useLiveQuery } from '@tanstack/react-db'
-import { usePublish } from '@tanstack/react-realtime'
+import { usePublish } from '@realtimejs/react'
 import { viewersCollection } from './collection'
 
 const HEARTBEAT_INTERVAL = 3000  // ms
@@ -658,7 +658,7 @@ function ViewingIndicator({ pageId }: { pageId: string }) {
       <h3 id="cursor-channel">Define a presence channel</h3>
       <CodeBlock
         title="features/cursors/channel.ts"
-        code={`import { createPresenceChannel } from '@tanstack/realtime'
+        code={`import { createPresenceChannel } from '@realtimejs/core'
 
 export interface CursorPresenceData {
   name: string
@@ -676,8 +676,8 @@ export const cursorPresence = createPresenceChannel({
       <h3 id="cursor-component">Cursor-aware component</h3>
       <CodeBlock
         title="features/cursors/CollaborativeCanvas.tsx"
-        code={`import { usePresence } from '@tanstack/react-realtime'
-import { throttle } from '@tanstack/realtime'
+        code={`import { usePresence } from '@realtimejs/react'
+import { throttle } from '@realtimejs/core'
 import { useMemo } from 'react'
 import { cursorPresence, type CursorPresenceData } from './channel'
 
@@ -788,7 +788,7 @@ function CollaborativeCanvas({ documentId }: { documentId: string }) {
         code={`// ── Persistent side ──────────────────────────────────────────────────────
 // A PN-Counter CRDT that survives reconnects and page reloads.
 // Concurrent increments from multiple users never get lost.
-import { defineSyncedCounter } from '@tanstack/realtime'
+import { defineSyncedCounter } from '@realtimejs/core'
 
 export const reactionCounter = defineSyncedCounter({
   id: 'reaction-count',
@@ -798,7 +798,7 @@ export const reactionCounter = defineSyncedCounter({
 // ── Ephemeral side ───────────────────────────────────────────────────────
 // Short-lived reaction events for the flying-emoji animation.
 import { createCollection } from '@tanstack/db'
-import { ephemeralLiveOptions } from '@tanstack/realtime'
+import { ephemeralLiveOptions } from '@realtimejs/core'
 import { realtimeClient } from '../client'
 
 interface EphemeralReaction {
@@ -826,8 +826,8 @@ export const ephemeralReactions = createCollection(
       <CodeBlock
         title="features/reactions/PostReactions.tsx"
         code={`import { useLiveQuery } from '@tanstack/react-db'
-import { usePublish } from '@tanstack/react-realtime'
-import { useSyncedCounter } from '@tanstack/react-realtime'
+import { usePublish } from '@realtimejs/react'
+import { useSyncedCounter } from '@realtimejs/react'
 import { reactionCounter, ephemeralReactions } from './combined'
 
 function PostReactions({ postId }: { postId: string }) {
@@ -896,7 +896,7 @@ function PostReactions({ postId }: { postId: string }) {
       <h3 id="confetti-client">Client &mdash; celebration event listener</h3>
       <CodeBlock
         title="features/celebrations/CelebrationOverlay.tsx"
-        code={`import { useSubscribe } from '@tanstack/react-realtime'
+        code={`import { useSubscribe } from '@realtimejs/react'
 import confetti from 'canvas-confetti'
 
 function CelebrationOverlay({ projectId }: { projectId: string }) {
@@ -917,7 +917,7 @@ function CelebrationOverlay({ projectId }: { projectId: string }) {
       <CodeBlock
         title="server/routes/goals.ts"
         code={`// Server — trigger confetti when a goal is reached
-import { serializeKey } from '@tanstack/realtime'
+import { serializeKey } from '@realtimejs/core'
 import { sseHandler } from './realtime.server'
 
 export async function completeGoal(goalId: string, projectId: string) {
@@ -957,7 +957,7 @@ export async function completeGoal(goalId: string, projectId: string) {
       <h3 id="toast-client">Client &mdash; notification listener</h3>
       <CodeBlock
         title="features/notifications/NotificationListener.tsx"
-        code={`import { useSubscribe } from '@tanstack/react-realtime'
+        code={`import { useSubscribe } from '@realtimejs/react'
 import { toast } from 'your-toast-library'  // sonner, react-hot-toast, etc.
 
 function NotificationListener() {
@@ -988,7 +988,7 @@ function App() {
       <CodeBlock
         title="server/routes/notifications.ts"
         code={`// Server — broadcast a toast notification to all connected clients
-import { serializeKey } from '@tanstack/realtime'
+import { serializeKey } from '@realtimejs/core'
 import { sseHandler } from './realtime.server'
 
 export async function broadcastNotification(notification: {

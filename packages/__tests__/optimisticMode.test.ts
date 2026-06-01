@@ -14,12 +14,12 @@ import { Store } from '@tanstack/store'
 import {
   createRealtimeClient,
   realtimeCollectionOptions,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 import type {
   ConnectionStatus,
   RealtimeChannelMessage,
   RealtimeTransport,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 import type { CollectionConfig } from '@tanstack/db'
 
 // ---------------------------------------------------------------------------
@@ -451,10 +451,11 @@ describe('realtimeCollectionOptions — optimistic mode', () => {
       optimistic: true,
       onInsert: () => {
         insertCall++
-        if (insertCall === 1) {
-          return { id: '1', title: 'first' }
-        }
-        return { id: '2', title: 'second' }
+        return Promise.resolve(
+          insertCall === 1
+            ? { id: '1', title: 'first' }
+            : { id: '2', title: 'second' },
+        )
       },
     })
     const { ops } = driveSync(config)

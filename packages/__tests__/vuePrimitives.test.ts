@@ -1,5 +1,5 @@
 /**
- * Tests for the @tanstack/vue-realtime composable behavior.
+ * Tests for the @realtimejs/vue composable behavior.
  *
  * These tests verify the underlying logic that each Vue composable encapsulates
  * using the core framework-agnostic API directly. They serve as a contract
@@ -39,7 +39,7 @@ import {
   pnIncrement,
   pnValue,
   tickClock,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -261,7 +261,7 @@ describe('usePresence contract', () => {
     const { client } = makePresenceClient()
 
     const channel = 'room:roomId=1'
-    const received: Array<Array<unknown>> = []
+    const received: Array<ReadonlyArray<unknown>> = []
     client.subscribe(channel, () => {})
     client.onPresenceChange(channel, (users) => received.push(users))
     client.joinPresence(channel, { name: 'Alice' })
@@ -274,10 +274,10 @@ describe('usePresence contract', () => {
     const { client } = makePresenceClient()
 
     const channel = 'room:roomId=1'
-    const received: Array<Array<{ data: { name: string } }>> = []
+    const received: Array<ReadonlyArray<{ data: { name: string } }>> = []
     client.subscribe(channel, () => {})
     client.onPresenceChange(channel, (users) =>
-      received.push(users as Array<{ data: { name: string } }>),
+      received.push(users as ReadonlyArray<{ data: { name: string } }>),
     )
     client.joinPresence(channel, { name: 'Alice' })
 

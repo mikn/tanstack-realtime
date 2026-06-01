@@ -25,7 +25,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createSseHandler, sseTransport } from '@tanstack/realtime-adapter-sse'
+import { createSseHandler, sseTransport } from '@realtimejs/adapter-sse'
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>realtime.js — Chat</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: system-ui, sans-serif;
+        background: #f5f5f5;
+        color: #111;
+        height: 100vh;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 200px 1fr;
+        height: 100vh;
+      }
+      .sidebar {
+        background: #1e293b;
+        color: #e2e8f0;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+      }
+      .sidebar h2 {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #94a3b8;
+        margin-bottom: 8px;
+      }
+      .users {
+        list-style: none;
+        flex: 1;
+      }
+      .users li {
+        padding: 4px 0;
+        font-size: 14px;
+      }
+      .users li.me {
+        color: #38bdf8;
+        font-weight: 600;
+      }
+      .status {
+        font-size: 12px;
+        color: #94a3b8;
+      }
+      .dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 4px;
+        background: #64748b;
+      }
+      .dot.connected {
+        background: #22c55e;
+      }
+      .chat {
+        display: flex;
+        flex-direction: column;
+        padding: 16px;
+      }
+      .messages {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .msg {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 6px 10px;
+        max-width: 70%;
+        font-size: 14px;
+      }
+      .msg.own {
+        align-self: flex-end;
+        background: #dbeafe;
+      }
+      .msg .author {
+        display: block;
+        font-size: 11px;
+        color: #6b7280;
+        margin-bottom: 2px;
+      }
+      .typing {
+        height: 20px;
+        font-size: 12px;
+        color: #6b7280;
+        font-style: italic;
+        margin: 4px 0;
+      }
+      .composer {
+        display: flex;
+        gap: 8px;
+      }
+      .composer input {
+        flex: 1;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        padding: 8px 10px;
+        font-size: 14px;
+      }
+      .composer button {
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 8px 16px;
+        cursor: pointer;
+      }
+      .composer button:hover {
+        background: #1d4ed8;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

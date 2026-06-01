@@ -5,8 +5,8 @@
  *
  * withPresence wraps sseTransport to add presence over pub/sub channels.
  */
-import { createRealtimeClient } from '@tanstack/vue-realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+import { createRealtimeClient } from '@realtimejs/vue'
+import { sseTransport } from '@realtimejs/adapter-sse'
 import { withPresence } from './withPresence.js'
 
 const params = new URLSearchParams(

@@ -3,7 +3,7 @@
  * Pattern: append-only event stream (chat messages).
  */
 import { For, createSignal } from 'solid-js'
-import { liveChannelOptions } from '@tanstack/realtime'
+import { liveChannelOptions } from '@realtimejs/core'
 import { client, userId } from '../transport.js'
 import { createCollectionSync } from '../createCollectionSync.js'
 

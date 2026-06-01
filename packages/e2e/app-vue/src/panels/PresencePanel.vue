@@ -6,7 +6,7 @@
  * Re-announces presence every 2 s so late-joining peers can discover us.
  */
 import { onMounted, onUnmounted, ref } from 'vue'
-import { usePresence, useSyncedValue } from '@tanstack/vue-realtime'
+import { usePresence, useSyncedValue } from '@realtimejs/vue'
 import { roomPresence, sharedValue } from '../defs.js'
 import { userId } from '../transport.js'
 

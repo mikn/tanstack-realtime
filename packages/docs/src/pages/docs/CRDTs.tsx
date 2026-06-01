@@ -535,8 +535,8 @@ export function CRDTs() {
       </p>
       <CodeBlock
         title="useSyncedCounter"
-        code={`import { defineSyncedCounter } from '@tanstack/realtime'
-import { useSyncedCounter } from '@tanstack/react-realtime'
+        code={`import { defineSyncedCounter } from '@realtimejs/core'
+import { useSyncedCounter } from '@realtimejs/react'
 
 const postVotes = defineSyncedCounter({
   id: 'post-votes',
@@ -560,8 +560,8 @@ function VoteButton({ postId }: { postId: string }) {
       />
       <CodeBlock
         title="useSyncedSet"
-        code={`import { defineSyncedSet } from '@tanstack/realtime'
-import { useSyncedSet } from '@tanstack/react-realtime'
+        code={`import { defineSyncedSet } from '@realtimejs/core'
+import { useSyncedSet } from '@realtimejs/react'
 
 const postTags = defineSyncedSet({
   id: 'post-tags',
@@ -617,8 +617,8 @@ function TagEditor({ postId }: { postId: string }) {
       <CodeBlock
         title="Wrapping useSyncedValue with an undo stack"
         code={`import { useCallback, useRef } from 'react'
-import { defineSyncedValue } from '@tanstack/realtime'
-import { useSyncedValue } from '@tanstack/react-realtime'
+import { defineSyncedValue } from '@realtimejs/core'
+import { useSyncedValue } from '@realtimejs/react'
 
 const docTitle = defineSyncedValue<string>({
   id: 'doc-title',
@@ -675,10 +675,10 @@ function EditableTitle({ docId }: { docId: string }) {
 
       <h3 id="rich-text-undo">Rich text: use Y.js UndoManager</h3>
       <p>
-        For character-level collaborative text editing, TanStack
-        Realtime&rsquo;s field-level CRDTs aren&rsquo;t the right tool. They
-        operate on whole-field granularity (replacing the entire value), not
-        individual characters or ranges.
+        For character-level collaborative text editing, realtime.js&rsquo;s
+        field-level CRDTs aren&rsquo;t the right tool. They operate on
+        whole-field granularity (replacing the entire value), not individual
+        characters or ranges.
       </p>
       <p>
         Use a dedicated rich-text CRDT library such as <strong>Y.js</strong> or{' '}
@@ -695,8 +695,8 @@ function EditableTitle({ docId }: { docId: string }) {
         <p>
           <strong>Summary:</strong> Field-level CRDTs are designed for
           structured data (forms, settings, counters, tag sets). For rich text
-          collaboration with proper undo, pair TanStack Realtime as the
-          transport with Y.js as the CRDT engine.
+          collaboration with proper undo, pair realtime.js as the transport with
+          Y.js as the CRDT engine.
         </p>
       </div>
 

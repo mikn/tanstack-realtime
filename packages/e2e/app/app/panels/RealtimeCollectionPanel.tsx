@@ -10,7 +10,7 @@
  */
 
 import { useRef, useState } from 'react'
-import { realtimeCollectionOptions } from '@tanstack/realtime'
+import { realtimeCollectionOptions } from '@realtimejs/core'
 import { client, userId } from '../transport.js'
 import { useCollectionSync } from '../useCollectionSync.js'
 

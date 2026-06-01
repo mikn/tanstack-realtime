@@ -5,8 +5,8 @@ export function ChoosingAPattern() {
     <article className="doc-article">
       <h1>Choosing a Pattern</h1>
       <p className="doc-lead">
-        TanStack Realtime has several patterns for different use cases. Most
-        apps only need one or two.
+        realtime.js has several patterns for different use cases. Most apps only
+        need one or two.
       </p>
 
       <div className="doc-callout">
@@ -113,7 +113,7 @@ const { data: active } = useLiveQuery(
             <td>Do you need to show who is currently online?</td>
             <td>
               <a href="#/docs/presence">
-                <code>presenceChannelOptions</code>
+                <code>createPresenceChannel</code> + <code>usePresence</code>
               </a>
             </td>
           </tr>
@@ -218,7 +218,7 @@ const { data: active } = useLiveQuery(
           <tr>
             <td>
               <a href="#/docs/presence">
-                <code>presenceChannelOptions</code>
+                <code>usePresence</code>
               </a>
             </td>
             <td>read-only</td>
@@ -250,20 +250,37 @@ const { data: active } = useLiveQuery(
         code={`// Live data from your server functions
 useQuery(getIssues, { projectId }, { getKey: (i) => i.id })
 
-// Who is viewing this board right now
-presenceChannelOptions({ channel: ['board', { id }], ... })`}
+// Who is viewing this board right now — define the channel once...
+const boardPresence = createPresenceChannel({
+  id: 'board-presence',
+  channel: ({ id }: { id: string }) => ['board', { id }],
+})
+
+// ...then join + observe in a component (keyed by connectionId)
+const { others, updatePresence } = usePresence(boardPresence, {
+  params: { id },
+  initial: { name: currentUser.name },
+})`}
       />
 
       <h3>Chat app</h3>
       <CodeBlock
-        code={`// Message history + live messages
-liveChannelOptions({ channel: ['room', { id }], ... })
+        code={`// Message history + live messages (TanStack DB collection)
+liveChannelOptions({ client, channel: ['room', { id }], ... })
 
 // Typing indicators (auto-expire after 3s)
-ephemeralLiveOptions({ channel: ['typing', { id }], ttl: 3000, ... })
+ephemeralLiveOptions({ client, channel: ['typing', { id }], ttl: 3000, ... })
 
-// Who is in this room
-presenceChannelOptions({ channel: ['room', { id }], ... })`}
+// Who is in this room — join + observe via the presence hook
+const roomPresence = createPresenceChannel({
+  id: 'room-presence',
+  channel: ({ id }: { id: string }) => ['room', { id }],
+})
+const { others } = usePresence(roomPresence, {
+  params: { id },
+  initial: { name: currentUser.name },
+})
+// Each peer is a PresenceUser keyed by connectionId (u.connectionId)`}
       />
 
       <h3>AI assistant</h3>
@@ -282,7 +299,7 @@ streamChannelOptions({ channel: ['stream', { sessionId }], ... })`}
         CRUD automatically:
       </p>
       <CodeBlock
-        code={`import { useRealtimeCollection } from '@tanstack/react-realtime'
+        code={`import { useRealtimeCollection } from '@realtimejs/react'
 import { useLiveQuery } from '@tanstack/react-db'
 
 function TodoList() {

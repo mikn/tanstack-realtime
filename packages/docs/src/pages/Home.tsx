@@ -5,14 +5,18 @@ function Hero() {
     <section className="hero">
       <div className="hero-glow" />
       <div className="container">
-        <span className="badge">v0.1 &middot; Alpha</span>
+        <span className="badge">
+          v0.1 &middot; Experimental &middot; pre-1.0
+        </span>
         <h1>
-          Reactive queries. <span className="gradient-text">Any backend.</span>
+          <span className="logo-tan">realtime</span>
+          <span className="gradient-text">.js</span>
         </h1>
+        <p className="hero-tagline">Bring your own backend.</p>
         <p className="hero-sub">
-          Wrap a server function with <code>realtime.query()</code> and every
-          subscriber updates automatically. Your database, your ORM, your
-          deployment target.
+          The kitchen sink you actually need for proper realtime &mdash; sync,
+          presence, CRDTs, and offline &mdash; with no platform and no per-seat
+          bill. Keep your server, your database, your deploy target.
         </p>
 
         <div className="hero-code">
@@ -38,7 +42,7 @@ const { data, collection } = useQuery(getTodos, { teamId }, {
           </a>
         </div>
         <div className="hero-install">
-          <code>npm i @tanstack/realtime @tanstack/react-realtime</code>
+          <code>npm i @realtimejs/core @realtimejs/react</code>
           <p className="hero-install-alt">
             Also available for <a href="#/docs/solid-primitives">Solid</a> and{' '}
             <a href="#/docs/vue-composables">Vue</a>
@@ -77,18 +81,23 @@ const { data: active } = useLiveQuery(
     },
     {
       title: 'Presence',
-      desc: 'Who is online, cursor positions, typing indicators. Same transport connection.',
+      desc: 'Who is online, cursor positions, typing indicators. Needs a presence-capable transport (Centrifugo, Pusher, PartyKit).',
       code: `const { others } = usePresence(roomPresence, {
-  initialData: { cursor: { x: 0, y: 0 }, name },
+  params: { roomId },
+  initial: { cursor: { x: 0, y: 0 }, name },
 })`,
     },
     {
       title: 'Streaming',
       desc: 'Reduce-based state from ordered event streams. Resumable with HMAC checkpoints.',
-      code: `const { state, status } = useStream(aiStream, {
-  initial: '',
-  reduce: (text, token) => text + token,
-})`,
+      code: `const aiStream = createStreamChannel({
+  id: 'ai',
+  channel: (p: { requestId: string }) => ['ai', p],
+  initial: { content: '' },
+  reduce: (s, e: { token?: string }) => ({ content: s.content + (e.token ?? '') }),
+})
+
+const { state, status } = useStream(aiStream, { params: { requestId } })`,
     },
   ]
 
@@ -189,9 +198,9 @@ function Positioning() {
       <div className="container">
         <h2>What this is (and isn&rsquo;t)</h2>
         <p className="section-sub">
-          TanStack Realtime is a sync layer. It makes server functions reactive
-          and adds presence, CRDTs, and pub/sub. It is not a database, not a
-          hosting platform, and not a full backend.
+          <code>realtime.js</code> is a sync layer. It makes server functions
+          reactive and adds presence, CRDTs, and pub/sub. It is not a database,
+          not a hosting platform, and not a full backend &mdash; bring your own.
         </p>
 
         <div className="positioning-grid">
@@ -227,8 +236,8 @@ function Positioning() {
                 PowerSync replicate at the WAL level. Different architecture.
               </li>
               <li>
-                <strong>Rich text?</strong> Yjs is purpose-built. TanStack
-                Realtime works as a{' '}
+                <strong>Rich text?</strong> Yjs is purpose-built.{' '}
+                <code>realtime.js</code> works as a{' '}
                 <a href="#/docs/rich-text-crdts">transport for Y.js</a>, not a
                 replacement.
               </li>
@@ -290,7 +299,7 @@ function Features() {
       features: [
         {
           title: 'Transport-agnostic',
-          desc: 'SSE or Centrifugo (WebSocket). Swap transports without changing application code.',
+          desc: 'SSE, Centrifugo, Pusher/Soketi, or PartyKit. Swap transports without changing application code.',
         },
         {
           title: 'Type-safe end to end',
@@ -334,6 +343,57 @@ function Features() {
   )
 }
 
+function Transports() {
+  const transports = [
+    {
+      title: 'SSE',
+      tag: 'Serverless-friendly',
+      desc: 'Receive-only HTTP. Works behind every proxy and CDN, runs on edge and serverless. The TanStack Start preset uses it under the hood. No presence — pair it with a provider for that.',
+    },
+    {
+      title: 'Centrifugo',
+      tag: 'Self-hosted scale',
+      desc: 'WebSocket server you run. Bidirectional, with presence and gap replay built in. Scales across nodes natively.',
+    },
+    {
+      title: 'Pusher / Soketi',
+      tag: 'Managed or self-hosted',
+      desc: 'Hosted Pusher with zero servers, or self-host Soketi (Pusher-protocol compatible). Presence via presence channels.',
+    },
+    {
+      title: 'PartyKit',
+      tag: 'Edge / Durable Objects',
+      desc: 'Cloudflare Durable Objects at the edge. Bidirectional with presence; you deploy a small PartyKit server.',
+    },
+  ]
+  return (
+    <section id="transports" className="section">
+      <div className="container">
+        <h2>Bring your own transport</h2>
+        <p className="section-sub">
+          Four adapters ship today. Application code never references the
+          transport &mdash; swap one import and your collections, hooks, and
+          channels keep working. SSE handles the connection; for presence and
+          multi-instance fan-out, reach for a provider or add a{' '}
+          <code>PublishBackend</code>. See the{' '}
+          <a href="#/docs/transports">capability matrix</a> for the honest
+          per-provider breakdown.
+        </p>
+        <div className="features-grid">
+          {transports.map((t) => (
+            <div key={t.title} className="feature-card">
+              <h3>{t.title}</h3>
+              <p>
+                <strong>{t.tag}.</strong> {t.desc}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function QuickStart() {
   return (
     <section id="quickstart" className="section">
@@ -344,18 +404,16 @@ function QuickStart() {
           <div className="qs-step">
             <div className="qs-number">1</div>
             <h3>Install</h3>
-            <CodeBlock
-              code={`npm i @tanstack/realtime @tanstack/react-realtime`}
-            />
+            <CodeBlock code={`npm i @realtimejs/core @realtimejs/react`} />
           </div>
 
           <div className="qs-step">
             <div className="qs-number">2</div>
             <h3>Create a client</h3>
             <CodeBlock
-              code={`import { createRealtimeClient } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
-import { RealtimeProvider } from '@tanstack/react-realtime'
+              code={`import { createRealtimeClient } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
+import { RealtimeProvider } from '@realtimejs/react'
 
 const client = createRealtimeClient({
   transport: sseTransport({ url: '/api/realtime' }),
@@ -456,14 +514,59 @@ function Ecosystem() {
   )
 }
 
+function RunnableExamples() {
+  const examples = [
+    {
+      title: 'Collaborative todos',
+      desc: 'Live collections plus field-level CRDTs — concurrent edits merge with no conflicts.',
+      href: 'https://github.com/mikn/tanstack-realtime/tree/main/examples/collaborative-todos',
+    },
+    {
+      title: 'Chat',
+      desc: 'Channels and pub/sub — append-only live channels with history and typing indicators.',
+      href: 'https://github.com/mikn/tanstack-realtime/tree/main/examples/chat',
+    },
+    {
+      title: 'AI streaming',
+      desc: 'Reduce-based streaming state — ordered, resumable token streams to the client.',
+      href: 'https://github.com/mikn/tanstack-realtime/tree/main/examples/ai-streaming',
+    },
+  ]
+  return (
+    <section id="examples" className="section">
+      <div className="container">
+        <h2>Runnable examples</h2>
+        <p className="section-sub">
+          Full apps you can clone and run. Each one shows a different slice of
+          the library.
+        </p>
+        <div className="ecosystem-grid">
+          {examples.map((ex) => (
+            <a
+              key={ex.title}
+              className="eco-card"
+              href={ex.href}
+              target="_blank"
+              rel="noopener"
+            >
+              <h3>{ex.title}</h3>
+              <p>{ex.desc}</p>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function Community() {
   return (
     <section className="section">
       <div className="container">
         <h2>Built for the community</h2>
         <p className="section-sub">
-          TanStack Realtime is MIT-licensed and community-driven. Join the
-          conversation on{' '}
+          <code>realtime.js</code> is MIT-licensed and community-driven. Join
+          the conversation on{' '}
           <a
             href="https://github.com/mikn/tanstack-realtime"
             target="_blank"
@@ -491,9 +594,9 @@ function Footer() {
     <footer className="footer">
       <div className="container footer-inner">
         <div className="footer-brand">
-          <span className="logo-tan">TanStack</span>{' '}
-          <span className="logo-realtime">Realtime</span>
-          <p>Reactive queries. Any backend. Full control.</p>
+          <span className="logo-tan">realtime</span>
+          <span className="logo-realtime">.js</span>
+          <p>Bring your own backend. No platform, no per-seat bill.</p>
         </div>
         <div className="footer-links">
           <div>
@@ -538,8 +641,9 @@ function Footer() {
         </div>
         <div className="footer-bottom">
           <p>
-            &copy; {new Date().getFullYear()} mikn. MIT License. Not an official
-            TanStack project.
+            &copy; {new Date().getFullYear()} mikn. MIT License. An independent,
+            vendor-neutral project &mdash; not affiliated with or endorsed by
+            TanStack.
           </p>
         </div>
       </div>
@@ -555,8 +659,10 @@ export function Home() {
       <Spectrum />
       <Positioning />
       <Features />
+      <Transports />
       <QuickStart />
       <Ecosystem />
+      <RunnableExamples />
       <Community />
       <Footer />
     </>

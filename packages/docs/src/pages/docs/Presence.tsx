@@ -164,10 +164,25 @@ export function Presence() {
       <h2 id="try-it">Try it</h2>
       <PresenceDemo />
 
+      <div className="doc-callout">
+        <p>
+          <strong>Presence needs a presence-capable transport.</strong> Joining,
+          leaving, and tracking peers requires a bidirectional transport that
+          reports <code>capabilities.presence === true</code> &mdash;
+          Centrifugo, Pusher, or PartyKit. The SSE adapter is receive-only and
+          reports <code>capabilities.presence === false</code>, so{' '}
+          <code>usePresence</code> throws against it. Check{' '}
+          <code>client.capabilities.presence</code> before rendering presence
+          UI, or pick a presence-capable adapter. See the{' '}
+          <a href="#/docs/transports">Transports guide</a> for the capability
+          matrix.
+        </p>
+      </div>
+
       <h2 id="define-channel">Define a presence channel</h2>
       <CodeBlock
         title="presence/channel.ts"
-        code={`import { createPresenceChannel } from '@tanstack/realtime'
+        code={`import { createPresenceChannel } from '@realtimejs/core'
 
 export const docPresence = createPresenceChannel({
   id: 'doc-presence',
@@ -178,7 +193,7 @@ export const docPresence = createPresenceChannel({
       <h2 id="use-presence">Use in a component</h2>
       <CodeBlock
         title="presence/DocumentPage.tsx"
-        code={`import { usePresence } from '@tanstack/react-realtime'
+        code={`import { usePresence } from '@realtimejs/react'
 import { docPresence } from './channel'
 
 function DocumentPage({ docId }: { docId: string }) {
@@ -230,6 +245,67 @@ function DocumentPage({ docId }: { docId: string }) {
         </p>
       </div>
 
+      <h2 id="two-apis">Two presence APIs</h2>
+      <p>
+        There are two ways to consume presence, and they use{' '}
+        <strong>different shapes</strong> &mdash; don&rsquo;t mix them up:
+      </p>
+      <ul>
+        <li>
+          <strong>
+            <code>usePresence(def, {'{ params, initial }'})</code>
+          </strong>{' '}
+          (the hook API, shown above) &mdash; pair with a{' '}
+          <code>createPresenceChannel</code> definition. Each peer is a{' '}
+          <code>PresenceUser</code> with <code>connectionId</code> and{' '}
+          <code>data</code> fields (<code>u.connectionId</code>,{' '}
+          <code>u.data.name</code>). This is the right choice for almost all UI.
+        </li>
+        <li>
+          <strong>
+            <code>presenceChannelOptions({'{ client, channel }'})</code>
+          </strong>{' '}
+          (the TanStack DB collection API) &mdash; wrap it in{' '}
+          <code>createCollection</code> to query the live presence set with{' '}
+          <code>useLiveQuery</code> (sorting, joining, filtering). Rows are the
+          same <code>PresenceUser</code> shape, keyed by{' '}
+          <code>connectionId</code>. It only <em>observes</em> presence &mdash;
+          call <code>usePresence</code> (or <code>client.joinPresence</code>)
+          separately to announce the current user.
+        </li>
+      </ul>
+      <CodeBlock
+        title="presence/viewers.ts — DB-collection variant"
+        code={`import { createCollection } from '@tanstack/db'
+import { presenceChannelOptions } from '@realtimejs/core'
+import { realtimeClient } from '../client/realtime'
+
+// Observe who is viewing a document as a queryable collection.
+export const viewersCollection = (docId: string) =>
+  createCollection(
+    presenceChannelOptions<{ name: string; avatar: string }>({
+      client: realtimeClient,
+      channel: ['doc:presence', { docId }],
+      id: \`viewers-\${docId}\`,
+    }),
+  )
+
+// In a component — the current user still announces via usePresence,
+// and you query the collection for the live "others" list:
+//   const viewers = useLiveQuery((q) => q.from({ v: viewersCollection(docId) }))
+//   viewers.map((u) => u.connectionId)  // keyed by connectionId, not clientId`}
+      />
+      <div className="doc-callout">
+        <p>
+          <strong>
+            It&rsquo;s <code>connectionId</code>, not <code>clientId</code>.
+          </strong>{' '}
+          Both APIs key peers by <code>connectionId</code> and expose user data
+          under <code>.data</code>. There is no <code>user.clientId</code> on a{' '}
+          <code>PresenceUser</code>.
+        </p>
+      </div>
+
       <h2 id="contextual-presence">Contextual presence</h2>
       <p>
         Scope presence to a specific entity &mdash; a spreadsheet cell, a
@@ -238,8 +314,8 @@ function DocumentPage({ docId }: { docId: string }) {
       </p>
       <CodeBlock
         title="features/spreadsheet/CellPresence.tsx"
-        code={`import { usePresence } from '@tanstack/react-realtime'
-import { createPresenceChannel } from '@tanstack/realtime'
+        code={`import { usePresence } from '@realtimejs/react'
+import { createPresenceChannel } from '@realtimejs/core'
 import { useState } from 'react'
 
 // One presence channel per cell -- join when focused, leave on blur.
@@ -303,8 +379,8 @@ function Cell({ sheetId, cellId }: { sheetId: string; cellId: string }) {
       </p>
       <CodeBlock
         title="features/Canvas.tsx"
-        code={`import { throttle } from '@tanstack/realtime'
-import { usePresence } from '@tanstack/react-realtime'
+        code={`import { throttle } from '@realtimejs/core'
+import { usePresence } from '@realtimejs/react'
 import { useMemo, useCallback } from 'react'
 
 function Canvas({ docId }: { docId: string }) {

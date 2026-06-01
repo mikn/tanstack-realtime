@@ -5,7 +5,7 @@ import { CodeBlock } from '../../components/CodeBlock'
 // Interactive streaming demo
 // ---------------------------------------------------------------------------
 
-const SAMPLE_RESPONSE = `TanStack Realtime is a transport layer that adds live updates to your existing application. It plugs into whatever server and database you already have — no migration required. Start with a queryFn, add a channel to go live, and layer on CRDTs when you need conflict-free concurrent editing.`
+const SAMPLE_RESPONSE = `realtime.js is a transport layer that adds live updates to your existing application. It plugs into whatever server and database you already have — no migration required. Start with a queryFn, add a channel to go live, and layer on CRDTs when you need conflict-free concurrent editing.`
 
 function StreamDemo() {
   const [status, setStatus] = useState<
@@ -147,7 +147,7 @@ export function Streaming() {
       <h2 id="define-stream">Define a stream channel</h2>
       <CodeBlock
         title="features/ai/stream.ts"
-        code={`import { createStreamChannel, serverStreamCallbacks } from '@tanstack/realtime'
+        code={`import { createStreamChannel, serverStreamCallbacks } from '@realtimejs/core'
 
 export const aiResponseStream = createStreamChannel({
   id: 'ai-response',
@@ -167,7 +167,7 @@ export const aiResponseStream = createStreamChannel({
       <h2 id="consume-stream">Consume in React</h2>
       <CodeBlock
         title="features/ai/AIResponse.tsx"
-        code={`import { useStream } from '@tanstack/react-realtime'
+        code={`import { useStream } from '@realtimejs/react'
 import { aiResponseStream } from './stream'
 
 function AIResponse({ requestId }: { requestId: string }) {
@@ -188,9 +188,48 @@ function AIResponse({ requestId }: { requestId: string }) {
       />
 
       <h2 id="server-side">Server-side streaming</h2>
+      <p>
+        On the server, push events onto the channel the client subscribes to.
+        The TanStack Start preset exposes <code>realtime.createStream()</code>{' '}
+        (from <code>createStartHandler</code>) which wraps{' '}
+        <code>createServerStream</code> and uses the handler&rsquo;s{' '}
+        <code>publish</code> &mdash; so the same call works across multiple
+        server processes when a <code>PublishBackend</code> is configured. See{' '}
+        <a href="#/docs/server-functions">TanStack Start + Drizzle</a> for the{' '}
+        <code>realtime</code> composition.
+      </p>
+      <CodeBlock
+        title="app/server/functions/chat.ts"
+        code={`import { createServerFn } from '@tanstack/start'
+import { realtime } from '../realtime'
+
+export const askAI = createServerFn({ method: 'POST' }).handler(
+  async ({ data }: { data: { requestId: string; prompt: string } }) => {
+    const stream = realtime.createStream({
+      channel: ['ai', { requestId: data.requestId }],
+    })
+
+    try {
+      for await (const chunk of openai.stream(data.prompt)) {
+        await stream.push({ type: 'token', token: chunk.text })
+      }
+      await stream.done()
+    } catch (err) {
+      await stream.error(String(err))
+    }
+  },
+)`}
+      />
+      <p>
+        Outside TanStack Start, build the stream directly with{' '}
+        <code>createServerStream</code> from <code>@realtimejs/core</code> and
+        pass any <code>PublishFn</code> &mdash; for the SSE adapter that is{' '}
+        <code>sseHandler.broadcast</code>. This variant also takes an optional{' '}
+        <code>hmacKey</code> and server-side <code>checkpoint</code> config:
+      </p>
       <CodeBlock
         title="server/routes/chat.ts"
-        code={`import { createServerStream } from '@tanstack/realtime'
+        code={`import { createServerStream } from '@realtimejs/core'
 import { sseHandler } from '../realtime'
 
 app.post('/api/chat', async (req) => {
@@ -235,7 +274,7 @@ app.post('/api/chat', async (req) => {
       </p>
       <CodeBlock
         title="features/ai/stream.ts"
-        code={`import { createStreamChannel, serverStreamCallbacks } from '@tanstack/realtime'
+        code={`import { createStreamChannel, serverStreamCallbacks } from '@realtimejs/core'
 
 export const aiResponseStream = createStreamChannel({
   id: 'ai-response',
@@ -261,7 +300,7 @@ export const aiResponseStream = createStreamChannel({
       </p>
       <CodeBlock
         title="features/ai/AIResponse.tsx"
-        code={`import { useStream } from '@tanstack/react-realtime'
+        code={`import { useStream } from '@realtimejs/react'
 import { aiResponseStream } from './stream'
 
 function AIResponse({ requestId }: { requestId: string }) {
@@ -319,7 +358,7 @@ function AIResponse({ requestId }: { requestId: string }) {
       </p>
       <CodeBlock
         title="server/routes/ai-stream.ts"
-        code={`import { createServerStream } from '@tanstack/realtime'
+        code={`import { createServerStream } from '@realtimejs/core'
 import { sseHandler } from '../realtime'
 import { db } from '../db'
 
@@ -350,6 +389,23 @@ const stream = createServerStream({
           checkpoints every 50th event.
         </p>
       </div>
+
+      <h2 id="see-also">See also</h2>
+      <ul>
+        <li>
+          <a href="#/docs/channels">Channels &amp; Pub/Sub</a> &mdash; the raw{' '}
+          <code>subscribe</code>/<code>publish</code> layer streams are built on
+        </li>
+        <li>
+          <a href="#/docs/server-functions">TanStack Start + Drizzle</a> &mdash;
+          the <code>realtime.createStream()</code> composition and server wiring
+        </li>
+        <li>
+          <a href="#/docs/server-hooks">Server Lifecycle Hooks</a> &mdash;{' '}
+          <code>onFirstSubscriber</code> / <code>onChannelEmpty</code> for
+          starting and stopping producers
+        </li>
+      </ul>
     </article>
   )
 }

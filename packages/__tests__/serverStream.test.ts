@@ -16,8 +16,8 @@ import {
   serverStreamCallbacks,
   streamChannelOptions,
   verifyEventSignature,
-} from '@tanstack/realtime'
-import type { PublishFn } from '@tanstack/realtime'
+} from '@realtimejs/core'
+import type { PublishFn } from '@realtimejs/core'
 
 // ---------------------------------------------------------------------------
 // Tests: createServerStream (standalone)

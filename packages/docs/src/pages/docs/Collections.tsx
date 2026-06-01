@@ -19,7 +19,7 @@ export function Collections() {
       </p>
       <CodeBlock
         title="features/tasks/TaskList.tsx"
-        code={`import { useRealtimeCollection } from '@tanstack/react-realtime'
+        code={`import { useRealtimeCollection } from '@realtimejs/react'
 import { useLiveQuery } from '@tanstack/react-db'
 
 function TaskList({ projectId }: { projectId: string }) {
@@ -46,7 +46,7 @@ function TaskList({ projectId }: { projectId: string }) {
       </p>
       <CodeBlock
         title="features/tasks/collection.ts"
-        code={`import { withRest, realtimeCollectionOptions } from '@tanstack/realtime'
+        code={`import { withRest, realtimeCollectionOptions } from '@realtimejs/core'
 
 const tasksOptions = (projectId: string) =>
   realtimeCollectionOptions({
@@ -116,7 +116,7 @@ router.delete('/api/tasks/:id', async (req) => {
       <CodeBlock
         title="server/jobs/inventorySync.ts"
         code={`import { sseHandler } from '../realtime'
-import { serializeKey } from '@tanstack/realtime'
+import { serializeKey } from '@realtimejs/core'
 
 export async function syncInventory(productId: string) {
   const latestStock = await warehouseApi.getStock(productId)
@@ -161,17 +161,18 @@ export async function syncInventory(productId: string) {
         including conflicts detected by the server.
       </p>
       <CodeBlock
-        code={`import { isConflictError } from '@tanstack/realtime'
+        code={`import { isConflictError } from '@realtimejs/core'
 
 realtimeCollectionOptions({
   // ...
   optimistic: true,
   onOptimisticError: ({ error, action, key }) => {
+    // action is the mutation type: 'insert' | 'update' | 'delete'
     if (isConflictError(error)) {
       // error.current holds the authoritative server state
-      showConflictDialog({ current: error.current, attempted: action.modified })
+      showConflictDialog({ current: error.current, action, key })
     } else {
-      console.error('Mutation failed for key', key, error)
+      console.error(\`\${action} failed for key\`, key, error)
     }
   },
 })`}
@@ -193,25 +194,29 @@ realtimeCollectionOptions({
       <h2 id="subscribe-errors">Subscribe error handling</h2>
       <p>
         When a subscription is rejected &mdash; authorization denied, channel
-        not found, or a transport error &mdash; the transport emits a warning to
-        the console. To surface these errors in your UI, check the
-        client&rsquo;s connection status and handle transport-level events.
+        not found, or a transport error &mdash; the client emits a subscribe
+        error. The collection-level hooks surface it for you:{' '}
+        <code>liveChannelOptions</code> accepts an <code>onSubscribeError</code>{' '}
+        callback, and <code>useChannel</code> / <code>useSubscribe</code> return
+        a reactive <code>subscribeError</code>. To observe errors globally,
+        register a listener with <code>client.onSubscribeError</code>.
       </p>
       <CodeBlock
-        code={`// The transport logs subscribe rejections as console.warn messages.
-// To react programmatically, observe the client's connection status:
+        code={`import { useRealtime } from '@realtimejs/react'
+import { useEffect } from 'react'
 
-import { createRealtimeClient } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
-
-const baseTransport = sseTransport({ url: '/api/realtime' })
-
-// Listen for connection status changes
-const client = createRealtimeClient({ transport: baseTransport })
-
-// In your component, check status to show a banner
 function SyncBanner() {
-  const { status } = useRealtime()
+  const { status, client } = useRealtime()
+
+  // Surface per-channel subscribe rejections (e.g. authorization denied).
+  useEffect(
+    () =>
+      client.onSubscribeError((channel, reason, code) => {
+        toast.error(\`Subscription to \${channel} failed: \${reason} (\${code})\`)
+      }),
+    [client],
+  )
+
   if (status === 'disconnected') {
     return <div>Live updates unavailable. Check your connection.</div>
   }
@@ -236,7 +241,7 @@ function SyncBanner() {
         flush.
       </p>
       <CodeBlock
-        code={`import { useOfflineQueue, createLocalStorageAdapter } from '@tanstack/realtime'
+        code={`import { useOfflineQueue, createLocalStorageAdapter } from '@realtimejs/core'
 
 const queue = useOfflineQueue(baseTransport, {
   maxSize: 500,
@@ -253,6 +258,16 @@ const client = createRealtimeClient({ transport: baseTransport })`}
 
       <h2 id="see-also">See also</h2>
       <ul>
+        <li>
+          <a href="#/docs/server-functions">TanStack Start + Drizzle</a> &mdash;{' '}
+          <code>withServerFns</code> for end-to-end type-safe collections
+          without a REST layer
+        </li>
+        <li>
+          <a href="#/docs/reactive-queries">Reactive Queries</a> &mdash; the
+          auto-channel <code>realtime.query()</code> alternative for
+          Drizzle/Postgres
+        </li>
         <li>
           <a href="#/docs/crdts">CRDTs</a> &mdash; field-level conflict
           resolution with LWW registers, PN-Counters, and OR-Sets

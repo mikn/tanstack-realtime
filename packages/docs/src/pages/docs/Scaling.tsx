@@ -59,8 +59,8 @@ export function Scaling() {
 
       <h2 id="publish-backend-interface">The PublishBackend interface</h2>
       <p>
-        The interface lives in <code>@tanstack/realtime-preset-start</code> and
-        has exactly two methods. <code>publish</code> is required;{' '}
+        The interface lives in <code>@realtimejs/preset-start</code> and has
+        exactly two methods. <code>publish</code> is required;{' '}
         <code>subscribe</code> is optional but needed for multi-process fan-out.
       </p>
       <CodeBlock
@@ -93,7 +93,7 @@ export function Scaling() {
       <CodeBlock
         title="server/redis-backend.ts"
         code={`import Redis from 'ioredis'
-import type { PublishBackend } from '@tanstack/realtime-preset-start'
+import type { PublishBackend } from '@realtimejs/preset-start'
 
 const pub = new Redis(process.env.REDIS_URL!)
 const sub = new Redis(process.env.REDIS_URL!)
@@ -134,7 +134,7 @@ export const redisBackend: PublishBackend = {
       <CodeBlock
         title="server/pg-backend.ts"
         code={`import { Client } from 'pg'
-import type { PublishBackend } from '@tanstack/realtime-preset-start'
+import type { PublishBackend } from '@realtimejs/preset-start'
 
 const pgPub = new Client(process.env.DATABASE_URL!)
 const pgSub = new Client(process.env.DATABASE_URL!)
@@ -180,7 +180,7 @@ export const pgBackend: PublishBackend = {
       </p>
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
 import { redisBackend } from './redis-backend'
 
 export const realtime = createStartHandler({
@@ -203,7 +203,7 @@ export const realtimePublish = realtime.publish`}
       </p>
       <CodeBlock
         title="server/sse-with-backend.ts"
-        code={`import { createSseHandler } from '@tanstack/realtime-adapter-sse'
+        code={`import { createSseHandler } from '@realtimejs/adapter-sse'
 import { redisBackend } from './redis-backend'
 
 const sse = createSseHandler({ getUser: validateToken })
@@ -241,7 +241,7 @@ process.on('SIGTERM', () => {
       </p>
       <CodeBlock
         code={`// Client — uses centrifugoTransport, no PublishBackend needed
-import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
+import { centrifugoTransport } from '@realtimejs/adapter-centrifugo'
 
 const client = createRealtimeClient({
   transport: centrifugoTransport({
@@ -411,7 +411,7 @@ export class RealtimeChannel extends DurableObject {
       </ul>
       <CodeBlock
         title="Example: metrics + resource management"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
 import { redisBackend } from './redis-backend'
 import { metrics } from './metrics'
 import { startLiveQuery, stopLiveQuery } from './live-queries'

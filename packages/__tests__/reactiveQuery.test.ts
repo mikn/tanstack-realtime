@@ -15,20 +15,23 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createStartHandler } from '@realtimejs/preset-start'
 import {
-  createStartHandler,
+  createReactiveQueries,
+  createSubscriptionManager,
   wrapReactiveDb,
-} from '@tanstack/realtime-preset-start'
+} from '@realtimejs/reactive-drizzle'
 import {
   deriveCacheKey,
   getOrCreateQueryCollection,
+  lookupQueryCollection,
   serializeKey,
-} from '@tanstack/realtime'
-import { createSubscriptionManager } from '../realtime-preset-start/src/subscription-manager.js'
+} from '@realtimejs/core'
 import {
   REALTIME_BATCH_CHANNEL,
   clearRegistry,
-} from '../realtime/src/queryCollectionRegistry.js'
+  subscribeToRealtimeBatch,
+} from '../core/src/queryCollectionRegistry.js'
 
 // ---------------------------------------------------------------------------
 // Drizzle-compatible fake table objects (same pattern as reactiveLayer.test.ts)
@@ -110,18 +113,23 @@ function makeSelectDbNoWhere(queryResult: Array<any>) {
 
 describe('query factory — auto-derived channel', () => {
   it('returns { data, channel } with channel derived from WHERE teamId = A', async () => {
-    const handler = createStartHandler({ pingInterval: 0 })
+    const reactive = createReactiveQueries({})
     const db = makeSelectDb([{ id: 1, teamId: 'A' }])
 
-    const result = await handler.query(
+    const result = await reactive.query(
       async () => await db.select().from(fakeTable),
     )(undefined)
 
     expect(result).toHaveProperty('data')
     expect(result).toHaveProperty('channel')
     expect(result.data).toEqual([{ id: 1, teamId: 'A' }])
-    // Channel should be derived as todos:teamId=A
-    expect(result.channel).toBe(serializeKey(['todos', { teamId: 'A' }]))
+    // Channel prefix is the human-readable equality key (todos:teamId=A),
+    // followed by the :q=<hash> full-SQL discriminator.
+    expect(
+      result.channel.startsWith(
+        serializeKey(['todos', { teamId: 'A' }]) + ':q=',
+      ),
+    ).toBe(true)
   })
 
   it('returns the correct data alongside the channel', async () => {
@@ -129,10 +137,10 @@ describe('query factory — auto-derived channel', () => {
       { id: 1, teamId: 'A', done: false },
       { id: 2, teamId: 'A', done: true },
     ]
-    const handler = createStartHandler({ pingInterval: 0 })
+    const reactive = createReactiveQueries({})
     const db = makeSelectDb(todos)
 
-    const { data, channel } = await handler.query(
+    const { data, channel } = await reactive.query(
       async () => await db.select().from(fakeTable),
     )(undefined)
 
@@ -148,14 +156,14 @@ describe('query factory — auto-derived channel', () => {
 
 describe('query factory — registers subscription', () => {
   it('registers the channel in the subscriptionManager after call', async () => {
-    const handler = createStartHandler({ pingInterval: 0 })
+    const reactive = createReactiveQueries({})
     const db = makeSelectDb([{ id: 1, teamId: 'A' }])
 
-    const { channel } = await handler.query(
+    const { channel } = await reactive.query(
       async () => await db.select().from(fakeTable),
     )(undefined)
 
-    const activeChannels = handler.subscriptionManager.activeChannels()
+    const activeChannels = reactive.subscriptionManager.activeChannels()
     expect(activeChannels.has(channel)).toBe(true)
   })
 
@@ -171,14 +179,15 @@ describe('query factory — registers subscription', () => {
       backend,
       pingInterval: 0,
     })
+    const reactive = createReactiveQueries({ publish: handler.publish })
     const db = makeSelectDb([{ id: 1, teamId: 'A' }])
 
-    const { channel } = await handler.query(
+    const { channel } = await reactive.query(
       async () => await db.select().from(fakeTable),
     )(undefined)
 
     // Trigger invalidation with a matching row
-    await handler.invalidate([
+    await reactive.invalidate([
       { table: 'todos', operation: 'insert', affectedRows: [{ teamId: 'A' }] },
     ])
 
@@ -203,14 +212,15 @@ describe('query factory — registers subscription', () => {
       backend,
       pingInterval: 0,
     })
+    const reactive = createReactiveQueries({ publish: handler.publish })
     const db = makeSelectDb([{ id: 1, teamId: 'A' }])
 
-    const { channel } = await handler.query(
+    const { channel } = await reactive.query(
       async () => await db.select().from(fakeTable),
     )(undefined)
 
     // Row belongs to team B — should not invalidate team A's subscription
-    await handler.invalidate([
+    await reactive.invalidate([
       { table: 'todos', operation: 'insert', affectedRows: [{ teamId: 'B' }] },
     ])
 
@@ -229,29 +239,27 @@ describe('query factory — registers subscription', () => {
 
   it('two query calls with the same manager both register the same channel for same query', async () => {
     const mgr = createSubscriptionManager(vi.fn().mockResolvedValue(undefined))
-    const handlerA = createStartHandler({
-      subscriptionManager: mgr,
-      pingInterval: 0,
-    })
-    const handlerB = createStartHandler({
-      subscriptionManager: mgr,
-      pingInterval: 0,
-    })
+    const reactiveA = createReactiveQueries({ subscriptionManager: mgr })
+    const reactiveB = createReactiveQueries({ subscriptionManager: mgr })
 
     const dbA = makeSelectDb([])
     const dbB = makeSelectDb([])
 
-    await handlerA.query(async () => await dbA.select().from(fakeTable))(
+    await reactiveA.query(async () => await dbA.select().from(fakeTable))(
       undefined,
     )
-    await handlerB.query(async () => await dbB.select().from(fakeTable))(
+    await reactiveB.query(async () => await dbB.select().from(fakeTable))(
       undefined,
     )
 
     const channels = mgr.activeChannels()
-    const expectedChannel = serializeKey(['todos', { teamId: 'A' }])
-    // Both handlers used the same manager; channel should be registered (possibly overwritten once)
-    expect(channels.has(expectedChannel)).toBe(true)
+    const expectedPrefix = serializeKey(['todos', { teamId: 'A' }]) + ':q='
+    // Both engines ran the byte-identical query, so they derive the SAME
+    // channel (one registration overwrites the other — identical requery).
+    const matching = Array.from(channels).filter((c) =>
+      c.startsWith(expectedPrefix),
+    )
+    expect(matching.length).toBe(1)
   })
 })
 
@@ -261,27 +269,32 @@ describe('query factory — registers subscription', () => {
 
 describe('query factory — table-level channel (no WHERE)', () => {
   it('derives a table-level channel when query has no WHERE clause', async () => {
-    const handler = createStartHandler({ pingInterval: 0 })
+    const reactive = createReactiveQueries({})
     const db = makeSelectDbNoWhere([{ id: 1 }, { id: 2 }])
 
-    const { channel, data } = await handler.query(
+    const { channel, data } = await reactive.query(
       async () => await db.select().from(fakeTable),
     )(undefined)
 
-    expect(channel).toBe(serializeKey(['todos']))
+    // Table-level prefix + full-SQL discriminator.
+    expect(channel.startsWith(serializeKey(['todos']) + ':q=')).toBe(true)
     expect(data).toEqual([{ id: 1 }, { id: 2 }])
   })
 
   it('table-level channel is registered in subscriptionManager', async () => {
-    const handler = createStartHandler({ pingInterval: 0 })
+    const reactive = createReactiveQueries({})
     const db = makeSelectDbNoWhere([])
 
-    await handler.query(async () => await db.select().from(fakeTable))(
+    await reactive.query(async () => await db.select().from(fakeTable))(
       undefined,
     )
 
-    const channels = handler.subscriptionManager.activeChannels()
-    expect(channels.has(serializeKey(['todos']))).toBe(true)
+    const channels = reactive.subscriptionManager.activeChannels()
+    expect(
+      Array.from(channels).some((c) =>
+        c.startsWith(serializeKey(['todos']) + ':q='),
+      ),
+    ).toBe(true)
   })
 
   it('table-level subscription is triggered by affectedRows:[] invalidation', async () => {
@@ -296,14 +309,15 @@ describe('query factory — table-level channel (no WHERE)', () => {
       backend,
       pingInterval: 0,
     })
+    const reactive = createReactiveQueries({ publish: handler.publish })
     const db = makeSelectDbNoWhere([{ id: 1 }])
 
-    const { channel } = await handler.query(
+    const { channel } = await reactive.query(
       async () => await db.select().from(fakeTable),
     )(undefined)
 
     // Table-level invalidation (no specific rows)
-    await handler.invalidate([
+    await reactive.invalidate([
       { table: 'todos', operation: 'insert', affectedRows: [] },
     ])
 
@@ -2033,6 +2047,145 @@ describe('shared cache — deriveCacheKey edge cases', () => {
 })
 
 // ---------------------------------------------------------------------------
+// 19b. Batch fan-out over channelIndex Map<channel, Set<cacheKey>>
+// ---------------------------------------------------------------------------
+
+/**
+ * A mock client whose `subscribe` records each channel's callback so a test can
+ * drive a synthetic realtime batch through `subscribeToRealtimeBatch`.
+ */
+function makeRecordingClient() {
+  const callbacks = new Map<string, (msg: unknown) => void>()
+  return {
+    client: {
+      clientId: 'rec-client',
+      store: { state: { status: 'connected' } } as any,
+      connect: vi.fn().mockResolvedValue(undefined),
+      disconnect: vi.fn(),
+      destroy: vi.fn(),
+      subscribe: vi.fn((ch: string, cb: (msg: unknown) => void) => {
+        callbacks.set(ch, cb)
+        return () => callbacks.delete(ch)
+      }),
+      publish: vi.fn().mockResolvedValue(undefined),
+      joinPresence: vi.fn(),
+      leavePresence: vi.fn(),
+    } as any,
+    emitBatch(updates: Array<{ channel: string; data: unknown }>) {
+      callbacks.get(REALTIME_BATCH_CHANNEL)?.({
+        type: 'realtime_batch',
+        updates,
+      })
+    },
+  }
+}
+
+describe('batch fan-out — channelIndex Set<cacheKey>', () => {
+  beforeEach(() => {
+    clearRegistry()
+  })
+
+  it('two DISTINCT queries (different channels) each receive only their own update', async () => {
+    const { client, emitBatch } = makeRecordingClient()
+    const getKey = (item: { id: string }) => item.id
+
+    const serverFnA = vi.fn().mockResolvedValue({
+      data: [{ id: 'a0' }],
+      channel: 'todos:teamId=A:q=aaa',
+    })
+    const serverFnB = vi.fn().mockResolvedValue({
+      data: [{ id: 'b0' }],
+      channel: 'todos:teamId=A:q=bbb',
+    })
+
+    const entryA = getOrCreateQueryCollection(
+      'k::A',
+      serverFnA,
+      {},
+      getKey,
+      client,
+    )
+    const entryB = getOrCreateQueryCollection(
+      'k::B',
+      serverFnB,
+      {},
+      getKey,
+      client,
+    )
+    await (entryA.collection as any).stateWhenReady()
+    await (entryB.collection as any).stateWhenReady()
+
+    const unsub = subscribeToRealtimeBatch(client)
+
+    // One batch carrying both channels — each query gets ITS OWN data only.
+    emitBatch([
+      { channel: 'todos:teamId=A:q=aaa', data: [{ id: 'a1' }] },
+      { channel: 'todos:teamId=A:q=bbb', data: [{ id: 'b1' }] },
+    ])
+
+    const stateA = (entryA.collection as any).state as Map<string, any>
+    const stateB = (entryB.collection as any).state as Map<string, any>
+    expect([...stateA.keys()]).toEqual(['a1'])
+    expect([...stateB.keys()]).toEqual(['b1'])
+
+    unsub()
+  })
+
+  it('two IDENTICAL queries sharing one channel both update (Set fan-out), once each', async () => {
+    const { client, emitBatch } = makeRecordingClient()
+    const getKey = (item: { id: string }) => item.id
+    const sharedChannel = 'todos:teamId=A:q=same'
+
+    // Two distinct cache keys (e.g. two components) but the SAME derived
+    // channel because the query+args are byte-identical.
+    const makeFn = () =>
+      vi
+        .fn()
+        .mockResolvedValue({ data: [{ id: 'v0' }], channel: sharedChannel })
+    const entry1 = getOrCreateQueryCollection(
+      'k::1',
+      makeFn(),
+      {},
+      getKey,
+      client,
+    )
+    const entry2 = getOrCreateQueryCollection(
+      'k::2',
+      makeFn(),
+      {},
+      getKey,
+      client,
+    )
+    await (entry1.collection as any).stateWhenReady()
+    await (entry2.collection as any).stateWhenReady()
+
+    const applied1: Array<unknown> = []
+    const applied2: Array<unknown> = []
+    const orig1 = entry1.applyUpdate!
+    const orig2 = entry2.applyUpdate!
+    entry1.applyUpdate = (d) => {
+      applied1.push(d)
+      orig1(d)
+    }
+    entry2.applyUpdate = (d) => {
+      applied2.push(d)
+      orig2(d)
+    }
+
+    const unsub = subscribeToRealtimeBatch(client)
+    emitBatch([{ channel: sharedChannel, data: [{ id: 'v1' }] }])
+
+    // Both shared-channel queries updated, exactly once each.
+    expect(applied1).toEqual([[{ id: 'v1' }]])
+    expect(applied2).toEqual([[{ id: 'v1' }]])
+    expect((entry1.collection as any).state.get('v1')).toBeTruthy()
+    expect((entry2.collection as any).state.get('v1')).toBeTruthy()
+
+    unsub()
+  })
+})
+
+// ---------------------------------------------------------------------------
 // 20. Registry lifecycle
 // ---------------------------------------------------------------------------
 
@@ -2423,5 +2576,119 @@ describe('Adversarial / race conditions', () => {
     expect(
       ((collection as any).state as Map<string, any>).get('item')?.score,
     ).toBe(100)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 22. Multi-table queries — client batch fan-out across ALL channels (WP-C)
+//
+// A query whose server function returns multiple `channels` must update when a
+// __realtime_batch__ update arrives on ANY of them, and exactly ONCE when a
+// single batch carries updates for several of its channels (dedupe). This is
+// the client side of closing the multi-table silent-drop.
+// ---------------------------------------------------------------------------
+
+describe('multi-table query — client batch fan-out (WP-C)', () => {
+  beforeEach(() => {
+    clearRegistry()
+  })
+
+  /**
+   * A mock client whose `subscribe` captures the batch-channel callback so the
+   * test can drive __realtime_batch__ messages directly. Per-query channel
+   * subscriptions are no-ops here (we exercise the batch path).
+   */
+  function makeBatchClient() {
+    const client = makeMockClient()
+    let batchCb: ((msg: unknown) => void) | null = null
+    client.subscribe = vi
+      .fn()
+      .mockImplementation((ch: string, cb: (msg: unknown) => void) => {
+        if (ch === REALTIME_BATCH_CHANNEL) batchCb = cb
+        return () => {}
+      })
+    return {
+      client,
+      emitBatch: (updates: Array<{ channel: string; data: unknown }>) => {
+        batchCb?.({ type: 'realtime_batch', updates })
+      },
+    }
+  }
+
+  it('updates the query when a batch arrives on EITHER of its channels', async () => {
+    const { client, emitBatch } = makeBatchClient()
+    subscribeToRealtimeBatch(client)
+
+    const chA = 'todos:teamId=A'
+    const chB = 'projects:teamId=A'
+    const serverFn = vi.fn().mockResolvedValue({
+      data: [{ id: 'item', n: 0 }],
+      channel: chA,
+      channels: [chA, chB],
+    })
+    const getKey = (item: { id: string }) => item.id
+    const { collection } = getOrCreateQueryCollection<{
+      id: string
+      n: number
+    }>('test-group-22::either', serverFn, {}, getKey, client)
+    await (collection as any).stateWhenReady()
+
+    const getN = () =>
+      ((collection as any).state as Map<string, any>).get('item')?.n
+
+    // A batch on the FIRST channel updates the query.
+    emitBatch([{ channel: chA, data: [{ id: 'item', n: 1 }] }])
+    await new Promise((r) => setTimeout(r, 0))
+    expect(getN()).toBe(1)
+
+    // A batch on the SECOND channel ALSO updates the query.
+    emitBatch([{ channel: chB, data: [{ id: 'item', n: 2 }] }])
+    await new Promise((r) => setTimeout(r, 0))
+    expect(getN()).toBe(2)
+  })
+
+  it('applies the query refresh ONCE when a single batch carries both its channels', async () => {
+    const { client, emitBatch } = makeBatchClient()
+    subscribeToRealtimeBatch(client)
+
+    const chA = 'todos:teamId=A'
+    const chB = 'projects:teamId=A'
+
+    const key = 'test-group-22::dedupe'
+    const serverFn = vi.fn().mockResolvedValue({
+      data: [{ id: 'item', n: 0 }],
+      channel: chA,
+      channels: [chA, chB],
+    })
+    const getKey = (item: { id: string }) => item.id
+    const { collection } = getOrCreateQueryCollection<{
+      id: string
+      n: number
+    }>(key, serverFn, {}, getKey, client)
+    await (collection as any).stateWhenReady()
+
+    // Wrap the registry entry's applyUpdate to count how many times the batch
+    // fan-out applies a refresh for this query. Without dedupe this would be
+    // called twice (once per channel in the batch); with dedupe, exactly once.
+    const entry = lookupQueryCollection<{ id: string; n: number }>(key)!
+    const realApply = entry.applyUpdate!
+    let applyCount = 0
+    entry.applyUpdate = (data: unknown) => {
+      applyCount++
+      realApply(data)
+    }
+
+    // One batch carrying updates for BOTH of the query's channels — the same
+    // fresh result on each. Must apply once, not twice.
+    emitBatch([
+      { channel: chA, data: [{ id: 'item', n: 9 }] },
+      { channel: chB, data: [{ id: 'item', n: 9 }] },
+    ])
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(((collection as any).state as Map<string, any>).get('item')?.n).toBe(
+      9,
+    )
+    expect(applyCount).toBe(1)
   })
 })

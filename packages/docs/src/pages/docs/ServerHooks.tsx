@@ -34,20 +34,33 @@ export function ServerHooks() {
       <ul>
         <li>
           <strong>
-            <code>@tanstack/realtime-adapter-sse</code>
+            <code>@realtimejs/adapter-sse</code>
           </strong>{' '}
           — <code>createSseHandler</code>. Fetch-API compatible. Mount on any
           edge runtime, Hono, or bare Node.js.
         </li>
         <li>
           <strong>
-            <code>@tanstack/realtime-preset-start</code>
+            <code>@realtimejs/preset-start</code>
           </strong>{' '}
           — <code>createStartHandler</code>. Wraps <code>createSseHandler</code>{' '}
           and adds a first-class <code>publish</code> function plus optional{' '}
-          <code>PublishBackend</code> for multi-process fan-out.
+          <code>PublishBackend</code> for multi-process fan-out. Returns{' '}
+          <code>{'{ handle, publish, createStream, dispose }'}</code>.
         </li>
       </ul>
+      <div className="doc-callout">
+        <p>
+          The examples below assign the handler directly to a{' '}
+          <code>realtime</code> binding to focus on the auth/lifecycle surface.
+          When you also use the auto-reactive <code>realtime.query()</code>/
+          <code>realtime.mutation()</code> layer, the handler is one half of a
+          composition with <code>createReactiveQueries()</code> &mdash; see{' '}
+          <a href="#/docs/server-functions">TanStack Start + Drizzle</a> for the
+          full <code>realtime</code> object. The hook options documented here
+          are identical either way.
+        </p>
+      </div>
 
       {/* ------------------------------------------------------------------ */}
       <h2 id="getUser">
@@ -85,7 +98,7 @@ export function ServerHooks() {
       </p>
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
 import { verifyJwt } from './auth'
 
 export const realtime = createStartHandler({
@@ -107,7 +120,7 @@ export const realtimePublish = realtime.publish`}
       <h3>Session cookie</h3>
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
 import { getSession } from './auth'
 
 export const realtime = createStartHandler({
@@ -154,7 +167,7 @@ export const realtime = createStartHandler({
 
       <h3>Signature</h3>
       <CodeBlock
-        code={`import type { AuthorizeFn, ChannelPermissions, ParsedChannel } from '@tanstack/realtime'
+        code={`import type { AuthorizeFn, ChannelPermissions, ParsedChannel } from '@realtimejs/core'
 
 type AuthorizeFn = (
   userId: string,
@@ -183,8 +196,8 @@ interface ParsedChannel {
       <h3>Basic role check</h3>
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
-import type { AuthorizeFn } from '@tanstack/realtime'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
+import type { AuthorizeFn } from '@realtimejs/core'
 
 const authorize: AuthorizeFn = async (userId, channel) => {
   if (channel.namespace === 'admin') {
@@ -259,7 +272,7 @@ authorize: (userId, channel) => {
 
       <h3>Signature</h3>
       <CodeBlock
-        code={`import type { LifecycleHooks } from '@tanstack/realtime'
+        code={`import type { LifecycleHooks } from '@realtimejs/core'
 
 interface LifecycleHooks {
   /** Fires after getUser succeeds and the SSE stream is established. */
@@ -279,7 +292,7 @@ interface LifecycleHooks {
       <h3>Metrics and resource management</h3>
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
 
 export const realtime = createStartHandler({
   getUser: async (req) => resolveUser(req),
@@ -329,7 +342,7 @@ export const realtime = createStartHandler({
         payload.
       </p>
       <p>
-        Imported from <code>@tanstack/realtime</code>.
+        Imported from <code>@realtimejs/core</code>.
       </p>
 
       <h3>Signature</h3>
@@ -337,7 +350,7 @@ export const realtime = createStartHandler({
         code={`import {
   createValidatedPublish,
   PublishValidationError,
-} from '@tanstack/realtime'
+} from '@realtimejs/core'
 
 // ValidatePublishFn signature
 type ValidatePublishFn = (params: {
@@ -356,8 +369,8 @@ type PublishValidationResult =
       <h3>Schema validation with Zod</h3>
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
-import { createValidatedPublish } from '@tanstack/realtime'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
+import { createValidatedPublish } from '@realtimejs/core'
 import { z } from 'zod'
 
 const TodoEvent = z.object({
@@ -448,7 +461,7 @@ export const updateTodo = createServerFn({ method: 'POST' })
       </p>
 
       <CodeBlock
-        code={`import { createSseHandler } from '@tanstack/realtime-adapter-sse'
+        code={`import { createSseHandler } from '@realtimejs/adapter-sse'
 
 const sse = createSseHandler({
   pingInterval: 15_000,  // ping every 15 s (default: 30 000 ms)
@@ -469,7 +482,7 @@ const sse = createSseHandler({
 
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
 import { redisBackend } from './redisBackend'
 
 export const realtime = createStartHandler({
@@ -545,9 +558,9 @@ export const Route = createAPIFileRoute('/api/health')({
       <h3 id="pattern-auth">Full authentication + authorization setup</h3>
       <CodeBlock
         title="app/server/realtime.ts"
-        code={`import { createStartHandler } from '@tanstack/realtime-preset-start'
-import { createValidatedPublish } from '@tanstack/realtime'
-import type { AuthorizeFn } from '@tanstack/realtime'
+        code={`import { createStartHandler } from '@realtimejs/preset-start'
+import { createValidatedPublish } from '@realtimejs/core'
+import type { AuthorizeFn } from '@realtimejs/core'
 import { verifyJwt } from './auth'
 import { db } from './db'
 import { z } from 'zod'
@@ -633,7 +646,7 @@ export const realtimePublish = createValidatedPublish({
               <code>getUser(req)</code>
             </td>
             <td>
-              <code>realtime-adapter-sse</code>
+              <code>@realtimejs/adapter-sse</code>
             </td>
             <td>Every GET + POST request</td>
             <td>
@@ -645,7 +658,7 @@ export const realtimePublish = createValidatedPublish({
               <code>authorize(userId, channel)</code>
             </td>
             <td>
-              <code>realtime-adapter-sse</code>
+              <code>@realtimejs/adapter-sse</code>
             </td>
             <td>subscribe and publish actions (not unsubscribe)</td>
             <td>
@@ -658,7 +671,7 @@ export const realtimePublish = createValidatedPublish({
               <code>createValidatedPublish{'({ publish, validate })'}</code>
             </td>
             <td>
-              <code>realtime</code>
+              <code>@realtimejs/core</code>
             </td>
             <td>Wraps a publish fn; validate called before every broadcast</td>
             <td>Accepted / rejected / transformed payload</td>
@@ -668,7 +681,7 @@ export const realtimePublish = createValidatedPublish({
               <code>onClientConnect</code>
             </td>
             <td>
-              <code>realtime-adapter-sse</code>
+              <code>@realtimejs/adapter-sse</code>
             </td>
             <td>SSE stream opened and authenticated</td>
             <td>
@@ -680,7 +693,7 @@ export const realtimePublish = createValidatedPublish({
               <code>onClientDisconnect</code>
             </td>
             <td>
-              <code>realtime-adapter-sse</code>
+              <code>@realtimejs/adapter-sse</code>
             </td>
             <td>SSE stream closed</td>
             <td>
@@ -692,7 +705,7 @@ export const realtimePublish = createValidatedPublish({
               <code>onFirstSubscriber</code>
             </td>
             <td>
-              <code>realtime-adapter-sse</code>
+              <code>@realtimejs/adapter-sse</code>
             </td>
             <td>First client subscribes to a channel</td>
             <td>
@@ -704,7 +717,7 @@ export const realtimePublish = createValidatedPublish({
               <code>onChannelEmpty</code>
             </td>
             <td>
-              <code>realtime-adapter-sse</code>
+              <code>@realtimejs/adapter-sse</code>
             </td>
             <td>Last subscriber leaves a channel</td>
             <td>
@@ -716,7 +729,7 @@ export const realtimePublish = createValidatedPublish({
               <code>handler.publish(channel, data)</code>
             </td>
             <td>
-              <code>realtime-preset-start</code>
+              <code>@realtimejs/preset-start</code>
             </td>
             <td>Called explicitly in server functions</td>
             <td>
@@ -725,10 +738,10 @@ export const realtimePublish = createValidatedPublish({
           </tr>
           <tr>
             <td>
-              <code>handler.broadcast(channel, data)</code>
+              <code>sseHandler.broadcast(channel, data)</code>
             </td>
             <td>
-              <code>realtime-adapter-sse</code>
+              <code>@realtimejs/adapter-sse</code>
             </td>
             <td>Called explicitly; synchronous, string channel only</td>
             <td>
@@ -737,10 +750,10 @@ export const realtimePublish = createValidatedPublish({
           </tr>
           <tr>
             <td>
-              <code>handler.connectionCount()</code>
+              <code>sseHandler.connectionCount()</code>
             </td>
             <td>
-              <code>realtime-adapter-sse</code>
+              <code>@realtimejs/adapter-sse</code>
             </td>
             <td>On demand (health checks, metrics)</td>
             <td>
@@ -752,7 +765,7 @@ export const realtimePublish = createValidatedPublish({
               <code>handler.dispose()</code>
             </td>
             <td>
-              <code>realtime-preset-start</code>
+              <code>@realtimejs/preset-start</code>
             </td>
             <td>Server shutdown / HMR</td>
             <td>

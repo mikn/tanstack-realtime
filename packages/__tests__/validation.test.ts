@@ -12,8 +12,8 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   PublishValidationError,
   createValidatedPublish,
-} from '@tanstack/realtime'
-import type { PublishFn, ValidatePublishFn } from '@tanstack/realtime'
+} from '@realtimejs/core'
+import type { PublishFn, ValidatePublishFn } from '@realtimejs/core'
 
 // ---------------------------------------------------------------------------
 // Tests: createValidatedPublish

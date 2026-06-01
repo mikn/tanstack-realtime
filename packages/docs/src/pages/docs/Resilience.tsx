@@ -21,8 +21,8 @@ export function Resilience() {
   useOfflineQueue,
   createLocalStorageAdapter,
   createRealtimeClient,
-} from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+} from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 import { useStore } from '@tanstack/react-store'
 
 const transport = sseTransport({ url: '/api/realtime' })
@@ -41,6 +41,16 @@ function SyncStatus() {
     : null
 }`}
       />
+      <div className="doc-callout">
+        <p>
+          Both <code>createLocalStorageAdapter()</code> and{' '}
+          <code>createIndexedDBStorage()</code> default to the storage key{' '}
+          <code>'realtimejs-queue'</code> (the localStorage key / IndexedDB
+          database name). Override it with the <code>key</code> /{' '}
+          <code>dbName</code> option if you run more than one queue on the same
+          origin. The default <code>maxSize</code> is 1000 messages.
+        </p>
+      </div>
 
       <h2 id="gap-recovery">Gap recovery</h2>
       <p>
@@ -57,8 +67,8 @@ const tasksOptions = realtimeCollectionOptions({
 })
 
 // Option B — transport level
-import { useGapRecovery } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+import { useGapRecovery } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
 const transport = sseTransport({ url: '/api/realtime' })
 useGapRecovery(transport, {
@@ -81,13 +91,28 @@ useGapRecovery(transport, {
         it. Zero config.
       </p>
       <CodeBlock
-        code={`import { createCoordinatedTransport } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+        code={`import { createCoordinatedTransport } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
 const transport = createCoordinatedTransport({
   transport: () => sseTransport({ url: '/api/realtime' }),
 })`}
       />
+      <div className="doc-callout">
+        <p>
+          <strong>Honest capabilities.</strong> A coordinated transport reports
+          the <em>inner</em> transport&rsquo;s capabilities, so{' '}
+          <code>usePresence</code> degrades correctly. The BroadcastChannel and
+          direct-fallback strategies construct the inner synchronously and
+          auto-derive via <code>getCapabilities</code> &mdash; an SSE inner
+          still reports <code>presence: false</code>. The SharedWorker strategy
+          is the exception: the real transport lives in the worker process and
+          can&rsquo;t be inspected from the tab, so it defaults to the
+          least-capable set. If your worker wraps a presence-capable transport,
+          pass a matching <code>capabilities</code> object to{' '}
+          <code>createCoordinatedTransport</code> to re-enable presence.
+        </p>
+      </div>
 
       <h3>SharedWorker (opt-in)</h3>
       <p>
@@ -96,8 +121,8 @@ const transport = createCoordinatedTransport({
       </p>
       <CodeBlock
         title="realtime.worker.ts"
-        code={`import { createSharedWorkerCoordinator } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+        code={`import { createSharedWorkerCoordinator } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
 const coordinator = createSharedWorkerCoordinator(
   sseTransport({ url: '/api/realtime' }),
@@ -108,8 +133,8 @@ self.addEventListener('connect', (e) => {
       />
       <CodeBlock
         title="app code"
-        code={`import { createCoordinatedTransport } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+        code={`import { createCoordinatedTransport } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
 const transport = createCoordinatedTransport({
   transport: () => sseTransport({ url: '/api/realtime' }),
@@ -122,7 +147,7 @@ const transport = createCoordinatedTransport({
       <h3>createDedup</h3>
       <p>Bounded deduplication filter using FIFO eviction.</p>
       <CodeBlock
-        code={`import { createDedup } from '@tanstack/realtime'
+        code={`import { createDedup } from '@realtimejs/core'
 
 const dedup = createDedup({ maxSize: 500 })
 
@@ -135,7 +160,7 @@ transport.subscribe('chat', (msg) => {
       <h3>throttle</h3>
       <p>Trailing-edge throttle for high-frequency publishes.</p>
       <CodeBlock
-        code={`import { throttle } from '@tanstack/realtime'
+        code={`import { throttle } from '@realtimejs/core'
 
 const throttledPublish = throttle(
   (pos: { x: number; y: number }) => client.publish('cursors', pos),
@@ -152,7 +177,7 @@ onMouseMove = (e) =>
         typing indicators.
       </p>
       <CodeBlock
-        code={`import { createEphemeralMap } from '@tanstack/realtime'
+        code={`import { createEphemeralMap } from '@realtimejs/core'
 
 const typingUsers = createEphemeralMap<{ name: string }>({
   ttl: 3000,
@@ -184,8 +209,8 @@ typingUsers.subscribe((entries) => {
       </p>
       <CodeBlock
         title="realtime-worker.ts"
-        code={`import { createSharedWorkerCoordinator } from '@tanstack/realtime'
-import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
+        code={`import { createSharedWorkerCoordinator } from '@realtimejs/core'
+import { centrifugoTransport } from '@realtimejs/adapter-centrifugo'
 
 // createSharedWorkerCoordinator requires a PresenceCapable transport
 const coordinator = createSharedWorkerCoordinator(
@@ -203,8 +228,8 @@ self.addEventListener('connect', (e) => {
         will emit the worker as a separate chunk automatically.
       </p>
       <CodeBlock
-        code={`import { createCoordinatedTransport } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+        code={`import { createCoordinatedTransport } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
 const transport = createCoordinatedTransport({
   transport: () => sseTransport({ url: '/api/realtime' }),
@@ -219,8 +244,8 @@ const transport = createCoordinatedTransport({
         or plugin is required.
       </p>
       <CodeBlock
-        code={`import { createCoordinatedTransport } from '@tanstack/realtime'
-import { sseTransport } from '@tanstack/realtime-adapter-sse'
+        code={`import { createCoordinatedTransport } from '@realtimejs/core'
+import { sseTransport } from '@realtimejs/adapter-sse'
 
 const transport = createCoordinatedTransport({
   transport: () => sseTransport({ url: '/api/realtime' }),

@@ -89,8 +89,8 @@ docker run -d --name centrifugo -p 8000:8000 \\
 
       <h2 id="install-adapter">Install the adapter</h2>
       <CodeBlock
-        code={`npm i @tanstack/realtime @tanstack/react-realtime \\
-      @tanstack/realtime-adapter-centrifugo`}
+        code={`npm i @realtimejs/core @realtimejs/react \\
+      @realtimejs/adapter-centrifugo`}
       />
 
       <h2 id="client-setup">Client setup</h2>
@@ -102,8 +102,8 @@ docker run -d --name centrifugo -p 8000:8000 \\
       </p>
       <CodeBlock
         title="app/client/realtime.ts"
-        code={`import { createRealtimeClient } from '@tanstack/realtime'
-import { centrifugoTransport } from '@tanstack/realtime-adapter-centrifugo'
+        code={`import { createRealtimeClient } from '@realtimejs/core'
+import { centrifugoTransport } from '@realtimejs/adapter-centrifugo'
 
 export const realtimeClient = createRealtimeClient({
   transport: centrifugoTransport({
@@ -334,7 +334,7 @@ export async function GET(req: Request) {
       </p>
       <CodeBlock
         title="app/features/chat/presence.ts"
-        code={`import { createPresenceChannel } from '@tanstack/realtime'
+        code={`import { createPresenceChannel } from '@realtimejs/core'
 
 export const chatPresence = createPresenceChannel({
   id: 'chat-presence',
@@ -343,7 +343,7 @@ export const chatPresence = createPresenceChannel({
       />
       <CodeBlock
         title="app/features/chat/ChatRoom.tsx"
-        code={`import { usePresence } from '@tanstack/react-realtime'
+        code={`import { usePresence } from '@realtimejs/react'
 import { chatPresence } from './presence'
 
 // Must be rendered inside <RealtimeProvider>

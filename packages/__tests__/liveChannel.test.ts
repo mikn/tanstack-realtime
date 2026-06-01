@@ -7,8 +7,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Store } from '@tanstack/store'
-import { createRealtimeClient, liveChannelOptions } from '@tanstack/realtime'
-import type { RealtimeTransport } from '@tanstack/realtime'
+import { createRealtimeClient, liveChannelOptions } from '@realtimejs/core'
+import type { RealtimeTransport } from '@realtimejs/core'
 import type { CollectionConfig } from '@tanstack/db'
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 /**
- * Multi-user integration tests for @tanstack/solid-realtime.
+ * Multi-user integration tests for @realtimejs/solid.
  *
  * Tests run against the Solid app on localhost:3001 via the 'solid-chromium'
  * project.  All scenarios are defined in helpers/scenarios.ts and shared with
